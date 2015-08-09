@@ -3,7 +3,12 @@
 
 #include <stdio.h>
 
+std::string ftest();
+
 int main() {
+    auto t = ftest();
+    printf("%s\n", t.c_str());
+    
     ELFLoader elf;
     elf.load("/g/ps3/reversing/simple_printf/a.elf");
 //     try {

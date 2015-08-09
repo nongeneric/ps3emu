@@ -92,17 +92,17 @@ void ELFLoader::map(PPU* ppu) {
     const auto vaStackBase = 0x06000000;
     const auto vaStackSize = 0x4000;
     ppu->setMemory(vaStackBase, 0, vaStackSize);
-    ppu->setGPR(1, vaStackBase + vaStackSize - sizeof(uint64_t));
+    ppu->setGPR(0, vaStackBase + vaStackSize - sizeof(uint64_t));
     
     fdescr entry;
     ppu->readMemory(_header->e_entry, &entry, sizeof(entry));
-    ppu->setGPR(2, entry.tocBase);
+    ppu->setGPR(1, entry.tocBase);
     
+    ppu->setGPR(2, 0);
     ppu->setGPR(3, 0);
     ppu->setGPR(4, 0);
-    ppu->setGPR(5, 0);
-    ppu->setGPR(6, 0); // TODO: aux vector
-    ppu->setGPR(7, 0);
+    ppu->setGPR(5, 0); // TODO: aux vector
+    ppu->setGPR(6, 0);
     ppu->setFPSCR(0);
     
     ppu->setLR(entry.va);

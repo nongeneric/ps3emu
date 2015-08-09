@@ -14,6 +14,7 @@ class PPU {
     uint64_t _LR;
     uint64_t _CTR;
     uint64_t _XER;
+    uint64_t _NIP;
     uint64_t _GPR[64];
     double _FPR[64];
     double _FPSCR;
@@ -28,7 +29,7 @@ public:
     void run();
     
     inline void setGPR(int i, uint64_t value) {
-        _GPR[i - 1] = value;
+        _GPR[i] = value;
     }
     
     inline void setFPSCR(double value) {
@@ -37,5 +38,29 @@ public:
     
     inline void setLR(uint64_t value) {
         _LR = value;
+    }
+    
+    inline uint64_t getLR() {
+        return _LR;
+    }
+    
+    inline uint64_t getCTR() {
+        return _CTR;   
+    }
+    
+    inline void setCTR(uint64_t value) {
+        _CTR = value;
+    }
+    
+    inline uint32_t getCR() {
+        return _CR;   
+    }
+    
+    inline void setCR(uint32_t value) {
+        _CR = value;
+    }
+    
+    inline void setNIP(uint32_t value) {
+        _NIP = value;
     }
 };

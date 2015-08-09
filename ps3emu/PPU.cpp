@@ -57,12 +57,12 @@ void PPU::run() {
     auto instr = disasm_disassemble_instr(bytes);
     auto s = disasm_print_instr(&instr, true);
     
-    uint32_t revs = bytes;
-    uint8_t opcode = ((IForm*)&revs)->opcode;
-    
-    printf("opcode = %d\n", opcode);
-    printf("%x    ", (unsigned int)bytes);
-    printf("%s\n", s.c_str());
+//     uint32_t revs = bytes;
+//     uint8_t opcode = ((IForm*)&revs)->opcode;
+//     
+//     printf("opcode = %d\n", opcode);
+//     printf("%x    ", (unsigned int)bytes);
+//     printf("%s\n", s.c_str());
 }
 
 void PPU::readMemory(uint64_t va, void* buf, uint len) {
