@@ -3,7 +3,6 @@
 #include "disassm/disasm.h"
 #include <string.h>
 #include <functional>
-#include <boost/endian/arithmetic.hpp>
 #include <stdio.h>
 
 using namespace boost::endian;

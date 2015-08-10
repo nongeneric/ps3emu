@@ -7,5 +7,6 @@ disasm.cpp
 disasm.h
 ppu_dasm.cpp
 ppu_dasm.h
+ppu_dasm_forms.h
 )
 add_library(disassm ${SRC})
