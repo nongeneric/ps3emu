@@ -15,7 +15,7 @@ using namespace boost;
 #define PRINT(name, form) void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) void emulate##name(form* i, uint64_t cia, PPU* ppu)
 
-inline uint64_t bit_test(uint64_t number, int width, int n) {
+inline char bit_test(uint64_t number, int width, int n) {
     return (number & (1 << (width - n))) >> (width - n);
 }
 
@@ -541,8 +541,197 @@ EMU(LDUX, XForm_1) {
     ppu->setGPR(i->RA, ea);
 }
 
+// STORES
+//
 
+template <int Bytes>
+void EmuStore(DForm_3* i, PPU* ppu) {
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = (b << 1) + exts<DForm_3::D_bits>(i->D);
+    ppu->store<Bytes>(ea, i->RS);
+}
 
+template <int Bytes>
+void EmuStoreIndexed(XForm_8* i, PPU* ppu) {
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = (b << 1) + ppu->getGPR(i->RB);
+    ppu->store<1>(ea, i->RS);
+}
+
+template <int Bytes>
+void EmuStoreUpdate(DForm_3* i, PPU* ppu) {
+    auto ea = ppu->getGPR(i->RA) + exts<DForm_3::D_bits>(i->D);
+    ppu->store<Bytes>(ea, i->RS);
+    ppu->setGPR(i->RA, ea);
+}
+
+template <int Bytes>
+void EmuStoreUpdateIndexed(XForm_8* i, PPU* ppu) {
+    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
+    ppu->store<Bytes>(ea, i->RS);
+    ppu->setGPR(i->RA, ea);
+}
+
+void PrintStore(const char* mnemonic, DForm_3* i, std::string* result) {
+    *result = format_3d_3bracket(mnemonic, i->RS, i->D, i->RA);
+}
+
+void PrintStoreIndexed(const char* mnemonic, XForm_8* i, std::string* result) {
+    *result = format_3d(mnemonic, i->RS, i->RA, i->RB);
+}
+
+PRINT(STB, DForm_3) { PrintStore("stbx", i, result); }
+EMU(STB, DForm_3) { EmuStore<1>(i, ppu); }
+PRINT(STBX, XForm_8) { PrintStoreIndexed("stbx", i, result); }
+EMU(STBX, XForm_8) { EmuStoreIndexed<1>(i, ppu); }
+PRINT(STBU, DForm_3) { PrintStore("stbu", i, result); }
+EMU(STBU, DForm_3) { EmuStoreUpdate<1>(i, ppu); }
+PRINT(STBUX, XForm_8) { PrintStoreIndexed("stbux", i, result); }
+EMU(STBUX, XForm_8) { EmuStoreUpdateIndexed<1>(i, ppu); }
+
+PRINT(STH, DForm_3) { PrintStore("sth", i, result); }
+EMU(STH, DForm_3) { EmuStore<2>(i, ppu); }
+PRINT(STHX, XForm_8) { PrintStoreIndexed("sthx", i, result); }
+EMU(STHX, XForm_8) { EmuStoreIndexed<2>(i, ppu); }
+PRINT(STHU, DForm_3) { PrintStore("sthu", i, result); }
+EMU(STHU, DForm_3) { EmuStoreUpdate<2>(i, ppu); }
+PRINT(STHUX, XForm_8) { PrintStoreIndexed("sthux", i, result); }
+EMU(STHUX, XForm_8) { EmuStoreUpdateIndexed<2>(i, ppu); }
+
+PRINT(STW, DForm_3) { PrintStore("stw", i, result); }
+EMU(STW, DForm_3) { EmuStore<4>(i, ppu); }
+PRINT(STWX, XForm_8) { PrintStoreIndexed("stwx", i, result); }
+EMU(STWX, XForm_8) { EmuStoreIndexed<4>(i, ppu); }
+PRINT(STWU, DForm_3) { PrintStore("stwu", i, result); }
+EMU(STWU, DForm_3) { EmuStoreUpdate<4>(i, ppu); }
+PRINT(STWUX, XForm_8) { PrintStoreIndexed("stwux", i, result); }
+EMU(STWUX, XForm_8) { EmuStoreUpdateIndexed<4>(i, ppu); }
+
+PRINT(STD, DSForm_2) { 
+    *result = format_3d_3bracket("std", i->RS, i->DS, i->RA);
+}
+
+EMU(STD, DSForm_2) { 
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = (b << 1) + exts<DSForm_2::DS_bits + 2>(i->DS << 2);
+    ppu->store<8>(ea, i->RS);
+}
+
+PRINT(STDX, XForm_8) { PrintStoreIndexed("stdx", i, result); }
+EMU(STDX, XForm_8) { EmuStoreIndexed<8>(i, ppu); }
+
+PRINT(STDU, DSForm_2) { 
+    *result = format_3d_3bracket("stdu", i->RS, i->DS, i->RA);
+}
+
+EMU(STDU, DSForm_2) { 
+    auto ea = ppu->getGPR(i->RA) + exts<DSForm_2::DS_bits + 2>(i->DS << 2);
+    ppu->store<8>(ea, i->RS);
+    ppu->setGPR(i->RA, ea);
+}
+
+PRINT(STDUX, XForm_8) { PrintStoreIndexed("stdux", i, result); }
+EMU(STDUX, XForm_8) { EmuStoreUpdateIndexed<8>(i, ppu); }
+
+// Fixed-Point Load and Store with Byte Reversal Instructions, p44
+
+template <int Bytes>
+void EmuLoadByteReverseIndexed(XForm_1* i, PPU* ppu) {
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = (b << 1) + ppu->getGPR(i->RB);
+    ppu->setGPR(i->RT, endian_reverse(ppu->load<Bytes>(ea)));
+}
+
+PRINT(LHBRX, XForm_1) { *result = format_3d("lhbrx", i->RT, i->RA, i->RB); }
+EMU(LHBRX, XForm_1) { EmuLoadByteReverseIndexed<2>(i, ppu); }
+PRINT(LWBRX, XForm_1) { *result = format_3d("lwbrx", i->RT, i->RA, i->RB); }
+EMU(LWBRX, XForm_1) { EmuLoadByteReverseIndexed<4>(i, ppu); }
+
+template <int Bytes>
+void EmuStoreByteReverseIndexed(XForm_8* i, PPU* ppu) {
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = (b << 1) + ppu->getGPR(i->RB);
+    ppu->store<Bytes>(ea, endian_reverse(i->RS));
+}
+
+PRINT(STHBRX, XForm_8) { *result = format_3d("sthbrx", i->RS, i->RA, i->RB); }
+EMU(STHBRX, XForm_8) { EmuStoreByteReverseIndexed<2>(i, ppu); }
+PRINT(STWBRX, XForm_8) { *result = format_3d("stwbrx", i->RS, i->RA, i->RB); }
+EMU(STWBRX, XForm_8) { EmuStoreByteReverseIndexed<4>(i, ppu); }
+
+// Fixed-Point Arithmetic Instructions, p51
+
+PRINT(ADDI, DForm_2) {
+    *result = format_3d("addi", i->RT, i->RA, i->SI);
+}
+
+EMU(ADDI, DForm_2) {
+    auto ext = exts<DForm_2::SI_bits>(i->SI);
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    ppu->setGPR(i->RT, ext + (b << 1));
+}
+
+PRINT(ADDIS, DForm_2) {
+    *result = format_3d("addis", i->RT, i->RA, i->SI);
+}
+
+EMU(ADDIS, DForm_2) {
+    auto ext = exts<DForm_2::SI_bits>(i->SI) << 16;
+    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    ppu->setGPR(i->RT, ext + (b << 1));
+}
+
+inline void update_CR0(bool oe, bool rc, bool ov, int64_t result, PPU* ppu) {
+    if (oe && ov) {
+        ppu->setOV();
+    }
+    if (rc) {
+        auto s = result < 0 ? 4
+               : result > 0 ? 2
+               : 1;
+        ppu->setCR0_sign(s);
+    }
+}
+
+PRINT(ADD, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "add", "add." }, { "addo", "addo." }
+    };
+    *result = format_3d(mnemonics[i->OE][i->Rc], i->RT, i->RA, i->RB);
+}
+
+EMU(ADD, XOForm_1) {
+    auto ra = ppu->getGPR(i->RA);
+    auto rb = ppu->getGPR(i->RB);
+    int64_t res;
+    bool ov = 0;
+    if (i->OE)
+        ov = __builtin_saddll_overflow(rb, ra, (long long int*)&res);
+    else
+        res = ra + rb;
+    ppu->setGPR(i->RT, res);
+    update_CR0(i->OE, i->Rc, ov, res, ppu);
+}
+
+PRINT(SUBF, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "subf", "subf." }, { "subfo", "subfo." }
+    };
+    *result = format_3d(mnemonics[i->OE][i->Rc], i->RT, i->RA, i->RB);
+}
+
+EMU(SUBF, XOForm_1) {
+    auto ra = ppu->getGPR(i->RA);
+    auto rb = ppu->getGPR(i->RB);
+    int64_t res;
+    bool ov = 0;
+    if (i->OE)
+        ov = __builtin_ssubll_overflow(rb, ra, (long long int*)&res);
+    else
+        res = ra + rb;
+    ppu->setGPR(i->RT, res);
+    update_CR0(i->OE, i->Rc, ov, res, ppu);
+}
 
 
 enum class DasmMode {
@@ -572,6 +761,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD) {
+        case 14: invoke(ADDI);
+        case 15: invoke(ADDIS);
         case 16: invoke(BC);
         case 18: invoke(B);
         case 19: {
@@ -608,22 +799,51 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 373: invoke(LWAUX);
                 case 21: invoke(LDX);
                 case 53: invoke(LDUX);
+                case 215: invoke(STBX);
+                case 247: invoke(STBUX);
+                case 407: invoke(STHX);
+                case 439: invoke(STHUX);
+                case 151: invoke(STWX);
+                case 183: invoke(STWUX);
+                case 149: invoke(STDX);
+                case 181: invoke(STDUX);
+                case 790: invoke(LHBRX);
+                case 534: invoke(LWBRX);
+                case 918: invoke(STHBRX);
+                case 662: invoke(STWBRX);
+                default: throw std::runtime_error("unknown extented opcode");
             }
             break;
         }
         case 35: invoke(LBZU);
         case 32: invoke(LWZ);
         case 33: invoke(LWZU);
+        case 36: invoke(STW);
+        case 37: invoke(STWU);
+        case 38: invoke(STB);
+        case 39: invoke(STBU);
         case 40: invoke(LHZ);
         case 41: invoke(LHZU);
         case 42: invoke(LHA);
         case 43: invoke(LHAU);
+        case 44: invoke(STH);
+        case 45: invoke(STHU);
         case 58: {
             auto dsform = reinterpret_cast<DSForm_1*>(&x);
             switch (dsform->XO) {
                 case 2: invoke(LWA);
                 case 0: invoke(LD);
                 case 1: invoke(LDU);
+                default: throw std::runtime_error("unknown extented opcode");
+            }
+            break;
+        }
+        case 62: {
+            auto dsform = reinterpret_cast<DSForm_2*>(&x);
+            switch (dsform->XO) {
+                case 0: invoke(STD);
+                case 1: invoke(STDU);
+                default: throw std::runtime_error("unknown extented opcode");
             }
             break;
         }
@@ -633,7 +853,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
 
 std::string ftest() {
     //uint8_t instr[] = { 0x48, 0x00, 0x04, 0x49 };
-    uint8_t instr[] = { 0x48, 0x00, 0x04, 0x49 };
+    uint8_t instr[] = { 0x38, 0x40, 0x00, 0x00 };
     std::string str;
     ppu_dasm<DasmMode::Print>(instr, 0x10214, &str);
     return str;
