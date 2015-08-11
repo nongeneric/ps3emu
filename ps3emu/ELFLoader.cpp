@@ -104,8 +104,7 @@ void ELFLoader::map(PPU* ppu) {
     ppu->setGPR(5, 0); // TODO: aux vector
     ppu->setGPR(6, 0);
     ppu->setFPSCR(0);
-    
-    ppu->setLR(entry.va);
+    ppu->setNIP(entry.va);
 }
 
 void ELFLoader::link(PPU* ppu) {

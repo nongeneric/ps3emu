@@ -79,6 +79,6 @@ public:
     uint64_t entryPoint();
     std::string getString(uint idx);
     void load(std::string filePath);
-    void map(PPU* ppu); // TODO: return base address for rdx
+    void map(PPU* ppu);
     void link(PPU* ppu);
 };

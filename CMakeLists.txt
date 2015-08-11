@@ -17,3 +17,5 @@ set(CMAKE_CXX_FLAGS "-ggdb -O0 -pedantic -Wall -Werror -std=c++1y ${CMAKE_CXX_FL
 
 add_subdirectory(disassm)
 add_subdirectory(ps3emu)
+add_subdirectory(dbg-gui)
+add_subdirectory(tests)

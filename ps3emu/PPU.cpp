@@ -51,17 +51,6 @@ struct IForm {
 };
 
 void PPU::run() {
-    big_uint32_t bytes;
-    readMemory(_LR, reinterpret_cast<uint8_t*>(&bytes), sizeof bytes);
-    auto instr = disasm_disassemble_instr(bytes);
-    auto s = disasm_print_instr(&instr, true);
-    
-//     uint32_t revs = bytes;
-//     uint8_t opcode = ((IForm*)&revs)->opcode;
-//     
-//     printf("opcode = %d\n", opcode);
-//     printf("%x    ", (unsigned int)bytes);
-//     printf("%s\n", s.c_str());
 }
 
 void PPU::readMemory(uint64_t va, void* buf, uint len) {
@@ -75,4 +64,10 @@ void PPU::readMemory(uint64_t va, void* buf, uint len) {
     if (it == end(_pages))
         throw std::runtime_error("accessing non existing page");
     memcpy(buf, it->second.ptr.get() + pageOffset, len);
+}
+
+bool PPU::isAllocated(uint64_t va) {
+    auto offset = va % MemoryPage::pageSize;
+    auto page = va - offset;
+    return _pages.find(page) != end(_pages);
 }

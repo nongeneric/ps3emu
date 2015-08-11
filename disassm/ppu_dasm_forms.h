@@ -175,7 +175,7 @@ START_FORM(XForm_6)
     FIELD(XO, 10)
     FIELD(RB, 5)
     FIELD(RA, 5)
-    FIELD(RT, 5)
+    FIELD(RS, 5)
     FIELD(OPCD, 6)
 END_FORM(XForm_6)
 

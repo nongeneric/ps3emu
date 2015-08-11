@@ -8,7 +8,7 @@
 struct MemoryPage {
     MemoryPage();
     std::unique_ptr<uint8_t> ptr;
-    static constexpr uint pageSize = 4 * 1024;
+    static constexpr uint pageSize = 1 << 12;
 };
 
 template <int Bytes>
@@ -146,7 +146,13 @@ public:
         _XER.CA = bit;
     }
     
-    inline void setNIP(uint32_t value) {
+    inline void setNIP(uint64_t value) {
         _NIP = value;
     }
+    
+    inline uint64_t getNIP() {
+        return _NIP;
+    }
+    
+    bool isAllocated(uint64_t va);
 };
