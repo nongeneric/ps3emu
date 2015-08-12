@@ -71,3 +71,6 @@ bool PPU::isAllocated(uint64_t va) {
     auto page = va - offset;
     return _pages.find(page) != end(_pages);
 }
+int PPU::allocatedPages() {
+    return _pages.size();
+}

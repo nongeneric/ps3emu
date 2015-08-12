@@ -1,8 +1,10 @@
 #pragma once
 
+#include "../disassm/BitField.h"
 #include <stdint.h>
 #include <map>
 #include <memory>
+#include <type_traits>
 #include <boost/endian/arithmetic.hpp>
 
 struct MemoryPage {
@@ -17,21 +19,25 @@ template <>
 struct BytesToBEType<1> { 
     typedef boost::endian::big_uint8_t beType;
     typedef uint8_t type;
+    typedef int8_t stype;
 };
 template <>
 struct BytesToBEType<2> { 
     typedef boost::endian::big_uint16_t beType;
     typedef uint16_t type;
+    typedef int16_t stype;
 };
 template <>
 struct BytesToBEType<4> { 
     typedef boost::endian::big_uint32_t beType;
     typedef uint32_t type;
+    typedef int32_t stype;
 };
 template <>
 struct BytesToBEType<8> { 
     typedef boost::endian::big_uint64_t beType;
     typedef uint64_t type;
+    typedef int64_t stype;
 };
 
 union CR_t {
@@ -54,13 +60,16 @@ union CR_t {
 };
 static_assert(sizeof(CR_t) == sizeof(uint32_t), "");
 
-struct XER_t {
-    uint64_t Bytes : 7;
-    uint64_t __ : 22;
-    uint64_t CA : 1;
-    uint64_t OV : 1;
-    uint64_t SO : 1;
-    uint64_t _ : 32;
+union XER_t {
+    struct {
+        uint64_t Bytes : 7;
+        uint64_t __ : 22;
+        uint64_t CA : 1;
+        uint64_t OV : 1;
+        uint64_t SO : 1;
+        uint64_t _ : 32;
+    } f;
+    uint64_t v;
 };
 static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 
@@ -89,19 +98,26 @@ public:
     }
     
     template <int Bytes>
-    void store(uint64_t va, uint64_t value) {
-        typename BytesToBEType<Bytes>::beType x = value;
+    typename BytesToBEType<Bytes>::stype loads(uint64_t va) {
+        return load<Bytes>(va);
+    }
+    
+    template <int Bytes, typename V>
+    void store(uint64_t va, V value) {
+        typename BytesToBEType<Bytes>::beType x = getUValue(value);
         writeMemory(va, &x, Bytes);
     }
     
     void run();
     
-    inline void setGPR(int i, uint64_t value) {
-        _GPR[i] = value;
+    template <typename V>
+    inline void setGPR(V i, uint64_t value) {
+        _GPR[getUValue(i)] = value;
     }
     
-    inline uint64_t getGPR(int i) {
-        return _GPR[i];
+    template <typename V>
+    inline uint64_t getGPR(V i) {
+        return _GPR[getUValue(i)];
     }
     
     inline void setFPSCR(double value) {
@@ -120,6 +136,10 @@ public:
         return _CTR;   
     }
     
+    inline uint64_t getXER() {
+        return _XER.v;
+    }
+    
     inline void setCTR(uint64_t value) {
         _CTR = value;
     }
@@ -136,14 +156,30 @@ public:
         _CR.af.sign = bits;
     }
     
+    inline uint8_t getCR0_sign() {
+        return _CR.af.sign;
+    }
+    
     inline void setOV() {
-        _XER.OV = 1;
-        _XER.SO = 1;
+        _XER.f.OV = 1;
+        _XER.f.SO = 1;
         _CR.af.SO = 1;
     }
     
     inline void setCA(uint8_t bit) {
-        _XER.CA = bit;
+        _XER.f.CA = bit;
+    }
+    
+    inline uint8_t getCA() {
+        return _XER.f.CA;
+    }
+    
+    inline uint8_t getOV() {
+        return _XER.f.OV;
+    }
+    
+    inline uint8_t getSO() {
+        return _XER.f.SO;
     }
     
     inline void setNIP(uint64_t value) {
@@ -154,5 +190,6 @@ public:
         return _NIP;
     }
     
+    int allocatedPages();
     bool isAllocated(uint64_t va);
 };

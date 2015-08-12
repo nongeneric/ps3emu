@@ -30,30 +30,10 @@ uint64_t bit_set(T number, int n) {
     return number | (1 << (sizeof(T) * 8 - n));
 }
 
-template <int Bits>
-struct BitsToSignedType { };
-template <>
-struct BitsToSignedType<8> { typedef int8_t value; };
-template <>
-struct BitsToSignedType<16> { typedef int16_t value; };
-template <>
-struct BitsToSignedType<32> { typedef int32_t value; };
-
-template <int Bits>
-int64_t exts(uint64_t number) {
-    return (typename BitsToSignedType<Bits>::value)number;
-}
-
-template <>
-int64_t exts<24>(uint64_t number) {
-    auto extendedThirdByte = (int64_t)(char)((number >> 16) & 0xff);
-    return (number & 0xffff) | (extendedThirdByte << 16);
-}
-
 // Branch I-form, p24
 
 inline uint64_t getNIA(IForm* i, uint64_t cia) {
-    auto ext = exts<IForm::LI_bits>(i->LI) << 2;
+    auto ext = i->LI << 2;
     return i->AA ? ext : (cia + ext);
 }
 
@@ -74,7 +54,7 @@ EMU(B, IForm) {
 // Branch Conditional B-form, p24
 
 inline uint64_t getNIA(BForm* i, uint64_t cia) {
-    auto ext = exts<BForm::BD_bits + 2>(i->BD << 2);
+    auto ext = i->BD << 2;
     return i->AA ? ext : (ext + cia);
 }
 
@@ -94,13 +74,9 @@ inline bool is_taken(bool bo0, bool bo1, bool bo2, bool bo3, PPU* ppu, int bi) {
 }
 
 EMU(BC, BForm) {
-    auto bo0 = bit_test(i->BO, BForm::BO_bits, 0);
-    auto bo1 = bit_test(i->BO, BForm::BO_bits, 1);
-    auto bo2 = bit_test(i->BO, BForm::BO_bits, 2);
-    auto bo3 = bit_test(i->BO, BForm::BO_bits, 3);
-    if (!bo2)
+    if (!i->BO2)
         ppu->setCTR(ppu->getCTR() - 1);
-    if (is_taken(bo0, bo1, bo2, bo3, ppu, i->BI))
+    if (is_taken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
         ppu->setNIP(getNIA(i, cia));
     if (i->LK)
         ppu->setLR(cia + 4);
@@ -108,16 +84,23 @@ EMU(BC, BForm) {
 
 // Branch Conditional to Link Register XL-form, p25
 
-std::string format_3d(const char* mnemonic, uint64_t op1, uint64_t op2, uint64_t op3) {
-    return str(format("%s %d,%d,%d") % mnemonic % op1 % op2 % op3);
+template <typename OP1, typename OP2, typename OP3>
+std::string format_3d(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
+    return str(format("%s %d,%d,%d") % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3));
 }
 
 std::string format_2d(const char* mnemonic, uint64_t op1, uint64_t op2) {
     return str(format("%s %d,%d") % mnemonic % op1 % op2);
 }
 
-std::string format_3d_3bracket(const char* mnemonic, uint64_t op1, uint64_t op2, uint64_t op3) {
-    return str(format("%s %d,%d(%d)") % mnemonic % op1 % op2 % op3);
+template <typename OP1, typename OP2, typename OP3>
+std::string format_3d_3bracket(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
+    return str(format("%s %d,%d(%d)") % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3));
+}
+
+template <typename BF>
+inline int64_t getB(BF ra, PPU* ppu) {
+    return ra.u() == 0 ? 0 : ppu->getGPR(ra);
 }
 
 PRINT(BCLR, XLForm_2) {
@@ -126,13 +109,9 @@ PRINT(BCLR, XLForm_2) {
 }
 
 EMU(BCLR, XLForm_2) {
-    auto bo0 = bit_test(i->BO, XLForm_2::BO_bits, 0);
-    auto bo1 = bit_test(i->BO, XLForm_2::BO_bits, 1);
-    auto bo2 = bit_test(i->BO, XLForm_2::BO_bits, 2);
-    auto bo3 = bit_test(i->BO, XLForm_2::BO_bits, 3);
-    if (!bo2)
+    if (!i->BO2)
         ppu->setCTR(ppu->getCTR() - 1);
-    if (is_taken(bo0, bo1, bo2, bo3, ppu, i->BI))
+    if (is_taken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
         ppu->setNIP(ppu->getLR() & ~3);
     if (i->LK)
         ppu->setLR(cia + 4);
@@ -146,9 +125,7 @@ PRINT(BCCTR, XLForm_2) {
 }
 
 EMU(BCCTR, XLForm_2) {
-    auto bo0 = bit_test(i->BO, XLForm_2::BO_bits, 0);
-    auto bo1 = bit_test(i->BO, XLForm_2::BO_bits, 1);
-    auto cond_ok = bo0 || bit_test(ppu->getCR(), 32, i->BI) == bo1;
+    auto cond_ok = i->BO0 || bit_test(ppu->getCR(), 32, i->BI) == i->BO1;
     if (cond_ok)
         ppu->setNIP(ppu->getCTR() & ~3);
     if (i->LK)
@@ -274,8 +251,8 @@ PRINT(LBZ, DForm_1) {
 }
 
 EMU(LBZ, DForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + exts<DForm_1::D_bits>(i->D);
+    auto b = getB(i->RA, ppu);
+    auto ea = b + i->D;
     ppu->setGPR(i->RT, ppu->load<1>(ea));
 }
 
@@ -286,7 +263,7 @@ PRINT(LBZX, XForm_1) {
 }
 
 EMU(LBZX, XForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = b + ppu->getGPR(i->RA);
     ppu->setGPR(i->RT, ppu->load<1>(ea));
 }
@@ -298,7 +275,7 @@ PRINT(LBZU, DForm_1) {
 }
 
 EMU(LBZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + exts<DForm_1::D_bits>(i->D);
+    auto ea = ppu->getGPR(i->RA) + i->D;
     ppu->setGPR(i->RT, ppu->load<1>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -322,8 +299,8 @@ PRINT(LHZ, DForm_1) {
 }
 
 EMU(LHZ, DForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + exts<DForm_1::D_bits>(i->D);
+    auto b = getB(i->RA, ppu);
+    auto ea = b + i->D;
     ppu->setGPR(i->RT, ppu->load<2>(ea));
 }
 
@@ -334,7 +311,7 @@ PRINT(LHZX, XForm_1) {
 }
 
 EMU(LHZX, XForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = b + ppu->getGPR(i->RB);
     ppu->setGPR(i->RT, ppu->load<2>(ea));
 }
@@ -346,7 +323,7 @@ PRINT(LHZU, DForm_1) {
 }
 
 EMU(LHZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + exts<DForm_1::D_bits>(i->D);
+    auto ea = ppu->getGPR(i->RA) + i->D;
     ppu->setGPR(i->RT, ppu->load<2>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -370,9 +347,9 @@ PRINT(LHA, DForm_1) {
 }
 
 EMU(LHA, DForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + exts<DForm_1::D_bits>(i->D);
-    ppu->setGPR(i->RT, exts<16>(ppu->load<2>(ea)));
+    auto b = getB(i->RA, ppu);
+    auto ea = b + i->D;
+    ppu->setGPR(i->RT, ppu->loads<2>(ea));
 }
 
 // Load Halfword Algebraic Indexed, p36
@@ -382,9 +359,9 @@ PRINT(LHAX, XForm_1) {
 }
 
 EMU(LHAX, XForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, exts<16>(ppu->load<2>(ea)));
+    ppu->setGPR(i->RT, ppu->loads<2>(ea));
 }
 
 // Load Halfword Algebraic with Update, p36
@@ -394,8 +371,8 @@ PRINT(LHAU, DForm_1) {
 }
 
 EMU(LHAU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + exts<DForm_1::D_bits>(i->D);
-    ppu->setGPR(i->RT, exts<16>(ppu->load<2>(ea)));
+    auto ea = ppu->getGPR(i->RA) + i->D;
+    ppu->setGPR(i->RT, ppu->loads<2>(ea));
     ppu->setGPR(i->RA, ea);
 }
 
@@ -407,7 +384,7 @@ PRINT(LHAUX, XForm_1) {
 
 EMU(LHAUX, XForm_1) {
     auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, exts<16>(ppu->load<2>(ea)));
+    ppu->setGPR(i->RT, ppu->loads<2>(ea));
     ppu->setGPR(i->RA, ea);
 }
 
@@ -418,8 +395,8 @@ PRINT(LWZ, DForm_1) {
 }
 
 EMU(LWZ, DForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + exts<DForm_1::D_bits>(i->D);
+    auto b = getB(i->RA, ppu);
+    auto ea = b + i->D;
     ppu->setGPR(i->RT, ppu->load<4>(ea));
 }
 
@@ -430,7 +407,7 @@ PRINT(LWZX, XForm_1) {
 }
 
 EMU(LWZX, XForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = b + ppu->getGPR(i->RB);
     ppu->setGPR(i->RT, ppu->load<4>(ea));
 }
@@ -442,7 +419,7 @@ PRINT(LWZU, DForm_1) {
 }
 
 EMU(LWZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + exts<DForm_1::D_bits>(i->D);
+    auto ea = ppu->getGPR(i->RA) + i->D;
     ppu->setGPR(i->RT, ppu->load<4>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -461,13 +438,13 @@ EMU(LWZUX, XForm_1) {
 // Load Word Algebraic, p38
 
 PRINT(LWA, DSForm_1) {
-    *result = format_3d_3bracket("lwa", i->RT, i->DS, i->RA);
+    *result = format_3d_3bracket("lwa", i->RT, i->DS << 2, i->RA);
 }
 
 EMU(LWA, DSForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + exts<DSForm_1::DS_bits + 2>(i->DS << 2);
-    ppu->setGPR(i->RT, exts<32>(ppu->load<4>(ea)));
+    auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = b + (i->DS << 2);
+    ppu->setGPR(i->RT, ppu->loads<4>(ea));
 }
 
 // Load Word Algebraic Indexed, p38
@@ -477,9 +454,9 @@ PRINT(LWAX, XForm_1) {
 }
 
 EMU(LWAX, XForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, exts<32>(ppu->load<4>(ea)));
+    ppu->setGPR(i->RT, ppu->loads<4>(ea));
 }
 
 // Load Word Algebraic with Update Indexed, p38
@@ -490,19 +467,19 @@ PRINT(LWAUX, XForm_1) {
 
 EMU(LWAUX, XForm_1) {
     auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, exts<32>(ppu->load<4>(ea)));
+    ppu->setGPR(i->RT, ppu->loads<4>(ea));
     ppu->setGPR(i->RA, ea);
 }
 
 // Load Doubleword, p39
 
 PRINT(LD, DSForm_1) {
-    *result = format_3d_3bracket("ld", i->RT, i->RA, i->DS);
+    *result = format_3d_3bracket("ld", i->RT, i->DS << 2, i->RA);
 }
 
 EMU(LD, DSForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + exts<DSForm_1::DS_bits + 2>(i->DS << 2);
+    auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = b + (i->DS << 2);
     ppu->setGPR(i->RT, ppu->load<8>(ea));
 }
 
@@ -513,7 +490,7 @@ PRINT(LDX, XForm_1) {
 }
 
 EMU(LDX, XForm_1) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = b + ppu->getGPR(i->RB);
     ppu->setGPR(i->RT, ppu->load<8>(ea));
 }
@@ -521,11 +498,11 @@ EMU(LDX, XForm_1) {
 // Load Doubleword with Update, p39
 
 PRINT(LDU, DSForm_1) {
-    *result = format_3d_3bracket("ldu", i->RT, i->RA, i->DS);
+    *result = format_3d_3bracket("ldu", i->RT, i->DS << 2, i->RA);
 }
 
 EMU(LDU, DSForm_1) {
-    auto ea = ppu->getGPR(i->RA) + exts<DSForm_1::DS_bits + 2>(i->DS << 2);
+    auto ea = ppu->getGPR(i->RA) + (i->DS << 2);
     ppu->setGPR(i->RT, ppu->load<8>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -547,21 +524,21 @@ EMU(LDUX, XForm_1) {
 
 template <int Bytes>
 void EmuStore(DForm_3* i, PPU* ppu) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = (b << 1) + exts<DForm_3::D_bits>(i->D);
+    auto b = getB(i->RA, ppu);
+    auto ea = (b << 1) + i->D;
     ppu->store<Bytes>(ea, i->RS);
 }
 
 template <int Bytes>
 void EmuStoreIndexed(XForm_8* i, PPU* ppu) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = (b << 1) + ppu->getGPR(i->RB);
     ppu->store<1>(ea, i->RS);
 }
 
 template <int Bytes>
 void EmuStoreUpdate(DForm_3* i, PPU* ppu) {
-    auto ea = ppu->getGPR(i->RA) + exts<DForm_3::D_bits>(i->D);
+    auto ea = ppu->getGPR(i->RA) + i->D;
     ppu->store<Bytes>(ea, i->RS);
     ppu->setGPR(i->RA, ea);
 }
@@ -609,12 +586,12 @@ PRINT(STWUX, XForm_8) { PrintStoreIndexed("stwux", i, result); }
 EMU(STWUX, XForm_8) { EmuStoreUpdateIndexed<4>(i, ppu); }
 
 PRINT(STD, DSForm_2) { 
-    *result = format_3d_3bracket("std", i->RS, i->DS, i->RA);
+    *result = format_3d_3bracket("std", i->RS, i->DS << 2, i->RA);
 }
 
 EMU(STD, DSForm_2) { 
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = (b << 1) + exts<DSForm_2::DS_bits + 2>(i->DS << 2);
+    auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
+    auto ea = (b << 1) + (i->DS << 2);
     ppu->store<8>(ea, i->RS);
 }
 
@@ -622,12 +599,12 @@ PRINT(STDX, XForm_8) { PrintStoreIndexed("stdx", i, result); }
 EMU(STDX, XForm_8) { EmuStoreIndexed<8>(i, ppu); }
 
 PRINT(STDU, DSForm_2) { 
-    *result = format_3d_3bracket("stdu", i->RS, i->DS, i->RA);
+    *result = format_3d_3bracket("stdu", i->RS, i->DS << 2, i->RA);
 }
 
 EMU(STDU, DSForm_2) { 
-    auto ea = ppu->getGPR(i->RA) + exts<DSForm_2::DS_bits + 2>(i->DS << 2);
-    ppu->store<8>(ea, i->RS);
+    auto ea = ppu->getGPR(i->RA) + (i->DS << 2);
+    ppu->store<8>(ea, ppu->getGPR(i->RS));
     ppu->setGPR(i->RA, ea);
 }
 
@@ -638,7 +615,7 @@ EMU(STDUX, XForm_8) { EmuStoreUpdateIndexed<8>(i, ppu); }
 
 template <int Bytes>
 void EmuLoadByteReverseIndexed(XForm_1* i, PPU* ppu) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = (b << 1) + ppu->getGPR(i->RB);
     ppu->setGPR(i->RT, endian_reverse(ppu->load<Bytes>(ea)));
 }
@@ -650,9 +627,9 @@ EMU(LWBRX, XForm_1) { EmuLoadByteReverseIndexed<4>(i, ppu); }
 
 template <int Bytes>
 void EmuStoreByteReverseIndexed(XForm_8* i, PPU* ppu) {
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = getB(i->RA, ppu);
     auto ea = (b << 1) + ppu->getGPR(i->RB);
-    ppu->store<Bytes>(ea, endian_reverse(i->RS));
+    ppu->store<Bytes>(ea, endian_reverse(i->RS.u()));
 }
 
 PRINT(STHBRX, XForm_8) { *result = format_3d("sthbrx", i->RS, i->RA, i->RB); }
@@ -667,9 +644,8 @@ PRINT(ADDI, DForm_2) {
 }
 
 EMU(ADDI, DForm_2) {
-    auto ext = exts<DForm_2::SI_bits>(i->SI);
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    ppu->setGPR(i->RT, ext + (b << 1));
+    auto b = getB(i->RA, ppu);
+    ppu->setGPR(i->RT, i->SI + (b << 1));
 }
 
 PRINT(ADDIS, DForm_2) {
@@ -677,9 +653,8 @@ PRINT(ADDIS, DForm_2) {
 }
 
 EMU(ADDIS, DForm_2) {
-    auto ext = exts<DForm_2::SI_bits>(i->SI) << 16;
-    auto b = i->RA == 0 ? 0 : ppu->getGPR(i->RA);
-    ppu->setGPR(i->RT, ext + (b << 1));
+    auto b = getB(i->RA, ppu);
+    ppu->setGPR(i->RT, (i->SI << 16) + (b << 1));
 }
 
 inline void update_CR0(int64_t result, PPU* ppu) {
@@ -747,7 +722,7 @@ PRINT(ANDID, DForm_4) {
 }
 
 EMU(ANDID, DForm_4) {
-    auto res = ppu->getGPR(i->RS) & i->UI;
+    auto res = ppu->getGPR(i->RS) & i->UI.u();
     update_CR0(res, ppu);
     ppu->setGPR(i->RA, res);
 }
@@ -769,12 +744,12 @@ PRINT(ORI, DForm_4) {
 }
 
 EMU(ORI, DForm_4) {
-    auto res = ppu->getGPR(i->RS) | i->UI;
+    auto res = ppu->getGPR(i->RS) | i->UI.u();
     ppu->setGPR(i->RA, res);
 }
 
 PRINT(ORIS, DForm_4) {
-    *result = format_3d("oris.", i->RA, i->RS, i->UI);
+    *result = format_3d("oris", i->RA, i->RS, i->UI);
 }
 
 EMU(ORIS, DForm_4) {
@@ -789,12 +764,12 @@ PRINT(XORI, DForm_4) {
 }
 
 EMU(XORI, DForm_4) {
-    auto res = ppu->getGPR(i->RS) ^ i->UI;
+    auto res = ppu->getGPR(i->RS) ^ i->UI.u();
     ppu->setGPR(i->RA, res);
 }
 
 PRINT(XORIS, DForm_4) {
-    *result = format_3d("xoris.", i->RA, i->RS, i->UI);
+    *result = format_3d("xoris", i->RA, i->RS, i->UI);
 }
 
 EMU(XORIS, DForm_4) {
@@ -899,7 +874,7 @@ PRINT(EXTSB, XForm_11) {
 }
 
 EMU(EXTSB, XForm_11) {
-    ppu->setGPR(i->RA, exts<8>(ppu->getGPR(i->RS)));
+    ppu->setGPR(i->RA, (int64_t)static_cast<int8_t>(ppu->getGPR(i->RS)));
 }
 
 PRINT(EXTSH, XForm_11) {
@@ -907,7 +882,7 @@ PRINT(EXTSH, XForm_11) {
 }
 
 EMU(EXTSH, XForm_11) {
-    ppu->setGPR(i->RA, exts<16>(ppu->getGPR(i->RS)));
+    ppu->setGPR(i->RA, (int64_t)static_cast<int16_t>(ppu->getGPR(i->RS)));
 }
 
 PRINT(EXTSW, XForm_11) {
@@ -915,7 +890,7 @@ PRINT(EXTSW, XForm_11) {
 }
 
 EMU(EXTSW, XForm_11) {
-    ppu->setGPR(i->RA, exts<32>(ppu->getGPR(i->RS)));
+    ppu->setGPR(i->RA, (int64_t)static_cast<int32_t>(ppu->getGPR(i->RS)));
 }
 
 
@@ -959,14 +934,14 @@ template <DasmMode M, typename S>
 void ppu_dasm(void* instr, uint64_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
     auto iform = reinterpret_cast<IForm*>(&x);
-    switch (iform->OPCD) {
+    switch (iform->OPCD.u()) {
         case 14: invoke(ADDI);
         case 15: invoke(ADDIS);
         case 16: invoke(BC);
         case 18: invoke(B);
         case 19: {
             auto xlform = reinterpret_cast<XLForm_1*>(&x);
-            switch (xlform->XO) {
+            switch (xlform->XO.u()) {
                 case 16: invoke(BCLR);
                 case 528: invoke(BCCTR);
                 case 257: invoke(CRAND);
@@ -991,7 +966,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         case 34: invoke(LBZ);
         case 31: {
             auto xform = reinterpret_cast<XForm_1*>(&x);
-            switch (xform->XO) {
+            switch (xform->XO.u()) {
                 case 87: invoke(LBZX);
                 case 119: invoke(LBZUX);
                 case 279: invoke(LHZX);
@@ -1048,7 +1023,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         case 45: invoke(STHU);
         case 58: {
             auto dsform = reinterpret_cast<DSForm_1*>(&x);
-            switch (dsform->XO) {
+            switch (dsform->XO.u()) {
                 case 2: invoke(LWA);
                 case 0: invoke(LD);
                 case 1: invoke(LDU);
@@ -1058,7 +1033,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         }
         case 62: {
             auto dsform = reinterpret_cast<DSForm_2*>(&x);
-            switch (dsform->XO) {
+            switch (dsform->XO.u()) {
                 case 0: invoke(STD);
                 case 1: invoke(STDU);
                 default: throw std::runtime_error("unknown extented opcode");

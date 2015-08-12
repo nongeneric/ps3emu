@@ -9,6 +9,7 @@ class MainWindow : public QMainWindow {
      DebuggerModel _model;
      void setupDocks();
      void setupMenu();
+     void setupStatusBar();
 public slots:
     void openFile();
 public:

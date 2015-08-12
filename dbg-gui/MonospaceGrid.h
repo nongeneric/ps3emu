@@ -13,15 +13,14 @@ public:
     virtual QString getCell(uint64_t row, int col) = 0;
     virtual uint64_t getMinRow() = 0;
     virtual uint64_t getMaxRow() = 0;
-    virtual uint64_t getColumnCount() = 0;
+    virtual int getColumnCount() = 0;
     virtual uint64_t getRowStep();
-    void update();
+    virtual void update();
+    virtual bool isHighlighted(uint64_t row, int col);
     void navigate(uint64_t row);
     ~MonospaceGridModel();
 signals:
     void navigated(uint64_t row);
-    void rowHighlighted(uint64_t row);
-    void highligtingCleared(uint64_t row);
     void updated();
 };
 
@@ -39,16 +38,14 @@ class MonospaceGrid : public QWidget {
     
     MonospaceGridModel* _model = nullptr;
     std::vector<ColumnInfo> _columns;
-    std::map<uint64_t, RowInfo> _rows;
     uint64_t _curRow = 0;
+    uint64_t _lastRow = 0;
+    int _charWidth;
+    int _charHeight;
     
     virtual void paintEvent(QPaintEvent*) override;
-    
+    void navigate(uint64_t row);
 public:
-    void go(uint64_t row);
     void setModel(MonospaceGridModel* model);
     void setColumnWidth(int col, int chars);
-    void selectRow(uint64_t row);
-    void highlightRow(uint64_t row);
-    void clearHighlights();
 };

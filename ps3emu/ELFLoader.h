@@ -67,8 +67,7 @@ static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mi
 static_assert(sizeof(Elf64_be_Shdr) == sizeof(Elf64_Shdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Sym) == sizeof(Elf64_Sym), "big endian struct mismatch");
 
-class ELFLoader
-{
+class ELFLoader {
     std::vector<uint8_t> _file;
     Elf64_be_Ehdr* _header;
     Elf64_be_Phdr* _pheaders;

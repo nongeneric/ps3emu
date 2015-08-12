@@ -8,11 +8,14 @@
 
 class GPRModel;
 class DasmModel;
-class DebuggerModel {
+class DebuggerModel : public QWidget {
+    Q_OBJECT
+    
     ELFLoader _elf;
     std::unique_ptr<GPRModel> _grpModel;
     std::unique_ptr<DasmModel> _dasmModel;
     std::unique_ptr<PPU> _ppu;
+    bool _elfLoaded = false;
 public:
     DebuggerModel();
     ~DebuggerModel();
@@ -27,4 +30,7 @@ public:
     void stepIn();
     void stepOver();
     void run();
+    void restart();
+signals:
+    void message(QString text);
 };
