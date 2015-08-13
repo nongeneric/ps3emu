@@ -34,12 +34,8 @@ public:
         return r;
     }
     
-    inline int64_t operator<<(int shift) {
-        return s() << shift;
-    }
-    
-    inline operator bool() {
-        return u();
+    inline int64_t operator<<(unsigned shift) {
+        return static_cast<uint64_t>(s()) << shift;
     }
 };
 

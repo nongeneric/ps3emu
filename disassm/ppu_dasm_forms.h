@@ -118,3 +118,40 @@ union XOForm_1 {
     BitField<22, 31> XO;
     BitField<31, 32> Rc;
 };
+
+union XFXForm_1 {
+    BitField<6, 11> RT;
+    BitField<11, 21> spr;
+    BitField<21, 31> XO;
+};
+
+union XFXForm_5 {
+    BitField<6, 11> RS;
+    BitField<12, 19> FXM;
+};
+
+union XFXForm_7 {
+    BitField<6, 11> RS;
+    BitField<11, 21> spr;
+};
+
+union MDForm_1 {
+    BitField<6, 11> RS;
+    BitField<11, 16> RA;
+    BitField<16, 21> sh04;
+    BitField<21, 26> mb04;
+    BitField<26, 27> mb5;
+    BitField<27, 30> XO;
+    BitField<30, 31> sh5;
+    BitField<31, 32> Rc;
+};
+
+union MDForm_2 {
+    BitField<6, 11> RS;
+    BitField<11, 16> RA;
+    BitField<16, 21> sh04;
+    BitField<21, 26> me04;
+    BitField<26, 27> me5;
+    BitField<30, 31> sh5;
+    BitField<31, 32> Rc;
+};

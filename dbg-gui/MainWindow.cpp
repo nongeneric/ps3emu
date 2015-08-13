@@ -31,11 +31,25 @@ void MainWindow::setupDocks() {
     gprDock->setTitleBarWidget(new QWidget(this));
     addDockWidget(Qt::RightDockWidgetArea, gprDock);
     
+    auto logGrid = new MonospaceGrid();
+    logGrid->setModel(_model.getLogModel());
+    logGrid->setColumnWidth(0, 500);
+    logGrid->setMinimumHeight(300);
+    logGrid->setScrollable(true);
+    
+    auto bottomDock = new QDockWidget(this);
+    bottomDock->setFeatures(QDockWidget::NoDockWidgetFeatures);
+    bottomDock->setWidget(logGrid);
+    bottomDock->setTitleBarWidget(new QWidget(this));
+    addDockWidget(Qt::BottomDockWidgetArea, bottomDock);
+    
     auto dasmGrid = new MonospaceGrid();
     dasmGrid->setModel(_model.getDasmModel());
     dasmGrid->setColumnWidth(0, 17);
     dasmGrid->setColumnWidth(1, 12);
-    dasmGrid->setColumnWidth(2, 100);
+    dasmGrid->setColumnWidth(2, 30);
+    dasmGrid->setColumnWidth(3, 100);
+    dasmGrid->setScrollable(true);
     setCentralWidget(dasmGrid);
 }
 
@@ -67,9 +81,15 @@ void MainWindow::setupMenu() {
     trace->addAction(run);
     
     auto restart = new QAction("Restart", this);
-    restart->setShortcut(QKeySequence(Qt::Key_F2));
+    restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
     connect(restart, &QAction::triggered, this, [=]() { _model.restart(); });
     trace->addAction(restart);
+    
+    auto view = menuBar()->addMenu("&View");
+    auto toggleLog = new QAction("Toggle Log", this);
+    toggleLog->setShortcut(QKeySequence(Qt::Key_F1));
+    connect(toggleLog, &QAction::triggered, this, [=]() { _model.stepIn(); });
+    view->addAction(toggleLog);
 }
 
 void MainWindow::openFile() {

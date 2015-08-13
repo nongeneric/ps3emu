@@ -4,6 +4,7 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QPaintEvent>
+#include <QWheelEvent>
 
 void MonospaceGrid::setModel(MonospaceGridModel* model) {
     _model = model;
@@ -70,7 +71,22 @@ bool MonospaceGridModel::isHighlighted(uint64_t row, int col) {
 void MonospaceGrid::navigate(uint64_t row) {
     if (row < _curRow || row > _lastRow) {
         _curRow = row;
-        update();
     }
+    update();
+}
+void MonospaceGrid::wheelEvent(QWheelEvent* event) {
+    if (!_scrollable)
+        return;
+    auto d = event->delta() / 10.;
+    auto newRow = (__int128)_curRow - (__int128)d;
+    if (newRow > (__int128)~0ull || newRow < 0)
+        return;
+    _curRow -= d;
+    _curRow -= _curRow % _model->getRowStep();
+    update();
+}
+
+void MonospaceGrid::setScrollable(bool value) {
+    _scrollable = value;
 }
 

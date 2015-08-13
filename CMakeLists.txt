@@ -13,7 +13,8 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
 add_definitions(-DDEBUG)
-set(CMAKE_CXX_FLAGS "-ggdb -O0 -pedantic -Wall -Werror -std=c++1y ${CMAKE_CXX_FLAGS}")
+#-fsanitize=undefined
+set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
 
 add_subdirectory(disassm)
 add_subdirectory(ps3emu)

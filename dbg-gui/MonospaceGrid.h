@@ -36,6 +36,7 @@ struct RowInfo {
 class MonospaceGrid : public QWidget {
     Q_OBJECT
     
+    bool _scrollable = false;
     MonospaceGridModel* _model = nullptr;
     std::vector<ColumnInfo> _columns;
     uint64_t _curRow = 0;
@@ -48,4 +49,7 @@ class MonospaceGrid : public QWidget {
 public:
     void setModel(MonospaceGridModel* model);
     void setColumnWidth(int col, int chars);
+    void setScrollable(bool value);
+protected:
+    virtual void wheelEvent(QWheelEvent *) override;
 };

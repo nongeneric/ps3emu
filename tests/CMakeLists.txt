@@ -8,4 +8,4 @@ set(SRC
     PPUDasmTests.cpp
 )
 add_executable(tests ${SRC})
-target_link_libraries(tests disassm ps3emu)
+target_link_libraries(tests ps3emu)

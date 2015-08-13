@@ -13,16 +13,18 @@
 using namespace boost::endian;
 using namespace boost;
 
-#define PRINT(name, form) void print##name(form* i, uint64_t cia, std::string* result)
-#define EMU(name, form) void emulate##name(form* i, uint64_t cia, PPU* ppu)
+#define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
+#define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPU* ppu)
 
-inline char bit_test(uint64_t number, int width, int n) {
+template <int Pos, int Next>
+inline uint8_t bit_test(uint64_t number, int width, BitField<Pos, Next> bf) {
+    auto n = bf.u();
     return (number & (1 << (width - n))) >> (width - n);
 }
 
-template <typename T>
-T bit_test(T number, int n) {
-    return bit_test(number, sizeof(T) * 8, n);
+template <typename T, int Pos, int Next>
+T bit_test(T number, BitField<Pos, Next> bf) {
+    return bit_test(number, sizeof(T) * 8, bf);
 }
 
 template <typename T>
@@ -34,20 +36,20 @@ uint64_t bit_set(T number, int n) {
 
 inline uint64_t getNIA(IForm* i, uint64_t cia) {
     auto ext = i->LI << 2;
-    return i->AA ? ext : (cia + ext);
+    return i->AA.u() ? ext : (cia + ext);
 }
 
 PRINT(B, IForm) {
     const char* mnemonics[][2] = {
         { "b", "ba" }, { "bl", "bla" }  
     };
-    auto mnemonic = mnemonics[i->LK][i->AA];
+    auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
     *result = str(format("%s %x") % mnemonic % getNIA(i, cia));
 }
 
 EMU(B, IForm) {
     ppu->setNIP(getNIA(i, cia));
-    if (i->LK)
+    if (i->LK.u())
         ppu->setLR(cia + 4);
 }
 
@@ -55,30 +57,37 @@ EMU(B, IForm) {
 
 inline uint64_t getNIA(BForm* i, uint64_t cia) {
     auto ext = i->BD << 2;
-    return i->AA ? ext : (ext + cia);
+    return i->AA.u() ? ext : (ext + cia);
 }
 
 PRINT(BC, BForm) {
     const char* mnemonics[][2] = {
         { "bc", "bca" }, { "bcl", "bcla" }  
     };
-    auto mnemonic = mnemonics[i->LK][i->AA];
+    auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
     *result = str(format("%s %d,%d,%x") 
-        % mnemonic % (uint64_t)i->BO % (uint64_t)i->BI % getNIA(i, cia));
+        % mnemonic % i->BO.u() % i->BI.u() % getNIA(i, cia));
 }
 
-inline bool is_taken(bool bo0, bool bo1, bool bo2, bool bo3, PPU* ppu, int bi) {
-    auto ctr_ok = bo2 || ((ppu->getCTR() != 0) ^ bo3);
-    auto cond_ok = bo0 || bit_test(ppu->getCR(), 32, bi) == bo1;
+template <int P1, int P2, int P3, int P4, int P5>
+inline bool is_taken(BitField<P1, P1 + 1> bo0, 
+                     BitField<P2, P2 + 1> bo1,
+                     BitField<P3, P3 + 1> bo2,
+                     BitField<P4, P4 + 1> bo3,
+                     PPU* ppu,
+                     BitField<P5, P5 + 5> bi)
+{
+    auto ctr_ok = bo2.u() || ((ppu->getCTR() != 0) ^ bo3.u());
+    auto cond_ok = bo0.u() || bit_test(ppu->getCR(), 32, bi) == bo1.u();
     return ctr_ok && cond_ok;
 }
 
 EMU(BC, BForm) {
-    if (!i->BO2)
+    if (!i->BO2.u())
         ppu->setCTR(ppu->getCTR() - 1);
     if (is_taken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
         ppu->setNIP(getNIA(i, cia));
-    if (i->LK)
+    if (i->LK.u())
         ppu->setLR(cia + 4);
 }
 
@@ -89,8 +98,20 @@ std::string format_3d(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
     return str(format("%s %d,%d,%d") % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3));
 }
 
-std::string format_2d(const char* mnemonic, uint64_t op1, uint64_t op2) {
-    return str(format("%s %d,%d") % mnemonic % op1 % op2);
+template <typename OP1, typename OP2, typename OP3, typename OP4>
+std::string format_4d(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4) {
+    return str(format("%s %d,%d,%d") 
+        % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3) % getSValue(op4));
+}
+
+template <typename OP1, typename OP2>
+std::string format_2d(const char* mnemonic, OP1 op1, OP2 op2) {
+    return str(format("%s %d,%d") % mnemonic % getSValue(op1) % getSValue(op2));
+}
+
+template <typename OP1>
+std::string format_1d(const char* mnemonic, OP1 op1) {
+    return str(format("%s %d") % mnemonic % getSValue(op1));
 }
 
 template <typename OP1, typename OP2, typename OP3>
@@ -104,31 +125,31 @@ inline int64_t getB(BF ra, PPU* ppu) {
 }
 
 PRINT(BCLR, XLForm_2) {
-    auto mnemonic = i->LK ? "bclrl" : "bclr";
+    auto mnemonic = i->LK.u() ? "bclrl" : "bclr";
     *result = format_3d(mnemonic, i->BO, i->BI, i->BH);
 }
 
 EMU(BCLR, XLForm_2) {
-    if (!i->BO2)
+    if (!i->BO2.u())
         ppu->setCTR(ppu->getCTR() - 1);
     if (is_taken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
         ppu->setNIP(ppu->getLR() & ~3);
-    if (i->LK)
+    if (i->LK.u())
         ppu->setLR(cia + 4);
 }
 
 // Branch Conditional to Count Register, p25
 
 PRINT(BCCTR, XLForm_2) {
-    auto mnemonic = i->LK ? "bcctrl" : "bcctr";
+    auto mnemonic = i->LK.u() ? "bcctrl" : "bcctr";
     *result = format_3d(mnemonic, i->BO, i->BI, i->BH);
 }
 
 EMU(BCCTR, XLForm_2) {
-    auto cond_ok = i->BO0 || bit_test(ppu->getCR(), 32, i->BI) == i->BO1;
+    auto cond_ok = i->BO0.u() || bit_test(ppu->getCR(), 32, i->BI) == i->BO1.u();
     if (cond_ok)
         ppu->setNIP(ppu->getCTR() & ~3);
-    if (i->LK)
+    if (i->LK.u())
         ppu->setLR(cia + 4);
 }
 
@@ -239,7 +260,7 @@ EMU(MCRF, XLForm_3) {
     std::bitset<64> bs(cr);
     std::bitset<64> new_bs(cr);
     for (int j = 0; j <= 3; ++j) {
-        new_bs[j*i->BF] = bs[j*i->BFA];
+        new_bs[j*i->BF.u()] = bs[j*i->BFA.u()];
     }
     ppu->setCR(new_bs.to_ullong());
 }
@@ -525,36 +546,36 @@ EMU(LDUX, XForm_1) {
 template <int Bytes>
 void EmuStore(DForm_3* i, PPU* ppu) {
     auto b = getB(i->RA, ppu);
-    auto ea = (b << 1) + i->D;
-    ppu->store<Bytes>(ea, i->RS);
+    auto ea = b + i->D;
+    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
 }
 
 template <int Bytes>
 void EmuStoreIndexed(XForm_8* i, PPU* ppu) {
     auto b = getB(i->RA, ppu);
-    auto ea = (b << 1) + ppu->getGPR(i->RB);
-    ppu->store<1>(ea, i->RS);
+    auto ea = b + ppu->getGPR(i->RB);
+    ppu->store<1>(ea, ppu->getGPR(i->RS));
 }
 
 template <int Bytes>
 void EmuStoreUpdate(DForm_3* i, PPU* ppu) {
     auto ea = ppu->getGPR(i->RA) + i->D;
-    ppu->store<Bytes>(ea, i->RS);
+    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
     ppu->setGPR(i->RA, ea);
 }
 
 template <int Bytes>
 void EmuStoreUpdateIndexed(XForm_8* i, PPU* ppu) {
     auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->store<Bytes>(ea, i->RS);
+    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
     ppu->setGPR(i->RA, ea);
 }
 
-void PrintStore(const char* mnemonic, DForm_3* i, std::string* result) {
-    *result = format_3d_3bracket(mnemonic, i->RS, i->D, i->RA);
+inline void PrintStore(const char* mnemonic, DForm_3* i, std::string* result) {
+    *result = format_3d_3bracket(mnemonic, i->RS.u(), i->D, i->RA.u());
 }
 
-void PrintStoreIndexed(const char* mnemonic, XForm_8* i, std::string* result) {
+inline void PrintStoreIndexed(const char* mnemonic, XForm_8* i, std::string* result) {
     *result = format_3d(mnemonic, i->RS, i->RA, i->RB);
 }
 
@@ -590,9 +611,9 @@ PRINT(STD, DSForm_2) {
 }
 
 EMU(STD, DSForm_2) { 
-    auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = (b << 1) + (i->DS << 2);
-    ppu->store<8>(ea, i->RS);
+    auto b = getB(i->RA, ppu);
+    auto ea = b + (i->DS << 2);
+    ppu->store<8>(ea, ppu->getGPR(i->RS));
 }
 
 PRINT(STDX, XForm_8) { PrintStoreIndexed("stdx", i, result); }
@@ -645,7 +666,7 @@ PRINT(ADDI, DForm_2) {
 
 EMU(ADDI, DForm_2) {
     auto b = getB(i->RA, ppu);
-    ppu->setGPR(i->RT, i->SI + (b << 1));
+    ppu->setGPR(i->RT, i->SI + b);
 }
 
 PRINT(ADDIS, DForm_2) {
@@ -654,21 +675,24 @@ PRINT(ADDIS, DForm_2) {
 
 EMU(ADDIS, DForm_2) {
     auto b = getB(i->RA, ppu);
-    ppu->setGPR(i->RT, (i->SI << 16) + (b << 1));
+    ppu->setGPR(i->RT, (i->SI << 16) + b);
 }
 
 inline void update_CR0(int64_t result, PPU* ppu) {
     auto s = result < 0 ? 4
            : result > 0 ? 2
            : 1;
-    ppu->setCR0_sign(s);   
+    ppu->setCR0_sign(s);
 }
 
-inline void update_CR0_OV(bool oe, bool rc, bool ov, int64_t result, PPU* ppu) {
-    if (oe && ov) {
+template <int P1, int P2>
+inline void update_CR0_OV(BitField<P1, P1 + 1> oe, 
+                          BitField<P2, P2 + 1> rc, 
+                          bool ov, int64_t result, PPU* ppu) {
+    if (oe.u() && ov) {
         ppu->setOV();
     }
-    if (rc) {
+    if (rc.u()) {
         update_CR0(result, ppu);
     }
 }
@@ -677,7 +701,7 @@ PRINT(ADD, XOForm_1) {
     const char* mnemonics[][2] = {
         { "add", "add." }, { "addo", "addo." }
     };
-    *result = format_3d(mnemonics[i->OE][i->Rc], i->RT, i->RA, i->RB);
+    *result = format_3d(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
 EMU(ADD, XOForm_1) {
@@ -685,7 +709,7 @@ EMU(ADD, XOForm_1) {
     auto rb = ppu->getGPR(i->RB);
     int64_t res;
     bool ov = 0;
-    if (i->OE)
+    if (i->OE.u())
         ov = __builtin_saddll_overflow(rb, ra, (long long int*)&res);
     else
         res = ra + rb;
@@ -697,7 +721,7 @@ PRINT(SUBF, XOForm_1) {
     const char* mnemonics[][2] = {
         { "subf", "subf." }, { "subfo", "subfo." }
     };
-    *result = format_3d(mnemonics[i->OE][i->Rc], i->RT, i->RA, i->RB);
+    *result = format_3d(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
 EMU(SUBF, XOForm_1) {
@@ -705,7 +729,7 @@ EMU(SUBF, XOForm_1) {
     auto rb = ppu->getGPR(i->RB);
     int64_t res;
     bool ov = 0;
-    if (i->OE)
+    if (i->OE.u())
         ov = __builtin_ssubll_overflow(rb, ra, (long long int*)&res);
     else
         res = ra + rb;
@@ -780,97 +804,97 @@ EMU(XORIS, DForm_4) {
 // X-forms
 
 PRINT(AND, XForm_6) {
-    *result = format_3d(i->Rc ? "and." : "and", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "and." : "and", i->RA, i->RS, i->RB);
 }
 
 EMU(AND, XForm_6) {
     auto res = ppu->getGPR(i->RS) & ppu->getGPR(i->RB);
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(OR, XForm_6) {
-    *result = format_3d(i->Rc ? "or." : "or", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "or." : "or", i->RA, i->RS, i->RB);
 }
 
 EMU(OR, XForm_6) {
     auto res = ppu->getGPR(i->RS) | ppu->getGPR(i->RB);
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(XOR, XForm_6) {
-    *result = format_3d(i->Rc ? "xor." : "xor", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "xor." : "xor", i->RA, i->RS, i->RB);
 }
 
 EMU(XOR, XForm_6) {
     auto res = ppu->getGPR(i->RS) ^ ppu->getGPR(i->RB);
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(NAND, XForm_6) {
-    *result = format_3d(i->Rc ? "nand." : "nand", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "nand." : "nand", i->RA, i->RS, i->RB);
 }
 
 EMU(NAND, XForm_6) {
     auto res = ~(ppu->getGPR(i->RS) & ppu->getGPR(i->RB));
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(NOR, XForm_6) {
-    *result = format_3d(i->Rc ? "nor." : "nor", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "nor." : "nor", i->RA, i->RS, i->RB);
 }
 
 EMU(NOR, XForm_6) {
     auto res = ~(ppu->getGPR(i->RS) | ppu->getGPR(i->RB));
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(EQV, XForm_6) {
-    *result = format_3d(i->Rc ? "eqv." : "eqv", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "eqv." : "eqv", i->RA, i->RS, i->RB);
 }
 
 EMU(EQV, XForm_6) {
     auto res = ~(ppu->getGPR(i->RS) ^ ppu->getGPR(i->RB));
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(ANDC, XForm_6) {
-    *result = format_3d(i->Rc ? "andc." : "andc", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "andc." : "andc", i->RA, i->RS, i->RB);
 }
 
 EMU(ANDC, XForm_6) {
     auto res = ppu->getGPR(i->RS) & ~ppu->getGPR(i->RB);
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 PRINT(ORC, XForm_6) {
-    *result = format_3d(i->Rc ? "orc." : "orc", i->RA, i->RS, i->RB);
+    *result = format_3d(i->Rc.u() ? "orc." : "orc", i->RA, i->RS, i->RB);
 }
 
 EMU(ORC, XForm_6) {
     auto res = ppu->getGPR(i->RS) | ~ppu->getGPR(i->RB);
     ppu->setGPR(i->RA, res);
-    if (i->Rc)
+    if (i->Rc.u())
         update_CR0(res, ppu);
 }
 
 // Extend Sign
 
 PRINT(EXTSB, XForm_11) {
-    *result = format_2d(i->Rc ? "extsb." : "extsb", i->RA, i->RS);
+    *result = format_2d(i->Rc.u() ? "extsb." : "extsb", i->RA, i->RS);
 }
 
 EMU(EXTSB, XForm_11) {
@@ -878,7 +902,7 @@ EMU(EXTSB, XForm_11) {
 }
 
 PRINT(EXTSH, XForm_11) {
-    *result = format_2d(i->Rc ? "extsh." : "extsh", i->RA, i->RS);
+    *result = format_2d(i->Rc.u() ? "extsh." : "extsh", i->RA, i->RS);
 }
 
 EMU(EXTSH, XForm_11) {
@@ -886,26 +910,148 @@ EMU(EXTSH, XForm_11) {
 }
 
 PRINT(EXTSW, XForm_11) {
-    *result = format_2d(i->Rc ? "extsw." : "extsw", i->RA, i->RS);
+    *result = format_2d(i->Rc.u() ? "extsw." : "extsw", i->RA, i->RS);
 }
 
 EMU(EXTSW, XForm_11) {
     ppu->setGPR(i->RA, (int64_t)static_cast<int32_t>(ppu->getGPR(i->RS)));
 }
 
+// Move To/From System Register Instructions, p81
 
+inline bool isXER(BitField<11, 21> spr) {
+    return spr.u() == 1 << 5;
+}
 
+inline bool isLR(BitField<11, 21> spr) {
+    return spr.u() == 8 << 5;
+}
 
+inline bool isCTR(BitField<11, 21> spr) {
+    return spr.u() == 9 << 5;
+}
 
+PRINT(MTSPR, XFXForm_7) {
+    auto mnemonic = isXER(i->spr) ? "mtxer"
+                  : isLR(i->spr) ? "mtlr"
+                  : isCTR(i->spr) ? "mtctr"
+                  : nullptr;
+    if (mnemonic) {
+        *result = format_1d(mnemonic, i->RS);
+    } else {
+        throw std::runtime_error("illegal");
+    }
+}
 
+EMU(MTSPR, XFXForm_7) {
+    auto rs = ppu->getGPR(i->RS);
+    if (isXER(i->spr)) {
+        ppu->setXER(rs);
+    } else if (isLR(i->spr)) {
+        ppu->setLR(rs);
+    } else if (isCTR(i->spr)) {
+        ppu->setCR(rs);
+    } else {
+        throw std::runtime_error("illegal");
+    }
+}
 
+PRINT(MFSPR, XFXForm_7) {
+    auto mnemonic = isXER(i->spr) ? "mfxer"
+                  : isLR(i->spr) ? "mflr"
+                  : isCTR(i->spr) ? "mfctr"
+    : nullptr;
+    if (mnemonic) {
+        *result = format_1d(mnemonic, i->RS);
+    } else {
+        throw std::runtime_error("illegal");
+    }
+}
 
+EMU(MFSPR, XFXForm_7) {
+    auto v = isXER(i->spr) ? ppu->getXER()
+           : isLR(i->spr) ? ppu->getLR()
+           : isCTR(i->spr) ? ppu->getCTR()
+           : (throw std::runtime_error("illegal"), 0);
+     ppu->setGPR(i->RS, v);
+}
 
+// PRINT(MTCRF, XFXForm_5) {
+//     
+// }
 
+template <int Pos04, int Pos5>
+inline uint8_t getNBE(BitField<Pos04, Pos04 + 5> _04, BitField<Pos5, Pos5 + 1> _05) {
+    return (_05.u() << 5) | _04.u();
+}
 
+PRINT(RLDICL, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);
+    auto x = 64 - b;
+    auto y = n - 64 + b;
+    if (n == 0) {
+        *result = format_3d(i->Rc.u() ? "clrldi." : "clrldi", i->RA, i->RS, b);
+    } else if (64 - n == b) {
+        *result = format_3d(i->Rc.u() ? "srdi." : "srdi", i->RA, i->RS, b);
+    } else if (x + y < 64) {
+        *result = format_4d(i->Rc.u() ? "extrdi." : "extrdi", i->RA, i->RS, x, y);
+    } else {
+        *result = format_4d(i->Rc.u() ? "rldicl." : "rldicl", i->RA, i->RS, b + n, 64 - n);
+    }
+}
 
+inline uint64_t mask(uint8_t x, uint8_t y) {
+    if (x > y)
+        return ~mask(y + 1, x - 1);
+    return (~0ull << x) >> (64 - (y - x));
+}
 
+inline uint64_t ror(uint64_t n, uint8_t s) {
+    asm("rol %1,%0" : "+r" (n) : "c" (s));
+    return n;
+}
 
+inline uint64_t rol(uint64_t n, uint8_t s) {
+    asm("rol %1,%0" : "+r" (n) : "c" (s));
+    return n;
+}
+
+EMU(RLDICL, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);
+    auto r = rol(ppu->getGPR(i->RS), n);
+    auto m = mask(b, 63);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLDICR, MDForm_2) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->me04, i->me5);
+    if (n == 0) {
+        *result = format_3d(i->Rc.u() ? "clrrdi." : "clrrdi", i->RA, i->RS, 63 - b);
+    } else if (63 - b == n) {
+        *result = format_3d(i->Rc.u() ? "sldi." : "sldi", i->RA, i->RS, n);
+    } else if (b > 1) {
+        *result = format_4d(i->Rc.u() ? "extldi." : "extldi", i->RA, i->RS, b - 1, n);
+    } else {
+        *result = format_4d(i->Rc.u() ? "rldicr." : "rldicr", i->RA, i->RS, b + n, 64 - n);
+    }
+}
+
+EMU(RLDICR, MDForm_2) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto e = getNBE(i->me04, i->me5);
+    auto r = rol(ppu->getGPR(i->RS), n);
+    auto m = mask(0, e);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
 
 
 enum class DasmMode {
@@ -964,6 +1110,15 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         case 28: invoke(ANDID);
         case 29: invoke(ANDISD);
         case 34: invoke(LBZ);
+        case 30: {
+            auto mdform = reinterpret_cast<MDForm_1*>(&x);
+            switch (mdform->XO.u()) {
+                case 0: invoke(RLDICL);
+                case 1: invoke(RLDICR);
+                default: throw std::runtime_error("unknown extented opcode");
+            }
+            break;
+        }
         case 31: {
             auto xform = reinterpret_cast<XForm_1*>(&x);
             switch (xform->XO.u()) {
@@ -1004,6 +1159,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 954: invoke(EXTSB);
                 case 922: invoke(EXTSH);
                 case 986: invoke(EXTSW);
+                case 467: invoke(MTSPR);
+                case 339: invoke(MFSPR);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

@@ -1,5 +1,6 @@
 #include "DebuggerModel.h"
 #include "../disassm/ppu_dasm.h"
+#include <QStringList>
 
 class GridModelChangeTracker {
     MonospaceGridModel* _model;
@@ -140,8 +141,9 @@ public:
 
 class DasmModel : public MonospaceGridModel {
     PPU* _ppu;
+    ELFLoader* _elf;
 public:
-    DasmModel(PPU* ppu) : _ppu(ppu) { }
+    DasmModel(PPU* ppu, ELFLoader* elf) : _ppu(ppu), _elf(elf) { }
     
     virtual QString getCell(uint64_t row, int col) override {
         if (col == 0) {
@@ -152,6 +154,9 @@ public:
                 _ppu->readMemory(row, &instr, sizeof instr);
                 if (col == 1)
                     return printHex(&instr, sizeof instr);
+                if (col == 3) {
+                    return "";
+                }
                 std::string str;
                 try {
                     ppu_dasm<DasmMode::Print>(&instr, row, &str);
@@ -174,7 +179,7 @@ public:
     }
     
     virtual int getColumnCount() override {
-        return 3;
+        return 4;
     }
     
     virtual uint64_t getRowStep() override {
@@ -186,10 +191,38 @@ public:
     }
 };
 
+class LogModel : public MonospaceGridModel {
+    QStringList _list;
+public:    
+    virtual QString getCell(uint64_t row, int col) override {
+        if (col == 0 && row < static_cast<uint64_t>(_list.size()))
+            return _list[row];
+        return "";
+    }
+    
+    virtual uint64_t getMinRow() override {
+        return 0;
+    }
+    
+    virtual uint64_t getMaxRow() override {
+        return _list.size() - 1;
+    }
+    
+    virtual int getColumnCount() override {
+        return 1;
+    }
+    
+    void log(QString message) {
+        _list.push_back(message);
+        navigate(_list.size() - 1);
+    }
+};
+
 DebuggerModel::DebuggerModel() {
     _ppu.reset(new PPU());
     _grpModel.reset(new GPRModel(_ppu.get()));
-    _dasmModel.reset(new DasmModel(_ppu.get()));
+    _dasmModel.reset(new DasmModel(_ppu.get(), &_elf));
+    _logModel.reset(new LogModel());
 }
 
 DebuggerModel::~DebuggerModel() { }
@@ -202,10 +235,17 @@ MonospaceGridModel* DebuggerModel::getDasmModel() {
     return _dasmModel.get();
 }
 
+MonospaceGridModel* DebuggerModel::getLogModel() {
+    return _logModel.get();
+}
+
 void DebuggerModel::loadFile(QString path) {
+    _logModel->log(QString("Loading %1").arg(path));
     auto str = path.toStdString();
     _elf.load(str);
-    _elf.map(_ppu.get());
+    auto stdStringLog = [=](std::string s){ log(s); };
+    _elf.map(_ppu.get(), stdStringLog);
+    _elf.link(_ppu.get(), stdStringLog);
     _grpModel->update();
     _dasmModel->update();
     _dasmModel->navigate(_ppu->getNIP());
@@ -233,3 +273,6 @@ void DebuggerModel::stepIn() {
 void DebuggerModel::stepOver() {}
 void DebuggerModel::run() {}
 void DebuggerModel::restart() {}
+void DebuggerModel::log(std::string str) {
+    _logModel->log(QString::fromStdString(str));
+}

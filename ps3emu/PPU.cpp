@@ -8,12 +8,12 @@
 using namespace boost::endian;
 
 bool mergeAcrossPages(PPU* ppu, decltype(&PPU::writeMemory) f, uint64_t va, 
-                      void* buf, uint len, uint64_t& pageOffset) {
+                      void* buf, uint len, bool allocate, uint64_t& pageOffset) {
     pageOffset = va % MemoryPage::pageSize;
     if (pageOffset + len > MemoryPage::pageSize) {
         auto firstHalfLen = MemoryPage::pageSize - pageOffset;
-        (ppu->*f)(va, buf, firstHalfLen);
-        (ppu->*f)(va + MemoryPage::pageSize, (char*)buf + firstHalfLen, len - firstHalfLen);
+        (ppu->*f)(va, buf, firstHalfLen, allocate);
+        (ppu->*f)(va + MemoryPage::pageSize, (char*)buf + firstHalfLen, len - firstHalfLen, allocate);
         return true;
     }
     return false;
@@ -23,26 +23,28 @@ MemoryPage::MemoryPage() : ptr(new uint8_t[pageSize]) {
     memset(ptr.get(), 0, pageSize);
 }
 
-void PPU::writeMemory(uint64_t va, void* buf, uint len) {
+void PPU::writeMemory(uint64_t va, void* buf, uint len, bool allocate) {
     assert(va != 0 || len == 0);
     uint64_t pageOffset;
-    if (mergeAcrossPages(this, &PPU::writeMemory, va, buf, len, pageOffset))
+    if (mergeAcrossPages(this, &PPU::writeMemory, va, buf, len, allocate, pageOffset))
         return;
     
     // OPT: effective STL 24 if needed
     uint64_t vaPage = va - pageOffset;
     auto it = _pages.find(vaPage);
     if (it == end(_pages)) {
+        if (!allocate)
+            throw std::runtime_error("accessing non existing page");
         _pages[vaPage] = MemoryPage();
     }
     memcpy(_pages[vaPage].ptr.get() + pageOffset, buf, len);
 }
 
-void PPU::setMemory(uint64_t va, uint8_t value, uint len) {
+void PPU::setMemory(uint64_t va, uint8_t value, uint len, bool allocate) {
     // OPT:
     std::unique_ptr<uint8_t> buf(new uint8_t[len]);
     memset(buf.get(), value, len);
-    writeMemory(va, buf.get(), len);
+    writeMemory(va, buf.get(), len, allocate);
 }
 
 struct IForm {
@@ -53,9 +55,9 @@ struct IForm {
 void PPU::run() {
 }
 
-void PPU::readMemory(uint64_t va, void* buf, uint len) {
+void PPU::readMemory(uint64_t va, void* buf, uint len, bool allocate) {
     uint64_t pageOffset;
-    if (mergeAcrossPages(this, &PPU::readMemory, va, buf, len, pageOffset))
+    if (mergeAcrossPages(this, &PPU::readMemory, va, buf, len, allocate, pageOffset))
         return;
     
     // OPT: effective STL 24 if needed

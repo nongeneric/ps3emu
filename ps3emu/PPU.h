@@ -86,9 +86,9 @@ class PPU {
     std::map<uint64_t, MemoryPage> _pages;
     
 public:
-    void writeMemory(uint64_t va, void* buf, uint len);
-    void readMemory(uint64_t va, void* buf, uint len);
-    void setMemory(uint64_t va, uint8_t value, uint len);
+    void writeMemory(uint64_t va, void* buf, uint len, bool allocate = false);
+    void readMemory(uint64_t va, void* buf, uint len, bool allocate = false);
+    void setMemory(uint64_t va, uint8_t value, uint len, bool allocate = false);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(uint64_t va) {
@@ -138,6 +138,10 @@ public:
     
     inline uint64_t getXER() {
         return _XER.v;
+    }
+    
+    inline void setXER(uint64_t value) {
+        _XER.v = value;
     }
     
     inline void setCTR(uint64_t value) {

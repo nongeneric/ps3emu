@@ -5,6 +5,7 @@
 #include <elf.h>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include <boost/endian/arithmetic.hpp>
 
@@ -72,12 +73,15 @@ class ELFLoader {
     Elf64_be_Ehdr* _header;
     Elf64_be_Phdr* _pheaders;
     Elf64_be_Shdr* _sections;
+    Elf64_be_Shdr* findLibGenFunc();
 public:
     ELFLoader();
     ~ELFLoader();
     uint64_t entryPoint();
-    std::string getString(uint idx);
+    const char* getString(uint32_t idx);
+    const char* getSectionName(uint32_t idx);
+    Elf64_be_Sym* getGlobalSymbolByValue(uint32_t value, uint32_t section);
     void load(std::string filePath);
-    void map(PPU* ppu);
-    void link(PPU* ppu);
+    void map(PPU* ppu, std::function<void(std::string)> log);
+    void link(PPU* ppu, std::function<void(std::string)> log);
 };
