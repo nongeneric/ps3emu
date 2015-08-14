@@ -950,7 +950,7 @@ EMU(MTSPR, XFXForm_7) {
     } else if (isLR(i->spr)) {
         ppu->setLR(rs);
     } else if (isCTR(i->spr)) {
-        ppu->setCR(rs);
+        ppu->setCTR(rs);
     } else {
         throw std::runtime_error("illegal");
     }
@@ -1054,6 +1054,14 @@ EMU(RLDICR, MDForm_2) {
 }
 
 
+PRINT(NCALL, NCallForm) {
+    *result = format_1d("ncall", i->idx.u());
+}
+
+EMU(NCALL, NCallForm) {
+    ppu->ncall(i->idx.u());
+}
+
 enum class DasmMode {
     Print, Emulate  
 };
@@ -1081,6 +1089,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
+        case 1: invoke(NCALL);
         case 14: invoke(ADDI);
         case 15: invoke(ADDIS);
         case 16: invoke(BC);

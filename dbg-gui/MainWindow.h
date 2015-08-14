@@ -4,8 +4,11 @@
 #include <MonospaceGrid.h>
 #include "DebuggerModel.h"
 
+class QTextEdit;
 class MainWindow : public QMainWindow {
      Q_OBJECT
+     
+     QTextEdit* _log;
      DebuggerModel _model;
      void setupDocks();
      void setupMenu();

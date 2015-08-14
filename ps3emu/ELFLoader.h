@@ -73,7 +73,7 @@ class ELFLoader {
     Elf64_be_Ehdr* _header;
     Elf64_be_Phdr* _pheaders;
     Elf64_be_Shdr* _sections;
-    Elf64_be_Shdr* findLibGenFunc();
+    Elf64_be_Shdr* findSectionByName(std::string name);
 public:
     ELFLoader();
     ~ELFLoader();

@@ -1,5 +1,5 @@
 #include "DebuggerModel.h"
-#include "../disassm/ppu_dasm.h"
+#include "../ps3emu/ppu_dasm.h"
 #include <QStringList>
 
 class GridModelChangeTracker {
@@ -155,7 +155,10 @@ public:
                 if (col == 1)
                     return printHex(&instr, sizeof instr);
                 if (col == 3) {
-                    return "";
+                    auto sym = _elf->getGlobalSymbolByValue(row, -1);
+                    if (!sym)
+                        return "";
+                    return _elf->getString(sym->st_name);
                 }
                 std::string str;
                 try {
@@ -191,38 +194,10 @@ public:
     }
 };
 
-class LogModel : public MonospaceGridModel {
-    QStringList _list;
-public:    
-    virtual QString getCell(uint64_t row, int col) override {
-        if (col == 0 && row < static_cast<uint64_t>(_list.size()))
-            return _list[row];
-        return "";
-    }
-    
-    virtual uint64_t getMinRow() override {
-        return 0;
-    }
-    
-    virtual uint64_t getMaxRow() override {
-        return _list.size() - 1;
-    }
-    
-    virtual int getColumnCount() override {
-        return 1;
-    }
-    
-    void log(QString message) {
-        _list.push_back(message);
-        navigate(_list.size() - 1);
-    }
-};
-
 DebuggerModel::DebuggerModel() {
     _ppu.reset(new PPU());
     _grpModel.reset(new GPRModel(_ppu.get()));
     _dasmModel.reset(new DasmModel(_ppu.get(), &_elf));
-    _logModel.reset(new LogModel());
 }
 
 DebuggerModel::~DebuggerModel() { }
@@ -235,12 +210,8 @@ MonospaceGridModel* DebuggerModel::getDasmModel() {
     return _dasmModel.get();
 }
 
-MonospaceGridModel* DebuggerModel::getLogModel() {
-    return _logModel.get();
-}
-
 void DebuggerModel::loadFile(QString path) {
-    _logModel->log(QString("Loading %1").arg(path));
+    emit message(QString("Loading %1").arg(path));
     auto str = path.toStdString();
     _elf.load(str);
     auto stdStringLog = [=](std::string s){ log(s); };
@@ -274,5 +245,5 @@ void DebuggerModel::stepOver() {}
 void DebuggerModel::run() {}
 void DebuggerModel::restart() {}
 void DebuggerModel::log(std::string str) {
-    _logModel->log(QString::fromStdString(str));
+    emit message(QString::fromStdString(str));
 }

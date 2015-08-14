@@ -9,14 +9,12 @@
 
 class GPRModel;
 class DasmModel;
-class LogModel;
 class DebuggerModel : public QWidget {
     Q_OBJECT
     
     ELFLoader _elf;
     std::unique_ptr<GPRModel> _grpModel;
     std::unique_ptr<DasmModel> _dasmModel;
-    std::unique_ptr<LogModel> _logModel;
     std::unique_ptr<PPU> _ppu;
     bool _elfLoaded = false;
     void log(std::string str);
@@ -28,7 +26,6 @@ public:
     MonospaceGridModel* getMemoryDumpModel();
     MonospaceGridModel* getStackModel();
     MonospaceGridModel* getOtherAuxRegistersModel();
-    MonospaceGridModel* getLogModel();
     void loadFile(QString path);
     void exec(QString command);
     void stepIn();

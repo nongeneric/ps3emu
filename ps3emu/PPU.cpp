@@ -1,6 +1,4 @@
 #include "PPU.h"
-
-#include "disassm/disasm.h"
 #include <string.h>
 #include <functional>
 #include <stdio.h>
@@ -24,6 +22,8 @@ MemoryPage::MemoryPage() : ptr(new uint8_t[pageSize]) {
 }
 
 void PPU::writeMemory(uint64_t va, void* buf, uint len, bool allocate) {
+    if (va > 0xffffffff) // see Cell_OS-Overview_e
+        throw std::runtime_error("writing beyond user adress range");
     assert(va != 0 || len == 0);
     uint64_t pageOffset;
     if (mergeAcrossPages(this, &PPU::writeMemory, va, buf, len, allocate, pageOffset))
@@ -73,6 +73,7 @@ bool PPU::isAllocated(uint64_t va) {
     auto page = va - offset;
     return _pages.find(page) != end(_pages);
 }
+
 int PPU::allocatedPages() {
     return _pages.size();
 }

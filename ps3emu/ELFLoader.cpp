@@ -105,9 +105,15 @@ void ELFLoader::map(PPU* ppu, std::function<void(std::string)> log) {
         ppu->setMemory(ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
     }
     
-    // 3.4.1. Registers
+    auto procParamSectionName = ".sys_proc_param"; // ppu/include/sys/process.h
+    auto procParamSection = findSectionByName(procParamSectionName);
+    if (procParamSection) {
+        throw std::runtime_error("proc param section not implemented");
+    }
+    
+    // PPU_ABI-Specifications_e
     const auto vaStackBase = 0x06000000;
-    const auto vaStackSize = 0x4000;
+    const auto vaStackSize = 0x10000;
     ppu->setMemory(vaStackBase, 0, vaStackSize, true);
     ppu->setGPR(1, vaStackBase + vaStackSize - sizeof(uint64_t));
         
@@ -117,16 +123,14 @@ void ELFLoader::map(PPU* ppu, std::function<void(std::string)> log) {
     
     ppu->setGPR(3, 0);
     ppu->setGPR(4, vaStackBase);
-    ppu->setGPR(5, vaStackBase);
-    ppu->setGPR(6, 0); // TODO: aux vector
-    ppu->setGPR(7, 0);
+    ppu->setGPR(13, 0); //TODO: control block of tls
     ppu->setFPSCR(0);
     ppu->setNIP(entry.va);
 }
 
-Elf64_be_Shdr* ELFLoader::findLibGenFunc() {
+Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
     for (auto s = _sections; s != _sections + _header->e_shnum; ++s) {
-        if (getSectionName(s->sh_name) == std::string(".debug_libgenfunc"))
+        if (getSectionName(s->sh_name) == name)
             return s;
     }
     return nullptr;
@@ -141,7 +145,8 @@ struct LGFEntry {
 };
 
 void ELFLoader::link(PPU* ppu, std::function<void(std::string)> log) {
-    auto lgfSection = findLibGenFunc();
+    auto lgfSectionName = ".debug_libgenfunc";
+    auto lgfSection = findSectionByName(lgfSectionName);
     if (!lgfSection) {
         log("no libgenfunc section found, nothing to do");
         return;
@@ -150,12 +155,21 @@ void ELFLoader::link(PPU* ppu, std::function<void(std::string)> log) {
     auto count = lgfSection->sh_size / sizeof(LGFEntry);
     log(str(boost::format("%d LGF entries found in %s")
         % count % getSectionName(lgfSection->sh_name)));
+    uint64_t vaFDescrs = 0x7f000000;
+    ppu->setMemory(vaFDescrs, 0, count * 2, true);
     for (auto i = 0u; i < count; ++i) {
         uint32_t lgfIdx = std::distance(_sections, lgfSection);
         auto symbol = getGlobalSymbolByValue(entries[i].sym, lgfIdx);
         if (symbol) {
             auto sname = getString(symbol->st_name);
-            log(str(boost::format("patching %x to point to %s") % entries[i].va % sname));
+            auto vaFDescr = vaFDescrs + i * 8;
+            auto index = ppu->findNCallEntryIndex(sname);
+            uint32_t ncall = (1 << 26) | index;
+            ppu->store<4>(vaFDescr, vaFDescr + 4);
+            ppu->store<4>(vaFDescr + 4, ncall); // use tocbase to place ncall instruction
+            ppu->store<4>(entries[i].va, vaFDescr);
+            log(str(boost::format("resolved %x to point to %s (ncall %d)") 
+                % entries[i].va % sname % index));
         }
     }
 }
@@ -175,7 +189,7 @@ Elf64_be_Sym* ELFLoader::getGlobalSymbolByValue(uint32_t value, uint32_t section
             for (sym += 1; sym != end; ++sym) {
                 if (sym->st_value == value && 
                     ELF64_ST_BIND(sym->st_info) == STB_GLOBAL &&
-                    sym->st_shndx == section)
+                    (sym->st_shndx == section || section == ~0u))
                 {
                     return sym;
                 }

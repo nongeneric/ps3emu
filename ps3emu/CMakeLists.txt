@@ -7,6 +7,10 @@ set(SRC
     ELFLoader.h
     PPU.cpp
     PPU.h
+    ppu_dasm.cpp
+    ppu_dasm.h
+    ppu_dasm_forms.h
+    ncall.cpp
 )
 add_library(ps3emu ${SRC})
-target_link_libraries(ps3emu disassm)
+target_link_libraries(ps3emu libs)

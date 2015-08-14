@@ -6,6 +6,7 @@
 #include <QFileDialog>
 #include <QStatusBar>
 #include <QLabel>
+#include <QTextEdit>
 
 MainWindow::~MainWindow() { }
 
@@ -31,16 +32,12 @@ void MainWindow::setupDocks() {
     gprDock->setTitleBarWidget(new QWidget(this));
     addDockWidget(Qt::RightDockWidgetArea, gprDock);
     
-    auto logGrid = new MonospaceGrid();
-    logGrid->setModel(_model.getLogModel());
-    logGrid->setColumnWidth(0, 500);
-    logGrid->setMinimumHeight(300);
-    logGrid->setScrollable(true);
-    
     auto bottomDock = new QDockWidget(this);
-    bottomDock->setFeatures(QDockWidget::NoDockWidgetFeatures);
-    bottomDock->setWidget(logGrid);
-    bottomDock->setTitleBarWidget(new QWidget(this));
+    _log = new QTextEdit();
+    _log->setReadOnly(true);
+    _log->setFont(QFont("monospace", 10));
+    bottomDock->setWidget(_log);
+    
     addDockWidget(Qt::BottomDockWidgetArea, bottomDock);
     
     auto dasmGrid = new MonospaceGrid();
@@ -110,5 +107,6 @@ void MainWindow::setupStatusBar() {
     statusBar()->setSizeGripEnabled(false);
     connect(&_model, &DebuggerModel::message, this, [=](QString text){
         label->setText(text);
+        _log->append(text);
     });
 }

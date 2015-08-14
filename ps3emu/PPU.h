@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../disassm/BitField.h"
+#include "BitField.h"
 #include <stdint.h>
 #include <map>
 #include <memory>
@@ -10,7 +10,7 @@
 struct MemoryPage {
     MemoryPage();
     std::unique_ptr<uint8_t> ptr;
-    static constexpr uint pageSize = 1 << 12;
+    static constexpr uint pageSize = 64 * 1024;
 };
 
 template <int Bytes>
@@ -89,6 +89,8 @@ public:
     void writeMemory(uint64_t va, void* buf, uint len, bool allocate = false);
     void readMemory(uint64_t va, void* buf, uint len, bool allocate = false);
     void setMemory(uint64_t va, uint8_t value, uint len, bool allocate = false);
+    void ncall(uint32_t index);
+    uint32_t findNCallEntryIndex(std::string name);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(uint64_t va) {

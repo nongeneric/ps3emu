@@ -1,4 +1,4 @@
-#include "../disassm/ppu_dasm.h"
+#include "../ps3emu/ppu_dasm.h"
 #include <catch.hpp>
 
 TEST_CASE("common bitfield operations") {

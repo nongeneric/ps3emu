@@ -1,5 +1,5 @@
 #include "../ps3emu/PPU.h"
-#include "../disassm/ppu_dasm.h"
+#include "../ps3emu/ppu_dasm.h"
 #include <catch.hpp>
 
 TEST_CASE("read write memory") {
@@ -82,4 +82,12 @@ TEST_CASE("emu stw") {
     uint8_t instr[] = { 0x93, 0xab, 0x00, 0x00 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
     REQUIRE(ppu.load<4>(0x400000) == 0x55667788); 
+}
+
+TEST_CASE("emu mtctr") {
+    PPU ppu;
+    ppu.setGPR(0, 0x11223344);
+    uint8_t instr[] = { 0x7c, 0x09, 0x03, 0xa6 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE(ppu.getCTR() == 0x11223344); 
 }

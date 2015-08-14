@@ -155,3 +155,7 @@ union MDForm_2 {
     BitField<30, 31> sh5;
     BitField<31, 32> Rc;
 };
+
+union NCallForm {
+    BitField<6, 32> idx;
+};

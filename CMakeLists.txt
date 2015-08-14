@@ -16,7 +16,7 @@ add_definitions(-DDEBUG)
 #-fsanitize=undefined
 set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
 
-add_subdirectory(disassm)
 add_subdirectory(ps3emu)
 add_subdirectory(dbg-gui)
+add_subdirectory(libs)
 add_subdirectory(tests)
