@@ -27,26 +27,33 @@ TEST_CASE("signed stdu") {
     uint8_t instr[] = { 0xf8, 0x21, 0xff, 0x91 };
     std::string res;
     ppu_dasm<DasmMode::Print>(instr, 0x10248, &res);
-    REQUIRE(res == "stdu 1,-112(1)");
+    REQUIRE(res == "stdu r1,-112(r1)");
 }
 
 TEST_CASE("mtlr") {
     uint8_t instr[] = { 0x7c, 0x08, 0x03, 0xa6 };
     std::string res;
     ppu_dasm<DasmMode::Print>(instr, 0x10248, &res);
-    REQUIRE(res == "mtlr 0");
+    REQUIRE(res == "mtlr r0");
 }
 
 TEST_CASE("clrldi") {
     uint8_t instr[] = { 0x79, 0x04, 0x00, 0x20 };
     std::string res;
     ppu_dasm<DasmMode::Print>(instr, 0x10248, &res);
-    REQUIRE(res == "clrldi 4,8,32");
+    REQUIRE(res == "clrldi r4,r8,32");
 }
 
 TEST_CASE("stw") {
     uint8_t instr[] = { 0x93, 0xab, 0x00, 0x00 };
     std::string res;
     ppu_dasm<DasmMode::Print>(instr, 0x10248, &res);
-    REQUIRE(res == "stw 29,0(11)");
+    REQUIRE(res == "stw r29,0(r11)");
+}
+
+TEST_CASE("cmpld") {
+    uint8_t instr[] = { 0x7f, 0xbf, 0x40, 0x40 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x10248, &res);
+    REQUIRE(res == "cmpld cr7,r31,r8");
 }

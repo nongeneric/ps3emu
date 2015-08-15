@@ -4,14 +4,14 @@
 #include "ppu_dasm_forms.h"
 
 #include <boost/type_traits.hpp>
-#include <boost/format.hpp>
 #include <boost/endian/conversion.hpp>
 #include <string>
 #include <stdint.h>
 #include <bitset>
+#include <stdio.h>
+#include <cinttypes>
 
 using namespace boost::endian;
-using namespace boost;
 
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPU* ppu)
@@ -32,10 +32,79 @@ uint64_t bit_set(T number, int n) {
     return number | (1 << (sizeof(T) * 8 - n));
 }
 
+template <typename... Args>
+std::string ssnprintf(const char* f, Args... args) {
+    char buf[30];
+    snprintf(buf, sizeof buf, f, args...);
+    return std::string(buf);
+}
+
+inline std::string format_u(const char* mnemonic, uint64_t u) {
+    return ssnprintf("%s %" PRIx64, mnemonic, u);
+}
+
+template <typename OP1>
+inline std::string format_n(const char* mnemonic, OP1 op1) {
+    return ssnprintf("%s %s%d", mnemonic, op1.prefix(), op1.native());
+}
+
+template <typename OP1, typename OP2>
+inline std::string format_nn(const char* mnemonic, OP1 op1, OP2 op2) {
+    return ssnprintf("%s %s%d,%s%d", mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native());
+}
+
+template <typename OP1, typename OP2, typename OP3>
+inline std::string format_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
+    return ssnprintf("%s %s%d,%s%d,%s%d", mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native(),
+                     op3.prefix(), op3.native()
+                    );
+}
+
+template <typename OP1, typename OP2>
+inline std::string format_nnu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u) {
+    return ssnprintf("%s %s%d,%s%d,%" PRId64, mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native(),
+                     u
+    );
+}
+
+template <typename OP1, typename OP2>
+inline std::string format_nnuu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u1, uint64_t u2) {
+    return ssnprintf("%s %s%d,%s%d,%" PRId64 ",%" PRId64, mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native(),
+                     u1, u2
+    );
+}
+
+template <typename OP1, typename OP2, typename OP3>
+inline std::string format_br_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
+    return ssnprintf("%s %s%d,%s%d(%s%d)", mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native(),
+                     op3.prefix(), op3.native()
+    );
+}
+
+template <typename OP1, typename OP2, typename OP3, typename OP4>
+inline std::string format_nnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4) {
+    return ssnprintf("%s %s%d,%s%d,%s%d", mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native(),
+                     op3.prefix(), op3.native(),
+                     op4.prefix(), op4.native()
+    );
+}
+
 // Branch I-form, p24
 
 inline uint64_t getNIA(IForm* i, uint64_t cia) {
-    auto ext = i->LI << 2;
+    auto ext = i->LI.native();
     return i->AA.u() ? ext : (cia + ext);
 }
 
@@ -44,7 +113,7 @@ PRINT(B, IForm) {
         { "b", "ba" }, { "bl", "bla" }  
     };
     auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
-    *result = str(format("%s %x") % mnemonic % getNIA(i, cia));
+    *result = format_u(mnemonic, getNIA(i, cia));
 }
 
 EMU(B, IForm) {
@@ -65,8 +134,7 @@ PRINT(BC, BForm) {
         { "bc", "bca" }, { "bcl", "bcla" }  
     };
     auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
-    *result = str(format("%s %d,%d,%x") 
-        % mnemonic % i->BO.u() % i->BI.u() % getNIA(i, cia));
+    *result = format_nnu(mnemonic, i->BO, i->BI, getNIA(i, cia));
 }
 
 template <int P1, int P2, int P3, int P4, int P5>
@@ -93,32 +161,6 @@ EMU(BC, BForm) {
 
 // Branch Conditional to Link Register XL-form, p25
 
-template <typename OP1, typename OP2, typename OP3>
-std::string format_3d(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
-    return str(format("%s %d,%d,%d") % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3));
-}
-
-template <typename OP1, typename OP2, typename OP3, typename OP4>
-std::string format_4d(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4) {
-    return str(format("%s %d,%d,%d") 
-        % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3) % getSValue(op4));
-}
-
-template <typename OP1, typename OP2>
-std::string format_2d(const char* mnemonic, OP1 op1, OP2 op2) {
-    return str(format("%s %d,%d") % mnemonic % getSValue(op1) % getSValue(op2));
-}
-
-template <typename OP1>
-std::string format_1d(const char* mnemonic, OP1 op1) {
-    return str(format("%s %d") % mnemonic % getSValue(op1));
-}
-
-template <typename OP1, typename OP2, typename OP3>
-std::string format_3d_3bracket(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
-    return str(format("%s %d,%d(%d)") % mnemonic % getSValue(op1) % getSValue(op2) % getSValue(op3));
-}
-
 template <typename BF>
 inline int64_t getB(BF ra, PPU* ppu) {
     return ra.u() == 0 ? 0 : ppu->getGPR(ra);
@@ -126,7 +168,7 @@ inline int64_t getB(BF ra, PPU* ppu) {
 
 PRINT(BCLR, XLForm_2) {
     auto mnemonic = i->LK.u() ? "bclrl" : "bclr";
-    *result = format_3d(mnemonic, i->BO, i->BI, i->BH);
+    *result = format_nnn(mnemonic, i->BO, i->BI, i->BH);
 }
 
 EMU(BCLR, XLForm_2) {
@@ -142,7 +184,7 @@ EMU(BCLR, XLForm_2) {
 
 PRINT(BCCTR, XLForm_2) {
     auto mnemonic = i->LK.u() ? "bcctrl" : "bcctr";
-    *result = format_3d(mnemonic, i->BO, i->BI, i->BH);
+    *result = format_nnn(mnemonic, i->BO, i->BI, i->BH);
 }
 
 EMU(BCCTR, XLForm_2) {
@@ -156,7 +198,7 @@ EMU(BCCTR, XLForm_2) {
 // Condition Register AND, p28
 
 PRINT(CRAND, XLForm_1) {
-    *result = format_3d("crand", i->BT, i->BA, i->BB);
+    *result = format_nnn("crand", i->BT, i->BA, i->BB);
 }
 
 EMU(CRAND, XLForm_1) {
@@ -168,7 +210,7 @@ EMU(CRAND, XLForm_1) {
 // Condition Register OR, p28
 
 PRINT(CROR, XLForm_1) {
-    *result = format_3d("cror", i->BT, i->BA, i->BB);
+    *result = format_nnn("cror", i->BT, i->BA, i->BB);
 }
 
 EMU(CROR, XLForm_1) {
@@ -180,7 +222,7 @@ EMU(CROR, XLForm_1) {
 // Condition Register XOR, p28
 
 PRINT(CRXOR, XLForm_1) {
-    *result = format_3d("crxor", i->BT, i->BA, i->BB);
+    *result = format_nnn("crxor", i->BT, i->BA, i->BB);
 }
 
 EMU(CRXOR, XLForm_1) {
@@ -192,7 +234,7 @@ EMU(CRXOR, XLForm_1) {
 // Condition Register NAND, p28
 
 PRINT(CRNAND, XLForm_1) {
-    *result = format_3d("crnand", i->BT, i->BA, i->BB);
+    *result = format_nnn("crnand", i->BT, i->BA, i->BB);
 }
 
 EMU(CRNAND, XLForm_1) {
@@ -204,7 +246,7 @@ EMU(CRNAND, XLForm_1) {
 // Condition Register NOR, p29
 
 PRINT(CRNOR, XLForm_1) {
-    *result = format_3d("crnor", i->BT, i->BA, i->BB);
+    *result = format_nnn("crnor", i->BT, i->BA, i->BB);
 }
 
 EMU(CRNOR, XLForm_1) {
@@ -216,7 +258,7 @@ EMU(CRNOR, XLForm_1) {
 // Condition Register Equivalent, p29
 
 PRINT(CREQV, XLForm_1) {
-    *result = format_3d("creqv", i->BT, i->BA, i->BB);
+    *result = format_nnn("creqv", i->BT, i->BA, i->BB);
 }
 
 EMU(CREQV, XLForm_1) {
@@ -228,7 +270,7 @@ EMU(CREQV, XLForm_1) {
 // Condition Register AND with Complement, p29
 
 PRINT(CRANDC, XLForm_1) {
-    *result = format_3d("crandc", i->BT, i->BA, i->BB);
+    *result = format_nnn("crandc", i->BT, i->BA, i->BB);
 }
 
 EMU(CRANDC, XLForm_1) {
@@ -240,7 +282,7 @@ EMU(CRANDC, XLForm_1) {
 // Condition Register OR with Complement, p29
 
 PRINT(CRORC, XLForm_1) {
-    *result = format_3d("crorc", i->BT, i->BA, i->BB);
+    *result = format_nnn("crorc", i->BT, i->BA, i->BB);
 }
 
 EMU(CRORC, XLForm_1) {
@@ -252,7 +294,7 @@ EMU(CRORC, XLForm_1) {
 // Condition Register Field Instruction, p30
 
 PRINT(MCRF, XLForm_3) {
-    *result = format_2d("mcrf", i->BF, i->BFA);
+    *result = format_nn("mcrf", i->BF, i->BFA);
 }
 
 EMU(MCRF, XLForm_3) {
@@ -268,7 +310,7 @@ EMU(MCRF, XLForm_3) {
 // Load Byte and Zero, p34
 
 PRINT(LBZ, DForm_1) {
-    *result = format_3d_3bracket("lbz", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lbz", i->RT, i->D, i->RA);
 }
 
 EMU(LBZ, DForm_1) {
@@ -280,7 +322,7 @@ EMU(LBZ, DForm_1) {
 // Load Byte and Zero, p34
 
 PRINT(LBZX, XForm_1) {
-    *result = format_3d("lbzx", i->RT, i->RA, i->RB);
+    *result = format_nnn("lbzx", i->RT, i->RA, i->RB);
 }
 
 EMU(LBZX, XForm_1) {
@@ -292,7 +334,7 @@ EMU(LBZX, XForm_1) {
 // Load Byte and Zero with Update, p34
 
 PRINT(LBZU, DForm_1) {
-    *result = format_3d_3bracket("lbzu", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lbzu", i->RT, i->D, i->RA);
 }
 
 EMU(LBZU, DForm_1) {
@@ -304,7 +346,7 @@ EMU(LBZU, DForm_1) {
 // Load Byte and Zero with Update Indexed, p34
 
 PRINT(LBZUX, XForm_1) {
-    *result = format_3d("lbzux", i->RT, i->RA, i->RB);
+    *result = format_nnn("lbzux", i->RT, i->RA, i->RB);
 }
 
 EMU(LBZUX, XForm_1) {
@@ -316,7 +358,7 @@ EMU(LBZUX, XForm_1) {
 // Load Halfword and Zero, p35
 
 PRINT(LHZ, DForm_1) {
-    *result = format_3d_3bracket("lhz", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lhz", i->RT, i->D, i->RA);
 }
 
 EMU(LHZ, DForm_1) {
@@ -328,7 +370,7 @@ EMU(LHZ, DForm_1) {
 // Load Halfword and Zero Indexed, p35
 
 PRINT(LHZX, XForm_1) {
-    *result = format_3d("lhzx", i->RT, i->RA, i->RB);
+    *result = format_nnn("lhzx", i->RT, i->RA, i->RB);
 }
 
 EMU(LHZX, XForm_1) {
@@ -340,7 +382,7 @@ EMU(LHZX, XForm_1) {
 // Load Halfword and Zero with Update, p35
 
 PRINT(LHZU, DForm_1) {
-    *result = format_3d_3bracket("lhzu", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lhzu", i->RT, i->D, i->RA);
 }
 
 EMU(LHZU, DForm_1) {
@@ -352,7 +394,7 @@ EMU(LHZU, DForm_1) {
 // Load Halfword and Zero with Update Indexed, p35
 
 PRINT(LHZUX, XForm_1) {
-    *result = format_3d("lhzux", i->RT, i->RA, i->RB);
+    *result = format_nnn("lhzux", i->RT, i->RA, i->RB);
 }
 
 EMU(LHZUX, XForm_1) {
@@ -364,7 +406,7 @@ EMU(LHZUX, XForm_1) {
 // Load Halfword Algebraic, p36
 
 PRINT(LHA, DForm_1) {
-    *result = format_3d_3bracket("lha", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lha", i->RT, i->D, i->RA);
 }
 
 EMU(LHA, DForm_1) {
@@ -376,7 +418,7 @@ EMU(LHA, DForm_1) {
 // Load Halfword Algebraic Indexed, p36
 
 PRINT(LHAX, XForm_1) {
-    *result = format_3d("LHAX", i->RT, i->RA, i->RB);
+    *result = format_nnn("LHAX", i->RT, i->RA, i->RB);
 }
 
 EMU(LHAX, XForm_1) {
@@ -388,7 +430,7 @@ EMU(LHAX, XForm_1) {
 // Load Halfword Algebraic with Update, p36
 
 PRINT(LHAU, DForm_1) {
-    *result = format_3d_3bracket("lhaux", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lhaux", i->RT, i->D, i->RA);
 }
 
 EMU(LHAU, DForm_1) {
@@ -400,7 +442,7 @@ EMU(LHAU, DForm_1) {
 // Load Halfword Algebraic with Update Indexed, p36
 
 PRINT(LHAUX, XForm_1) {
-    *result = format_3d("lhaux", i->RT, i->RA, i->RB);
+    *result = format_nnn("lhaux", i->RT, i->RA, i->RB);
 }
 
 EMU(LHAUX, XForm_1) {
@@ -412,7 +454,7 @@ EMU(LHAUX, XForm_1) {
 // Load Word and Zero, p37
 
 PRINT(LWZ, DForm_1) {
-    *result = format_3d_3bracket("lwz", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lwz", i->RT, i->D, i->RA);
 }
 
 EMU(LWZ, DForm_1) {
@@ -424,7 +466,7 @@ EMU(LWZ, DForm_1) {
 // Load Word and Zero Indexed, p37
 
 PRINT(LWZX, XForm_1) {
-    *result = format_3d("lwzx", i->RT, i->RA, i->RB);
+    *result = format_nnn("lwzx", i->RT, i->RA, i->RB);
 }
 
 EMU(LWZX, XForm_1) {
@@ -436,7 +478,7 @@ EMU(LWZX, XForm_1) {
 // Load Word and Zero with Update, p37
 
 PRINT(LWZU, DForm_1) {
-    *result = format_3d_3bracket("lwzu", i->RT, i->D, i->RA);
+    *result = format_br_nnn("lwzu", i->RT, i->D, i->RA);
 }
 
 EMU(LWZU, DForm_1) {
@@ -448,7 +490,7 @@ EMU(LWZU, DForm_1) {
 // Load Word and Zero with Update Indexed, p37
 
 PRINT(LWZUX, XForm_1) {
-    *result = format_3d("lwzux", i->RT, i->RA, i->RB);
+    *result = format_nnn("lwzux", i->RT, i->RA, i->RB);
 }
 
 EMU(LWZUX, XForm_1) {
@@ -459,19 +501,19 @@ EMU(LWZUX, XForm_1) {
 // Load Word Algebraic, p38
 
 PRINT(LWA, DSForm_1) {
-    *result = format_3d_3bracket("lwa", i->RT, i->DS << 2, i->RA);
+    *result = format_br_nnn("lwa", i->RT, i->DS, i->RA);
 }
 
 EMU(LWA, DSForm_1) {
     auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + (i->DS << 2);
+    auto ea = b + i->DS.native();
     ppu->setGPR(i->RT, ppu->loads<4>(ea));
 }
 
 // Load Word Algebraic Indexed, p38
 
 PRINT(LWAX, XForm_1) {
-    *result = format_3d("lwax", i->RT, i->RA, i->RB);
+    *result = format_nnn("lwax", i->RT, i->RA, i->RB);
 }
 
 EMU(LWAX, XForm_1) {
@@ -483,7 +525,7 @@ EMU(LWAX, XForm_1) {
 // Load Word Algebraic with Update Indexed, p38
 
 PRINT(LWAUX, XForm_1) {
-    *result = format_3d("lwaux", i->RT, i->RA, i->RB);
+    *result = format_nnn("lwaux", i->RT, i->RA, i->RB);
 }
 
 EMU(LWAUX, XForm_1) {
@@ -495,19 +537,19 @@ EMU(LWAUX, XForm_1) {
 // Load Doubleword, p39
 
 PRINT(LD, DSForm_1) {
-    *result = format_3d_3bracket("ld", i->RT, i->DS << 2, i->RA);
+    *result = format_br_nnn("ld", i->RT, i->DS, i->RA);
 }
 
 EMU(LD, DSForm_1) {
     auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
-    auto ea = b + (i->DS << 2);
+    auto ea = b + i->DS.native();
     ppu->setGPR(i->RT, ppu->load<8>(ea));
 }
 
 // Load Doubleword Indexed, p39
 
 PRINT(LDX, XForm_1) {
-    *result = format_3d("ldx", i->RT, i->RA, i->RB);
+    *result = format_nnn("ldx", i->RT, i->RA, i->RB);
 }
 
 EMU(LDX, XForm_1) {
@@ -519,11 +561,11 @@ EMU(LDX, XForm_1) {
 // Load Doubleword with Update, p39
 
 PRINT(LDU, DSForm_1) {
-    *result = format_3d_3bracket("ldu", i->RT, i->DS << 2, i->RA);
+    *result = format_br_nnn("ldu", i->RT, i->DS, i->RA);
 }
 
 EMU(LDU, DSForm_1) {
-    auto ea = ppu->getGPR(i->RA) + (i->DS << 2);
+    auto ea = ppu->getGPR(i->RA) + i->DS.native();
     ppu->setGPR(i->RT, ppu->load<8>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -531,7 +573,7 @@ EMU(LDU, DSForm_1) {
 // Load Doubleword with Update Indexed, p39
 
 PRINT(LDUX, XForm_1) {
-    *result = format_3d("ldux", i->RT, i->RA, i->RB);
+    *result = format_nnn("ldux", i->RT, i->RA, i->RB);
 }
 
 EMU(LDUX, XForm_1) {
@@ -572,11 +614,11 @@ void EmuStoreUpdateIndexed(XForm_8* i, PPU* ppu) {
 }
 
 inline void PrintStore(const char* mnemonic, DForm_3* i, std::string* result) {
-    *result = format_3d_3bracket(mnemonic, i->RS.u(), i->D, i->RA.u());
+    *result = format_br_nnn(mnemonic, i->RS, i->D, i->RA);
 }
 
 inline void PrintStoreIndexed(const char* mnemonic, XForm_8* i, std::string* result) {
-    *result = format_3d(mnemonic, i->RS, i->RA, i->RB);
+    *result = format_nnn(mnemonic, i->RS, i->RA, i->RB);
 }
 
 PRINT(STB, DForm_3) { PrintStore("stbx", i, result); }
@@ -607,12 +649,12 @@ PRINT(STWUX, XForm_8) { PrintStoreIndexed("stwux", i, result); }
 EMU(STWUX, XForm_8) { EmuStoreUpdateIndexed<4>(i, ppu); }
 
 PRINT(STD, DSForm_2) { 
-    *result = format_3d_3bracket("std", i->RS, i->DS << 2, i->RA);
+    *result = format_br_nnn("std", i->RS, i->DS, i->RA);
 }
 
 EMU(STD, DSForm_2) { 
     auto b = getB(i->RA, ppu);
-    auto ea = b + (i->DS << 2);
+    auto ea = b + i->DS.native();
     ppu->store<8>(ea, ppu->getGPR(i->RS));
 }
 
@@ -620,11 +662,11 @@ PRINT(STDX, XForm_8) { PrintStoreIndexed("stdx", i, result); }
 EMU(STDX, XForm_8) { EmuStoreIndexed<8>(i, ppu); }
 
 PRINT(STDU, DSForm_2) { 
-    *result = format_3d_3bracket("stdu", i->RS, i->DS << 2, i->RA);
+    *result = format_br_nnn("stdu", i->RS, i->DS, i->RA);
 }
 
 EMU(STDU, DSForm_2) { 
-    auto ea = ppu->getGPR(i->RA) + (i->DS << 2);
+    auto ea = ppu->getGPR(i->RA) + i->DS.native();
     ppu->store<8>(ea, ppu->getGPR(i->RS));
     ppu->setGPR(i->RA, ea);
 }
@@ -641,9 +683,9 @@ void EmuLoadByteReverseIndexed(XForm_1* i, PPU* ppu) {
     ppu->setGPR(i->RT, endian_reverse(ppu->load<Bytes>(ea)));
 }
 
-PRINT(LHBRX, XForm_1) { *result = format_3d("lhbrx", i->RT, i->RA, i->RB); }
+PRINT(LHBRX, XForm_1) { *result = format_nnn("lhbrx", i->RT, i->RA, i->RB); }
 EMU(LHBRX, XForm_1) { EmuLoadByteReverseIndexed<2>(i, ppu); }
-PRINT(LWBRX, XForm_1) { *result = format_3d("lwbrx", i->RT, i->RA, i->RB); }
+PRINT(LWBRX, XForm_1) { *result = format_nnn("lwbrx", i->RT, i->RA, i->RB); }
 EMU(LWBRX, XForm_1) { EmuLoadByteReverseIndexed<4>(i, ppu); }
 
 template <int Bytes>
@@ -653,15 +695,15 @@ void EmuStoreByteReverseIndexed(XForm_8* i, PPU* ppu) {
     ppu->store<Bytes>(ea, endian_reverse(i->RS.u()));
 }
 
-PRINT(STHBRX, XForm_8) { *result = format_3d("sthbrx", i->RS, i->RA, i->RB); }
+PRINT(STHBRX, XForm_8) { *result = format_nnn("sthbrx", i->RS, i->RA, i->RB); }
 EMU(STHBRX, XForm_8) { EmuStoreByteReverseIndexed<2>(i, ppu); }
-PRINT(STWBRX, XForm_8) { *result = format_3d("stwbrx", i->RS, i->RA, i->RB); }
+PRINT(STWBRX, XForm_8) { *result = format_nnn("stwbrx", i->RS, i->RA, i->RB); }
 EMU(STWBRX, XForm_8) { EmuStoreByteReverseIndexed<4>(i, ppu); }
 
 // Fixed-Point Arithmetic Instructions, p51
 
 PRINT(ADDI, DForm_2) {
-    *result = format_3d("addi", i->RT, i->RA, i->SI);
+    *result = format_nnn("addi", i->RT, i->RA, i->SI);
 }
 
 EMU(ADDI, DForm_2) {
@@ -670,7 +712,7 @@ EMU(ADDI, DForm_2) {
 }
 
 PRINT(ADDIS, DForm_2) {
-    *result = format_3d("addis", i->RT, i->RA, i->SI);
+    *result = format_nnn("addis", i->RT, i->RA, i->SI);
 }
 
 EMU(ADDIS, DForm_2) {
@@ -701,7 +743,7 @@ PRINT(ADD, XOForm_1) {
     const char* mnemonics[][2] = {
         { "add", "add." }, { "addo", "addo." }
     };
-    *result = format_3d(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
 EMU(ADD, XOForm_1) {
@@ -721,7 +763,7 @@ PRINT(SUBF, XOForm_1) {
     const char* mnemonics[][2] = {
         { "subf", "subf." }, { "subfo", "subfo." }
     };
-    *result = format_3d(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
 EMU(SUBF, XOForm_1) {
@@ -742,7 +784,7 @@ EMU(SUBF, XOForm_1) {
 // AND
 
 PRINT(ANDID, DForm_4) {
-    *result = format_3d("andi.", i->RA, i->RS, i->UI);
+    *result = format_nnn("andi.", i->RA, i->RS, i->UI);
 }
 
 EMU(ANDID, DForm_4) {
@@ -752,7 +794,7 @@ EMU(ANDID, DForm_4) {
 }
 
 PRINT(ANDISD, DForm_4) {
-    *result = format_3d("andis.", i->RA, i->RS, i->UI);
+    *result = format_nnn("andis.", i->RA, i->RS, i->UI);
 }
 
 EMU(ANDISD, DForm_4) {
@@ -764,7 +806,7 @@ EMU(ANDISD, DForm_4) {
 // OR
 
 PRINT(ORI, DForm_4) {
-    *result = format_3d("ori", i->RA, i->RS, i->UI);
+    *result = format_nnn("ori", i->RA, i->RS, i->UI);
 }
 
 EMU(ORI, DForm_4) {
@@ -773,7 +815,7 @@ EMU(ORI, DForm_4) {
 }
 
 PRINT(ORIS, DForm_4) {
-    *result = format_3d("oris", i->RA, i->RS, i->UI);
+    *result = format_nnn("oris", i->RA, i->RS, i->UI);
 }
 
 EMU(ORIS, DForm_4) {
@@ -784,7 +826,7 @@ EMU(ORIS, DForm_4) {
 // XOR
 
 PRINT(XORI, DForm_4) {
-    *result = format_3d("xori", i->RA, i->RS, i->UI);
+    *result = format_nnn("xori", i->RA, i->RS, i->UI);
 }
 
 EMU(XORI, DForm_4) {
@@ -793,7 +835,7 @@ EMU(XORI, DForm_4) {
 }
 
 PRINT(XORIS, DForm_4) {
-    *result = format_3d("xoris", i->RA, i->RS, i->UI);
+    *result = format_nnn("xoris", i->RA, i->RS, i->UI);
 }
 
 EMU(XORIS, DForm_4) {
@@ -804,7 +846,7 @@ EMU(XORIS, DForm_4) {
 // X-forms
 
 PRINT(AND, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "and." : "and", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "and." : "and", i->RA, i->RS, i->RB);
 }
 
 EMU(AND, XForm_6) {
@@ -815,7 +857,7 @@ EMU(AND, XForm_6) {
 }
 
 PRINT(OR, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "or." : "or", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "or." : "or", i->RA, i->RS, i->RB);
 }
 
 EMU(OR, XForm_6) {
@@ -826,7 +868,7 @@ EMU(OR, XForm_6) {
 }
 
 PRINT(XOR, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "xor." : "xor", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "xor." : "xor", i->RA, i->RS, i->RB);
 }
 
 EMU(XOR, XForm_6) {
@@ -837,7 +879,7 @@ EMU(XOR, XForm_6) {
 }
 
 PRINT(NAND, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "nand." : "nand", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "nand." : "nand", i->RA, i->RS, i->RB);
 }
 
 EMU(NAND, XForm_6) {
@@ -848,7 +890,7 @@ EMU(NAND, XForm_6) {
 }
 
 PRINT(NOR, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "nor." : "nor", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "nor." : "nor", i->RA, i->RS, i->RB);
 }
 
 EMU(NOR, XForm_6) {
@@ -859,7 +901,7 @@ EMU(NOR, XForm_6) {
 }
 
 PRINT(EQV, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "eqv." : "eqv", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "eqv." : "eqv", i->RA, i->RS, i->RB);
 }
 
 EMU(EQV, XForm_6) {
@@ -870,7 +912,7 @@ EMU(EQV, XForm_6) {
 }
 
 PRINT(ANDC, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "andc." : "andc", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "andc." : "andc", i->RA, i->RS, i->RB);
 }
 
 EMU(ANDC, XForm_6) {
@@ -881,7 +923,7 @@ EMU(ANDC, XForm_6) {
 }
 
 PRINT(ORC, XForm_6) {
-    *result = format_3d(i->Rc.u() ? "orc." : "orc", i->RA, i->RS, i->RB);
+    *result = format_nnn(i->Rc.u() ? "orc." : "orc", i->RA, i->RS, i->RB);
 }
 
 EMU(ORC, XForm_6) {
@@ -894,7 +936,7 @@ EMU(ORC, XForm_6) {
 // Extend Sign
 
 PRINT(EXTSB, XForm_11) {
-    *result = format_2d(i->Rc.u() ? "extsb." : "extsb", i->RA, i->RS);
+    *result = format_nn(i->Rc.u() ? "extsb." : "extsb", i->RA, i->RS);
 }
 
 EMU(EXTSB, XForm_11) {
@@ -902,7 +944,7 @@ EMU(EXTSB, XForm_11) {
 }
 
 PRINT(EXTSH, XForm_11) {
-    *result = format_2d(i->Rc.u() ? "extsh." : "extsh", i->RA, i->RS);
+    *result = format_nn(i->Rc.u() ? "extsh." : "extsh", i->RA, i->RS);
 }
 
 EMU(EXTSH, XForm_11) {
@@ -910,7 +952,7 @@ EMU(EXTSH, XForm_11) {
 }
 
 PRINT(EXTSW, XForm_11) {
-    *result = format_2d(i->Rc.u() ? "extsw." : "extsw", i->RA, i->RS);
+    *result = format_nn(i->Rc.u() ? "extsw." : "extsw", i->RA, i->RS);
 }
 
 EMU(EXTSW, XForm_11) {
@@ -937,7 +979,7 @@ PRINT(MTSPR, XFXForm_7) {
                   : isCTR(i->spr) ? "mtctr"
                   : nullptr;
     if (mnemonic) {
-        *result = format_1d(mnemonic, i->RS);
+        *result = format_n(mnemonic, i->RS);
     } else {
         throw std::runtime_error("illegal");
     }
@@ -962,7 +1004,7 @@ PRINT(MFSPR, XFXForm_7) {
                   : isCTR(i->spr) ? "mfctr"
     : nullptr;
     if (mnemonic) {
-        *result = format_1d(mnemonic, i->RS);
+        *result = format_n(mnemonic, i->RS);
     } else {
         throw std::runtime_error("illegal");
     }
@@ -991,20 +1033,14 @@ PRINT(RLDICL, MDForm_1) {
     auto x = 64 - b;
     auto y = n - 64 + b;
     if (n == 0) {
-        *result = format_3d(i->Rc.u() ? "clrldi." : "clrldi", i->RA, i->RS, b);
+        *result = format_nnu(i->Rc.u() ? "clrldi." : "clrldi", i->RA, i->RS, b);
     } else if (64 - n == b) {
-        *result = format_3d(i->Rc.u() ? "srdi." : "srdi", i->RA, i->RS, b);
+        *result = format_nnu(i->Rc.u() ? "srdi." : "srdi", i->RA, i->RS, b);
     } else if (x + y < 64) {
-        *result = format_4d(i->Rc.u() ? "extrdi." : "extrdi", i->RA, i->RS, x, y);
+        *result = format_nnuu(i->Rc.u() ? "extrdi." : "extrdi", i->RA, i->RS, x, y);
     } else {
-        *result = format_4d(i->Rc.u() ? "rldicl." : "rldicl", i->RA, i->RS, b + n, 64 - n);
+        *result = format_nnuu(i->Rc.u() ? "rldicl." : "rldicl", i->RA, i->RS, b + n, 64 - n);
     }
-}
-
-inline uint64_t mask(uint8_t x, uint8_t y) {
-    if (x > y)
-        return ~mask(y + 1, x - 1);
-    return (~0ull << x) >> (64 - (y - x));
 }
 
 inline uint64_t ror(uint64_t n, uint8_t s) {
@@ -1032,13 +1068,13 @@ PRINT(RLDICR, MDForm_2) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->me04, i->me5);
     if (n == 0) {
-        *result = format_3d(i->Rc.u() ? "clrrdi." : "clrrdi", i->RA, i->RS, 63 - b);
+        *result = format_nnu(i->Rc.u() ? "clrrdi." : "clrrdi", i->RA, i->RS, 63 - b);
     } else if (63 - b == n) {
-        *result = format_3d(i->Rc.u() ? "sldi." : "sldi", i->RA, i->RS, n);
+        *result = format_nnu(i->Rc.u() ? "sldi." : "sldi", i->RA, i->RS, n);
     } else if (b > 1) {
-        *result = format_4d(i->Rc.u() ? "extldi." : "extldi", i->RA, i->RS, b - 1, n);
+        *result = format_nnuu(i->Rc.u() ? "extldi." : "extldi", i->RA, i->RS, b - 1, n);
     } else {
-        *result = format_4d(i->Rc.u() ? "rldicr." : "rldicr", i->RA, i->RS, b + n, 64 - n);
+        *result = format_nnuu(i->Rc.u() ? "rldicr." : "rldicr", i->RA, i->RS, b + n, 64 - n);
     }
 }
 
@@ -1053,13 +1089,93 @@ EMU(RLDICR, MDForm_2) {
         update_CR0(res, ppu);
 }
 
-
 PRINT(NCALL, NCallForm) {
-    *result = format_1d("ncall", i->idx.u());
+    *result = format_u("ncall", i->idx.u());
 }
 
 EMU(NCALL, NCallForm) {
     ppu->ncall(i->idx.u());
+}
+
+template <int LPos>
+inline int64_t get_cmp_ab(BitField<LPos, LPos + 1> l, uint64_t value) {
+    return l.u() == 0 ? (int64_t)static_cast<int32_t>(value) : value;
+}
+
+PRINT(CMPI, DForm_5) {
+    if (i->BF.u() == 0 && i->L.u() == 1) {
+        *result = format_nn("cmpdi", i->RA, i->SI);
+    } else if (i->L.u() == 0) {
+        *result = format_nnn("cmpwi", i->BF, i->RA, i->SI);
+    } else {
+        *result = format_nnnn("cmpi", i->BF, i->L, i->RA, i->SI);
+    }
+}
+
+EMU(CMPI, DForm_5) {
+    auto a = get_cmp_ab(i->L, ppu->getGPR(i->RA));
+    auto c = a < i->SI.s() ? 4
+           : a > i->SI.s() ? 2
+           : 1;
+    ppu->setCRF(i->BF.u(), c);
+}
+
+PRINT(CMP, XForm_16) {
+    auto mnemonic = i->L.u() ? "cmpd" : "cmpw";
+    if (i->BF.u() == 0) {
+        *result = format_nn(mnemonic, i->RA, i->RB);
+    } else {
+        *result = format_nnn(mnemonic, i->BF, i->RA, i->RB);
+    }
+}
+
+EMU(CMP, XForm_16) {
+    auto a = get_cmp_ab(i->L, ppu->getGPR(i->RA));
+    auto b = get_cmp_ab(i->L, ppu->getGPR(i->RB));
+    auto c = a < b ? 4
+           : a > b ? 2
+           : 1;
+    ppu->setCRF(i->BF.u(), c);
+}
+
+template <int LPos>
+inline uint64_t get_cmpl_ab(BitField<LPos, LPos + 1> l, uint64_t value) {
+    return l.u() == 0 ? static_cast<int32_t>(value) : value;
+}
+
+PRINT(CMPLI, DForm_6) {
+    auto mnemonic = i->L.u() ? "cmpldi" : "cmplwi";
+    if (i->BF.u() == 0) {
+        *result = format_nn(mnemonic, i->RA, i->UI);
+    } else {
+        *result = format_nnn(mnemonic, i->BF, i->RA, i->UI);
+    }
+}
+
+EMU(CMPLI, DForm_6) {
+    auto a = get_cmpl_ab(i->L, ppu->getGPR(i->RA));
+    auto c = a < i->UI.u() ? 4
+           : a > i->UI.u() ? 2
+           : 1;
+    ppu->setCRF(i->BF.u(), c);
+}
+
+PRINT(CMPL, XForm_16) {
+    auto mnemonic = i->L.u() ? "cmpld" : "cmplw";
+    if (i->BF.u() == 0) {
+        *result = format_nn(mnemonic, i->RA, i->RB);
+    } else {
+        *result = format_nnn(mnemonic, i->BF, i->RA, i->RB);
+    }
+}
+
+EMU(CMPL, XForm_16) {
+    auto a = get_cmpl_ab(i->L, ppu->getGPR(i->RA));
+    auto b = get_cmpl_ab(i->L, ppu->getGPR(i->RB));
+    auto c = a < b ? 4
+           : a > b ? 2
+           : 1;
+    ppu->setCRF(i->BF.u(), c);
 }
 
 enum class DasmMode {
@@ -1090,6 +1206,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
         case 1: invoke(NCALL);
+        case 10: invoke(CMPLI);
+        case 11: invoke(CMPI);
         case 14: invoke(ADDI);
         case 15: invoke(ADDIS);
         case 16: invoke(BC);
@@ -1170,6 +1288,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 986: invoke(EXTSW);
                 case 467: invoke(MTSPR);
                 case 339: invoke(MFSPR);
+                case 0: invoke(CMP);
+                case 32: invoke(CMPL);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

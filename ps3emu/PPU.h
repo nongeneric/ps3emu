@@ -158,6 +158,13 @@ public:
         _CR.v = value;
     }
     
+    inline void setCRF(uint8_t n, uint8_t sign) {
+        auto fpos = 4 * n;
+        auto fmask = ~mask(fpos, fpos + 3);
+        auto f = ((sign << 3) | getSO()) << (32 - fpos);
+        setCR((getCR() & fmask) | f);
+    }
+    
     inline void setCR0_sign(uint8_t bits) {
         _CR.af.sign = bits;
     }

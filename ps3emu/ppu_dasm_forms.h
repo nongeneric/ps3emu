@@ -2,9 +2,22 @@
 
 #include "BitField.h"
 
+typedef BitField<16, 30, BitFieldType::Signed, 2> BD_t;
+typedef BitField<6, 9, BitFieldType::CR> BF_t;
+typedef BitField<11, 13, BitFieldType::CR> BFA_t;
+typedef BitField<16, 32, BitFieldType::Signed> D_t;
+typedef BitField<16, 30, BitFieldType::Signed, 2> DS_t;
+typedef BitField<6, 30, BitFieldType::Signed, 2> LI_t;
+typedef BitField<11, 16, BitFieldType::GPR> RA_t;
+typedef BitField<16, 21, BitFieldType::GPR> RB_t;
+typedef BitField<6, 11, BitFieldType::GPR> RS_t;
+typedef BitField<6, 11, BitFieldType::GPR> RT_t;
+typedef BitField<16, 32, BitFieldType::Signed> SI_t;
+typedef BitField<16, 32, BitFieldType::Unsigned> UI_t;
+
 union IForm {
     BitField<0, 6> OPCD;
-    BitField<6, 30> LI;
+    LI_t LI;
     BitField<30, 31> AA;
     BitField<31, 32> LK;
 };
@@ -12,7 +25,7 @@ union IForm {
 union BForm {
     BitField<6, 11> BO;
     BitField<11, 16> BI;
-    BitField<16, 30> BD;
+    BD_t BD;
     BitField<30, 31> AA;
     BitField<31, 32> LK;
     
@@ -42,102 +55,123 @@ union XLForm_2 {
 };
 
 union XLForm_3 {
-    BitField<6, 9> BF;
-    BitField<11, 14> BFA;
+    BF_t BF;
+    BFA_t BFA;
 };
 
 union XForm_1 {
-    BitField<6, 11> RT;
-    BitField<11, 16> RA;
-    BitField<16, 21> RB;
+    RT_t RT;
+    RA_t RA;
+    RB_t RB;
     BitField<21, 31> XO;
 };
 
 union XForm_6 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
-    BitField<16, 21> RB;
+    RS_t RS;
+    RA_t RA;
+    RB_t RB;
     BitField<31, 32> Rc;
 };
 
 union XForm_8 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
-    BitField<16, 21> RB;
+    RS_t RS;
+    RA_t RA;
+    RB_t RB;
 };
 
 union XForm_11 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
+    RS_t RS;
+    RA_t RA;
     BitField<31, 32> Rc;
 };
 
+union XForm_16 {
+    BF_t BF;
+    BitField<10, 11> L;
+    RA_t RA;
+    RB_t RB;
+};
+
 union DForm_1 {
-    BitField<6, 11> RT;
-    BitField<11, 16> RA;
-    BitField<16, 32> D;
+    RT_t RT;
+    RA_t RA;
+    D_t D;
 };
 
 union DForm_2 {
-    BitField<6, 11> RT;
-    BitField<11, 16> RA;
-    BitField<16, 32> SI;
+    RT_t RT;
+    RA_t RA;
+    SI_t SI;
 };
 
 union DForm_3 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
-    BitField<16, 32> D;
+    RS_t RS;
+    RA_t RA;
+    D_t D;
 };
 
 union DForm_4 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
-    BitField<16, 32> UI;
+    RS_t RS;
+    RA_t RA;
+    UI_t UI;
+};
+
+union DForm_5 {
+    BF_t BF;
+    BitField<10, 11> L;
+    RA_t RA;
+    SI_t SI;
+};
+
+union DForm_6 {
+    BF_t BF;
+    BitField<10, 11> L;
+    RA_t RA;
+    UI_t UI;
 };
 
 union DSForm_1 {
-    BitField<6, 11> RT;
-    BitField<11, 16> RA;
-    BitField<16, 30> DS;
+    RT_t RT;
+    RA_t RA;
+    DS_t DS;
     BitField<30, 32> XO;
 };
 
 union DSForm_2 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
-    BitField<16, 30> DS;
+    RS_t RS;
+    RA_t RA;
+    DS_t DS;
     BitField<30, 32> XO;
 };
 
 union XOForm_1 {
-    BitField<6, 11> RT;
-    BitField<11, 16> RA;
-    BitField<16, 21> RB;
+    RT_t RT;
+    RA_t RA;
+    RB_t RB;
     BitField<21, 22> OE;
     BitField<22, 31> XO;
     BitField<31, 32> Rc;
 };
 
 union XFXForm_1 {
-    BitField<6, 11> RT;
+    RT_t RT;
     BitField<11, 21> spr;
     BitField<21, 31> XO;
 };
 
 union XFXForm_5 {
-    BitField<6, 11> RS;
+    RS_t RS;
     BitField<12, 19> FXM;
 };
 
 union XFXForm_7 {
-    BitField<6, 11> RS;
+    RS_t RS;
     BitField<11, 21> spr;
 };
 
 union MDForm_1 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
+    RS_t RS;
+    RA_t RA;
     BitField<16, 21> sh04;
     BitField<21, 26> mb04;
     BitField<26, 27> mb5;
@@ -147,8 +181,8 @@ union MDForm_1 {
 };
 
 union MDForm_2 {
-    BitField<6, 11> RS;
-    BitField<11, 16> RA;
+    RS_t RS;
+    RA_t RA;
     BitField<16, 21> sh04;
     BitField<21, 26> me04;
     BitField<26, 27> me5;
