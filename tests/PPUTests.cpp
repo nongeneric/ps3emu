@@ -91,3 +91,31 @@ TEST_CASE("emu mtctr") {
     ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
     REQUIRE(ppu.getCTR() == 0x11223344); 
 }
+
+TEST_CASE("mask") {
+    REQUIRE(mask<8>(1, 6) == 0x7e);
+    REQUIRE(mask<64>(63, 63) == 1);
+    REQUIRE(mask<64>(32, 63) == 0xffffffff);
+    REQUIRE(mask<5>(0, 2) == 28);
+    REQUIRE(mask<5>(2, 0) == 23);
+    REQUIRE(mask<5>(4, 0) == 17);
+}
+
+TEST_CASE("emu cmpld") {
+    PPU ppu;
+    ppu.setCR(0);
+    ppu.setGPR(30, 10);
+    ppu.setGPR(8, 10);
+    // cmpld cr7,r30,r8
+    uint8_t instr[] = { 0x7f, 0xbe, 0x40, 0x40 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE((ppu.getCR() & 0xf) == 2);
+    ppu.setGPR(30, 20);
+    ppu.setGPR(8, 10);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE((ppu.getCR() & 0xf) == 4);
+    ppu.setGPR(30, 20);
+    ppu.setGPR(8, 30);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE((ppu.getCR() & 0xf) == 8);
+}

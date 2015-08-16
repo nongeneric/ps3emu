@@ -59,6 +59,9 @@ public:
     
     virtual QString getCell(uint64_t row, int col) override {
         if (col == 0) {
+            if (8 <= row && row <= 15) {
+                return QString("CR%1").arg(row - 8);
+            }
             switch (row) {
                 case 0: return "LR";
                 case 1: return "CTR";
@@ -67,13 +70,21 @@ public:
                 case 4: return "CA";
                 case 5: return "OV";
                 case 6: return "SO";
-                case 7: return "Sign";
-                case 8: return "NIP";
-                case 10: return "MEM";
+                case 17: return "NIP";
+                case 19: return "MEM";
                 default: return "";
             }
         }
         if (col == 1) {
+            if (8 <= row && row <= 15) {
+                auto fpos = (row - 8) * 4;
+                auto field = (_ppu->getCR() >> (31 - fpos - 3)) & 0xf;
+                return QString("%1%2%3%4")
+                    .arg(field & 8 ? "<" : " ")
+                    .arg(field & 4 ? ">" : " ")
+                    .arg(field & 2 ? "=" : " ")
+                    .arg(field & 1 ? "SO" : "");
+            }
             switch (row) {
                 case 0: return print(_ppu->getLR());
                 case 1: return print(_ppu->getCTR());
@@ -82,13 +93,8 @@ public:
                 case 4: return printBit(_ppu->getCA());
                 case 5: return printBit(_ppu->getOV());
                 case 6: return printBit(_ppu->getSO());
-                case 7: {
-                    auto sign = _ppu->getCR0_sign();
-                    auto symbol = sign == 4 ? "<" : sign == 2 ? ">" : "=";
-                    return QString("%1 (%2)").arg(sign).arg(symbol);
-                }
-                case 8: return print(_ppu->getNIP());
-                case 10: {
+                case 17: return print(_ppu->getNIP());
+                case 19: {
                     auto pages = _ppu->allocatedPages();
                     auto usage = pages * MemoryPage::pageSize;
                     auto measure = "";
@@ -136,7 +142,7 @@ public:
     
     virtual bool isHighlighted(uint64_t row, int col) override {
         return _tracker.isHighlighted(row, col);
-    }        
+    }
 };
 
 class DasmModel : public MonospaceGridModel {

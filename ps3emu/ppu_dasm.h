@@ -1099,7 +1099,7 @@ EMU(RLDICL, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);
     auto r = rol(ppu->getGPR(i->RS), n);
-    auto m = mask(b, 63);
+    auto m = mask<64>(b, 63);
     auto res = r & m;
     ppu->setGPR(i->RA, res);
     if (i->Rc.u())
@@ -1124,7 +1124,7 @@ EMU(RLDICR, MDForm_2) {
     auto n = getNBE(i->sh04, i->sh5);
     auto e = getNBE(i->me04, i->me5);
     auto r = rol(ppu->getGPR(i->RS), n);
-    auto m = mask(0, e);
+    auto m = mask<64>(0, e);
     auto res = r & m;
     ppu->setGPR(i->RA, res);
     if (i->Rc.u())
@@ -1182,7 +1182,7 @@ EMU(CMP, XForm_16) {
 
 template <int LPos>
 inline uint64_t get_cmpl_ab(BitField<LPos, LPos + 1> l, uint64_t value) {
-    return l.u() == 0 ? static_cast<int32_t>(value) : value;
+    return l.u() == 0 ? static_cast<uint32_t>(value) : value;
 }
 
 PRINT(CMPLI, DForm_6) {

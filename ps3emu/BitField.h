@@ -74,8 +74,9 @@ inline uint64_t operator+(uint64_t x, BF bf) {
     return bf.u() + x;
 }
 
+template <int Width>
 inline uint64_t mask(uint8_t x, uint8_t y) {
     if (x > y)
-        return ~mask(y + 1, x - 1);
-    return (~0ull << x) >> (64 - (y - x));
+        return mask<Width>(0, y) | mask<Width>(x, Width - 1);
+    return ((~0ull >> x) & (~0ull << (63 - y))) >> (64 - Width);
 }

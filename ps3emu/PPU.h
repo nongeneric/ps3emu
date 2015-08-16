@@ -151,7 +151,7 @@ public:
     }
     
     inline uint32_t getCR() {
-        return _CR.v;   
+        return _CR.v;
     }
     
     inline void setCR(uint32_t value) {
@@ -160,8 +160,8 @@ public:
     
     inline void setCRF(uint8_t n, uint8_t sign) {
         auto fpos = 4 * n;
-        auto fmask = ~mask(fpos, fpos + 3);
-        auto f = ((sign << 3) | getSO()) << (32 - fpos);
+        auto fmask = ~(uint32_t)mask<32>(fpos, fpos + 3);
+        auto f = ((sign << 1) | getSO()) << (31 - fpos - 3);
         setCR((getCR() & fmask) | f);
     }
     

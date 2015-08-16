@@ -120,3 +120,10 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "bdnztl 4*cr5+eq,27640");
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7f, 0xbe, 0x40, 0x40 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "cmpld cr7,r30,r8");
+}

@@ -14,7 +14,7 @@
 MainWindow::~MainWindow() { }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    resize(1200, 800);
+    resize(1200, 900);
     setupMenu();
     setupDocks();
     setupStatusBar();
