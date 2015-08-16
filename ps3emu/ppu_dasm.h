@@ -16,8 +16,8 @@ using namespace boost::endian;
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPU* ppu)
 
-template <int Pos, int Next>
-inline uint8_t bit_test(uint64_t number, int width, BitField<Pos, Next> bf) {
+template <typename BF>
+inline uint8_t bit_test(uint64_t number, int width, BF bf) {
     auto n = bf.u();
     return (number & (1 << (width - n))) >> (width - n);
 }
@@ -124,26 +124,50 @@ EMU(B, IForm) {
 
 // Branch Conditional B-form, p24
 
+enum class BranchMnemonicType {
+    ExtSimple, ExtCondition, Generic
+};
+
+BranchMnemonicType getExtBranchMnemonic(
+    bool lr, bool abs, bool tolr, bool toctr, BO_t btbo, BI_t bi, std::string& mnemonic);
+std::string formatCRbit(BI_t bi);
+
 inline uint64_t getNIA(BForm* i, uint64_t cia) {
     auto ext = i->BD << 2;
     return i->AA.u() ? ext : (ext + cia);
 }
 
 PRINT(BC, BForm) {
-    const char* mnemonics[][2] = {
-        { "bc", "bca" }, { "bcl", "bcla" }  
-    };
-    auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
-    *result = format_nnu(mnemonic, i->BO, i->BI, getNIA(i, cia));
+    std::string extMnemonic;
+    auto mtype = getExtBranchMnemonic(
+        i->LK.u(), i->AA.u(), false, false, i->BO, i->BI, extMnemonic);
+    if (mtype == BranchMnemonicType::Generic) {
+        const char* mnemonics[][2] = {
+            { "bc", "bca" }, { "bcl", "bcla" }  
+        };
+        auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
+        *result = ssnprintf("%s %d,%s,%x", 
+                            mnemonic, i->BO.u(), formatCRbit(i->BI).c_str(), getNIA(i, cia));
+    } else if (i->BI.u() > 3) {
+        if (mtype == BranchMnemonicType::ExtCondition) {
+            *result = ssnprintf("%s cr%d,%" PRIx64,
+                                extMnemonic.c_str(), i->BI.u() / 4, getNIA(i, cia));
+        } else if (mtype == BranchMnemonicType::ExtSimple) {
+            *result = ssnprintf("%s %s,%" PRIx64,
+                                extMnemonic.c_str(), formatCRbit(i->BI).c_str(), getNIA(i, cia));
+        }
+    } else {
+        *result = format_u(extMnemonic.c_str(), getNIA(i, cia));
+    }
 }
 
-template <int P1, int P2, int P3, int P4, int P5>
+template <int P1, int P2, int P3, int P4>
 inline bool is_taken(BitField<P1, P1 + 1> bo0, 
                      BitField<P2, P2 + 1> bo1,
                      BitField<P3, P3 + 1> bo2,
                      BitField<P4, P4 + 1> bo3,
                      PPU* ppu,
-                     BitField<P5, P5 + 5> bi)
+                     BI_t bi)
 {
     auto ctr_ok = bo2.u() || ((ppu->getCTR() != 0) ^ bo3.u());
     auto cond_ok = bo0.u() || bit_test(ppu->getCR(), 32, bi) == bo1.u();
@@ -167,8 +191,17 @@ inline int64_t getB(BF ra, PPU* ppu) {
 }
 
 PRINT(BCLR, XLForm_2) {
-    auto mnemonic = i->LK.u() ? "bclrl" : "bclr";
-    *result = format_nnn(mnemonic, i->BO, i->BI, i->BH);
+    std::string extMnemonic;
+    auto mtype = getExtBranchMnemonic(i->LK.u(), 0, true, false, i->BO, i->BI, extMnemonic);
+    if (mtype == BranchMnemonicType::Generic) {
+        auto mnemonic = i->LK.u() ? "bclrl" : "bclr";
+        *result = ssnprintf("%s %d,%s,%d",
+                            mnemonic, i->BO.u(), formatCRbit(i->BI).c_str(), i->BH.u());
+    } else if (i->BI.u() > 3) {
+        *result = ssnprintf("%s cr%d", extMnemonic.c_str(), i->BI.u() / 4);
+    } else {
+        *result = extMnemonic;
+    }
 }
 
 EMU(BCLR, XLForm_2) {
@@ -183,8 +216,17 @@ EMU(BCLR, XLForm_2) {
 // Branch Conditional to Count Register, p25
 
 PRINT(BCCTR, XLForm_2) {
-    auto mnemonic = i->LK.u() ? "bcctrl" : "bcctr";
-    *result = format_nnn(mnemonic, i->BO, i->BI, i->BH);
+    std::string extMnemonic;
+    auto mtype = getExtBranchMnemonic(i->LK.u(), 0, true, false, i->BO, i->BI, extMnemonic);
+    if (mtype == BranchMnemonicType::Generic) {
+        auto mnemonic = i->LK.u() ? "bcctrl" : "bcctr";
+        *result = ssnprintf("%s %d,%s,%d",
+                            mnemonic, i->BO.u(), formatCRbit(i->BI).c_str(), i->BH.u());
+    } else if (i->BI.u() > 3) {
+        *result = ssnprintf("%s cr%d", extMnemonic.c_str(), i->BI.u() / 4);
+    } else {
+        *result = extMnemonic;
+    }
 }
 
 EMU(BCCTR, XLForm_2) {

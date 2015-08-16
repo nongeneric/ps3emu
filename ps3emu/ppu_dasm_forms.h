@@ -14,6 +14,8 @@ typedef BitField<6, 11, BitFieldType::GPR> RS_t;
 typedef BitField<6, 11, BitFieldType::GPR> RT_t;
 typedef BitField<16, 32, BitFieldType::Signed> SI_t;
 typedef BitField<16, 32, BitFieldType::Unsigned> UI_t;
+typedef BitField<6, 11> BO_t;
+typedef BitField<11, 16> BI_t;
 
 union IForm {
     BitField<0, 6> OPCD;
@@ -23,8 +25,8 @@ union IForm {
 };
 
 union BForm {
-    BitField<6, 11> BO;
-    BitField<11, 16> BI;
+    BO_t BO;
+    BI_t BI;
     BD_t BD;
     BitField<30, 31> AA;
     BitField<31, 32> LK;
@@ -43,8 +45,8 @@ union XLForm_1 {
 };
 
 union XLForm_2 {
-    BitField<6, 11> BO;
-    BitField<11, 16> BI;
+    BO_t BO;
+    BI_t BI;;
     BitField<19, 21> BH;
     BitField<31, 32> LK;
     

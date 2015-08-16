@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "CommandLineEdit.h"
 
 #include <QDockWidget>
 #include <QMenuBar>
@@ -7,6 +8,8 @@
 #include <QStatusBar>
 #include <QLabel>
 #include <QTextEdit>
+#include <QLineEdit>
+#include <QKeyEvent>
 
 MainWindow::~MainWindow() { }
 
@@ -101,9 +104,18 @@ void MainWindow::openFile() {
 }
 
 void MainWindow::setupStatusBar() {
+    _command = new CommandLineEdit(this);
+    connect(_command, &CommandLineEdit::selected, this, [=] {
+        auto line = _command->text();
+        _command->clear();
+       _log->append(QString("executing \"%1\"").arg(line));
+       _model.exec(line);
+    });
+    
     auto label = new QLabel("Ready");
-    label->setAlignment(Qt::AlignLeft);
-    statusBar()->addPermanentWidget(label);
+    label->setAlignment(Qt::AlignRight);    
+    statusBar()->addWidget(_command, 1);
+    statusBar()->addWidget(label, 1);
     statusBar()->setSizeGripEnabled(false);
     connect(&_model, &DebuggerModel::message, this, [=](QString text){
         label->setText(text);

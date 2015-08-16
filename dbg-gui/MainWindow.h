@@ -5,10 +5,12 @@
 #include "DebuggerModel.h"
 
 class QTextEdit;
+class CommandLineEdit;
 class MainWindow : public QMainWindow {
      Q_OBJECT
      
      QTextEdit* _log;
+     CommandLineEdit* _command;
      DebuggerModel _model;
      void setupDocks();
      void setupMenu();

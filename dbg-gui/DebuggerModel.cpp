@@ -242,8 +242,43 @@ void DebuggerModel::stepIn() {
 }
 
 void DebuggerModel::stepOver() {}
-void DebuggerModel::run() {}
+
+void DebuggerModel::run() {
+    for (int i = 0; i < 500; ++i) {
+        stepIn();
+    }
+}
+
 void DebuggerModel::restart() {}
+
 void DebuggerModel::log(std::string str) {
     emit message(QString::fromStdString(str));
+}
+
+void DebuggerModel::exec(QString command) {
+    auto s = command.split(' ', QString::QString::SkipEmptyParts);
+    if (s.size() < 1) {
+        emit message(QString("command \"%1\" parsing error").arg(command));
+    }
+    auto name = s[0];
+    if (s.size() > 1) {
+        bool ok;
+        auto va = s[1].toULongLong(&ok, 16);
+        if (!ok) {
+            emit message("bad argument");
+        }
+        try {
+            if (name == "go") {
+                _dasmModel->navigate(va);
+                return;
+            } else if (name == "runto") {
+                while (_ppu->getNIP() != va)
+                    stepIn();
+                return;
+            }
+        } catch (...) {
+            emit message("command failed");
+        }
+    }
+    throw std::runtime_error("unknown command");
 }
