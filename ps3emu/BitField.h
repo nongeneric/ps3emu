@@ -80,3 +80,20 @@ inline uint64_t mask(uint8_t x, uint8_t y) {
         return mask<Width>(0, y) | mask<Width>(x, Width - 1);
     return ((~0ull >> x) & (~0ull << (63 - y))) >> (64 - Width);
 }
+
+template <typename N>
+inline uint8_t bit_test(uint64_t number, int width, N nvalue) {
+    auto n = getUValue(nvalue);
+    auto sh = width - n - 1;
+    return (number & (1 << sh)) >> sh;
+}
+
+template <typename T, int Pos, int Next>
+T bit_test(T number, BitField<Pos, Next> bf) {
+    return bit_test(number, sizeof(T) * 8, bf);
+}
+
+template <typename T>
+uint64_t bit_set(T number, int n) {
+    return number | (1 << (sizeof(T) * 8 - n));
+}

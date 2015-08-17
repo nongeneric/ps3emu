@@ -5,6 +5,7 @@
 #include <QFontMetrics>
 #include <QPaintEvent>
 #include <QWheelEvent>
+#include <algorithm>
 
 void MonospaceGrid::setModel(MonospaceGridModel* model) {
     _model = model;
@@ -33,22 +34,31 @@ void MonospaceGrid::paintEvent(QPaintEvent* event) {
         painter.drawLine(x, 0, x, event->rect().height());
     }
     
+    std::vector<ArrowInfo> arrows;
+    
     auto y = _charHeight;
     auto r = _curRow;
     for (; r <= _model->getMaxRow(); r += _model->getRowStep()) {
         x = 0;
-        for (auto c = 0u; c < _columns.size(); ++c) {
+        for (auto c = 0; c < (int)_columns.size(); ++c) {
             auto z = _model->getCell(r, c);
             auto isHighlighted = _model->isHighlighted(r, c);
             painter.setPen(QPen(QColor(isHighlighted ? Qt::red : Qt::black)));
             painter.drawText(x, y, z);
-            x += _columns.at(c).charsWidth * _charWidth + 5;
+            x += getColumnWidth(c);
+            
+            ArrowInfo arrow;
+            if (c == _arrowsColumn && _model->pointsTo(r, arrow.to, arrow.highlighted)) {
+                arrow.from = r;
+                arrows.push_back(arrow);
+            }
         }
-        y += _charHeight + 3;
+        y += _charHeight;
         if (y > event->rect().height())
             break;
     }
     _lastRow = r;
+    drawArrows(arrows, painter);
 }
 MonospaceGridModel::~MonospaceGridModel() { }
 
@@ -90,3 +100,64 @@ void MonospaceGrid::setScrollable(bool value) {
     _scrollable = value;
 }
 
+void MonospaceGrid::drawArrow(ArrowInfo arrow, int pos, QPainter& painter) {
+    if (_arrowsColumn == -1)
+        return;
+    auto space = 8;
+    auto right = -15;
+    for (int c = 0; c <= _arrowsColumn; ++c) {
+        right += getColumnWidth(c);
+    }
+    auto x = right - space * pos;
+    auto y = [=](uint64_t row) {
+        return (row - _curRow) / _model->getRowStep() * _charHeight + 2 * _charHeight / 3;
+    };
+    painter.setPen(QPen(QColor(arrow.highlighted ? Qt::red : Qt::black)));
+    painter.drawLine(right, y(arrow.from), x, y(arrow.from));
+    painter.drawLine(x, y(arrow.from), x, y(arrow.to));
+    if (0u < y(arrow.to) && y(arrow.to) < (uint)height()) {
+        painter.drawLine(x, y(arrow.to), right, y(arrow.to));
+        painter.drawLine(right - 5, y(arrow.to) + 6, right, y(arrow.to) + 1);
+        painter.drawLine(right - 5, y(arrow.to) - 5, right, y(arrow.to));
+    }
+}
+
+bool MonospaceGridModel::pointsTo(uint64_t row, uint64_t& to, bool& highlighted) {
+    return false;
+}
+
+void MonospaceGrid::setArrowsColumn(int col) {
+    _arrowsColumn = col;
+}
+
+int MonospaceGrid::getColumnWidth(int index) {
+    return _columns.at(index).charsWidth * _charWidth + 5;
+}
+
+void MonospaceGrid::drawArrows(std::vector<ArrowInfo> arrows, QPainter& painter) {
+    if (arrows.empty())
+        return;
+    std::sort(begin(arrows), end(arrows), [](auto l, auto r) {
+        return std::min(l.from, l.to) < std::min(r.from, r.to);
+    });
+    std::vector<std::vector<ArrowInfo>> groups;
+    groups.push_back({});
+    uint64_t min = std::max(arrows.front().from, arrows.front().to);
+    for (auto a : arrows) {
+         if (min < std::min(a.from, a.to)) {
+             groups.push_back({});
+             min = std::max(a.from, a.to);
+         }
+        groups.back().push_back(a);
+    }
+    for (auto g : groups) {
+        std::sort(begin(g), end(g), [](auto l, auto r) {
+            return std::max(l.from, l.to) - std::min(l.from, l.to) <
+                   std::max(r.from, r.to) - std::min(r.from, r.to);
+        });
+        int pos = 1;
+        for (auto arrow : g) {
+            drawArrow(arrow, pos++, painter);
+        }
+    }
+}

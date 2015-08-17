@@ -101,6 +101,14 @@ TEST_CASE("mask") {
     REQUIRE(mask<5>(4, 0) == 17);
 }
 
+TEST_CASE("bit_test") {
+    REQUIRE(bit_test(21, 6, 0) == 0);
+    REQUIRE(bit_test(21, 6, 1) == 1);
+    REQUIRE(bit_test(21, 6, 2) == 0);
+    REQUIRE(bit_test(21, 6, 3) == 1);
+    REQUIRE(bit_test(21, 6, 5) == 1);
+}
+
 TEST_CASE("emu cmpld") {
     PPU ppu;
     ppu.setCR(0);
@@ -118,4 +126,73 @@ TEST_CASE("emu cmpld") {
     ppu.setGPR(8, 30);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
     REQUIRE((ppu.getCR() & 0xf) == 8);
+}
+
+TEST_CASE("list3") {
+    /*
+0000000000000000 <loop-0x1035c>:
+        ...
+   10350:       38 60 00 00     li      r3,0
+   10354:       38 80 00 03     li      r4,3
+   10358:       38 40 00 05     li      r2,5
+
+000000000001035c <loop>:
+   1035c:       98 47 00 00     stb     r2,0(r7)
+   10360:       7f a4 18 40     cmpld   cr7,r4,r3
+   10364:       38 e7 00 01     addi    r7,r7,1
+   10368:       38 63 00 01     addi    r3,r3,1
+   1036c:       40 9c ff f0     bge     cr7,1035c <loop>
+   10370:       60 00 00 00     nop
+     */
+    PPU ppu;
+    auto base = 0x10350;
+    auto mem = 0x400000;
+    ppu.setNIP(base);
+    ppu.setMemory(mem, 0, 4, true);
+    ppu.setGPR(7, mem);
+    uint8_t instr[] = {
+          0x38, 0x60, 0x00, 0x00
+        , 0x38, 0x80, 0x00, 0x03
+        , 0x38, 0x40, 0x00, 0x05
+        , 0x98, 0x47, 0x00, 0x00
+        , 0x7f, 0xa4, 0x18, 0x40
+        , 0x38, 0xe7, 0x00, 0x01
+        , 0x38, 0x63, 0x00, 0x01
+        , 0x40, 0x9c, 0xff, 0xf0
+        , 0x60, 0x00, 0x00, 0x00
+    };
+    int i = 0;
+    for (;; i++) {
+        if (i == 50 || ppu.getNIP() == 0x10370)
+            break;
+        auto nip = ppu.getNIP();
+        ppu.setNIP(nip + 4);
+        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &ppu);
+    }
+    REQUIRE(i < 50);
+    REQUIRE(ppu.getNIP() == 0x10370);
+    REQUIRE(ppu.load<4>(mem) == 0x05050505);
+}
+
+TEST_CASE("set crf") {
+    PPU ppu;
+    ppu.setCR(0);
+    ppu.setCRF_sign(7, 4);
+    REQUIRE(ppu.getCR() == 8);
+    ppu.setCR(0xf);
+    ppu.setCRF_sign(7, 4);
+    REQUIRE(ppu.getCR() == 9);
+}
+
+TEST_CASE("branch info bge") {
+    PPU ppu;
+    ppu.setGPR(10, ~0ull);
+    // bge cr7,103b4
+    uint8_t instr[] = { 0x40, 0x9c, 0xff, 0xe0 };
+    REQUIRE(isAbsoluteBranch(instr));
+    REQUIRE(getTargetAddress(instr, 0x103d4) == 0x103b4);
+    ppu.setCRF_sign(7, 2);
+    REQUIRE(isTaken(instr, 0x103d4, &ppu));
+    ppu.setCRF_sign(7, 4);
+    REQUIRE(!isTaken(instr, 0x103d4, &ppu));
 }

@@ -16,22 +16,6 @@ using namespace boost::endian;
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPU* ppu)
 
-template <typename BF>
-inline uint8_t bit_test(uint64_t number, int width, BF bf) {
-    auto n = bf.u();
-    return (number & (1 << (width - n))) >> (width - n);
-}
-
-template <typename T, int Pos, int Next>
-T bit_test(T number, BitField<Pos, Next> bf) {
-    return bit_test(number, sizeof(T) * 8, bf);
-}
-
-template <typename T>
-uint64_t bit_set(T number, int n) {
-    return number | (1 << (sizeof(T) * 8 - n));
-}
-
 template <typename... Args>
 std::string ssnprintf(const char* f, Args... args) {
     char buf[30];
@@ -162,22 +146,22 @@ PRINT(BC, BForm) {
 }
 
 template <int P1, int P2, int P3, int P4>
-inline bool is_taken(BitField<P1, P1 + 1> bo0, 
-                     BitField<P2, P2 + 1> bo1,
-                     BitField<P3, P3 + 1> bo2,
-                     BitField<P4, P4 + 1> bo3,
-                     PPU* ppu,
-                     BI_t bi)
+inline bool isTaken(BitField<P1, P1 + 1> bo0, 
+                    BitField<P2, P2 + 1> bo1,
+                    BitField<P3, P3 + 1> bo2,
+                    BitField<P4, P4 + 1> bo3,
+                    PPU* ppu,
+                    BI_t bi)
 {
-    auto ctr_ok = bo2.u() || ((ppu->getCTR() != 0) ^ bo3.u());
-    auto cond_ok = bo0.u() || bit_test(ppu->getCR(), 32, bi) == bo1.u();
+    auto ctr_ok = bo2.u() | ((ppu->getCTR() != 0) ^ bo3.u());
+    auto cond_ok = bo0.u() | (bit_test(ppu->getCR(), 32, bi) == bo1.u());
     return ctr_ok && cond_ok;
 }
 
 EMU(BC, BForm) {
     if (!i->BO2.u())
         ppu->setCTR(ppu->getCTR() - 1);
-    if (is_taken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
+    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
         ppu->setNIP(getNIA(i, cia));
     if (i->LK.u())
         ppu->setLR(cia + 4);
@@ -207,7 +191,7 @@ PRINT(BCLR, XLForm_2) {
 EMU(BCLR, XLForm_2) {
     if (!i->BO2.u())
         ppu->setCTR(ppu->getCTR() - 1);
-    if (is_taken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
+    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
         ppu->setNIP(ppu->getLR() & ~3);
     if (i->LK.u())
         ppu->setLR(cia + 4);
@@ -1159,7 +1143,7 @@ EMU(CMPI, DForm_5) {
     auto c = a < i->SI.s() ? 4
            : a > i->SI.s() ? 2
            : 1;
-    ppu->setCRF(i->BF.u(), c);
+    ppu->setCRF_sign(i->BF.u(), c);
 }
 
 PRINT(CMP, XForm_16) {
@@ -1177,7 +1161,7 @@ EMU(CMP, XForm_16) {
     auto c = a < b ? 4
            : a > b ? 2
            : 1;
-    ppu->setCRF(i->BF.u(), c);
+    ppu->setCRF_sign(i->BF.u(), c);
 }
 
 template <int LPos>
@@ -1199,7 +1183,7 @@ EMU(CMPLI, DForm_6) {
     auto c = a < i->UI.u() ? 4
            : a > i->UI.u() ? 2
            : 1;
-    ppu->setCRF(i->BF.u(), c);
+    ppu->setCRF_sign(i->BF.u(), c);
 }
 
 PRINT(CMPL, XForm_16) {
@@ -1217,7 +1201,7 @@ EMU(CMPL, XForm_16) {
     auto c = a < b ? 4
            : a > b ? 2
            : 1;
-    ppu->setCRF(i->BF.u(), c);
+    ppu->setCRF_sign(i->BF.u(), c);
 }
 
 enum class DasmMode {
@@ -1371,6 +1355,10 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         default: throw std::runtime_error("unknown opcode");
     }
 }
+
+bool isAbsoluteBranch(void* instr);
+bool isTaken(void* branchInstr, uint64_t cia, PPU* ppu);
+uint64_t getTargetAddress(void* branchInstr, uint64_t cia);
 
 #undef PRINT
 #undef EMU

@@ -18,6 +18,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupMenu();
     setupDocks();
     setupStatusBar();
+    
+    _command->setFocus();
 }
 
 void MainWindow::setupDocks() {
@@ -47,8 +49,10 @@ void MainWindow::setupDocks() {
     dasmGrid->setModel(_model.getDasmModel());
     dasmGrid->setColumnWidth(0, 17);
     dasmGrid->setColumnWidth(1, 12);
-    dasmGrid->setColumnWidth(2, 30);
-    dasmGrid->setColumnWidth(3, 100);
+    dasmGrid->setColumnWidth(2, 12);
+    dasmGrid->setColumnWidth(3, 30);
+    dasmGrid->setColumnWidth(4, 100);
+    dasmGrid->setArrowsColumn(2);
     dasmGrid->setScrollable(true);
     setCentralWidget(dasmGrid);
 }
@@ -84,12 +88,6 @@ void MainWindow::setupMenu() {
     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
     connect(restart, &QAction::triggered, this, [=]() { _model.restart(); });
     trace->addAction(restart);
-    
-    auto view = menuBar()->addMenu("&View");
-    auto toggleLog = new QAction("Toggle Log", this);
-    toggleLog->setShortcut(QKeySequence(Qt::Key_F1));
-    connect(toggleLog, &QAction::triggered, this, [=]() { _model.stepIn(); });
-    view->addAction(toggleLog);
 }
 
 void MainWindow::openFile() {

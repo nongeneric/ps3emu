@@ -154,29 +154,29 @@ public:
     virtual QString getCell(uint64_t row, int col) override {
         if (col == 0) {
             return QString("%1").arg(row, 16, 16, QChar('0'));
-        } else {
-            if (_ppu->isAllocated(row)) {
-                uint32_t instr;
-                _ppu->readMemory(row, &instr, sizeof instr);
-                if (col == 1)
-                    return printHex(&instr, sizeof instr);
-                if (col == 3) {
-                    auto sym = _elf->getGlobalSymbolByValue(row, -1);
-                    if (!sym)
-                        return "";
-                    return _elf->getString(sym->st_name);
-                }
-                std::string str;
-                try {
-                    ppu_dasm<DasmMode::Print>(&instr, row, &str);
-                    return QString::fromStdString(str);
-                } catch(...) {
-                    return "<error>";
-                }
-            } else {
-                return QString();
+        }
+        if (!_ppu->isAllocated(row) || col == 2)
+            return "";
+        uint32_t instr;
+        _ppu->readMemory(row, &instr, sizeof instr);
+        if (col == 1)
+            return printHex(&instr, sizeof instr);
+        if (col == 4) {
+            auto sym = _elf->getGlobalSymbolByValue(row, -1);
+            if (!sym)
+                return "";
+            return _elf->getString(sym->st_name);
+        }
+        if (col == 3) {
+            std::string str;
+            try {
+                ppu_dasm<DasmMode::Print>(&instr, row, &str);
+                return QString::fromStdString(str);
+            } catch(...) {
+                return "<error>";
             }
         }
+        return "";
     }
     
     virtual uint64_t getMinRow() override {
@@ -188,7 +188,7 @@ public:
     }
     
     virtual int getColumnCount() override {
-        return 4;
+        return 5;
     }
     
     virtual uint64_t getRowStep() override {
@@ -197,6 +197,19 @@ public:
     
     virtual bool isHighlighted(uint64_t row, int col) override {
         return row == _ppu->getNIP();
+    }
+    
+    virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) {
+        if (!_ppu->isAllocated(row))
+            return false;
+        uint32_t instr;
+        _ppu->readMemory(row, &instr, sizeof instr);
+        if (isAbsoluteBranch(&instr)) {
+            to = getTargetAddress(&instr, row);
+            highlighted = row == _ppu->getNIP() && isTaken(&instr, row, _ppu);
+            return true;
+        }
+        return false;
     }
 };
 
@@ -217,7 +230,6 @@ MonospaceGridModel* DebuggerModel::getDasmModel() {
 }
 
 void DebuggerModel::loadFile(QString path) {
-    emit message(QString("Loading %1").arg(path));
     auto str = path.toStdString();
     _elf.load(str);
     auto stdStringLog = [=](std::string s){ log(s); };
@@ -286,5 +298,5 @@ void DebuggerModel::exec(QString command) {
             emit message("command failed");
         }
     }
-    throw std::runtime_error("unknown command");
+    emit message("unknown command");
 }

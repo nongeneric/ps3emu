@@ -98,3 +98,32 @@ std::string formatCRbit(BI_t bi) {
     }
     return ssnprintf("4*cr%d+%s", bi.u() / 4, crbit);
 }
+
+bool isAbsoluteBranch(void* instr) {
+    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
+    auto iform = reinterpret_cast<IForm*>(&x);
+    return iform->OPCD.u() == 18 || iform->OPCD.u() == 16;
+}
+
+bool isTaken(void* branchInstr, uint64_t cia, PPU* ppu) {
+    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(branchInstr));
+    auto iform = reinterpret_cast<IForm*>(&x);
+    if (iform->OPCD.u() == 18) {
+        return true;
+    } else if (iform->OPCD.u() == 16) {
+        auto b = reinterpret_cast<BForm*>(&x);
+        return isTaken(b->BO0, b->BO1, b->BO2, b->BO3, ppu, b->BI);
+    }
+    throw std::runtime_error("not absolute branch");
+}
+
+uint64_t getTargetAddress(void* branchInstr, uint64_t cia) {
+    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(branchInstr));
+    auto iform = reinterpret_cast<IForm*>(&x);
+    if (iform->OPCD.u() == 18) {
+        return getNIA(iform, cia);
+    } else if (iform->OPCD.u() == 16) {
+        return getNIA(reinterpret_cast<BForm*>(&x), cia);
+    }
+    throw std::runtime_error("not absolute branch");
+}
