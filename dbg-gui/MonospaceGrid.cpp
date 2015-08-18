@@ -134,30 +134,33 @@ int MonospaceGrid::getColumnWidth(int index) {
     return _columns.at(index).charsWidth * _charWidth + 5;
 }
 
+bool intersects(ArrowInfo a, ArrowInfo b) {
+    return !(std::max(a.from, a.to) < std::min(b.from, b.to) ||
+             std::max(b.from, b.to) < std::min(a.from, a.to));
+}
+
 void MonospaceGrid::drawArrows(std::vector<ArrowInfo> arrows, QPainter& painter) {
-    if (arrows.empty())
-        return;
     std::sort(begin(arrows), end(arrows), [](auto l, auto r) {
-        return std::min(l.from, l.to) < std::min(r.from, r.to);
+        return std::max(l.from, l.to) - std::min(l.from, l.to) <
+               std::max(r.from, r.to) - std::min(r.from, r.to);
     });
-    std::vector<std::vector<ArrowInfo>> groups;
-    groups.push_back({});
-    uint64_t min = std::max(arrows.front().from, arrows.front().to);
+    std::map<int, std::vector<ArrowInfo>> lines;
     for (auto a : arrows) {
-         if (min < std::min(a.from, a.to)) {
-             groups.push_back({});
-             min = std::max(a.from, a.to);
-         }
-        groups.back().push_back(a);
-    }
-    for (auto g : groups) {
-        std::sort(begin(g), end(g), [](auto l, auto r) {
-            return std::max(l.from, l.to) - std::min(l.from, l.to) <
-                   std::max(r.from, r.to) - std::min(r.from, r.to);
-        });
-        int pos = 1;
-        for (auto arrow : g) {
-            drawArrow(arrow, pos++, painter);
+        uint linePos = 1;
+        auto pred = [=](auto b) { return intersects(a, b); };
+        if (!lines[linePos].empty()) {
+            while (std::find_if(begin(lines[linePos]), end(lines[linePos]), pred) 
+                != end(lines[linePos]))
+            {
+                linePos++;
+            }
         }
+        lines[linePos].push_back(a);
+    }
+    
+    for (auto& pair : lines) {
+        for (auto arrow : pair.second) {
+            drawArrow(arrow, pair.first, painter);
+        }   
     }
 }
