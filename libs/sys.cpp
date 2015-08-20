@@ -19,3 +19,9 @@ int sys_lwmutex_lock(sys_lwmutex_t* lwmutex_id, usecond_t timeout) {
 int sys_lwmutex_unlock(sys_lwmutex_t* lwmutex_id) {
     return CELL_OK;
 }
+
+int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
+    mem_info->available_user_memory = 256 * (1 << 20);
+    mem_info->total_user_memory = 512 * (1 << 20);
+    return CELL_OK;
+}

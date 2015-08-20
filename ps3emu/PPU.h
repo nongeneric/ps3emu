@@ -90,6 +90,7 @@ public:
     void readMemory(uint64_t va, void* buf, uint len, bool allocate = false);
     void setMemory(uint64_t va, uint8_t value, uint len, bool allocate = false);
     void ncall(uint32_t index);
+    void scall();
     uint32_t findNCallEntryIndex(std::string name);
     
     template <int Bytes>

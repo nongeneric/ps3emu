@@ -228,6 +228,11 @@ union MForm_2 {
     BitField<31, 32> Rc;
 };
 
+union SCForm {
+    BitField<20, 27> LEV;
+    BitField<30, 31> _1;
+};
+
 union NCallForm {
     BitField<6, 32> idx;
 };

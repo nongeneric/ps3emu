@@ -48,3 +48,10 @@ extern int sys_lwmutex_trylock(sys_lwmutex_t * lwmutex_id);
 extern int sys_lwmutex_unlock(sys_lwmutex_t * lwmutex_id);
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2);
+
+typedef struct sys_memory_info {
+    big_uint64_t total_user_memory;
+    big_uint64_t available_user_memory;
+} sys_memory_info_t;
+
+int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);

@@ -1289,6 +1289,14 @@ EMU(RLWIMI, MForm_2) {
         update_CR0(res, ppu);
 }
 
+PRINT(SC, SCForm) {
+    *result = "sc";
+}
+
+EMU(SC, SCForm) {
+    ppu->scall();
+}
+
 PRINT(NCALL, NCallForm) {
     *result = format_u("ncall", i->idx.u());
 }
@@ -1411,6 +1419,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         case 14: invoke(ADDI);
         case 15: invoke(ADDIS);
         case 16: invoke(BC);
+        case 17: invoke(SC);
         case 18: invoke(B);
         case 19: {
             auto xlform = reinterpret_cast<XLForm_1*>(&x);

@@ -1,55 +1,59 @@
 #include "PPU.h"
 #include "../libs/sys.h"
+#include <boost/type_traits.hpp>
 
 struct NCallEntry {
     const char* name;
     void (*stub)(PPU*);
 };
 
+template <int ArgN, class T, class Enable = void>
+struct get_arg {
+    inline T value(PPU* ppu) {
+        return (T)ppu->getGPR(3 + ArgN);
+    }
+};
+
+template <int ArgN, class T>
+struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type> {
+    typedef typename boost::remove_pointer<T>::type elem_type;
+    elem_type _t;
+    uint64_t _va;
+    PPU* _ppu;
+    inline T value(PPU* ppu) {
+        _va = ppu->getGPR(3 + ArgN);
+        ppu->readMemory(_va, &_t, sizeof(elem_type));
+        _ppu = ppu;
+        return &_t; 
+    }
+    inline ~get_arg() {
+        _ppu->writeMemory(_va, &_t, sizeof(elem_type));
+    }
+};
+
 void nstub_sys_initialize_tls(PPU* ppu) {
     
 }
 
-void nstub_sys_lwmutex_create(PPU* ppu) {
-    sys_lwmutex_t a1;
-    uint64_t a1va = ppu->getGPR(3);
-    ppu->readMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    sys_lwmutex_attribute_t a2;
-    uint64_t a2va = ppu->getGPR(4);
-    ppu->readMemory(a2va, &a2, sizeof(sys_lwmutex_attribute_t));
-    auto r = sys_lwmutex_create(&a1, &a2);
-    ppu->writeMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    ppu->writeMemory(a2va, &a2, sizeof(sys_lwmutex_attribute_t));
-    ppu->setGPR(3, r);
+#define ARG(n, f) get_arg<n - 1, \
+    typename boost::function_traits< \
+        typename boost::remove_pointer<decltype(&f)>::type >::arg##n##_type >() \
+            .value(ppu)
+
+#define STUB_2(f) void nstub_##f(PPU* ppu) { \
+    ppu->setGPR(3, f(ARG(1, f), ARG(2, f))); \
 }
 
-void nstub_sys_lwmutex_destroy(PPU* ppu) {
-    sys_lwmutex_t a1;
-    uint64_t a1va = ppu->getGPR(3);
-    ppu->readMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    auto r = sys_lwmutex_destroy(&a1);
-    ppu->writeMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    ppu->setGPR(3, r);
+#define STUB_1(f) void nstub_##f(PPU* ppu) { \
+    ppu->setGPR(3, f(ARG(1, f))); \
 }
+            
+STUB_2(sys_lwmutex_create);
+STUB_1(sys_lwmutex_destroy);
+STUB_2(sys_lwmutex_lock);
+STUB_1(sys_lwmutex_unlock);
 
-void nstub_sys_lwmutex_lock(PPU* ppu) {
-    sys_lwmutex_t a1;
-    uint64_t a1va = ppu->getGPR(3);
-    ppu->readMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    auto a2 = (usecond_t)ppu->getGPR(4);
-    auto r = sys_lwmutex_lock(&a1, a2);
-    ppu->writeMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    ppu->setGPR(3, r);
-}
-
-void nstub_sys_lwmutex_unlock(PPU* ppu) {
-    sys_lwmutex_t a1;
-    uint64_t a1va = ppu->getGPR(3);
-    ppu->readMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    auto r = sys_lwmutex_unlock(&a1);
-    ppu->writeMemory(a1va, &a1, sizeof(sys_lwmutex_t));
-    ppu->setGPR(3, r);
-}
+STUB_1(sys_memory_get_user_memory_size);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -64,9 +68,16 @@ NCallEntry ncallTable[] {
 
 void PPU::ncall(uint32_t index) {
     if (index == 0)
-        throw std::runtime_error("unknown index");
+        throw std::runtime_error("unknown ncall index");
     ncallTable[index].stub(this);
     setNIP(getLR());
+}
+
+void PPU::scall() {
+    switch (getGPR(11)) {
+        case 352: nstub_sys_memory_get_user_memory_size(this); break;
+        default: throw std::runtime_error("unknown syscall");
+    }
 }
 
 uint32_t PPU::findNCallEntryIndex(std::string name) {

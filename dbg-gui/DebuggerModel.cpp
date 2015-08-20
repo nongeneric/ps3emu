@@ -255,16 +255,20 @@ void DebuggerModel::stepIn() {
         _dasmModel->update();
         _dasmModel->navigate(_ppu->getNIP());
     } catch (std::exception& exc) {
-        emit message(QString("error: %1").arg(exc.what()));
+        emit message(QString("error: %1 (NIP: %2)")
+            .arg(exc.what()).arg(_ppu->getNIP(), 16, 16));
+        throw exc;
     }
 }
 
 void DebuggerModel::stepOver() {}
 
 void DebuggerModel::run() {
-    for (int i = 0; i < 500; ++i) {
-        stepIn();
-    }
+    try {
+        for (int i = 0; i < 500; ++i) {
+            stepIn();
+        }
+    } catch (...) { }
 }
 
 void DebuggerModel::restart() {}
