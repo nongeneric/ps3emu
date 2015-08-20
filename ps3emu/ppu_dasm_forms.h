@@ -192,6 +192,42 @@ union MDForm_2 {
     BitField<31, 32> Rc;
 };
 
+union MDSForm_1 {
+    RS_t RS;
+    RA_t RA;
+    RB_t RB;
+    BitField<21, 27> mb;
+    BitField<27, 31> XO;
+    BitField<31, 32> Rc;
+};
+
+union MDSForm_2 {
+    RS_t RS;
+    RA_t RA;
+    RB_t RB;
+    BitField<21, 27> me;
+    BitField<27, 31> XO;
+    BitField<31, 32> Rc;
+};
+
+union MForm_1 {
+    RS_t RS;
+    RA_t RA;
+    RB_t RB;
+    BitField<21, 26> mb;
+    BitField<26, 31> me;
+    BitField<31, 32> Rc;
+};
+
+union MForm_2 {
+    RS_t RS;
+    RA_t RA;
+    BitField<16, 21> SH;
+    BitField<21, 26> mb;
+    BitField<26, 31> me;
+    BitField<31, 32> Rc;
+};
+
 union NCallForm {
     BitField<6, 32> idx;
 };

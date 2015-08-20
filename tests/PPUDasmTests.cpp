@@ -127,3 +127,123 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "cmpld cr7,r30,r8");
 }
+
+TEST_CASE("rotate dword ext mnemonics") {
+/*
+rldicr %r0,%r2,10,3
+rldicl %r0,%r2,14,54
+rldimi %r0,%r2,50,4
+rldicl %r0,%r2,10,0
+rldicl %r0,%r2,54,0
+rldcl  %r0,%r2,13,0
+rldicr %r0,%r2,10,53
+rldicl %r0,%r2,54,10
+rldicl %r0,%r2,0,10
+rldicr %r0,%r2,0,53
+rldic  %r0,%r2,10,10
+rldicl %r0,%r2,1,63
+rldimi %r0,%r2,63,0
+rldicr %r0,%r2,8,55
+rldicl %r0,%r2,0,32
+*/
+    uint8_t instrs[] = {
+          0x78, 0x40, 0x50, 0xc4
+        , 0x78, 0x40, 0x75, 0xa0
+        , 0x78, 0x40, 0x91, 0x0e
+        , 0x78, 0x40, 0x50, 0x00
+        , 0x78, 0x40, 0xb0, 0x02
+        , 0x78, 0x40, 0x68, 0x10
+        , 0x78, 0x40, 0x55, 0x64
+        , 0x78, 0x40, 0xb2, 0x82
+        , 0x78, 0x40, 0x02, 0x80
+        , 0x78, 0x40, 0x05, 0x64
+        , 0x78, 0x40, 0x52, 0x88
+        , 0x78, 0x40, 0x0f, 0xe0
+        , 0x78, 0x40, 0xf8, 0x0e
+        , 0x78, 0x40, 0x45, 0xe4
+        , 0x78, 0x40, 0x00, 0x20
+    };
+    std::string strs[] = {
+        "extldi r0,r2,4,10",
+        "extrdi r0,r2,10,4",
+        "insrdi r0,r2,10,4",
+        "rotldi r0,r2,10",
+        "rotrdi r0,r2,10",
+        "rotld r0,r2,r13",
+        "sldi r0,r2,10",
+        "srdi r0,r2,10",
+        "clrldi r0,r2,10",
+        "clrrdi r0,r2,10",
+        "clrlsldi r0,r2,20,10",
+        "srdi r0,r2,63",
+        "insrdi r0,r2,1,0",
+        "sldi r0,r2,8",
+        "clrldi r0,r2,32"
+    };
+    int j = 0;
+    for (auto i = instrs; i < std::end(instrs); i += 4) {
+        std::string res;
+        ppu_dasm<DasmMode::Print>(i, 0, &res);
+        REQUIRE(res == strs[j++]);
+    }
+}
+
+TEST_CASE("rotate word ext mnemonics") {
+/*
+rlwinm %r0,%r2,20,0,9
+rlwinm %r0,%r2,30,22,31
+rlwimi %r0,%r2,12,22,19
+rlwimi %r0,%r2,2,20,19
+rlwinm %r0,%r2,10,0,31
+rlwinm %r0,%r2,22,0,31
+rlwnm %r0,%r2,13,0,31
+rlwinm %r0,%r2,10,0,21
+rlwinm %r0,%r2,22,10,31
+rlwinm %r0,%r2,0,10,31
+rlwinm %r0,%r2,0,0,21
+rlwinm %r0,%r2,10,10,21
+rlwinm %r10,%r0,5,0,26
+rlwimi %r0,%r2,12,20,29
+rlwimi %r0,%r2,2,20,29
+*/
+    uint8_t instrs[] = {
+          0x54, 0x40, 0xa0, 0x12
+        , 0x54, 0x40, 0xf5, 0xbe
+        , 0x50, 0x40, 0x65, 0xa6
+        , 0x50, 0x40, 0x15, 0x26
+        , 0x54, 0x40, 0x50, 0x3e
+        , 0x54, 0x40, 0xb0, 0x3e
+        , 0x5c, 0x40, 0x68, 0x3e
+        , 0x54, 0x40, 0x50, 0x2a
+        , 0x54, 0x40, 0xb2, 0xbe
+        , 0x54, 0x40, 0x02, 0xbe
+        , 0x54, 0x40, 0x00, 0x2a
+        , 0x54, 0x40, 0x52, 0xaa
+        , 0x54, 0x0a, 0x28, 0x34
+        , 0x50, 0x40, 0x65, 0x3a
+        , 0x50, 0x40, 0x15, 0x3a
+    };
+    std::string strs[] = {
+        "extlwi r0,r2,10,20",
+        "extrwi r0,r2,10,20",
+        "rlwimi r0,r2,12,22,19",
+        "rlwimi r0,r2,2,20,19",
+        "rotlwi r0,r2,10",
+        "rotrwi r0,r2,10",
+        "rotlw r0,r2,r13",
+        "slwi r0,r2,10",
+        "srwi r0,r2,10",
+        "clrlwi r0,r2,10",
+        "clrrwi r0,r2,10",
+        "clrlslwi r0,r2,20,10",
+        "slwi r10,r0,5",
+        "inslwi r0,r2,10,20",
+        "insrwi r0,r2,10,20"
+    };
+    int j = 0;
+    for (auto i = instrs; i < std::end(instrs); i += 4) {
+        std::string res;
+        ppu_dasm<DasmMode::Print>(i, 0, &res);
+        REQUIRE(res == strs[j++]);
+    }
+}

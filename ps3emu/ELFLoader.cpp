@@ -123,6 +123,11 @@ void ELFLoader::map(PPU* ppu, std::function<void(std::string)> log) {
     
     ppu->setGPR(3, 0);
     ppu->setGPR(4, vaStackBase);
+    
+    // undocumented:
+    ppu->setGPR(5, vaStackBase);
+    ppu->setGPR(6, 0);
+    
     ppu->setGPR(13, 0); //TODO: control block of tls
     ppu->setFPSCR(0);
     ppu->setNIP(entry.va);

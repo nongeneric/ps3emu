@@ -85,6 +85,17 @@ inline std::string format_nnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, 
     );
 }
 
+template <typename OP1, typename OP2, typename OP3, typename OP4, typename OP5>
+inline std::string format_nnnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4, OP5 op5) {
+    return ssnprintf("%s %s%d,%s%d,%s%d,%s%d,%s%d", mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     op2.prefix(), op2.native(),
+                     op3.prefix(), op3.native(),
+                     op4.prefix(), op4.native(),
+                     op5.prefix(), op5.native()
+    );
+}
+
 // Branch I-form, p24
 
 inline uint64_t getNIA(IForm* i, uint64_t cia) {
@@ -1053,22 +1064,6 @@ inline uint8_t getNBE(BitField<Pos04, Pos04 + 5> _04, BitField<Pos5, Pos5 + 1> _
     return (_05.u() << 5) | _04.u();
 }
 
-PRINT(RLDICL, MDForm_1) {
-    auto n = getNBE(i->sh04, i->sh5);
-    auto b = getNBE(i->mb04, i->mb5);
-    auto x = 64 - b;
-    auto y = n - 64 + b;
-    if (n == 0) {
-        *result = format_nnu(i->Rc.u() ? "clrldi." : "clrldi", i->RA, i->RS, b);
-    } else if (64 - n == b) {
-        *result = format_nnu(i->Rc.u() ? "srdi." : "srdi", i->RA, i->RS, b);
-    } else if (x + y < 64) {
-        *result = format_nnuu(i->Rc.u() ? "extrdi." : "extrdi", i->RA, i->RS, x, y);
-    } else {
-        *result = format_nnuu(i->Rc.u() ? "rldicl." : "rldicl", i->RA, i->RS, b + n, 64 - n);
-    }
-}
-
 inline uint64_t ror(uint64_t n, uint8_t s) {
     asm("rol %1,%0" : "+r" (n) : "c" (s));
     return n;
@@ -1077,6 +1072,29 @@ inline uint64_t ror(uint64_t n, uint8_t s) {
 inline uint64_t rol(uint64_t n, uint8_t s) {
     asm("rol %1,%0" : "+r" (n) : "c" (s));
     return n;
+}
+
+inline uint32_t rol32(uint32_t n, uint8_t s) {
+    asm("roll %1,%0" : "+r" (n) : "c" (s));
+    return n;
+}
+
+PRINT(RLDICL, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);
+    if (b == 0 && n > 32) {
+        *result = format_nnu(i->Rc.u() ? "rotrdi." : "rotrdi", i->RA, i->RS, 64 - n);
+    } else if (b == 0 && n <= 32 ) {
+        *result = format_nnu(i->Rc.u() ? "rotldi." : "rotldi", i->RA, i->RS, n);
+    } else if (b == 64 - n) {
+        *result = format_nnu(i->Rc.u() ? "srdi." : "srdi", i->RA, i->RS, b);
+    } else if (n == 0) {
+        *result = format_nnu(i->Rc.u() ? "clrldi." : "clrldi", i->RA, i->RS, b);
+    } else if (64 - b > 0) {
+        *result = format_nnuu(i->Rc.u() ? "extrdi." : "extrdi", i->RA, i->RS, 64 - b, n + b - 64);
+    } else {
+        *result = format_nnuu(i->Rc.u() ? "rldicl." : "rldicl", i->RA, i->RS, b + n, 64 - n);
+    }
 }
 
 EMU(RLDICL, MDForm_1) {
@@ -1093,12 +1111,12 @@ EMU(RLDICL, MDForm_1) {
 PRINT(RLDICR, MDForm_2) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->me04, i->me5);
-    if (n == 0) {
-        *result = format_nnu(i->Rc.u() ? "clrrdi." : "clrrdi", i->RA, i->RS, 63 - b);
-    } else if (63 - b == n) {
+    if (63 - b == n) {
         *result = format_nnu(i->Rc.u() ? "sldi." : "sldi", i->RA, i->RS, n);
+    } else if (n == 0) {
+        *result = format_nnu(i->Rc.u() ? "clrrdi." : "clrrdi", i->RA, i->RS, 63 - b);
     } else if (b > 1) {
-        *result = format_nnuu(i->Rc.u() ? "extldi." : "extldi", i->RA, i->RS, b - 1, n);
+        *result = format_nnuu(i->Rc.u() ? "extldi." : "extldi", i->RA, i->RS, b + 1, n);
     } else {
         *result = format_nnuu(i->Rc.u() ? "rldicr." : "rldicr", i->RA, i->RS, b + n, 64 - n);
     }
@@ -1110,6 +1128,162 @@ EMU(RLDICR, MDForm_2) {
     auto r = rol(ppu->getGPR(i->RS), n);
     auto m = mask<64>(0, e);
     auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLDIMI, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);
+    if (n + b < 64) {
+        *result = format_nnuu(i->Rc.u() ? "insrdi." : "insrdi", i->RA, i->RS, 64 - (n + b), b);
+    } else {
+        *result = format_nnuu(i->Rc.u() ? "rldimi." : "rldimi", i->RA, i->RS, n, b);
+    }
+}
+
+EMU(RLDIMI, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);
+    auto r = rol(ppu->getGPR(i->RS), n);
+    auto m = mask<64>(b, ~n);
+    auto res = (r & m) | (ppu->getGPR(i->RA) & (~m));
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLDCL, MDSForm_1) {
+    if (i->mb.u() == 0) {
+        *result = format_nnn(i->Rc.u() ? "rotld." : "rotld", i->RA, i->RS, i->RB);
+    } else {
+        *result = format_nnnn(i->Rc.u() ? "rotld." : "rotld", i->RA, i->RS, i->RB, i->mb);
+    }
+}
+    
+EMU(RLDCL, MDSForm_1) {
+    auto n = ppu->getGPR(i->RB) & 63;
+    auto r = rol(ppu->getGPR(i->RS), n);
+    auto b = i->mb.u();
+    auto m = mask<64>(b, 63);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLDCR, MDSForm_2) {
+    *result = format_nnnn(i->Rc.u() ? "rldcr." : "rldcr", i->RA, i->RS, i->RB, i->me);
+}
+
+EMU(RLDCR, MDSForm_2) {
+    auto n = ppu->getGPR(i->RB) & 63;
+    auto r = rol(ppu->getGPR(i->RS), n);
+    auto e = i->me.u();
+    auto m = mask<64>(0, e);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLDIC, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);
+    if (n <= b + n && b + n < 64) {
+        *result = format_nnuu(i->Rc.u() ? "clrlsldi." : "clrlsldi", i->RA, i->RS, b + n, n);
+    } else {
+        *result = format_nnuu(i->Rc.u() ? "rldic." : "rldic", i->RA, i->RS, n, b);   
+    }
+}
+
+EMU(RLDIC, MDForm_1) {
+    auto n = getNBE(i->sh04, i->sh5);
+    auto b = getNBE(i->mb04, i->mb5);    
+    auto r = rol(ppu->getGPR(i->RS), n);
+    auto m = mask<64>(b, ~n);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLWINM, MForm_2) {
+    auto s = i->SH.u();
+    auto b = i->mb.u();
+    auto e = i->me.u();
+    if (b == 0 && e == 31) {
+        if (s < 16) {
+            *result = format_nnn(i->Rc.u() ? "rotlwi." : "rotlwi", i->RA, i->RS, i->SH);
+        } else {
+            *result = format_nnu(i->Rc.u() ? "rotrwi." : "rotrwi", i->RA, i->RS, 32 - s);
+        }
+    } else if (b == 0 && e == 31 - s) {
+        *result = format_nnu(i->Rc.u() ? "slwi." : "slwi", i->RA, i->RS, s);
+    } else if (e == 31 && 32 - s == b) {
+        *result = format_nnu(i->Rc.u() ? "srwi." : "srwi", i->RA, i->RS, b);
+    } else if (s == 0 && e == 31) {
+        *result = format_nnu(i->Rc.u() ? "clrlwi." : "clrlwi", i->RA, i->RS, b);
+    } else if (s == 0 && b == 0) {
+        *result = format_nnu(i->Rc.u() ? "clrrwi." : "clrrwi", i->RA, i->RS, 31 - e);
+    } else if (e == 31 - s && s <= s + b && s + b < 32) {
+        *result = format_nnuu(i->Rc.u() ? "clrlslwi." : "clrlslwi", i->RA, i->RS, s + b, s);
+    } else if (b == 0 && e <= 30) {
+        *result = format_nnuu(i->Rc.u() ? "extlwi." : "extlwi", i->RA, i->RS, e + 1, s);
+    } else if (e == 31) {
+        *result = format_nnuu(i->Rc.u() ? "extrwi." : "extrwi", i->RA, i->RS, 32 - b, s + b - 32);
+    } else {
+        *result = format_nnnnn(i->Rc.u() ? "rlwinm." : "rlwinm", i->RA, i->RS, i->SH, i->mb, i->me);
+    }
+}
+
+EMU(RLWINM, MForm_2) {
+    auto n = i->SH.u();
+    auto r = rol32(ppu->getGPR(i->RS), n);
+    auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLWNM, MForm_1) {
+    if (i->mb.u() == 0 && i->me.u() == 31) {
+        *result = format_nnn(i->Rc.u() ? "rotlw." : "rotlw", i->RA, i->RS, i->RB);
+    } else {
+        *result = format_nnnnn(i->Rc.u() ? "rlwnm." : "rlwnm", i->RA, i->RS, i->RB, i->mb, i->me);
+    }
+}
+
+EMU(RLWNM, MForm_1) {
+    auto n = ppu->getGPR(i->RB) & 31;
+    auto r = rol32(ppu->getGPR(i->RS), n);
+    auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
+    auto res = r & m;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(RLWIMI, MForm_2) {
+    auto s = i->SH.u();
+    auto b = i->mb.u();
+    auto e = i->me.u();
+    if (s == 32 - b && b <= e) {
+        *result = format_nnuu(i->Rc.u() ? "inslwi." : "inslwi", i->RA, i->RS, e - b + 1, b);
+    } else if (32 - s == e + 1 && e + 1 > b) {
+        *result = format_nnuu(i->Rc.u() ? "insrwi." : "insrwi", i->RA, i->RS, e + 1 - b, b);
+    } else {
+        *result = format_nnnnn(i->Rc.u() ? "rlwimi." : "rlwimi", i->RA, i->RS, i->SH, i->mb, i->me);
+    }
+}
+
+EMU(RLWIMI, MForm_2) {
+    auto n = i->SH.u();
+    auto r = rol32(ppu->getGPR(i->RS), n);
+    auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
+    auto res = (r & m) | (ppu->getGPR(i->RA) & ~m);
     ppu->setGPR(i->RA, res);
     if (i->Rc.u())
         update_CR0(res, ppu);
@@ -1256,6 +1430,9 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
             }
             break;
         }
+        case 20: invoke(RLWIMI);
+        case 21: invoke(RLWINM);
+        case 23: invoke(RLWNM);
         case 24: invoke(ORI);
         case 25: invoke(ORIS);
         case 26: invoke(XORI);
@@ -1265,9 +1442,16 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         case 34: invoke(LBZ);
         case 30: {
             auto mdform = reinterpret_cast<MDForm_1*>(&x);
-            switch (mdform->XO.u()) {
+            auto mdsform = reinterpret_cast<MDSForm_1*>(&x);
+            if (mdsform->XO.u() == 8) {
+                invoke(RLDCL);
+            } else if (mdsform->XO.u() == 9) {
+                invoke(RLDCR);
+            } else switch (mdform->XO.u()) {
                 case 0: invoke(RLDICL);
                 case 1: invoke(RLDICR);
+                case 2: invoke(RLDIC);
+                case 3: invoke(RLDIMI);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;
