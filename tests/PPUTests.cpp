@@ -196,3 +196,133 @@ TEST_CASE("branch info bge") {
     ppu.setCRF_sign(7, 4);
     REQUIRE(!isTaken(instr, 0x103d4, &ppu));
 }
+
+TEST_CASE("neg") {
+    PPU ppu;
+    ppu.setGPR(3, ~0ull);
+    // neg r0,r3
+    uint8_t instr[] = { 0x7c, 0x03, 0x00, 0xd0 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(0) == 1 );
+}
+
+TEST_CASE("strlen") {
+/*   
+0000000000017ff4 <.strlen>:
+   17ff4:       7c 03 00 d0     neg     r0,r3
+   17ff8:       78 00 07 60     clrldi  r0,r0,61                # 3d
+   17ffc:       7c a5 2a 78     xor     r5,r5,r5
+   18000:       28 00 00 00     cmplwi  r0,0
+   18004:       7c 64 1b 78     mr      r4,r3
+   18008:       41 82 00 1c     beq     18024 <.strlen+0x30>
+   1800c:       7c 09 03 a6     mtctr   r0
+   18010:       88 04 00 00     lbz     r0,0(r4)
+   18014:       7c 25 00 00     cmpd    r5,r0
+   18018:       38 84 00 01     addi    r4,r4,1
+   1801c:       41 82 00 70     beq     1808c <.strlen+0x98>
+   18020:       42 00 ff f0     bdnz    18010 <.strlen+0x1c>
+   18024:       38 c0 00 80     li      r6,128          # 80
+   18028:       7c 00 22 2c     dcbt    r0,r4
+   1802c:       7c 06 22 2c     dcbt    r6,r4
+   18030:       38 c0 7f 7f     li      r6,32639                # 7f7f
+   18034:       78 c6 80 2c     rldimi  r6,r6,16,32             # 20
+   18038:       39 00 00 10     li      r8,16
+   1803c:       78 c6 00 0e     rldimi  r6,r6,32,0
+   18040:       38 04 01 00     addi    r0,r4,256               # 100
+   18044:       7c 00 02 2c     dcbt    r0,r0
+   18048:       7d 09 03 a6     mtctr   r8
+   1804c:       e8 04 00 00     ld      r0,0(r4)
+   18050:       7c 07 30 38     and     r7,r0,r6
+   18054:       7c 09 33 78     or      r9,r0,r6
+   18058:       7d 47 32 14     add     r10,r7,r6
+   1805c:       7d 2b 50 f8     nor     r11,r9,r10
+   18060:       7d 60 00 74     cntlzd  r0,r11
+   18064:       78 00 e8 c2     rldicl  r0,r0,61,3
+   18068:       28 00 00 08     cmplwi  r0,8
+   1806c:       38 84 00 08     addi    r4,r4,8
+   18070:       41 80 00 0c     blt     1807c <.strlen+0x88>
+   18074:       42 00 ff d8     bdnz    1804c <.strlen+0x58>
+   18078:       4b ff ff c8     b       18040 <.strlen+0x4c>
+   1807c:       38 84 ff f8     addi    r4,r4,-8                # fffffff8
+   18080:       7c 84 02 14     add     r4,r4,r0
+   18084:       7c 63 20 50     subf    r3,r3,r4
+   18088:       4e 80 00 20     blr
+   1808c:       38 84 ff ff     addi    r4,r4,-1
+   18090:       7c 63 20 50     subf    r3,r3,r4
+   18094:       4e 80 00 20     blr
+*/
+    uint8_t instr[] = { 
+        0x7c, 0x03, 0x00, 0xd0, 0x78, 0x00, 0x07, 0x60, 0x7c, 0xa5, 0x2a, 0x78,
+        0x28, 0x00, 0x00, 0x00, 0x7c, 0x64, 0x1b, 0x78, 0x41, 0x82, 0x00, 0x1c,
+        0x7c, 0x09, 0x03, 0xa6, 0x88, 0x04, 0x00, 0x00, 0x7c, 0x25, 0x00, 0x00,
+        0x38, 0x84, 0x00, 0x01, 0x41, 0x82, 0x00, 0x70, 0x42, 0x00, 0xff, 0xf0,
+        0x38, 0xc0, 0x00, 0x80, 0x7c, 0x00, 0x22, 0x2c, 0x7c, 0x06, 0x22, 0x2c,
+        0x38, 0xc0, 0x7f, 0x7f, 0x78, 0xc6, 0x80, 0x2c, 0x39, 0x00, 0x00, 0x10,
+        0x78, 0xc6, 0x00, 0x0e, 0x38, 0x04, 0x01, 0x00, 0x7c, 0x00, 0x02, 0x2c,
+        0x7d, 0x09, 0x03, 0xa6, 0xe8, 0x04, 0x00, 0x00, 0x7c, 0x07, 0x30, 0x38,
+        0x7c, 0x09, 0x33, 0x78, 0x7d, 0x47, 0x32, 0x14, 0x7d, 0x2b, 0x50, 0xf8,
+        0x7d, 0x60, 0x00, 0x74, 0x78, 0x00, 0xe8, 0xc2, 0x28, 0x00, 0x00, 0x08,
+        0x38, 0x84, 0x00, 0x08, 0x41, 0x80, 0x00, 0x0c, 0x42, 0x00, 0xff, 0xd8,
+        0x4b, 0xff, 0xff, 0xc8, 0x38, 0x84, 0xff, 0xf8, 0x7c, 0x84, 0x02, 0x14,
+        0x7c, 0x63, 0x20, 0x50, 0x4e, 0x80, 0x00, 0x20, 0x38, 0x84, 0xff, 0xff,
+        0x7c, 0x63, 0x20, 0x50, 0x4e, 0x80, 0x00, 0x20
+    };
+    PPU ppu;
+    auto base = 0x17ff4;
+    ppu.setNIP(base);
+    ppu.setLR(0);
+    const char* str = "hello there";
+    ppu.writeMemory(0x400000, str, strlen(str) + 1, true);
+    ppu.setGPR(3, 0x400000);
+    for (;;) {
+        if (ppu.getNIP() == 0)
+            break;
+        auto nip = ppu.getNIP();
+        ppu.setNIP(nip + 4);
+        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &ppu);
+    }
+    REQUIRE( ppu.getGPR(3) == strlen(str) );
+}
+
+TEST_CASE("clrldi r0,r0,61") {
+    PPU ppu;
+    ppu.setGPR(0, ~0ull);
+    uint8_t instr[] = { 0x78, 0x00, 0x07, 0x60 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(0) == 7 );
+}
+
+TEST_CASE("cntlzd r0,r11") {
+    uint8_t instr[] = { 0x7d, 0x60, 0x00, 0x74 };
+    PPU ppu;
+    ppu.setGPR(0, 100);
+    ppu.setGPR(11, 0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(0) == 64 );
+    ppu.setGPR(11, 1);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(0) == 63 );
+    ppu.setGPR(11, 0xffffffff);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(0) == 32 );
+}
+
+TEST_CASE("nor r11,r9,r10") {
+    PPU ppu;
+    ppu.setGPR(11, 500);
+    ppu.setGPR(9, 0x7f7f7f7f7f7f7f7full);
+    ppu.setGPR(10, 0xf2eeece49feef4f3ull);
+    uint8_t instr[] = { 0x7d, 0x2b, 0x50, 0xf8 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(11) == 0 );
+}
+
+TEST_CASE("subf r3,r3,r4") {
+    PPU ppu;
+    ppu.setGPR(3, 500);
+    ppu.setGPR(4, 700);
+    uint8_t instr[] = { 0x7c, 0x63, 0x20, 0x50 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(3) == 200 );
+}
+

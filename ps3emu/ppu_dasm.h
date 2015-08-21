@@ -811,7 +811,7 @@ EMU(SUBF, XOForm_1) {
     if (i->OE.u())
         ov = __builtin_ssubll_overflow(rb, ra, (long long int*)&res);
     else
-        res = ra + rb;
+        res = rb - ra;
     ppu->setGPR(i->RT, res);
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
 }
@@ -1386,6 +1386,115 @@ EMU(CMPL, XForm_16) {
     ppu->setCRF_sign(i->BF.u(), c);
 }
 
+PRINT(MFCR, XFXForm_3) {
+    *result = format_n("mfcr", i->RT);
+}
+
+EMU(MFCR, XFXForm_3) {
+    ppu->setGPR(i->RT, ppu->getCR());
+}
+
+PRINT(SLD, XForm_6) {
+   *result = format_nnn(i->Rc.u() ? "sld." : "sld", i->RA, i->RS, i->RB); 
+}
+
+EMU(SLD, XForm_6) {
+    auto b = ppu->getGPR(i->RB) & 63;
+    auto res = ppu->getGPR(i->RS) << b;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(SLW, XForm_6) {
+    *result = format_nnn(i->Rc.u() ? "slw." : "slw", i->RA, i->RS, i->RB); 
+}
+
+EMU(SLW, XForm_6) {
+    auto b = ppu->getGPR(i->RB) & 31;
+    auto res = (uint32_t)ppu->getGPR(i->RS) << b;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(SRD, XForm_6) {
+    *result = format_nnn(i->Rc.u() ? "srd." : "srd", i->RA, i->RS, i->RB); 
+}
+
+EMU(SRD, XForm_6) {
+    auto b = ppu->getGPR(i->RB) & 63;
+    auto res = ppu->getGPR(i->RS) >> b;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(SRW, XForm_6) {
+    *result = format_nnn(i->Rc.u() ? "srw." : "srw", i->RA, i->RS, i->RB); 
+}
+
+EMU(SRW, XForm_6) {
+    auto b = ppu->getGPR(i->RB) & 31;
+    auto res = (uint32_t)ppu->getGPR(i->RS) >> b;
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(NEG, XOForm_3) {
+    const char* mnemonics[][2] = {
+        { "neg", "neg." }, { "nego", "nego." }
+    };
+    *result = format_nn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA);
+}
+
+EMU(NEG, XOForm_3) {
+    auto ra = ppu->getGPR(i->RA);
+    auto ov = ra == (1ull << 63);
+    auto res = ov ? ra : (~ra + 1);
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);    
+}
+
+PRINT(MTOCRF, XFXForm_6) {
+    *result = format_nn("mtocrf", i->FXM, i->RS);
+}
+
+EMU(MTOCRF, XFXForm_6) {
+    auto fxm = i->FXM.u();
+    auto n = fxm & 128 ? 0
+           : fxm & 64 ? 1
+           : fxm & 32 ? 2
+           : fxm & 16 ? 3
+           : fxm & 8 ? 4
+           : fxm & 4 ? 5
+           : fxm & 2 ? 6
+           : 7;
+    auto cr = ppu->getCR() & ~mask<64>(4*n, 4*n + 3);
+    auto rs = ppu->getGPR(i->RS) & mask<32>(4*n, 4*n + 3);
+    ppu->setCR(cr | rs);
+}
+
+PRINT(DCBT, XForm_31) {
+    *result = format_nn("dcbt", i->RA, i->RB);
+}
+
+EMU(DCBT, XForm_31) { }
+
+PRINT(CNTLZD, XForm_11) {
+    *result = format_nn(i->Rc.u() ? "cntlzd." : "cntlzd", i->RA, i->RS);
+}
+
+EMU(CNTLZD, XForm_11) {
+    static_assert(sizeof(unsigned long long int) == 8, "");
+    auto rs = ppu->getGPR(i->RS);
+    auto res = !rs ? 64 : __builtin_clzll(rs);
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
 enum class DasmMode {
     Print, Emulate  
 };
@@ -1509,6 +1618,15 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 339: invoke(MFSPR);
                 case 0: invoke(CMP);
                 case 32: invoke(CMPL);
+                case 19: invoke(MFCR);
+                case 27: invoke(SLD);
+                case 24: invoke(SLW);
+                case 539: invoke(SRD);
+                case 536: invoke(SRW);
+                case 104: invoke(NEG);
+                case 144: invoke(MTOCRF);
+                case 278: invoke(DCBT);
+                case 58: invoke(CNTLZD);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

@@ -86,7 +86,7 @@ class PPU {
     std::map<uint64_t, MemoryPage> _pages;
     
 public:
-    void writeMemory(uint64_t va, void* buf, uint len, bool allocate = false);
+    void writeMemory(uint64_t va, const void* buf, uint len, bool allocate = false);
     void readMemory(uint64_t va, void* buf, uint len, bool allocate = false);
     void setMemory(uint64_t va, uint8_t value, uint len, bool allocate = false);
     void ncall(uint32_t index);

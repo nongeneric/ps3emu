@@ -16,6 +16,7 @@ typedef BitField<16, 32, BitFieldType::Signed> SI_t;
 typedef BitField<16, 32, BitFieldType::Unsigned> UI_t;
 typedef BitField<6, 11> BO_t;
 typedef BitField<11, 16> BI_t;
+typedef BitField<12, 20> FXM_t;
 
 union IForm {
     BitField<0, 6> OPCD;
@@ -94,6 +95,11 @@ union XForm_16 {
     RB_t RB;
 };
 
+union XForm_31 {
+    RA_t RA;
+    RB_t RB;
+};
+
 union DForm_1 {
     RT_t RT;
     RA_t RA;
@@ -155,20 +161,39 @@ union XOForm_1 {
     BitField<31, 32> Rc;
 };
 
+union XOForm_3 {
+    RT_t RT;
+    RA_t RA;
+    BitField<21, 22> OE;
+    BitField<31, 32> Rc;
+};
+
+
 union XFXForm_1 {
     RT_t RT;
     BitField<11, 21> spr;
     BitField<21, 31> XO;
 };
 
+union XFXForm_3 {
+    RT_t RT;
+    BitField<11, 12> _0;
+};
+
 union XFXForm_5 {
     RS_t RS;
-    BitField<12, 19> FXM;
+    FXM_t FXM;
 };
 
 union XFXForm_7 {
     RS_t RS;
     BitField<11, 21> spr;
+};
+
+union XFXForm_6 {
+    RS_t RS;
+    BitField<11, 12> _1;
+    FXM_t FXM;
 };
 
 union MDForm_1 {

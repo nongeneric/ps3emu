@@ -55,3 +55,20 @@ typedef struct sys_memory_info {
 } sys_memory_info_t;
 
 int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
+
+typedef big_int64_t system_time_t;
+
+extern system_time_t sys_time_get_system_time();
+extern int _sys_process_atexitspawn();
+extern int _sys_process_at_Exitspawn();
+
+typedef big_uint64_t sys_ppu_thread_t;
+
+extern int sys_ppu_thread_get_id(sys_ppu_thread_t * thread_id);
+
+extern int sys_tty_write(unsigned int ch, const void *buf,
+                         unsigned int len, unsigned int *pwritelen);
+
+int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags);
+
+int sys_prx_exitspawn_with_level(uint64_t level);

@@ -5,7 +5,8 @@
 
 using namespace boost::endian;
 
-bool mergeAcrossPages(PPU* ppu, decltype(&PPU::writeMemory) f, uint64_t va, 
+template <class F>
+bool mergeAcrossPages(PPU* ppu, F f, uint64_t va, 
                       void* buf, uint len, bool allocate, uint64_t& pageOffset) {
     pageOffset = va % MemoryPage::pageSize;
     if (pageOffset + len > MemoryPage::pageSize) {
@@ -21,12 +22,12 @@ MemoryPage::MemoryPage() : ptr(new uint8_t[pageSize]) {
     memset(ptr.get(), 0, pageSize);
 }
 
-void PPU::writeMemory(uint64_t va, void* buf, uint len, bool allocate) {
+void PPU::writeMemory(uint64_t va, const void* buf, uint len, bool allocate) {
     if (va > 0xffffffff) // see Cell_OS-Overview_e
         throw std::runtime_error("writing beyond user adress range");
     assert(va != 0 || len == 0);
     uint64_t pageOffset;
-    if (mergeAcrossPages(this, &PPU::writeMemory, va, buf, len, allocate, pageOffset))
+    if (mergeAcrossPages(this, &PPU::writeMemory, va, const_cast<void*>(buf), len, allocate, pageOffset))
         return;
     
     // OPT: effective STL 24 if needed

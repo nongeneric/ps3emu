@@ -247,3 +247,45 @@ rlwimi %r0,%r2,2,20,29
         REQUIRE(res == strs[j++]);
     }
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x80, 0x00, 0x26 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "mfcr r12");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7f, 0x60, 0x58, 0x30 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "slw r0,r27,r11");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x29, 0x00, 0xd0 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "neg r9,r9");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x90, 0x81, 0x20 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "mtocrf 8,r12");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x00, 0x1a, 0x2c };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "dcbt r0,r3");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x60, 0x00, 0x74 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "cntlzd r0,r11");
+}

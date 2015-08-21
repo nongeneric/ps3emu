@@ -115,7 +115,7 @@ public:
             }
         }
         if (col == 2) {
-            return QString("GRP%1").arg(row);
+            return QString("GPR%1").arg(row);
         }
         if (col == 3) {
             return print(_ppu->getGPR(row));
