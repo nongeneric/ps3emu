@@ -18,6 +18,7 @@ class DebuggerModel : public QWidget {
     std::unique_ptr<PPU> _ppu;
     bool _elfLoaded = false;
     void log(std::string str);
+    void printMemory(uint64_t va);
 public:
     DebuggerModel();
     ~DebuggerModel();

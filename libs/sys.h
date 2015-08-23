@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/endian/arithmetic.hpp>
+#include "../ps3emu/PPU.h"
 
 using namespace boost::endian;
 
@@ -72,3 +73,11 @@ extern int sys_tty_write(unsigned int ch, const void *buf,
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags);
 
 int sys_prx_exitspawn_with_level(uint64_t level);
+
+typedef big_uint32_t sys_addr_t;
+
+#define SYS_MEMORY_GRANULARITY_1M        0x0000000000000400ULL
+#define SYS_MEMORY_GRANULARITY_64K       0x0000000000000200ULL
+#define SYS_MEMORY_GRANULARITY_MASK      0x0000000000000f00ULL
+
+int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);

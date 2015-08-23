@@ -15,6 +15,13 @@ struct get_arg {
     }
 };
 
+template <int ArgN>
+struct get_arg<ArgN, PPU*> {
+    inline PPU* value(PPU* ppu) {
+        return ppu;
+    }
+};
+
 template <int ArgN, class T>
 struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type> {
     typedef typename boost::remove_pointer<T>::type elem_type;
@@ -41,7 +48,7 @@ void nstub_sys_initialize_tls(PPU* ppu) {
 }
 
 void nstub_sys_process_exit(PPU* ppu) {
-    throw std::runtime_error("process exit called");
+    throw ProcessFinishedException();
 }
 
 #define ARG(n, f) get_arg<n - 1, \
@@ -50,6 +57,14 @@ void nstub_sys_process_exit(PPU* ppu) {
             .value(ppu)
 
 #define ARG_VOID_PTR(n, lenArg, f) get_arg<n - 1, void*>().value(ppu, lenArg)
+
+#define STUB_4(f) void nstub_##f(PPU* ppu) { \
+    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f))); \
+}
+
+#define STUB_3(f) void nstub_##f(PPU* ppu) { \
+    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f))); \
+}
 
 #define STUB_2(f) void nstub_##f(PPU* ppu) { \
     ppu->setGPR(3, f(ARG(1, f), ARG(2, f))); \
@@ -83,6 +98,7 @@ STUB_1(sys_memory_get_user_memory_size);
 STUB_2(sys_dbg_set_mask_to_ppu_exception_handler);
 STUB_sys_tty_write(sys_tty_write);
 STUB_1(sys_prx_exitspawn_with_level);
+STUB_4(sys_memory_allocate);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -113,6 +129,7 @@ void PPU::scall() {
         case 352: nstub_sys_memory_get_user_memory_size(this); break;
         case 403: nstub_sys_tty_write(this); break;
         case 988: nstub_sys_dbg_set_mask_to_ppu_exception_handler(this); break;
+        case 348: nstub_sys_memory_allocate(this); break;
         default: throw std::runtime_error("unknown syscall");
     }
 }

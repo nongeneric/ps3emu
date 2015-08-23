@@ -82,6 +82,13 @@ union XForm_8 {
     RB_t RB;
 };
 
+union XForm_10 {
+    RS_t RS;
+    RA_t RA;
+    BitField<16, 21> SH;
+    BitField<31, 32> Rc;
+};
+
 union XForm_11 {
     RS_t RS;
     RA_t RA;
@@ -260,4 +267,13 @@ union SCForm {
 
 union NCallForm {
     BitField<6, 32> idx;
+};
+
+union XSForm {
+    RS_t RS;
+    RA_t RA;
+    BitField<16, 21> sh04;
+    BitField<21, 30> XO;
+    BitField<30, 31> sh5;
+    BitField<31, 32> Rc;
 };

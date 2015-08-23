@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdexcept>
+#include <boost/format.hpp>
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     
@@ -88,7 +89,11 @@ int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned i
         fwrite(buf, 1, len, stdout);
         return CELL_OK;
     }
-    throw std::runtime_error("unknown channel");
+    if (ch == SYS_TTYP_PPU_STDERR) {
+        fwrite(buf, 1, len, stderr);
+        return CELL_OK;
+    }
+    throw std::runtime_error(str(boost::format("unknown channel %d") % ch));
 }
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
@@ -96,5 +101,10 @@ int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
 }
 
 int sys_prx_exitspawn_with_level(uint64_t level) {
+    return CELL_OK;
+}
+
+int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t* alloc_addr, PPU* ppu) {
+    *alloc_addr = ppu->malloc(size);
     return CELL_OK;
 }

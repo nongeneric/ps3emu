@@ -289,3 +289,31 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "cntlzd r0,r11");
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x09, 0xfe, 0x70 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "srawi r9,r0,31");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x21, 0x60, 0x00, 0x10 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "subfic r11,r0,16");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x29, 0xfb, 0x96 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "divwu r9,r9,r31");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x3f, 0x49, 0xd6 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "mullw r9,r31,r9");
+}

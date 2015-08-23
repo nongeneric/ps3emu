@@ -754,7 +754,7 @@ PRINT(ADDIS, DForm_2) {
 
 EMU(ADDIS, DForm_2) {
     auto b = getB(i->RA, ppu);
-    ppu->setGPR(i->RT, (i->SI << 16) + b);
+    ppu->setGPR(i->RT, (i->SI.u() << 16) + b);
 }
 
 inline void update_CR0(int64_t result, PPU* ppu) {
@@ -786,10 +786,10 @@ PRINT(ADD, XOForm_1) {
 EMU(ADD, XOForm_1) {
     auto ra = ppu->getGPR(i->RA);
     auto rb = ppu->getGPR(i->RB);
-    int64_t res;
+    uint64_t res;
     bool ov = 0;
     if (i->OE.u())
-        ov = __builtin_saddll_overflow(rb, ra, (long long int*)&res);
+        ov = __builtin_uaddl_overflow(rb, ra, &res);
     else
         res = ra + rb;
     ppu->setGPR(i->RT, res);
@@ -806,14 +806,54 @@ PRINT(SUBF, XOForm_1) {
 EMU(SUBF, XOForm_1) {
     auto ra = ppu->getGPR(i->RA);
     auto rb = ppu->getGPR(i->RB);
-    int64_t res;
+    uint64_t res;
     bool ov = 0;
     if (i->OE.u())
-        ov = __builtin_ssubll_overflow(rb, ra, (long long int*)&res);
+        ov = __builtin_usubl_overflow(rb, ra, &res);
     else
         res = rb - ra;
     ppu->setGPR(i->RT, res);
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+}
+
+PRINT(ADDIC, DForm_2) {
+    *result = format_nnn("addic", i->RT, i->RA, i->SI);
+}
+
+EMU(ADDIC, DForm_2) {
+    auto ra = ppu->getGPR(i->RA);
+    auto si = i->SI.s();
+    uint64_t res;
+    auto ov = __builtin_uaddl_overflow(ra, si, &res);
+    ppu->setGPR(i->RT, res);
+    ppu->setCA(ov);
+}
+
+PRINT(ADDICD, DForm_2) {
+    *result = format_nnn("addic.", i->RT, i->RA, i->SI);
+}
+
+EMU(ADDICD, DForm_2) {
+    auto ra = ppu->getGPR(i->RA);
+    auto si = i->SI.s();
+    uint64_t res;
+    auto ov = __builtin_uaddl_overflow(ra, si, &res);
+    ppu->setGPR(i->RT, res);
+    ppu->setCA(ov);
+    update_CR0(res, ppu);
+}
+
+PRINT(SUBFIC, DForm_2) {
+    *result = format_nnn("subfic", i->RT, i->RA, i->SI);
+}
+
+EMU(SUBFIC, DForm_2) {
+    auto ra = ppu->getGPR(i->RA);
+    auto si = i->SI.s();
+    int64_t res;
+    auto ov = __builtin_ssubl_overflow(si, ra, &res);
+    ppu->setGPR(i->RT, res);
+    ppu->setCA(ov);
 }
 
 // Fixed-Point Logical Instructions, p65
@@ -1442,6 +1482,40 @@ EMU(SRW, XForm_6) {
         update_CR0(res, ppu);
 }
 
+PRINT(SRADI, XSForm) {
+    auto n =  getNBE(i->sh04, i->sh5);
+    *result = format_nnu(i->Rc.u() ? "sradi." : "sradi", i->RA, i->RS, n);
+}
+
+EMU(SRADI, XSForm) {
+    auto n =  getNBE(i->sh04, i->sh5);
+    auto rs = ppu->getGPR(i->RS);
+    auto sign = rs & (1ul << 63);
+    auto ca = n == 0 ? 0 : (sign && (rs & mask<64>(64 - n, 63)));
+    auto res = (rs >> n) | (sign ? mask<64>(0, n) : 0);
+    ppu->setGPR(i->RA, res);
+    ppu->setCA(ca);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+PRINT(SRAWI, XForm_10) {
+    *result = format_nnn(i->Rc.u() ? "srawi." : "srawi", i->RA, i->RS, i->SH);
+}
+
+EMU(SRAWI, XForm_10) {
+    auto n =  i->SH.u();
+    auto rs = ppu->getGPR(i->RS) & 0xffffffff;
+    auto sign = rs & (1ul << 31);
+    auto ca = n == 0 ? 0 : (sign && (rs & mask<64>(64 - n, 63)));
+    auto res = (rs >> n) | (sign ? mask<32>(0, n) : 0);
+    ppu->setGPR(i->RA, res);
+    ppu->setCA(ca);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
+
 PRINT(NEG, XOForm_3) {
     const char* mnemonics[][2] = {
         { "neg", "neg." }, { "nego", "nego." }
@@ -1455,6 +1529,38 @@ EMU(NEG, XOForm_3) {
     auto res = ov ? ra : (~ra + 1);
     ppu->setGPR(i->RT, res);
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);    
+}
+
+PRINT(DIVWU, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "divwu", "divwu." }, { "divwuo", "divwuo." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(DIVWU, XOForm_1) {
+    auto dividend = static_cast<uint32_t>(ppu->getGPR(i->RA));
+    auto divisor = static_cast<uint32_t>(ppu->getGPR(i->RB));
+    auto ov = divisor == 0;
+    auto res = ov ? 0 : dividend / divisor;
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+}
+
+PRINT(MULLW, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "mullw", "mullw." }, { "mullwo", "mullwo." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(MULLW, XOForm_1) {
+    int32_t a = ppu->getGPR(i->RA);
+    int32_t b = ppu->getGPR(i->RB);
+    int32_t res;
+    auto ov = __builtin_smul_overflow(a, b, &res);
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
 }
 
 PRINT(MTOCRF, XFXForm_6) {
@@ -1523,8 +1629,11 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
         case 1: invoke(NCALL);
+        case 8: invoke(SUBFIC);
         case 10: invoke(CMPLI);
         case 11: invoke(CMPI);
+        case 12: invoke(ADDIC);
+        case 13: invoke(ADDICD);
         case 14: invoke(ADDI);
         case 15: invoke(ADDIS);
         case 16: invoke(BC);
@@ -1576,6 +1685,10 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         }
         case 31: {
             auto xform = reinterpret_cast<XForm_1*>(&x);
+            auto xsform = reinterpret_cast<XSForm*>(&x);
+            if (xsform->XO.u() == 413) {
+                invoke(SRADI);
+            } else
             switch (xform->XO.u()) {
                 case 87: invoke(LBZX);
                 case 119: invoke(LBZUX);
@@ -1627,6 +1740,9 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 144: invoke(MTOCRF);
                 case 278: invoke(DCBT);
                 case 58: invoke(CNTLZD);
+                case 824: invoke(SRAWI);
+                case 459: invoke(DIVWU);
+                case 235: invoke(MULLW);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

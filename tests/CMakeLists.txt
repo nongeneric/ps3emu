@@ -6,6 +6,7 @@ set(SRC
     main.cpp
     PPUTests.cpp
     PPUDasmTests.cpp
+    PPUSysCallsTests.cpp
 )
 add_executable(tests ${SRC})
 target_link_libraries(tests ps3emu)

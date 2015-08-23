@@ -5,7 +5,12 @@
 #include <map>
 #include <memory>
 #include <type_traits>
+#include <stdexcept>
 #include <boost/endian/arithmetic.hpp>
+
+class ProcessFinishedException : public std::exception { };
+
+typedef uint32_t ps3_uintptr_t;
 
 struct MemoryPage {
     MemoryPage();
@@ -86,12 +91,16 @@ class PPU {
     std::map<uint64_t, MemoryPage> _pages;
     
 public:
-    void writeMemory(uint64_t va, const void* buf, uint len, bool allocate = false);
-    void readMemory(uint64_t va, void* buf, uint len, bool allocate = false);
-    void setMemory(uint64_t va, uint8_t value, uint len, bool allocate = false);
+    void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
+    void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
+    void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
+    ps3_uintptr_t malloc(ps3_uintptr_t size);
+    void reset();
     void ncall(uint32_t index);
     void scall();
     uint32_t findNCallEntryIndex(std::string name);
+    int allocatedPages();
+    bool isAllocated(ps3_uintptr_t va);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(uint64_t va) {
@@ -203,7 +212,4 @@ public:
     inline uint64_t getNIP() {
         return _NIP;
     }
-    
-    int allocatedPages();
-    bool isAllocated(uint64_t va);
 };

@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 2.8.11)
 
-project(pdfshrink)
-
 include_directories(${pdfshrink_SOURCE_DIR})
 
 # set up boost
@@ -19,4 +17,5 @@ set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
 add_subdirectory(ps3emu)
 add_subdirectory(dbg-gui)
 add_subdirectory(libs)
+add_subdirectory(ps3run)
 add_subdirectory(tests)
