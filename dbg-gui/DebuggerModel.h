@@ -27,11 +27,12 @@ public:
     MonospaceGridModel* getMemoryDumpModel();
     MonospaceGridModel* getStackModel();
     MonospaceGridModel* getOtherAuxRegistersModel();
-    void loadFile(QString path);
+    void loadFile(QString path, QStringList args);
     void exec(QString command);
     void stepIn();
     void stepOver();
     void run();
+    void runToLR();
     void restart();
 signals:
     void message(QString text);

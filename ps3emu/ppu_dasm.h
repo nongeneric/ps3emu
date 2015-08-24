@@ -352,7 +352,7 @@ PRINT(LBZ, DForm_1) {
 
 EMU(LBZ, DForm_1) {
     auto b = getB(i->RA, ppu);
-    auto ea = b + i->D;
+    auto ea = b + i->D.s();
     ppu->setGPR(i->RT, ppu->load<1>(ea));
 }
 
@@ -375,7 +375,7 @@ PRINT(LBZU, DForm_1) {
 }
 
 EMU(LBZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D;
+    auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->setGPR(i->RT, ppu->load<1>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -400,7 +400,7 @@ PRINT(LHZ, DForm_1) {
 
 EMU(LHZ, DForm_1) {
     auto b = getB(i->RA, ppu);
-    auto ea = b + i->D;
+    auto ea = b + i->D.s();
     ppu->setGPR(i->RT, ppu->load<2>(ea));
 }
 
@@ -423,7 +423,7 @@ PRINT(LHZU, DForm_1) {
 }
 
 EMU(LHZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D;
+    auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->setGPR(i->RT, ppu->load<2>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -448,7 +448,7 @@ PRINT(LHA, DForm_1) {
 
 EMU(LHA, DForm_1) {
     auto b = getB(i->RA, ppu);
-    auto ea = b + i->D;
+    auto ea = b + i->D.s();
     ppu->setGPR(i->RT, ppu->loads<2>(ea));
 }
 
@@ -471,7 +471,7 @@ PRINT(LHAU, DForm_1) {
 }
 
 EMU(LHAU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D;
+    auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->setGPR(i->RT, ppu->loads<2>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -496,7 +496,7 @@ PRINT(LWZ, DForm_1) {
 
 EMU(LWZ, DForm_1) {
     auto b = getB(i->RA, ppu);
-    auto ea = b + i->D;
+    auto ea = b + i->D.s();
     ppu->setGPR(i->RT, ppu->load<4>(ea));
 }
 
@@ -519,7 +519,7 @@ PRINT(LWZU, DForm_1) {
 }
 
 EMU(LWZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D;
+    auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->setGPR(i->RT, ppu->load<4>(ea));
     ppu->setGPR(i->RA, ea);
 }
@@ -625,7 +625,7 @@ EMU(LDUX, XForm_1) {
 template <int Bytes>
 void EmuStore(DForm_3* i, PPU* ppu) {
     auto b = getB(i->RA, ppu);
-    auto ea = b + i->D;
+    auto ea = b + i->D.s();
     ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
 }
 
@@ -638,7 +638,7 @@ void EmuStoreIndexed(XForm_8* i, PPU* ppu) {
 
 template <int Bytes>
 void EmuStoreUpdate(DForm_3* i, PPU* ppu) {
-    auto ea = ppu->getGPR(i->RA) + i->D;
+    auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
     ppu->setGPR(i->RA, ea);
 }
@@ -745,7 +745,7 @@ PRINT(ADDI, DForm_2) {
 
 EMU(ADDI, DForm_2) {
     auto b = getB(i->RA, ppu);
-    ppu->setGPR(i->RT, i->SI + b);
+    ppu->setGPR(i->RT, i->SI.s() + b);
 }
 
 PRINT(ADDIS, DForm_2) {
@@ -1531,6 +1531,38 @@ EMU(NEG, XOForm_3) {
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);    
 }
 
+PRINT(DIVD, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "divd", "divd." }, { "divdo", "divdo." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(DIVD, XOForm_1) {
+    int64_t dividend = ppu->getGPR(i->RA);
+    int64_t divisor = ppu->getGPR(i->RB);
+    auto ov = divisor == 0 || ((uint64_t)dividend == 0x8000000000000000 && divisor == -1ll);
+    int64_t res = ov ? 0 : dividend / divisor;
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+}
+
+PRINT(DIVDU, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "divdu", "divdu." }, { "divduo", "divduo." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(DIVDU, XOForm_1) {
+    auto dividend = ppu->getGPR(i->RA);
+    auto divisor = ppu->getGPR(i->RB);
+    auto ov = divisor == 0;
+    auto res = ov ? 0 : dividend / divisor;
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+}
+
 PRINT(DIVWU, XOForm_1) {
     const char* mnemonics[][2] = {
         { "divwu", "divwu." }, { "divwuo", "divwuo." }
@@ -1546,6 +1578,23 @@ EMU(DIVWU, XOForm_1) {
     ppu->setGPR(i->RT, res);
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
 }
+
+PRINT(MULLD, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "mulld", "mulld." }, { "mulldo", "mulldo." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(MULLD, XOForm_1) {
+    int64_t a = ppu->getGPR(i->RA);
+    int64_t b = ppu->getGPR(i->RB);
+    int64_t res;
+    auto ov = __builtin_smull_overflow(a, b, &res);
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+}
+
 
 PRINT(MULLW, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -1743,6 +1792,9 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 824: invoke(SRAWI);
                 case 459: invoke(DIVWU);
                 case 235: invoke(MULLW);
+                case 457: invoke(DIVDU);
+                case 233: invoke(MULLD);
+                case 489: invoke(DIVD);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

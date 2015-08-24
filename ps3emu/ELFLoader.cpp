@@ -6,6 +6,11 @@
 
 using namespace boost::endian;
 
+const auto vaStackBase = 0x06000000u;
+const auto stackSize = 0x10000u;
+const auto vaTLS = vaStackBase + stackSize;
+const auto tlsSize = 64 * (1u << 10);
+
 ELFLoader::ELFLoader()
 {
 
@@ -87,7 +92,7 @@ struct fdescr {
 };
 static_assert(sizeof(fdescr) == 8, "bad function descriptor size");
 
-void ELFLoader::map(PPU* ppu, std::function<void(std::string)> log) {
+void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(std::string)> log) {
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -112,24 +117,24 @@ void ELFLoader::map(PPU* ppu, std::function<void(std::string)> log) {
     }
     
     // PPU_ABI-Specifications_e
-    const auto vaStackBase = 0x06000000;
-    const auto vaStackSize = 0x10000;
-    ppu->setMemory(vaStackBase, 0, vaStackSize, true);
-    ppu->setGPR(1, vaStackBase + vaStackSize - sizeof(uint64_t));
+    ppu->setMemory(vaStackBase, 0, stackSize, true);
+    ppu->setGPR(1, vaStackBase + stackSize - sizeof(uint64_t));
         
     fdescr entry;
     ppu->readMemory(_header->e_entry, &entry, sizeof(entry));
     ppu->setGPR(2, entry.tocBase);
     
-    ppu->setGPR(3, 0);
-    ppu->setGPR(4, vaStackBase);
+    auto vaArgs = storeArgs(ppu, args);
+    ppu->setGPR(3, args.size());
+    ppu->setGPR(4, vaArgs);
     
     // undocumented:
     ppu->setGPR(5, vaStackBase);
     ppu->setGPR(6, 0);
     ppu->setGPR(12, MemoryPage::pageSize);
     
-    ppu->setGPR(13, 0); //TODO: control block of tls
+    ppu->setMemory(vaTLS, 0, tlsSize, true);
+    ppu->setGPR(13, vaTLS);
     ppu->setFPSCR(0);
     ppu->setNIP(entry.va);
 }
@@ -205,3 +210,20 @@ Elf64_be_Sym* ELFLoader::getGlobalSymbolByValue(uint32_t value, uint32_t section
     }
     throw std::runtime_error("no symbol table section present");
 }
+
+ps3_uintptr_t ELFLoader::storeArgs(PPU* ppu, std::vector<std::string> const& args) {
+    const auto vaArgs = vaTLS + tlsSize;
+    std::vector<big_uint64_t> arr;
+    ppu->setMemory(vaArgs, 0, (args.size() + 1) * 8, true);
+    auto len = 0;
+    for (auto arg : args) {
+        auto vaPtr = vaArgs + (args.size() + 1) * 8 + len;
+        ppu->writeMemory(vaPtr, arg.data(), arg.size() + 1, true);
+        arr.push_back(vaPtr);
+        len += arg.size() + 1;
+    }
+    arr.push_back(0);
+    ppu->writeMemory(vaArgs, arr.data(), arr.size() * 8);
+    return vaArgs;
+}
+

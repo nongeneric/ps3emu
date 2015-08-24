@@ -229,12 +229,16 @@ MonospaceGridModel* DebuggerModel::getDasmModel() {
     return _dasmModel.get();
 }
 
-void DebuggerModel::loadFile(QString path) {
+void DebuggerModel::loadFile(QString path, QStringList args) {
     _ppu->reset();
     auto str = path.toStdString();
     _elf.load(str);
     auto stdStringLog = [=](std::string s){ log(s); };
-    _elf.map(_ppu.get(), stdStringLog);
+    std::vector<std::string> argsVec;
+    for (auto arg : args) {
+        argsVec.push_back(arg.toStdString());
+    }
+    _elf.map(_ppu.get(), argsVec, stdStringLog);
     _elf.link(_ppu.get(), stdStringLog);
     _grpModel->update();
     _dasmModel->update();
@@ -302,6 +306,7 @@ void DebuggerModel::exec(QString command) {
                 return;
             } else if (name == "mem") {
                 printMemory(va);
+                return;
             }
         } catch (...) {
             emit message("command failed");
@@ -318,4 +323,10 @@ void DebuggerModel::printMemory(uint64_t va) {
         s += QString("%1 ").arg(buf[i], 2, 16, QChar('0'));
     }
     emit message(s);
+}
+
+void DebuggerModel::runToLR() {
+    auto lr = _ppu->getLR();
+    while (_ppu->getNIP() != lr)
+        stepIn();
 }

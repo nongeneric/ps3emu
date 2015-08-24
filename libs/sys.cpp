@@ -87,10 +87,12 @@ int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
 int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
     if (ch == SYS_TTYP_PPU_STDOUT) {
         fwrite(buf, 1, len, stdout);
+        fflush(stdout);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_PPU_STDERR) {
         fwrite(buf, 1, len, stderr);
+        fflush(stderr);
         return CELL_OK;
     }
     throw std::runtime_error(str(boost::format("unknown channel %d") % ch));

@@ -29,7 +29,7 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
     uint64_t _va;
     PPU* _ppu;
     inline T value(PPU* ppu) {
-        _va = ppu->getGPR(3 + ArgN);
+        _va = (ps3_uintptr_t)ppu->getGPR(3 + ArgN);
         if (_va == 0)
             return nullptr;
         ppu->readMemory(_va, &_t, sizeof(elem_type));

@@ -54,26 +54,6 @@ public:
     }
 };
 
-template <typename BF, int = BF::P>
-inline int64_t operator+(BF bf, int64_t x) {
-    return bf.s() + x;
-}
-
-template <typename BF, int = BF::P>
-inline int64_t operator+(int64_t x, BF bf) {
-    return bf.s() + x;
-}
-
-template <typename BF, int = BF::P>
-inline uint64_t operator+(BF bf, uint64_t x) {
-    return bf.u() + x;
-}
-
-template <typename BF, int = BF::P>
-inline uint64_t operator+(uint64_t x, BF bf) {
-    return bf.u() + x;
-}
-
 template <int Width>
 inline uint64_t mask(uint8_t x, uint8_t y) {
     if (x > y)

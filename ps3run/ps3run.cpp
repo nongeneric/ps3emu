@@ -3,11 +3,11 @@
 #include "../ps3emu/ppu_dasm.h"
 #include "stdio.h"
 
-void emulate(const char* path) {
+void emulate(const char* path, std::vector<std::string> args) {
     PPU ppu;
     ELFLoader elf;
     elf.load(path);
-    elf.map(&ppu, [](auto){});
+    elf.map(&ppu, args, [](auto){});
     elf.link(&ppu, [](auto){});
     
     try {
@@ -30,7 +30,11 @@ int main(int argc, char* argv[]) {
     }
     auto path = argv[1];
     try {
-        emulate(path);
+        std::vector<std::string> args;
+        for (int i = 1; i < argc; ++i) {
+            args.push_back(argv[i]);
+        }
+        emulate(path, args);
     } catch(std::exception& e) {
         printf("exception: %s\n", e.what());
         return 1;

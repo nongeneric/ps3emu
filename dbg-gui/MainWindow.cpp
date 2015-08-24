@@ -79,6 +79,11 @@ void MainWindow::setupMenu() {
     connect(stepOver, &QAction::triggered, this, [=]() { _model.stepOver(); });
     trace->addAction(stepOver);
     
+    auto runToLR = new QAction("Run to LR", this);
+    runToLR->setShortcut(QKeySequence(Qt::Key_F4));
+    connect(runToLR, &QAction::triggered, this, [=]() { _model.runToLR(); });
+    trace->addAction(runToLR);
+    
     auto run = new QAction("Run", this);
     run->setShortcut(QKeySequence(Qt::Key_F5));
     connect(run, &QAction::triggered, this, [=]() { _model.run(); });
@@ -92,12 +97,13 @@ void MainWindow::setupMenu() {
 
 void MainWindow::openFile() {
 #if DEBUG
-    _model.loadFile("/g/ps3/reversing/simple_printf/a.elf");
+    auto args = QStringList() << "a.elf" << "10" << "-1" << "9";
+    _model.loadFile("/g/ps3/reversing/bubblesort/a.elf", args);
     return;
 #endif
     auto path = QFileDialog::getOpenFileName(this, "Open ELF executable");
     if (!path.isEmpty()) {
-        _model.loadFile(path);
+        _model.loadFile(path, {});
     }
 }
 
