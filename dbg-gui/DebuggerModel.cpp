@@ -1,6 +1,7 @@
 #include "DebuggerModel.h"
 #include "../ps3emu/ppu_dasm.h"
 #include <QStringList>
+#include "stdio.h"
 
 class GridModelChangeTracker {
     MonospaceGridModel* _model;
@@ -39,10 +40,18 @@ QString printHex(void* ptr, int len) {
 class GPRModel : public MonospaceGridModel {
     PPU* _ppu;
     GridModelChangeTracker _tracker;
+    bool _isFPR = false;
 public:
     GPRModel(PPU* ppu) : _ppu(ppu), _tracker(this) { 
         _tracker.track();
         _tracker.track();
+    }
+    
+    void toggleFPR() {
+        _isFPR = !_isFPR;
+        _tracker.track();
+        _tracker.track();
+        update();
     }
     
     QString print(uint64_t value) {
@@ -115,9 +124,12 @@ public:
             }
         }
         if (col == 2) {
-            return QString("GPR%1").arg(row);
+            return QString("%1PR%2").arg(_isFPR ? "F" : "G").arg(row);
         }
         if (col == 3) {
+            if (_isFPR) {
+                return QString("%1").arg(_ppu->getFPRd(row));
+            }
             return print(_ppu->getGPR(row));
         }
         throw std::runtime_error("bad column");
@@ -215,14 +227,14 @@ public:
 
 DebuggerModel::DebuggerModel() {
     _ppu.reset(new PPU());
-    _grpModel.reset(new GPRModel(_ppu.get()));
+    _gprModel.reset(new GPRModel(_ppu.get()));
     _dasmModel.reset(new DasmModel(_ppu.get(), &_elf));
 }
 
 DebuggerModel::~DebuggerModel() { }
 
-MonospaceGridModel* DebuggerModel::getGRPModel() {
-    return _grpModel.get();
+MonospaceGridModel* DebuggerModel::getGPRModel() {
+    return _gprModel.get();
 }
 
 MonospaceGridModel* DebuggerModel::getDasmModel() {
@@ -240,7 +252,7 @@ void DebuggerModel::loadFile(QString path, QStringList args) {
     }
     _elf.map(_ppu.get(), argsVec, stdStringLog);
     _elf.link(_ppu.get(), stdStringLog);
-    _grpModel->update();
+    _gprModel->update();
     _dasmModel->update();
     _dasmModel->navigate(_ppu->getNIP());
     _elfLoaded = true;
@@ -256,7 +268,7 @@ void DebuggerModel::stepIn() {
         _ppu->readMemory(cia, &instr, sizeof instr);
         _ppu->setNIP(cia + sizeof instr);
         ppu_dasm<DasmMode::Emulate>(&instr, cia, _ppu.get());
-        _grpModel->update();
+        _gprModel->update();
         _dasmModel->update();
         _dasmModel->navigate(_ppu->getNIP());
     } catch (ProcessFinishedException&) {
@@ -307,6 +319,9 @@ void DebuggerModel::exec(QString command) {
             } else if (name == "mem") {
                 printMemory(va);
                 return;
+            } else if (name == "traceto") {
+                traceTo(va);
+                return;
             }
         } catch (...) {
             emit message("command failed");
@@ -326,7 +341,31 @@ void DebuggerModel::printMemory(uint64_t va) {
 }
 
 void DebuggerModel::runToLR() {
-    auto lr = _ppu->getLR();
-    while (_ppu->getNIP() != lr)
+    try {
+        auto lr = _ppu->getLR();
+        while (_ppu->getNIP() != lr) {
+            stepIn();
+        }
+    } catch (...) {
+        emit message("unhandled exception");
+    }
+}
+
+void DebuggerModel::toggleFPR() {
+    _gprModel->toggleFPR();
+}
+
+void DebuggerModel::traceTo(ps3_uintptr_t va) {
+    auto tracefile = "/tmp/ps3trace";
+    auto f = fopen(tracefile, "w");
+    ps3_uintptr_t nip;
+    std::string str;
+    while ((nip = _ppu->getNIP()) != va) {
+        uint32_t instr;
+        _ppu->readMemory(nip, &instr, sizeof instr);
+        ppu_dasm<DasmMode::Print>(&instr, nip, &str);
+        fprintf(f, "%08x  %s\n", nip, str.c_str());
         stepIn();
+    }
+    fclose(f);
 }

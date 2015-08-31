@@ -13,20 +13,22 @@ class DebuggerModel : public QWidget {
     Q_OBJECT
     
     ELFLoader _elf;
-    std::unique_ptr<GPRModel> _grpModel;
+    std::unique_ptr<GPRModel> _gprModel;
     std::unique_ptr<DasmModel> _dasmModel;
     std::unique_ptr<PPU> _ppu;
     bool _elfLoaded = false;
     void log(std::string str);
     void printMemory(uint64_t va);
+    void traceTo(ps3_uintptr_t va);
 public:
     DebuggerModel();
     ~DebuggerModel();
     MonospaceGridModel* getDasmModel();
-    MonospaceGridModel* getGRPModel();
+    MonospaceGridModel* getGPRModel();
     MonospaceGridModel* getMemoryDumpModel();
     MonospaceGridModel* getStackModel();
     MonospaceGridModel* getOtherAuxRegistersModel();
+    void toggleFPR();
     void loadFile(QString path, QStringList args);
     void exec(QString command);
     void stepIn();

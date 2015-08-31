@@ -17,6 +17,12 @@ typedef BitField<16, 32, BitFieldType::Unsigned> UI_t;
 typedef BitField<6, 11> BO_t;
 typedef BitField<11, 16> BI_t;
 typedef BitField<12, 20> FXM_t;
+typedef BitField<11, 16, BitFieldType::FPR> FRA_t;
+typedef BitField<16, 21, BitFieldType::FPR> FRB_t;
+typedef BitField<21, 26, BitFieldType::FPR> FRC_t;
+typedef BitField<6, 11, BitFieldType::FPR> FRS_t;
+typedef BitField<6, 11, BitFieldType::FPR> FRT_t;
+typedef BitField<31, 32> Rc_t;
 
 union IForm {
     BitField<0, 6> OPCD;
@@ -73,7 +79,7 @@ union XForm_6 {
     RS_t RS;
     RA_t RA;
     RB_t RB;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union XForm_8 {
@@ -86,18 +92,42 @@ union XForm_10 {
     RS_t RS;
     RA_t RA;
     BitField<16, 21> SH;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union XForm_11 {
     RS_t RS;
     RA_t RA;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union XForm_16 {
     BF_t BF;
     BitField<10, 11> L;
+    RA_t RA;
+    RB_t RB;
+};
+
+union XForm_17 {
+    BF_t BF;
+    FRA_t FRA;
+    FRB_t FRB;
+};
+
+union XForm_26 {
+    FRT_t FRT;
+    RA_t RA;
+    RB_t RB;
+};
+
+union XForm_27 {
+    FRT_t FRT;
+    FRB_t FRB;
+    Rc_t Rc;
+};
+
+union XForm_29 {
+    FRT_t FRS;
     RA_t RA;
     RB_t RB;
 };
@@ -159,20 +189,32 @@ union DSForm_2 {
     BitField<30, 32> XO;
 };
 
+union DForm_8 {
+    FRT_t FRT;
+    RA_t RA;
+    D_t D;
+};
+
+union DForm_9 {
+    FRS_t FRS;
+    RA_t RA;
+    D_t D;
+};
+
 union XOForm_1 {
     RT_t RT;
     RA_t RA;
     RB_t RB;
     BitField<21, 22> OE;
     BitField<22, 31> XO;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union XOForm_3 {
     RT_t RT;
     RA_t RA;
     BitField<21, 22> OE;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 
@@ -211,7 +253,7 @@ union MDForm_1 {
     BitField<26, 27> mb5;
     BitField<27, 30> XO;
     BitField<30, 31> sh5;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union MDForm_2 {
@@ -221,7 +263,7 @@ union MDForm_2 {
     BitField<21, 26> me04;
     BitField<26, 27> me5;
     BitField<30, 31> sh5;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union MDSForm_1 {
@@ -230,7 +272,7 @@ union MDSForm_1 {
     RB_t RB;
     BitField<21, 27> mb;
     BitField<27, 31> XO;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union MDSForm_2 {
@@ -239,7 +281,7 @@ union MDSForm_2 {
     RB_t RB;
     BitField<21, 27> me;
     BitField<27, 31> XO;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union MForm_1 {
@@ -248,7 +290,7 @@ union MForm_1 {
     RB_t RB;
     BitField<21, 26> mb;
     BitField<26, 31> me;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union MForm_2 {
@@ -257,7 +299,7 @@ union MForm_2 {
     BitField<16, 21> SH;
     BitField<21, 26> mb;
     BitField<26, 31> me;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
 };
 
 union SCForm {
@@ -275,5 +317,37 @@ union XSForm {
     BitField<16, 21> sh04;
     BitField<21, 30> XO;
     BitField<30, 31> sh5;
-    BitField<31, 32> Rc;
+    Rc_t Rc;
+};
+
+union AForm_1 {
+    FRT_t FRT;
+    FRA_t FRA;
+    FRB_t FRB;
+    FRC_t FRC;
+    BitField<26, 31> XO;
+    Rc_t Rc;
+};
+
+union AForm_2 {
+    FRT_t FRT;
+    FRA_t FRA;
+    FRB_t FRB;
+    BitField<26, 31> XO;
+    Rc_t Rc;
+};
+
+union AForm_3 {
+    FRT_t FRT;
+    FRA_t FRA;
+    FRC_t FRC;
+    BitField<26, 31> XO;
+    Rc_t Rc;
+};
+
+union AForm_4 {
+    FRT_t FRT;
+    FRB_t FRB;
+    BitField<26, 31> XO;
+    Rc_t Rc;
 };

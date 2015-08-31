@@ -65,6 +65,52 @@ union CR_t {
 };
 static_assert(sizeof(CR_t) == sizeof(uint32_t), "");
 
+union FPSCR_t {
+    struct {
+        uint32_t RN : 2;
+        uint32_t NI : 1;
+        uint32_t XE : 1;
+        uint32_t ZE : 1;
+        uint32_t UE : 1;
+        uint32_t OE : 1;
+        uint32_t VE : 1;
+        uint32_t VXCVI : 1;
+        uint32_t VXSQRT : 1;
+        uint32_t VXSOFT : 1;
+        uint32_t _ : 1;
+        uint32_t FUorNAN : 1;
+        uint32_t FEorEq : 1;
+        uint32_t FGorGt : 1;
+        uint32_t FLofLt : 1;
+        uint32_t C : 1;
+        uint32_t FI : 1;
+        uint32_t FR : 1;
+        uint32_t VXVC : 1;
+        uint32_t VXIMZ : 1;
+        uint32_t VXZDZ : 1;
+        uint32_t VXIDI : 1;
+        uint32_t VXISI : 1;
+        uint32_t VXSNAN : 1;
+        uint32_t XX : 1;
+        uint32_t ZX : 1;
+        uint32_t UX : 1;
+        uint32_t OX : 1;
+        uint32_t VX : 1;
+        uint32_t FEX : 1;
+        uint32_t FX : 1;
+    } f;
+    struct {
+        uint32_t _ : 12;
+        uint32_t v : 5;
+    } fprf;
+    struct {
+        uint32_t _ : 13;
+        uint32_t v : 4;
+    } fpcc;
+    uint32_t v;
+};
+static_assert(sizeof(FPSCR_t) == sizeof(uint32_t), "");
+
 union XER_t {
     struct {
         uint64_t Bytes : 7;
@@ -82,9 +128,9 @@ class PPU {
     uint64_t _LR;
     uint64_t _CTR;
     uint64_t _NIP;
-    uint64_t _GPR[64];
-    double _FPR[64];
-    double _FPSCR;
+    uint64_t _GPR[32];
+    double _FPR[32];
+    FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
     
@@ -103,14 +149,14 @@ public:
     bool isAllocated(ps3_uintptr_t va);
     
     template <int Bytes>
-    typename BytesToBEType<Bytes>::type load(uint64_t va) {
+    typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
         typename BytesToBEType<Bytes>::beType res;
         readMemory(va, &res, Bytes);
         return res;
     }
     
     template <int Bytes>
-    typename BytesToBEType<Bytes>::stype loads(uint64_t va) {
+    typename BytesToBEType<Bytes>::stype loads(ps3_uintptr_t va) {
         return load<Bytes>(va);
     }
     
@@ -118,6 +164,24 @@ public:
     void store(uint64_t va, V value) {
         typename BytesToBEType<Bytes>::beType x = getUValue(value);
         writeMemory(va, &x, Bytes);
+    }
+    
+    void storef(ps3_uintptr_t va, float value) {
+        store<sizeof(float)>(va, *reinterpret_cast<uint32_t*>(&value));
+    }
+    
+    void stored(ps3_uintptr_t va, double value) {
+        store<sizeof(double)>(va, *reinterpret_cast<uint64_t*>(&value));
+    }
+    
+    float loadf(ps3_uintptr_t va) {
+        auto f = (uint32_t)load<sizeof(float)>(va);
+        return *reinterpret_cast<float*>(&f);
+    }
+    
+    double loadd(ps3_uintptr_t va) {
+        auto f = (uint64_t)load<sizeof(double)>(va);
+        return *reinterpret_cast<double*>(&f);
     }
     
     void run();
@@ -132,8 +196,34 @@ public:
         return _GPR[getUValue(i)];
     }
     
-    inline void setFPSCR(double value) {
-        _FPSCR = value;
+    template <typename V>
+    inline void setFPRd(V i, double value) {
+        _FPR[getUValue(i)] = value;
+    }
+    
+    template <typename V>
+    inline double getFPRd(V i) {
+        return _FPR[getUValue(i)];
+    }
+    
+    template <typename V>
+    inline void setFPR(V i, uint64_t value) {
+        auto idx = getUValue(i);
+        *reinterpret_cast<uint64_t*>(_FPR + idx) = value;
+    }
+    
+    template <typename V>
+    inline uint64_t getFPR(V i) {
+        auto idx = getUValue(i);
+        return *reinterpret_cast<uint64_t*>(_FPR + idx);
+    }
+    
+    inline void setFPSCR(uint32_t value) {
+        _FPSCR.v = value;
+    }
+    
+    inline FPSCR_t getFPSCR() {
+        return _FPSCR;
     }
     
     inline void setLR(uint64_t value) {
@@ -168,19 +258,26 @@ public:
         _CR.v = value;
     }
     
+    inline uint8_t getCRF_sign(uint8_t n) {
+        return getCRF(n) >> 1;
+    }
+    
     inline void setCRF_sign(uint8_t n, uint8_t sign) {
+        auto so = getCRF(n) & 1;
+        setCRF(n, (sign << 1) | so);
+    }
+    
+    inline uint8_t getCRF(uint8_t n) {
         auto fpos = 4 * n;
-        auto fmask = ~(uint32_t)mask<32>(fpos, fpos + 2);
-        auto f = ((sign << 1) | getSO()) << (31 - fpos - 3);
+        auto fmask = (uint32_t)mask<32>(fpos, fpos + 3);
+        return (getCR() & fmask) >> (32 - fpos - 4);
+    }
+    
+    inline void setCRF(uint8_t n, uint8_t value) {
+        auto fpos = 4 * n;
+        auto fmask = ~(uint32_t)mask<32>(fpos, fpos + 3);
+        auto f = value << (32 - fpos - 4);
         setCR((getCR() & fmask) | f);
-    }
-    
-    inline void setCR0_sign(uint8_t bits) {
-        _CR.af.sign = bits;
-    }
-    
-    inline uint8_t getCR0_sign() {
-        return _CR.af.sign;
     }
     
     inline void setOV() {

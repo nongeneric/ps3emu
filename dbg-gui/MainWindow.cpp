@@ -24,7 +24,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
 void MainWindow::setupDocks() {
     auto gprGrid = new MonospaceGrid();
-    gprGrid->setModel(_model.getGRPModel());
+    gprGrid->setModel(_model.getGPRModel());
     gprGrid->setColumnWidth(0, 5);
     gprGrid->setColumnWidth(1, 17);
     gprGrid->setColumnWidth(2, 7);
@@ -93,12 +93,18 @@ void MainWindow::setupMenu() {
     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
     connect(restart, &QAction::triggered, this, [=]() { _model.restart(); });
     trace->addAction(restart);
+    
+    auto view = menuBar()->addMenu("&View");
+    auto toggleFPR = new QAction("Toggle GPR/FPR", this);
+    toggleFPR->setShortcut(QKeySequence(Qt::Key_Tab));
+    connect(toggleFPR, &QAction::triggered, this, [=]() { _model.toggleFPR(); });
+    view->addAction(toggleFPR);
 }
 
 void MainWindow::openFile() {
 #if DEBUG
-    auto args = QStringList() << "a.elf" << "10" << "-1" << "9";
-    _model.loadFile("/g/ps3/reversing/bubblesort/a.elf", args);
+    auto args = QStringList() << "a.elf" << "-3.4" << "-1" << "9";
+    _model.loadFile("/g/ps3/reversing/printf/a.elf", args);
     return;
 #endif
     auto path = QFileDialog::getOpenFileName(this, "Open ELF executable");

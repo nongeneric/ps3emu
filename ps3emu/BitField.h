@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <assert.h>
 
 inline int64_t getSValue(int64_t u) { return u; }
 template <typename BF, int = BF::P>
@@ -11,7 +12,7 @@ template <typename BF, int = BF::P>
 inline uint64_t getUValue(BF bf) { return bf.u(); }
 
 enum class BitFieldType {
-    Signed, Unsigned, GPR, CR, None
+    Signed, Unsigned, GPR, CR, FPR, None
 };
 
 template <int Pos, int Next, BitFieldType T = BitFieldType::None, int Shift = 0>
@@ -46,6 +47,7 @@ public:
     inline const char* prefix() {
         return T == BitFieldType::CR ? "cr"
              : T == BitFieldType::GPR ? "r"
+             : T == BitFieldType::FPR ? "f"
              : "";
     }
     
@@ -55,7 +57,10 @@ public:
 };
 
 template <int Width>
-inline uint64_t mask(uint8_t x, uint8_t y) {
+inline uint64_t mask(int x, int y) {
+    static_assert(Width <= 64, "");
+    assert(x < Width && y < Width);
+    assert(x >= 0 && y >= 0);
     if (x > y)
         return mask<Width>(0, y) | mask<Width>(x, Width - 1);
     return ((~0ull >> x) & (~0ull << (63 - y))) >> (64 - Width);

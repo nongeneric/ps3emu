@@ -317,3 +317,17 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "mullw r9,r31,r9");
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x98, 0x61, 0x01, 0x12 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "stb r3,274(r1)");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x2f, 0xa0, 0x00, 0x00 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "cmpdi cr7,r0,0");
+}
