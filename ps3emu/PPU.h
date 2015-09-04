@@ -136,6 +136,19 @@ class PPU {
     
     std::map<uint64_t, MemoryPage> _pages;
     
+    inline uint8_t get4bitField(uint32_t r, uint8_t n) {
+        auto fpos = 4 * n;
+        auto fmask = (uint32_t)mask<32>(fpos, fpos + 3);
+        return (r & fmask) >> (32 - fpos - 4);
+    }
+    
+    inline uint32_t set4bitField(uint32_t r, uint8_t n, uint8_t value) {
+        auto fpos = 4 * n;
+        auto fmask = ~(uint32_t)mask<32>(fpos, fpos + 3);
+        auto f = value << (32 - fpos - 4);
+        return (r & fmask) | f;
+    }
+    
 public:
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
     void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
@@ -268,16 +281,19 @@ public:
     }
     
     inline uint8_t getCRF(uint8_t n) {
-        auto fpos = 4 * n;
-        auto fmask = (uint32_t)mask<32>(fpos, fpos + 3);
-        return (getCR() & fmask) >> (32 - fpos - 4);
+        return get4bitField(getCR(), n);
     }
     
     inline void setCRF(uint8_t n, uint8_t value) {
-        auto fpos = 4 * n;
-        auto fmask = ~(uint32_t)mask<32>(fpos, fpos + 3);
-        auto f = value << (32 - fpos - 4);
-        setCR((getCR() & fmask) | f);
+        setCR(set4bitField(getCR(), n, value));
+    }
+    
+    inline uint8_t getFPSCRF(uint8_t n) {
+        return get4bitField(getFPSCR().v, n);
+    }
+    
+    inline void setFPSCRF(uint8_t n, uint8_t value) {
+        setFPSCR(set4bitField(getFPSCR().v, n, value));
     }
     
     inline void setOV() {

@@ -20,6 +20,8 @@ void emulate(const char* path, std::vector<std::string> args) {
         }
     } catch (ProcessFinishedException& e) {
         return;
+    } catch (std::exception& e) {
+        printf("exception: %s (NIP=%" PRIx64 ")\n", e.what(), ppu.getNIP());
     }
 }
 
@@ -36,7 +38,6 @@ int main(int argc, char* argv[]) {
         }
         emulate(path, args);
     } catch(std::exception& e) {
-        printf("exception: %s\n", e.what());
         return 1;
     }
     return 0;

@@ -1,8 +1,8 @@
 #include "ELFLoader.h"
+#include "utils.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdexcept>
-#include <boost/format.hpp>
 
 using namespace boost::endian;
 
@@ -101,9 +101,8 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(
         if (ph->p_memsz == 0)
             continue;
         
-        log(str(boost::format("mapping segment of size %x to %x-%x")
-            % ph->p_filesz % ph->p_vaddr % (ph->p_paddr + ph->p_memsz)
-        ));
+        log(ssnprintf("mapping segment of size %x to %x-%x",
+            ph->p_filesz, ph->p_vaddr, (ph->p_paddr + ph->p_memsz)));
         
         assert(ph->p_memsz >= ph->p_filesz);
         ppu->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
@@ -164,8 +163,8 @@ void ELFLoader::link(PPU* ppu, std::function<void(std::string)> log) {
     }
     auto entries = reinterpret_cast<LGFEntry*>(&_file[0] + lgfSection->sh_offset);
     auto count = lgfSection->sh_size / sizeof(LGFEntry);
-    log(str(boost::format("%d LGF entries found in %s")
-        % count % getSectionName(lgfSection->sh_name)));
+    log(ssnprintf("%d LGF entries found in %s",
+        count, getSectionName(lgfSection->sh_name)));
     uint64_t vaFDescrs = 0x7f000000;
     ppu->setMemory(vaFDescrs, 0, count * 2, true);
     for (auto i = 0u; i < count; ++i) {
@@ -179,8 +178,8 @@ void ELFLoader::link(PPU* ppu, std::function<void(std::string)> log) {
             ppu->store<4>(vaFDescr, vaFDescr + 4);
             ppu->store<4>(vaFDescr + 4, ncall); // use tocbase to place ncall instruction
             ppu->store<4>(entries[i].va, vaFDescr);
-            log(str(boost::format("resolved %x to point to %s (ncall %d)") 
-                % entries[i].va % sname % index));
+            log(ssnprintf("resolved %x to point to %s (ncall %d)",
+                entries[i].va, sname, index));
         }
     }
 }

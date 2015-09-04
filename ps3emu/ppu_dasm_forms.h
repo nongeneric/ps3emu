@@ -23,6 +23,7 @@ typedef BitField<21, 26, BitFieldType::FPR> FRC_t;
 typedef BitField<6, 11, BitFieldType::FPR> FRS_t;
 typedef BitField<6, 11, BitFieldType::FPR> FRT_t;
 typedef BitField<31, 32> Rc_t;
+typedef BitField<7, 15> FLM_t;
 
 union IForm {
     BitField<0, 6> OPCD;
@@ -126,6 +127,11 @@ union XForm_27 {
     Rc_t Rc;
 };
 
+union XForm_28 {
+    FRT_t FRT;
+    Rc_t Rc;
+};
+
 union XForm_29 {
     FRT_t FRS;
     RA_t RA;
@@ -135,6 +141,12 @@ union XForm_29 {
 union XForm_31 {
     RA_t RA;
     RB_t RB;
+};
+
+union XFLForm {
+    FLM_t FLM;
+    FRB_t FRB;
+    Rc_t Rc;
 };
 
 union DForm_1 {
@@ -333,7 +345,6 @@ union AForm_2 {
     FRT_t FRT;
     FRA_t FRA;
     FRB_t FRB;
-    BitField<26, 31> XO;
     Rc_t Rc;
 };
 
@@ -341,13 +352,11 @@ union AForm_3 {
     FRT_t FRT;
     FRA_t FRA;
     FRC_t FRC;
-    BitField<26, 31> XO;
     Rc_t Rc;
 };
 
 union AForm_4 {
     FRT_t FRT;
     FRB_t FRB;
-    BitField<26, 31> XO;
     Rc_t Rc;
 };

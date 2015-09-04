@@ -100,3 +100,72 @@ TEST_CASE("fcmpconv") {
         "1.190000\n"
     );
 }
+
+TEST_CASE("matrixmul") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/matrixmul/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "mul3 = 1.851600e+01\n"
+        "isnan(NAN)         = 1\n"
+        "isnan(INFINITY)    = 0\n"
+        "isnan(0.0)         = 0\n"
+        "isnan(DBL_MIN/2.0) = 0\n"
+        "isnan(0.0 / 0.0)   = 1\n"
+        "isnan(Inf - Inf)   = 1\n"
+        "isfinite(NAN)         = 0\n"
+        "isfinite(INFINITY)    = 0\n"
+        "isfinite(0.0)         = 1\n"
+        "isfinite(DBL_MIN/2.0) = 1\n"
+        "isfinite(1.0)         = 1\n"
+        "isfinite(exp(800))    = 0\n"
+        "isinf(NAN)         = 0\n"
+        "isinf(INFINITY)    = 1\n"
+        "isinf(0.0)         = 0\n"
+        "isinf(DBL_MIN/2.0) = 0\n"
+        "isinf(1.0)         = 0\n"
+        "isinf(exp(800))    = 1\n"
+        "isnormal(NAN)         = 0\n"
+        "isnormal(INFINITY)    = 0\n"
+        "isnormal(0.0)         = 0\n"
+        "isnormal(1.0)         = 1\n"
+        "isunordered(NAN,1.0) = 1\n"
+        "isunordered(1.0,NAN) = 1\n"
+        "isunordered(NAN,NAN) = 1\n"
+        "isunordered(1.0,0.0) = 0\n"
+        "mul4vec = 7.984118e+04\n"
+        "a.b.c=\n"
+        "11633689.000000\n"
+        "38058352.000000\n"
+        "-12969724.000000\n"
+        "7520124.500000\n"
+        "2673266.750000\n"
+        "-5750935.500000\n"
+        "24634854.000000\n"
+        "42614816.000000\n"
+        "-22973844.000000\n"
+        "1436.699829\n"
+        "33139.847656\n"
+        "788596.937500\n"
+        "-nan\n"
+        "-513356256.000000\n"
+    );
+}
+
+TEST_CASE("dtoa") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/dtoa/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "3.13 = 3.13\n"
+        "0.02380113 = 0.02380113\n"
+        "3.23234 * 0.1292999 = 0.41794123876600003\n"
+        "-493893848 = -493893848\n"
+        "1.322828e300 = 1.322828e+300\n"
+        "0.0000182919575748888 = 1.82919575748888e-5\n"
+    );
+}

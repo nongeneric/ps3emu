@@ -26,6 +26,7 @@ class BitField {
     }
 public:
     static constexpr int P = Pos;
+    static constexpr int W = Next - Pos;
     
     inline uint64_t u() {
         return v();

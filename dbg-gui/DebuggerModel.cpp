@@ -42,7 +42,7 @@ class GPRModel : public MonospaceGridModel {
     GridModelChangeTracker _tracker;
     bool _isFPR = false;
 public:
-    GPRModel(PPU* ppu) : _ppu(ppu), _tracker(this) { 
+    GPRModel(PPU* ppu) : _ppu(ppu), _tracker(this) {
         _tracker.track();
         _tracker.track();
     }
@@ -360,12 +360,27 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
     auto f = fopen(tracefile, "w");
     ps3_uintptr_t nip;
     std::string str;
+    std::map<std::string, int> counts;
     while ((nip = _ppu->getNIP()) != va) {
         uint32_t instr;
         _ppu->readMemory(nip, &instr, sizeof instr);
         ppu_dasm<DasmMode::Print>(&instr, nip, &str);
+        std::string name;
+        ppu_dasm<DasmMode::Name>(&instr, nip, &name);
+        counts[name]++;
         fprintf(f, "%08x  %s\n", nip, str.c_str());
         stepIn();
+    }
+    fprintf(f, "\ninstruction frequencies:\n");
+    std::vector<std::pair<std::string, int>> sorted;
+    for (auto p : counts) {
+        sorted.push_back(p);
+    }
+    std::sort(begin(sorted), end(sorted), [](auto a, auto b) {
+        return b.second < a.second;
+    });
+    for (auto p : sorted) {
+        fprintf(f, "%-10s%-5d\n", p.first.c_str(), p.second);
     }
     fclose(f);
 }

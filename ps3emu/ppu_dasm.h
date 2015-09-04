@@ -2,12 +2,12 @@
 
 #include "../ps3emu/PPU.h"
 #include "ppu_dasm_forms.h"
+#include "utils.h"
 
 #include <boost/type_traits.hpp>
 #include <boost/endian/conversion.hpp>
 #include <string>
 #include <stdint.h>
-#include <bitset>
 #include <cfenv>
 #include <cmath>
 #include <cfloat>
@@ -19,13 +19,6 @@ using namespace boost::endian;
 
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPU* ppu)
-
-template <typename... Args>
-std::string ssnprintf(const char* f, Args... args) {
-    char buf[30];
-    snprintf(buf, sizeof buf, f, args...);
-    return std::string(buf);
-}
 
 inline std::string format_u(const char* mnemonic, uint64_t u) {
     return ssnprintf("%s %" PRIx64, mnemonic, u);
@@ -81,7 +74,7 @@ inline std::string format_br_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3
 
 template <typename OP1, typename OP2, typename OP3, typename OP4>
 inline std::string format_nnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4) {
-    return ssnprintf("%s %s%d,%s%d,%s%d", mnemonic, 
+    return ssnprintf("%s %s%d,%s%d,%s%d,%s%d", mnemonic, 
                      op1.prefix(), op1.native(), 
                      op2.prefix(), op2.native(),
                      op3.prefix(), op3.native(),
@@ -206,7 +199,7 @@ EMU(BCLR, XLForm_2) {
     if (!i->BO2.u())
         ppu->setCTR(ppu->getCTR() - 1);
     if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
-        ppu->setNIP(ppu->getLR() & ~3);
+        ppu->setNIP(ppu->getLR() & ~3ul);
     if (i->LK.u())
         ppu->setLR(cia + 4);
 }
@@ -338,13 +331,7 @@ PRINT(MCRF, XLForm_3) {
 }
 
 EMU(MCRF, XLForm_3) {
-    auto cr = ppu->getCR();
-    std::bitset<64> bs(cr);
-    std::bitset<64> new_bs(cr);
-    for (int j = 0; j <= 3; ++j) {
-        new_bs[j*i->BF.u()] = bs[j*i->BFA.u()];
-    }
-    ppu->setCR(new_bs.to_ullong());
+    ppu->setCRF(i->BF.u(), ppu->getCRF(i->BFA.u()));
 }
 
 // Load Byte and Zero, p34
@@ -795,12 +782,23 @@ PRINT(ADD, XOForm_1) {
 EMU(ADD, XOForm_1) {
     auto ra = ppu->getGPR(i->RA);
     auto rb = ppu->getGPR(i->RB);
-    uint64_t res;
-    bool ov = 0;
-    if (i->OE.u())
-        ov = __builtin_uaddl_overflow(rb, ra, &res);
-    else
-        res = ra + rb;
+    unsigned __int128 res = (__int128)ra + rb;
+    bool ov = res > 0xffffffffffffffff;
+    ppu->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+}
+
+PRINT(ADDZE, XOForm_3) {
+    const char* mnemonics[][2] = {
+        { "addze", "addze." }, { "addzeo", "addzeo." }
+    };
+    *result = format_nn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA);
+}
+
+EMU(ADDZE, XOForm_3) {
+    auto ra = ppu->getGPR(i->RA);
+    unsigned __int128 res = (__int128)ra + ppu->getCA();
+    bool ov = res > 0xffffffffffffffff;
     ppu->setGPR(i->RT, res);
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
 }
@@ -884,7 +882,7 @@ PRINT(ANDISD, DForm_4) {
 }
 
 EMU(ANDISD, DForm_4) {
-    auto res = ppu->getGPR(i->RS) & (i->UI << 16);
+    auto res = ppu->getGPR(i->RS) & (i->UI.u() << 16);
     update_CR0(res, ppu);
     ppu->setGPR(i->RA, res);
 }
@@ -892,7 +890,11 @@ EMU(ANDISD, DForm_4) {
 // OR
 
 PRINT(ORI, DForm_4) {
-    *result = format_nnn("ori", i->RA, i->RS, i->UI);
+    if (i->RS.u() == 0 && i->RA.u() == 0 && i->UI.u() == 0) {
+        *result = "nop";
+    } else {
+        *result = format_nnn("ori", i->RA, i->RS, i->UI);
+    }
 }
 
 EMU(ORI, DForm_4) {
@@ -905,7 +907,7 @@ PRINT(ORIS, DForm_4) {
 }
 
 EMU(ORIS, DForm_4) {
-    auto res = ppu->getGPR(i->RS) | (i->UI << 16);
+    auto res = ppu->getGPR(i->RS) | (i->UI.u() << 16);
     ppu->setGPR(i->RA, res);
 }
 
@@ -925,7 +927,7 @@ PRINT(XORIS, DForm_4) {
 }
 
 EMU(XORIS, DForm_4) {
-    auto res = ppu->getGPR(i->RS) ^ (i->UI << 16);
+    auto res = ppu->getGPR(i->RS) ^ (i->UI.u() << 16);
     ppu->setGPR(i->RA, res);
 }
 
@@ -943,7 +945,11 @@ EMU(AND, XForm_6) {
 }
 
 PRINT(OR, XForm_6) {
-    *result = format_nnn(i->Rc.u() ? "or." : "or", i->RA, i->RS, i->RB);
+    if (i->RS.u() == i->RB.u()) {
+        *result = format_nn(i->Rc.u() ? "mr." : "mr", i->RA, i->RS);
+    } else {
+        *result = format_nnn(i->Rc.u() ? "or." : "or", i->RA, i->RS, i->RB);
+    }
 }
 
 EMU(OR, XForm_6) {
@@ -1048,15 +1054,15 @@ EMU(EXTSW, XForm_11) {
 // Move To/From System Register Instructions, p81
 
 inline bool isXER(BitField<11, 21> spr) {
-    return spr.u() == 1 << 5;
+    return spr.u() == 1u << 5;
 }
 
 inline bool isLR(BitField<11, 21> spr) {
-    return spr.u() == 8 << 5;
+    return spr.u() == 8u << 5;
 }
 
 inline bool isCTR(BitField<11, 21> spr) {
-    return spr.u() == 9 << 5;
+    return spr.u() == 9u << 5;
 }
 
 PRINT(MTSPR, XFXForm_7) {
@@ -1103,10 +1109,6 @@ EMU(MFSPR, XFXForm_7) {
            : (throw std::runtime_error("illegal"), 0);
      ppu->setGPR(i->RS, v);
 }
-
-// PRINT(MTCRF, XFXForm_5) {
-//     
-// }
 
 template <int Pos04, int Pos5>
 inline uint8_t getNBE(BitField<Pos04, Pos04 + 5> _04, BitField<Pos5, Pos5 + 1> _05) {
@@ -1489,7 +1491,7 @@ PRINT(SRW, XForm_6) {
 
 EMU(SRW, XForm_6) {
     auto b = ppu->getGPR(i->RB) & 63;
-    auto res = b > 31 ? 0 :(uint32_t)ppu->getGPR(i->RS) >> b;
+    auto res = b > 31 ? 0 : (uint32_t)ppu->getGPR(i->RS) >> b;
     ppu->setGPR(i->RA, res);
     if (i->Rc.u())
         update_CR0(res, ppu);
@@ -1616,10 +1618,10 @@ PRINT(MULLD, XOForm_1) {
 }
 
 EMU(MULLD, XOForm_1) {
-    int64_t a = ppu->getGPR(i->RA);
-    int64_t b = ppu->getGPR(i->RB);
-    int64_t res;
-    auto ov = __builtin_smull_overflow(a, b, &res);
+    auto a = ppu->getGPR(i->RA);
+    auto b = ppu->getGPR(i->RB);
+    unsigned __int128 res = a * b;
+    auto ov = res > 0xffffffffffffffff;
     ppu->setGPR(i->RT, res);
     update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
 }
@@ -1740,6 +1742,7 @@ PRINT(LFSU, DForm_8) {
 EMU(LFSU, DForm_8) {
     auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->setFPRd(i->FRT, ppu->loadf(ea));
+    ppu->setGPR(i->RA, ea);
 }
 
 PRINT(LFSUX, XForm_26) {
@@ -1749,6 +1752,7 @@ PRINT(LFSUX, XForm_26) {
 EMU(LFSUX, XForm_26) {
     auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
     ppu->setFPRd(i->FRT, ppu->loadf(ea));
+    ppu->setGPR(i->RA, ea);
 }
 
 PRINT(LFD, DForm_8) {
@@ -1778,6 +1782,7 @@ PRINT(LFDU, DForm_8) {
 EMU(LFDU, DForm_8) {
     auto ea = ppu->getGPR(i->RA) + i->D.s();
     ppu->setFPRd(i->FRT, ppu->loadd(ea));
+    ppu->setGPR(i->RA, ea);
 }
 
 PRINT(LFDUX, XForm_26) {
@@ -1787,6 +1792,7 @@ PRINT(LFDUX, XForm_26) {
 EMU(LFDUX, XForm_26) {
     auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
     ppu->setFPRd(i->FRT, ppu->loadd(ea));
+    ppu->setGPR(i->RA, ea);
 }
 
 PRINT(STFS, DForm_9) {
@@ -1928,10 +1934,6 @@ EMU(FNABS, XForm_27) {
         update_CRFSign<1>(res, ppu);
 }
 
-PRINT(FADD, AForm_2) {
-    *result = format_nnn(i->Rc.u() ? "fadd." : "fadd", i->FRT, i->FRA, i->FRB);
-}
-
 namespace FPRF {
     enum t {
         QNAN = 17,
@@ -1963,15 +1965,11 @@ inline uint32_t getFPRF(double r) {
     return fprf;
 }
 
-EMU(FADD, AForm_2) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
-    auto fpscr = ppu->getFPSCR();
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a + b;
-    ppu->setFPRd(i->FRT, r);
+template <typename T>
+inline void completeFPInstr(T a, T b, T c, T r, Rc_t rc, PPU* ppu) {
     // TODO: set FI
     // TODO: set FR
+    auto fpscr = ppu->getFPSCR();
     fpscr.fprf.v = getFPRF(r);
     uint32_t fx = fpscr.f.FX;
     if (std::fetestexcept(FE_OVERFLOW)) {
@@ -1994,8 +1992,47 @@ EMU(FADD, AForm_2) {
     }
     fpscr.f.FX = fx;
     ppu->setFPSCR(fpscr.v);
-    if (i->Rc.u())
+    if (rc.u())
         update_CRFSign<1>(r, ppu);
+}
+
+PRINT(FADD, AForm_2) {
+    *result = format_nnn(i->Rc.u() ? "fadd." : "fadd", i->FRT, i->FRA, i->FRB);
+}
+
+EMU(FADD, AForm_2) {
+    auto a = ppu->getFPRd(i->FRA);
+    auto b = ppu->getFPRd(i->FRB);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a + b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+}
+
+PRINT(FSUB, AForm_2) {
+    *result = format_nnn(i->Rc.u() ? "fsub." : "fsub", i->FRT, i->FRA, i->FRB);
+}
+
+EMU(FSUB, AForm_2) {
+    auto a = ppu->getFPRd(i->FRA);
+    auto b = ppu->getFPRd(i->FRB);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a - b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+}
+
+PRINT(FSUBS, AForm_2) {
+    *result = format_nnn(i->Rc.u() ? "fsubs." : "fsubs", i->FRT, i->FRA, i->FRB);
+}
+
+EMU(FSUBS, AForm_2) {
+    auto a = ppu->getFPRd(i->FRA);
+    auto b = ppu->getFPRd(i->FRB);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a - b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, ppu);
 }
 
 PRINT(FADDS, AForm_2) {
@@ -2003,7 +2040,92 @@ PRINT(FADDS, AForm_2) {
 }
 
 EMU(FADDS, AForm_2) {
-    throw std::runtime_error("not implemented");
+    float a = ppu->getFPRd(i->FRA);
+    float b = ppu->getFPRd(i->FRB);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a + b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0f, r, i->Rc, ppu);
+}
+
+PRINT(FMUL, AForm_3) {
+    *result = format_nnn(i->Rc.u() ? "fmul." : "fmul", i->FRT, i->FRA, i->FRC);
+}
+
+EMU(FMUL, AForm_3) {
+    auto a = ppu->getFPRd(i->FRA);
+    auto b = ppu->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a * b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+}
+
+PRINT(FMULS, AForm_3) {
+    *result = format_nnn(i->Rc.u() ? "fmuls." : "fmuls", i->FRT, i->FRA, i->FRC);
+}
+
+EMU(FMULS, AForm_3) {
+    float a = ppu->getFPRd(i->FRA);
+    float b = ppu->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a * b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0f, r, i->Rc, ppu);
+}
+
+PRINT(FDIV, AForm_2) {
+    *result = format_nnn(i->Rc.u() ? "fdiv." : "fdiv", i->FRT, i->FRA, i->FRB);
+}
+
+EMU(FDIV, AForm_2) {
+    auto a = ppu->getFPRd(i->FRA);
+    auto b = ppu->getFPRd(i->FRB);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a / b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+}
+
+PRINT(FDIVS, AForm_2) {
+    *result = format_nnn(i->Rc.u() ? "fdivs." : "fdivs", i->FRT, i->FRA, i->FRB);
+}
+
+EMU(FDIVS, AForm_2) {
+    float a = ppu->getFPRd(i->FRA);
+    float b = ppu->getFPRd(i->FRB);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a / b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0f, r, i->Rc, ppu);
+}
+
+PRINT(FMADD, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fmadd." : "fmadd", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FMADD, AForm_1) {
+    auto a = ppu->getFPRd(i->FRA);
+    auto b = ppu->getFPRd(i->FRB);
+    auto c = ppu->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a * c + b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, ppu);
+}
+
+PRINT(FMADDS, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fmadds." : "fmadds", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FMADDS, AForm_1) {
+    float a = ppu->getFPRd(i->FRA);
+    float b = ppu->getFPRd(i->FRB);
+    float c = ppu->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a * c + b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, ppu);
 }
 
 PRINT(FCFID, XForm_27) {
@@ -2011,7 +2133,7 @@ PRINT(FCFID, XForm_27) {
 }
 
 EMU(FCFID, XForm_27) {
-    auto b = (int64_t)ppu->getFPR(i->FRB);
+    double b = (int64_t)ppu->getFPR(i->FRB);
     ppu->setFPRd(i->FRT, b);
     auto fpscr = ppu->getFPSCR();
     fpscr.fprf.v = getFPRF(b);
@@ -2048,7 +2170,9 @@ PRINT(FCTIWZ, XForm_27) {
 
 EMU(FCTIWZ, XForm_27) {
     auto b = ppu->getFPRd(i->FRB);
-    auto res = (int32_t)b;
+    int32_t res = b > 2147483647. ? 0x7fffffff
+                : b < -2147483648. ? 0x80000000
+                : (int32_t)b;
     // TODO invalid operation, XX
     auto fpscr = ppu->getFPSCR();
     if (issignaling(b)) {
@@ -2071,12 +2195,35 @@ EMU(FRSP, XForm_27) {
     ppu->setFPRd(i->FRT, b);
 }
 
+PRINT(MFFS, XForm_28) {
+    *result = format_n(i->Rc.u() ? "mffs." : "mffs", i->FRT);
+}
+
+EMU(MFFS, XForm_28) {
+    uint32_t fpscr = ppu->getFPSCR().v;
+    ppu->setFPR(i->FRT, fpscr);
+    if (i->Rc.u())
+        update_CRFSign<1>(fpscr, ppu);
+}
+
+PRINT(MTFSF, XFLForm) {
+    *result = format_nn(i->Rc.u() ? "mtfsf." : "mtfsf", i->FLM, i->FRB);
+}
+
+EMU(MTFSF, XFLForm) {
+    auto n = __builtin_clzll(i->FLM.u()) - 64 + FLM_t::W;
+    auto r = ppu->getFPSCRF(n);
+    ppu->setFPSCRF(n, r);
+    if (i->Rc.u())
+        update_CRFSign<1>(r, ppu);
+}
+
 enum class DasmMode {
-    Print, Emulate  
+    Print, Emulate, Name
 };
 
 template <DasmMode M, typename P, typename E, typename S>
-void invoke_impl(P* phandler, E* ehandler, void* instr, uint64_t cia, S* s) {
+void invoke_impl(const char* name, P* phandler, E* ehandler, void* instr, uint64_t cia, S* s) {
     typedef typename boost::function_traits<P>::arg1_type F;
     typedef typename boost::function_traits<P>::arg3_type PS;
     typedef typename boost::function_traits<E>::arg3_type ES;
@@ -2084,6 +2231,8 @@ void invoke_impl(P* phandler, E* ehandler, void* instr, uint64_t cia, S* s) {
         phandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<PS>(s));
     if (M == DasmMode::Emulate)
         ehandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<ES>(s));
+    if (M == DasmMode::Name)
+        *reinterpret_cast<std::string*>(s) = name;
 }
 
 struct PPUDasmInstruction {
@@ -2091,7 +2240,7 @@ struct PPUDasmInstruction {
     std::string operands;
 };
 
-#define invoke(name) invoke_impl<M>(print##name, emulate##name, &x, cia, state); break
+#define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, &x, cia, state); break
 
 template <DasmMode M, typename S>
 void ppu_dasm(void* instr, uint64_t cia, S* state) {
@@ -2160,6 +2309,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
             auto xoform = reinterpret_cast<XOForm_1*>(&x);
             if (xoform->XO.u() == 40) {
                 invoke(SUBF);
+            } else if (xoform->XO.u() == 202) {
+                invoke(ADDZE);
             } else if (xsform->XO.u() == 413) {
                 invoke(SRADI);
             } else
@@ -2268,10 +2419,13 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
         }
         case 59: {
             auto aform = reinterpret_cast<AForm_1*>(&x);
-            if (aform->XO.u() == 21) {
-                invoke(FADDS);
-            } else {
-                throw std::runtime_error("unknown extented opcode");
+            switch (aform->XO.u()) {
+                case 21: invoke(FADDS);
+                case 25: invoke(FMULS);
+                case 18: invoke(FDIVS);
+                case 29: invoke(FMADDS);
+                case 20: invoke(FSUBS);
+                default: throw std::runtime_error("unknown extented opcode");
             }
             break;
         }
@@ -2289,6 +2443,14 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
             auto aform = reinterpret_cast<AForm_1*>(&x);
             if (aform->XO.u() == 21) {
                 invoke(FADD);
+            } else if (aform->XO.u() == 25) {
+                invoke(FMUL);
+            } else if (aform->XO.u() == 18) {
+                invoke(FDIV);
+            } else if (aform->XO.u() == 29) {
+                invoke(FMADD);
+            } else if (aform->XO.u() == 20) {
+                invoke(FSUB);
             } else
             switch (xform->XO.u()) {
                 case 72: invoke(FMR);
@@ -2299,6 +2461,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 0: invoke(FCMPU);
                 case 15: invoke(FCTIWZ);
                 case 12: invoke(FRSP);
+                case 583: invoke(MFFS);
+                case 711: invoke(MTFSF);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

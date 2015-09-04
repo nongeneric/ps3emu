@@ -1,8 +1,8 @@
+#include "../ps3emu/utils.h"
 #include "sys.h"
 #include <time.h>
 #include <stdio.h>
 #include <stdexcept>
-#include <boost/format.hpp>
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     
@@ -95,7 +95,7 @@ int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned i
         fflush(stderr);
         return CELL_OK;
     }
-    throw std::runtime_error(str(boost::format("unknown channel %d") % ch));
+    throw std::runtime_error(ssnprintf("unknown channel %d", ch));
 }
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
