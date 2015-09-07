@@ -169,3 +169,16 @@ TEST_CASE("dtoa") {
         "0.0000182919575748888 = 1.82919575748888e-5\n"
     );
 }
+
+TEST_CASE("float_printf") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/float_printf/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "18.516 = 1.851600e+01\n"
+        "float = 4.179412e-01\n"
+        "double = 4.179412e-01\n"
+    );
+}

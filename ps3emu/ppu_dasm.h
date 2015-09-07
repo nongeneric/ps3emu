@@ -1659,9 +1659,9 @@ PRINT(MULHW, XOForm_1) {
 }
 
 EMU(MULHW, XOForm_1) {
-    auto prod = (ppu->getGPR(i->RA) & 0xffffffff) 
-              * (ppu->getGPR(i->RB) & 0xffffffff);
-    auto res = prod >> 32;
+    int64_t prod = (int64_t)(int32_t)ppu->getGPR(i->RA)
+                 * (int64_t)(int32_t)ppu->getGPR(i->RB);
+    auto res = (int64_t)((uint64_t)prod >> 32);
     ppu->setGPR(i->RT, res);
     if (i->Rc.u())
         update_CR0(res, ppu);

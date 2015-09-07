@@ -1338,10 +1338,15 @@ TEST_CASE("fixed mulls") {
     REQUIRE( ppu.getGPR(5) == 0x15c296d930824100 );
     REQUIRE( ppu.getGPR(6) == 0x9a54a01930824100 );
     REQUIRE( ppu.getGPR(7) == 0xb7fa0b30583d7de );
-    REQUIRE( (ppu.getGPR(8) & 0xffffffff) == 0x9a54a019 );
+    REQUIRE( (ppu.getGPR(8) & 0xffffffff) == 0x89037f9 );
     //REQUIRE( ppu.getGPR(9) == 0x8888889088884b80 );
     //REQUIRE( ppu.getGPR(10) == 0x8888889088884b80 );
     REQUIRE( ppu.getGPR(11) == 0xc71c71b9c71cd780 );
+    
+    ppu.setGPR(2, 0xffffffffffff8a69ull);
+    ppu.setGPR(3, 0x14f8b589ull);
+    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &ppu);
+    REQUIRE( (ppu.getGPR(8) & 0xffffffffull) == 0xfffff65dull);
 }
 
 TEST_CASE("rlwinm r0,r9,0,17,27") {
