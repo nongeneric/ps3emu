@@ -12,6 +12,8 @@ set(SRC
     ppu_dasm_forms.h
     ncall.cpp
     utils.h
+    shader_dasm.h
+    shader_dasm.cpp
 )
 add_library(ps3emu ${SRC})
 target_link_libraries(ps3emu libs)

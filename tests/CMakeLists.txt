@@ -11,7 +11,9 @@ set(SRC
     PPUTests.cpp
     PPUDasmTests.cpp
     PPUSysCallsTests.cpp
+    ShDasmTests.cpp
     RunnerTests.cpp
 )
+
 add_executable(tests ${SRC})
 target_link_libraries(tests ps3emu Qt5::Core)
