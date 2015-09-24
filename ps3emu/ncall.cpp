@@ -1,7 +1,10 @@
 #include "PPU.h"
 #include "../libs/sys.h"
+#include "../libs/graphics/gcm.h"
 #include <boost/type_traits.hpp>
 #include <memory>
+
+using namespace emu::Gcm;
 
 struct NCallEntry {
     const char* name;
@@ -58,6 +61,10 @@ void nstub_sys_process_exit(PPU* ppu) {
 
 #define ARG_VOID_PTR(n, lenArg, f) get_arg<n - 1, void*>().value(ppu, lenArg)
 
+#define STUB_5(f) void nstub_##f(PPU* ppu) { \
+    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f))); \
+}
+
 #define STUB_4(f) void nstub_##f(PPU* ppu) { \
     ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f))); \
 }
@@ -99,6 +106,10 @@ STUB_2(sys_dbg_set_mask_to_ppu_exception_handler);
 STUB_sys_tty_write(sys_tty_write);
 STUB_1(sys_prx_exitspawn_with_level);
 STUB_4(sys_memory_allocate);
+STUB_4(cellVideoOutConfigure);
+STUB_3(cellVideoOutGetState);
+STUB_2(cellVideoOutGetResolution);
+STUB_5(_cellGcmInitBody);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -115,6 +126,10 @@ NCallEntry ncallTable[] {
     ENTRY(sys_ppu_thread_get_id),
     ENTRY(sys_prx_exitspawn_with_level),
     ENTRY(sys_process_exit),
+    ENTRY(_cellGcmInitBody),
+    ENTRY(cellVideoOutConfigure),
+    ENTRY(cellVideoOutGetState),
+    ENTRY(cellVideoOutGetResolution),
 };
 
 void PPU::ncall(uint32_t index) {

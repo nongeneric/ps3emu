@@ -1,4 +1,6 @@
 #include "DebuggerModel.h"
+#include "../ps3emu/LocalMemory.h"
+#include "../ps3emu/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
 #include <QStringList>
 #include "stdio.h"
@@ -105,7 +107,7 @@ public:
                 case 17: return print(_ppu->getNIP());
                 case 19: {
                     auto pages = _ppu->allocatedPages();
-                    auto usage = pages * MemoryPage::pageSize;
+                    auto usage = pages * DefaultMainMemoryPageSize;
                     auto measure = "";
                     if (usage > (1 << 30)) {
                         measure = "GB";
@@ -227,11 +229,16 @@ public:
 
 DebuggerModel::DebuggerModel() {
     _ppu.reset(new PPU());
+    _localMemory.reset(new LocalMemory(_ppu.get()));
+    _rsx.reset(new Rsx(_localMemory.get()));
+    _ppu->setRsx(_rsx.get());
     _gprModel.reset(new GPRModel(_ppu.get()));
     _dasmModel.reset(new DasmModel(_ppu.get(), &_elf));
 }
 
-DebuggerModel::~DebuggerModel() { }
+DebuggerModel::~DebuggerModel() {
+    _rsx->shutdown();
+}
 
 MonospaceGridModel* DebuggerModel::getGPRModel() {
     return _gprModel.get();

@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Rsx.h"
 #include "BitField.h"
+#include "constants.h"
 #include <stdint.h>
-#include <map>
 #include <memory>
 #include <type_traits>
 #include <stdexcept>
@@ -10,12 +11,15 @@
 
 class ProcessFinishedException : public std::exception { };
 
-typedef uint32_t ps3_uintptr_t;
+union VirtualAddress {
+    uint32_t val;
+    BitField<0, DefaultMainMemoryPageBits> page;
+    BitField<DefaultMainMemoryPageBits, 32> offset;
+};
 
 struct MemoryPage {
-    MemoryPage();
-    std::unique_ptr<uint8_t> ptr;
-    static constexpr uint pageSize = 64 * 1024;
+    uint8_t* ptr = nullptr;
+    void alloc();
 };
 
 template <int Bytes>
@@ -134,7 +138,8 @@ class PPU {
     CR_t _CR;
     XER_t _XER;
     
-    std::map<uint64_t, MemoryPage> _pages;
+    std::unique_ptr<MemoryPage[]> _pages;
+    Rsx* _rsx = nullptr;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -150,6 +155,8 @@ class PPU {
     }
     
 public:
+    PPU();
+    void shutdown();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
     void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
@@ -160,6 +167,7 @@ public:
     uint32_t findNCallEntryIndex(std::string name);
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);
+    void setRsx(Rsx* rsx);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
@@ -324,5 +332,9 @@ public:
     
     inline uint64_t getNIP() {
         return _NIP;
+    }
+    
+    inline Rsx* getRsx() {
+        return _rsx;
     }
 };

@@ -1,13 +1,9 @@
 #pragma once
 
+#include "sys_defs.h"
 #include <boost/endian/arithmetic.hpp>
-#include "../ps3emu/PPU.h"
 
 using namespace boost::endian;
-
-#define CELL_OK 0
-#define CELL_STATUS_IS_FAILURE(status) ((status) & 0x80000000)
-#define CELL_STATUS_IS_SUCCESS(status) (!((status) & 0x80000000))
 
 typedef big_uint32_t _sys_sleep_queue_t;
 typedef big_uint32_t sys_protocol_t;
@@ -16,6 +12,8 @@ typedef big_uint64_t usecond_t;
 
 #define SYS_SYNC_NAME_LENGTH        7
 #define SYS_SYNC_NAME_SIZE          (SYS_SYNC_NAME_LENGTH + 1)
+
+class PPU;
 
 typedef struct {
     volatile big_uint32_t owner;

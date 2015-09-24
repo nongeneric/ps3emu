@@ -6,44 +6,47 @@
 
 using namespace boost::endian;
 
+bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
+    return va <= GcmControlRegisters && va + len >= GcmControlRegisters;
+}
+
 template <class F>
 bool mergeAcrossPages(PPU* ppu, F f, ps3_uintptr_t va, 
-                      void* buf, uint len, bool allocate, ps3_uintptr_t& pageOffset) {
-    pageOffset = va % MemoryPage::pageSize;
-    if (pageOffset + len > MemoryPage::pageSize) {
-        auto firstHalfLen = MemoryPage::pageSize - pageOffset;
+                      void* buf, uint len, bool allocate) {
+    auto pageOffset = va % DefaultMainMemoryPageSize;
+    if (pageOffset + len > DefaultMainMemoryPageSize) {
+        auto firstHalfLen = DefaultMainMemoryPageSize - pageOffset;
         (ppu->*f)(va, buf, firstHalfLen, allocate);
-        (ppu->*f)(va + MemoryPage::pageSize, (char*)buf + firstHalfLen, len - firstHalfLen, allocate);
+        (ppu->*f)(va + DefaultMainMemoryPageSize, (char*)buf + firstHalfLen, len - firstHalfLen, allocate);
         return true;
     }
     return false;
 }
 
-MemoryPage::MemoryPage() : ptr(new uint8_t[pageSize]) {
-    memset(ptr.get(), 0, pageSize);
-}
-
 void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
-    if (va > 0xffffffff) // see Cell_OS-Overview_e
-        throw std::runtime_error("writing beyond user adress range");
+    if (coversRsxRegsRange(va, len)) {
+        if (va + len < GcmControlRegisters + sizeof(emu::CellGcmControl))
+            throw std::runtime_error("incomplete rsx regs update not implemented");
+        auto regs = (emu::CellGcmControl*)((char*)buf + (GcmControlRegisters - va));
+        if (_rsx) {
+            _rsx->setRegs(regs);
+        }
+    }
+    
     assert(va != 0 || len == 0);
-    ps3_uintptr_t pageOffset;
-    if (mergeAcrossPages(this, &PPU::writeMemory, va, const_cast<void*>(buf), len, allocate, pageOffset))
+    if (mergeAcrossPages(this, &PPU::writeMemory, va, const_cast<void*>(buf), len, allocate))
         return;
     
-    // OPT: effective STL 24 if needed
-    ps3_uintptr_t vaPage = va - pageOffset;
-    auto it = _pages.find(vaPage);
-    if (it == end(_pages)) {
-        if (!allocate)
-            throw std::runtime_error("accessing non existing page");
-        _pages[vaPage] = MemoryPage();
-    }
-    memcpy(_pages[vaPage].ptr.get() + pageOffset, buf, len);
+    VirtualAddress split { va };
+    auto& page = _pages[split.page.u()];
+    if (!page.ptr && !allocate)
+        throw std::runtime_error("accessing non existing page");
+    if (!page.ptr)
+        page.alloc();
+    memcpy(page.ptr + split.offset.u(), buf, len);
 }
 
 void PPU::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
-    // OPT:
     std::unique_ptr<uint8_t> buf(new uint8_t[len]);
     memset(buf.get(), value, len);
     writeMemory(va, buf.get(), len, allocate);
@@ -58,40 +61,75 @@ void PPU::run() {
 }
 
 void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
-    ps3_uintptr_t pageOffset;
-    if (mergeAcrossPages(this, &PPU::readMemory, va, buf, len, allocate, pageOffset))
+    if (coversRsxRegsRange(va, len)) {
+        throw std::runtime_error("reading rsx registers not implemented");
+    }
+    
+    if (mergeAcrossPages(this, &PPU::readMemory, va, buf, len, allocate))
         return;
     
-    // OPT: effective STL 24 if needed
-    ps3_uintptr_t vaPage = va - pageOffset;
-    auto it = _pages.find(vaPage);
-    if (it == end(_pages))
+    VirtualAddress split { va };
+    auto& page = _pages[split.page.u()];
+    if (!page.ptr)
         throw std::runtime_error("accessing non existing page");
-    memcpy(buf, it->second.ptr.get() + pageOffset, len);
+    memcpy(buf, page.ptr + split.offset.u(), len);
 }
 
 bool PPU::isAllocated(ps3_uintptr_t va) {
-    auto offset = va % MemoryPage::pageSize;
-    auto page = va - offset;
-    return _pages.find(page) != end(_pages);
+    VirtualAddress split { va };
+    return (bool)_pages[split.page.u()].ptr;
 }
 
 int PPU::allocatedPages() {
-    return _pages.size();
+    int i = 0;
+    for (auto j = 0u; j != DefaultMainMemoryPageCount; ++j) {
+        if (_pages[j].ptr) {
+            i++;
+        }
+    }
+    return i;
 }
 
 void PPU::reset() {
-    _pages.clear();
+    if (_pages) {
+        for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
+            if (_pages[i].ptr) {
+                delete _pages[i].ptr;
+            }
+        }
+    }
+    _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
     memset(_GPR, 0xcc, 8 * 32);
 }
 
 ps3_uintptr_t PPU::malloc(ps3_uintptr_t size) {
-    uint64_t va = 0;
-    assert(!_pages.empty());
-    for (auto& p : _pages) {
-        va = std::max(va, p.first);
+    ps3_uintptr_t va = 0;
+    for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
+        auto& p =_pages[i];
+        if (p.ptr) {
+            va = std::max(va, i * DefaultMainMemoryPageSize);
+        }
     }
-    va += MemoryPage::pageSize;
+    va += DefaultMainMemoryPageSize;
     setMemory(va, 0, size, true);
     return va;
+}
+
+void PPU::setRsx(Rsx* rsx) {
+    _rsx = rsx;
+}
+
+PPU::PPU() {
+    reset();
+}
+
+void MemoryPage::alloc() {
+    ptr = new uint8_t[DefaultMainMemoryPageSize];
+    memset(ptr, 0, DefaultMainMemoryPageSize);
+}
+
+void PPU::shutdown() {
+    if (_rsx) {
+        _rsx->shutdown();
+    }
 }

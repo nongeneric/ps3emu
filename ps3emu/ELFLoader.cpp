@@ -101,8 +101,8 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(
         if (ph->p_memsz == 0)
             continue;
         
-        log(ssnprintf("mapping segment of size %x to %x-%x",
-            ph->p_filesz, ph->p_vaddr, (ph->p_paddr + ph->p_memsz)));
+        log(ssnprintf("mapping segment of size %" PRIx64 " to %" PRIx64 "-%" PRIx64,
+            (uint64_t)ph->p_filesz, (uint64_t)ph->p_vaddr, (ph->p_paddr + ph->p_memsz)));
         
         assert(ph->p_memsz >= ph->p_filesz);
         ppu->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
@@ -130,7 +130,7 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(
     // undocumented:
     ppu->setGPR(5, vaStackBase);
     ppu->setGPR(6, 0);
-    ppu->setGPR(12, MemoryPage::pageSize);
+    ppu->setGPR(12, DefaultMainMemoryPageSize);
     
     ppu->setMemory(vaTLS, 0, tlsSize, true);
     ppu->setGPR(13, vaTLS);
