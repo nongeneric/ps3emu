@@ -10,7 +10,6 @@
 class GPRModel;
 class DasmModel;
 class Rsx;
-class LocalMemory;
 class DebuggerModel : public QWidget {
     Q_OBJECT
     
@@ -19,7 +18,6 @@ class DebuggerModel : public QWidget {
     std::unique_ptr<DasmModel> _dasmModel;
     std::unique_ptr<PPU> _ppu;
     std::unique_ptr<Rsx> _rsx;
-    std::unique_ptr<LocalMemory> _localMemory;
     bool _elfLoaded = false;
     void log(std::string str);
     void printMemory(uint64_t va);

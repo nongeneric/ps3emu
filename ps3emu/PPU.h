@@ -20,6 +20,7 @@ union VirtualAddress {
 struct MemoryPage {
     uint8_t* ptr = nullptr;
     void alloc();
+    void dealloc();
 };
 
 template <int Bytes>
@@ -168,6 +169,7 @@ public:
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);
     void setRsx(Rsx* rsx);
+    void map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {

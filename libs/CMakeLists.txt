@@ -9,6 +9,7 @@ set(SRC
     sys.cpp
     sys.h
     graphics/gcm.cpp
+    graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp
     graphics/graphics.cpp
     graphics/GL/src/glad.c

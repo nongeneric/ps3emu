@@ -110,6 +110,8 @@ STUB_4(cellVideoOutConfigure);
 STUB_3(cellVideoOutGetState);
 STUB_2(cellVideoOutGetResolution);
 STUB_5(_cellGcmInitBody);
+STUB_1(cellGcmSetFlipMode);
+STUB_1(cellGcmGetConfiguration);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -130,6 +132,8 @@ NCallEntry ncallTable[] {
     ENTRY(cellVideoOutConfigure),
     ENTRY(cellVideoOutGetState),
     ENTRY(cellVideoOutGetResolution),
+    ENTRY(cellGcmSetFlipMode),
+    ENTRY(cellGcmGetConfiguration),
 };
 
 void PPU::ncall(uint32_t index) {

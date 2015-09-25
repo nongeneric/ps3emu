@@ -41,8 +41,7 @@ void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate
     auto& page = _pages[split.page.u()];
     if (!page.ptr && !allocate)
         throw std::runtime_error("accessing non existing page");
-    if (!page.ptr)
-        page.alloc();
+    page.alloc();
     memcpy(page.ptr + split.offset.u(), buf, len);
 }
 
@@ -93,9 +92,7 @@ int PPU::allocatedPages() {
 void PPU::reset() {
     if (_pages) {
         for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
-            if (_pages[i].ptr) {
-                delete _pages[i].ptr;
-            }
+            _pages[i].dealloc();
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
@@ -124,12 +121,39 @@ PPU::PPU() {
 }
 
 void MemoryPage::alloc() {
+    if (ptr)
+        return;
     ptr = new uint8_t[DefaultMainMemoryPageSize];
     memset(ptr, 0, DefaultMainMemoryPageSize);
+}
+
+void MemoryPage::dealloc() {
+    if (ptr) {
+        delete [] ptr;
+    }
+    ptr = nullptr;
 }
 
 void PPU::shutdown() {
     if (_rsx) {
         _rsx->shutdown();
+    }
+}
+
+void PPU::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
+    if (src == 0 || size == 0)
+        throw std::runtime_error("zero size or zero source address");
+    auto mbMask = 1024 * 1024 - 1;
+    if (src & mbMask || dest & mbMask || size & mbMask)
+        throw std::runtime_error("size, source or dest isn't multiple of 1 MB");
+    auto srcPageIndex =  VirtualAddress { src }.page.u();
+    auto destPageIndex = VirtualAddress { dest }.page.u();
+    auto pageCount = size / DefaultMainMemoryPageSize;
+    for (auto i = 0u; i < pageCount; ++i) {
+        auto& destPage = _pages[destPageIndex + i];
+        destPage.alloc();
+        auto& srcPage = _pages[srcPageIndex + i];
+        srcPage.dealloc();
+        srcPage.ptr = destPage.ptr;
     }
 }

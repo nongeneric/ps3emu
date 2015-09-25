@@ -1,8 +1,9 @@
 #include "sysutil_sysparam.h"
-
+#include <boost/log/trivial.hpp>
 #include "assert.h"
 
 int cellVideoOutGetState(uint32_t videoOut, uint32_t deviceIndex, CellVideoOutState* state) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     assert(videoOut == CELL_VIDEO_OUT_PRIMARY);
     assert(deviceIndex == 0);
     state->colorSpace = CELL_VIDEO_OUT_COLOR_SPACE_RGB;
@@ -16,6 +17,7 @@ int cellVideoOutGetState(uint32_t videoOut, uint32_t deviceIndex, CellVideoOutSt
 }
 
 int cellVideoOutGetResolution(uint32_t resolutionId, CellVideoOutResolution* resolution) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     resolution->width = 1280;
     resolution->height = 720;
     return CELL_OK;
@@ -26,6 +28,7 @@ int cellVideoOutConfigure(uint32_t videoOut,
                           CellVideoOutOption* option, 
                           uint32_t waitForEvent) 
 {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     assert(videoOut == CELL_VIDEO_OUT_PRIMARY);
     assert(waitForEvent == 0);
     assert(option == NULL);

@@ -1,7 +1,7 @@
 #include "DebuggerModel.h"
-#include "../ps3emu/LocalMemory.h"
 #include "../ps3emu/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
+#include <boost/log/trivial.hpp>
 #include <QStringList>
 #include "stdio.h"
 
@@ -229,8 +229,7 @@ public:
 
 DebuggerModel::DebuggerModel() {
     _ppu.reset(new PPU());
-    _localMemory.reset(new LocalMemory(_ppu.get()));
-    _rsx.reset(new Rsx(_localMemory.get()));
+    _rsx.reset(new Rsx(_ppu.get()));
     _ppu->setRsx(_rsx.get());
     _gprModel.reset(new GPRModel(_ppu.get()));
     _dasmModel.reset(new DasmModel(_ppu.get(), &_elf));
@@ -281,8 +280,10 @@ void DebuggerModel::stepIn() {
     } catch (ProcessFinishedException&) {
         emit message("process terminated");
     } catch (std::exception& exc) {
-        emit message(QString("error: %1 (NIP: %2)")
-            .arg(exc.what()).arg(_ppu->getNIP(), 16, 16));
+        auto msg = QString("error: %1 (NIP: %2)")
+            .arg(exc.what()).arg(_ppu->getNIP(), 16, 16);
+        emit message(msg);
+        BOOST_LOG_TRIVIAL(fatal) << msg.toStdString();
         throw exc;
     }
 }

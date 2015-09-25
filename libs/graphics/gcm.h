@@ -9,6 +9,18 @@
 
 class PPU;
 
+extern int gcmResetCommandsSize;
+extern int gcmInitCommandsSize;
+extern uint8_t gcmResetCommands[];
+extern uint8_t gcmInitCommands[];
+
+struct TargetCellGcmContextData {
+    boost::endian::big_uint32_t begin;
+    boost::endian::big_uint32_t end;
+    boost::endian::big_uint32_t current;
+    boost::endian::big_uint32_t callback;
+};
+
 namespace emu {
 namespace Gcm {
 
@@ -42,10 +54,10 @@ namespace Gcm {
 
 uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu);
 
-void cellGcmSetFlipMode(uint32_t mode);
-void cellGcmGetConfiguration(CellGcmConfig *config);
+emu_void_t cellGcmSetFlipMode(uint32_t mode);
+emu_void_t cellGcmGetConfiguration(CellGcmConfig *config);
 int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t *offset);
 
-void cellGcmSetSurface(const CellGcmSurface *surface);
+emu_void_t cellGcmSetSurface(const CellGcmSurface *surface);
 
 }}

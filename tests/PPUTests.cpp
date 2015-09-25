@@ -13,6 +13,23 @@ TEST_CASE("read write memory") {
     REQUIRE(ppu.load<4>(0x400) == 0x55667788);
 }
 
+TEST_CASE("map memory") {
+    PPU ppu;
+    auto mb = 1024 * 1024;
+    ppu.map(100 * mb, 200 * mb, 2 * mb);
+    ppu.store<4>(100 * mb, 13);
+    REQUIRE( ppu.load<4>(100 * mb) == 13 );
+    REQUIRE( ppu.load<4>(200 * mb) == 13 );
+    ppu.store<4>(100 * mb, 33);
+    REQUIRE( ppu.load<4>(100 * mb) == 33 );
+    REQUIRE( ppu.load<4>(200 * mb) == 33 );
+    ppu.setMemory(102 * mb, 0, 2, true);
+    ppu.setMemory(202 * mb, 0, 2, true);
+    ppu.store<4>(102 * mb - 2, 0xffffffff);
+    REQUIRE( ppu.load<4>(102 * mb - 2) == 0xffffffff );
+    REQUIRE( ppu.load<4>(202 * mb - 2) == 0xffff0000 );
+}
+
 TEST_CASE("fixed loads") {
 /*
 10474:       88 60 00 20     lbz     r3,32(0)

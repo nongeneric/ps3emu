@@ -1,12 +1,7 @@
 #include "Rsx.h"
-#include "LocalMemory.h"
 
+#include "PPU.h"
 #include <boost/log/trivial.hpp>
-
-uint32_t Rsx::getGet() {
-    boost::unique_lock<boost::mutex> lock(_mutex);
-    return _get;
-}
 
 void Rsx::setPut(uint32_t put) {
     boost::unique_lock<boost::mutex> lock(_mutex);
@@ -14,11 +9,15 @@ void Rsx::setPut(uint32_t put) {
 }
 
 void Rsx::loop() {
+    BOOST_LOG_TRIVIAL(trace) << "rsx loop started, waiting for updates";
     boost::unique_lock<boost::mutex> lock(_mutex);
     for (;;) {
         _cv.wait(lock);
-        if (_shutdown)
+        BOOST_LOG_TRIVIAL(trace) << "rsx loop update recieved";
+        if (_shutdown) {
+            BOOST_LOG_TRIVIAL(trace) << "rsx loop shutdown";
             return;
+        }
         while (_get != _put) {
             auto get = _get;
             lock.unlock();
@@ -31,7 +30,7 @@ void Rsx::loop() {
 
 uint32_t Rsx::interpret(uint32_t get) {
     BOOST_LOG_TRIVIAL(trace) << "rsx instruction at " << get;
-    auto method = _localMemory->load(get);
+    auto method = _ppu->load<4>(GcmLocalMemoryBase + get);
     return method;
 }
 
@@ -42,32 +41,17 @@ void Rsx::setRegs(emu::CellGcmControl* regs) {
     _cv.notify_all();
 }
 
-Rsx::Rsx(LocalMemory* localMemory) : _localMemory(localMemory) {
+Rsx::Rsx(PPU* ppu) : _ppu(ppu) {
     _thread.reset(new boost::thread([=]{ loop(); }));    
 }
 
-TargetProxyCellGcmContextData Rsx::getCurrentContext(uint32_t currentContextOffset) {
-    TargetProxyCellGcmContextData context;
-    context.begin = _localMemory->load(currentContextOffset);
-    context.end = _localMemory->load(currentContextOffset + 4);
-    context.current = _localMemory->load(currentContextOffset + 8);
-    context.callback = _localMemory->load(currentContextOffset + 12);
-    return context;
-}
-
-void Rsx::updateCurrentContext(TargetProxyCellGcmContextData* context, uint32_t currentContextOffset) {
-    _localMemory->store(currentContextOffset, context->begin);
-    _localMemory->store(currentContextOffset + 4, context->end);
-    _localMemory->store(currentContextOffset + 8, context->current);
-    _localMemory->store(currentContextOffset + 12, context->callback);
-    setPut(context->end);
-}
-
 void Rsx::shutdown() {
-    if (_shutdown)
-        return;
-    boost::unique_lock<boost::mutex> lock(_mutex);
-    _shutdown = true;
+    assert(!_shutdown);
+    BOOST_LOG_TRIVIAL(trace) << "waiting for rsx to shutdown";
+    {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        _shutdown = true;
+    }
     _cv.notify_all();
     _thread->join();
 }

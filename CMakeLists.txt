@@ -12,7 +12,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 add_definitions(-DDEBUG)
 #-fsanitize=undefined
-set(CMAKE_CXX_FLAGS "-ggdb -fsanitize=undefined -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
