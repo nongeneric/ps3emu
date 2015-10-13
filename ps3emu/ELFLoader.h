@@ -75,6 +75,7 @@ class ELFLoader {
     Elf64_be_Shdr* _sections;
     Elf64_be_Shdr* findSectionByName(std::string name);
     ps3_uintptr_t storeArgs(PPU* ppu, std::vector<std::string> const& args);
+    void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
 public:
     ELFLoader();
     ~ELFLoader();
@@ -82,7 +83,8 @@ public:
     const char* getString(uint32_t idx);
     const char* getSectionName(uint32_t idx);
     Elf64_be_Sym* getGlobalSymbolByValue(uint32_t value, uint32_t section);
+    uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
-    void map(PPU* ppu, std::vector<std::string> args, std::function<void(std::string)> log);
-    void link(PPU* ppu, std::function<void(std::string)> log);
+    void map(PPU* ppu, std::vector<std::string> args);
+    void link(PPU* ppu);
 };

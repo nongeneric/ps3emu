@@ -6,13 +6,15 @@ add_definitions(-DBOOST_LOG_DYN_LINK)
 set(Boost_USE_STATIC_LIBS       OFF)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package(Boost COMPONENTS filesystem regex thread system log REQUIRED)
+find_package(Boost COMPONENTS filesystem regex thread system log chrono REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-add_definitions(-DDEBUG)
 #-fsanitize=undefined
+add_definitions(-DDEBUG)
 set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
+#add_definitions(-DNDEBUG)
+#set(CMAKE_CXX_FLAGS "-O2 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})

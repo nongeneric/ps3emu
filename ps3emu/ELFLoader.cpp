@@ -3,12 +3,11 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdexcept>
+#include <boost/log/trivial.hpp>
 
 using namespace boost::endian;
 
-const auto vaStackBase = 0x06000000u;
-const auto stackSize = 0x10000u;
-const auto vaTLS = vaStackBase + stackSize;
+const auto vaTLS = StackBase + StackSize;
 const auto tlsSize = 64 * (1u << 10);
 
 ELFLoader::ELFLoader()
@@ -33,6 +32,7 @@ void ELFLoader::load(std::string filePath) {
     
     _file.resize(fileSize);
     auto read = fread(&_file[0], 1, fileSize, f);
+    (void)read;
     assert(read == fileSize);
     fclose(f);
     
@@ -92,7 +92,8 @@ struct fdescr {
 };
 static_assert(sizeof(fdescr) == 8, "bad function descriptor size");
 
-void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(std::string)> log) {
+void ELFLoader::map(PPU* ppu, std::vector<std::string> args) {
+    ppu->setELFLoader(this);
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -101,8 +102,8 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(
         if (ph->p_memsz == 0)
             continue;
         
-        log(ssnprintf("mapping segment of size %" PRIx64 " to %" PRIx64 "-%" PRIx64,
-            (uint64_t)ph->p_filesz, (uint64_t)ph->p_vaddr, (ph->p_paddr + ph->p_memsz)));
+        BOOST_LOG_TRIVIAL(trace) << ssnprintf("mapping segment of size %" PRIx64 " to %" PRIx64 "-%" PRIx64,
+            (uint64_t)ph->p_filesz, (uint64_t)ph->p_vaddr, (ph->p_paddr + ph->p_memsz));
         
         assert(ph->p_memsz >= ph->p_filesz);
         ppu->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
@@ -116,8 +117,8 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(
     }
     
     // PPU_ABI-Specifications_e
-    ppu->setMemory(vaStackBase, 0, stackSize, true);
-    ppu->setGPR(1, vaStackBase + stackSize - sizeof(uint64_t));
+    ppu->setMemory(StackBase, 0, StackSize, true);
+    ppu->setGPR(1, StackBase + StackSize - sizeof(uint64_t));
         
     fdescr entry;
     ppu->readMemory(_header->e_entry, &entry, sizeof(entry));
@@ -128,7 +129,7 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args, std::function<void(
     ppu->setGPR(4, vaArgs);
     
     // undocumented:
-    ppu->setGPR(5, vaStackBase);
+    ppu->setGPR(5, StackBase);
     ppu->setGPR(6, 0);
     ppu->setGPR(12, DefaultMainMemoryPageSize);
     
@@ -154,19 +155,20 @@ struct LGFEntry {
     big_uint32_t sym;
 };
 
-void ELFLoader::link(PPU* ppu, std::function<void(std::string)> log) {
+void ELFLoader::link(PPU* ppu) {
     auto lgfSectionName = ".debug_libgenfunc";
     auto lgfSection = findSectionByName(lgfSectionName);
     if (!lgfSection) {
-        log("no libgenfunc section found, nothing to do");
+        BOOST_LOG_TRIVIAL(trace) << "no libgenfunc section found, nothing to do";
         return;
     }
     auto entries = reinterpret_cast<LGFEntry*>(&_file[0] + lgfSection->sh_offset);
     auto count = lgfSection->sh_size / sizeof(LGFEntry);
-    log(ssnprintf("%d LGF entries found in %s",
-        count, getSectionName(lgfSection->sh_name)));
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%d LGF entries found in %s",
+        count, getSectionName(lgfSection->sh_name));
     uint64_t vaFDescrs = 0x7f000000;
     ppu->setMemory(vaFDescrs, 0, count * 2, true);
+    uint32_t curUnknownNcall = 0x3ffffff;
     for (auto i = 0u; i < count; ++i) {
         uint32_t lgfIdx = std::distance(_sections, lgfSection);
         auto symbol = getGlobalSymbolByValue(entries[i].sym, lgfIdx);
@@ -174,12 +176,15 @@ void ELFLoader::link(PPU* ppu, std::function<void(std::string)> log) {
             auto sname = getString(symbol->st_name);
             auto vaFDescr = vaFDescrs + i * 8;
             auto index = ppu->findNCallEntryIndex(sname);
+            if (index == 0) {
+                index = curUnknownNcall--;
+            }
             uint32_t ncall = (1 << 26) | index;
             ppu->store<4>(vaFDescr, vaFDescr + 4);
             ppu->store<4>(vaFDescr + 4, ncall); // use tocbase to place ncall instruction
             ppu->store<4>(entries[i].va, vaFDescr);
-            log(ssnprintf("resolved %x to point to %s (ncall %d)",
-                entries[i].va, sname, index));
+            BOOST_LOG_TRIVIAL(trace) << ssnprintf("resolved %x to point to %s (ncall %d)",
+                entries[i].va, sname, index);
         }
     }
 }
@@ -189,25 +194,15 @@ uint64_t ELFLoader::entryPoint() {
 }
 
 Elf64_be_Sym* ELFLoader::getGlobalSymbolByValue(uint32_t value, uint32_t section) {
-    for (auto s = _sections; s != _sections + _header->e_shnum; ++s) {
-        if (s->sh_type == SHT_SYMTAB) {
-            if (s->sh_entsize != sizeof(Elf64_be_Sym))
-                throw std::runtime_error("bad symbol table");
-            int count = s->sh_size / s->sh_entsize;
-            auto sym = reinterpret_cast<Elf64_be_Sym*>(&_file[0] + s->sh_offset);
-            auto end = sym + count;
-            for (sym += 1; sym != end; ++sym) {
-                if (sym->st_value == value && 
-                    ELF64_ST_BIND(sym->st_info) == STB_GLOBAL &&
-                    (sym->st_shndx == section || section == ~0u))
-                {
-                    return sym;
-                }
-            }
-            return nullptr;
+    Elf64_be_Sym* res = nullptr;
+    foreachGlobalSymbol([&](auto sym) {
+        if (sym->st_value == value &&
+            (sym->st_shndx == section || section == ~0u))
+        {
+            res = sym;
         }
-    }
-    throw std::runtime_error("no symbol table section present");
+    });
+    return res;
 }
 
 ps3_uintptr_t ELFLoader::storeArgs(PPU* ppu, std::vector<std::string> const& args) {
@@ -224,5 +219,39 @@ ps3_uintptr_t ELFLoader::storeArgs(PPU* ppu, std::vector<std::string> const& arg
     arr.push_back(0);
     ppu->writeMemory(vaArgs, arr.data(), arr.size() * 8);
     return vaArgs;
+}
+
+void ELFLoader::foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action) {
+    for (auto s = _sections; s != _sections + _header->e_shnum; ++s) {
+        if (s->sh_type == SHT_SYMTAB) {
+            if (s->sh_entsize != sizeof(Elf64_be_Sym))
+                throw std::runtime_error("bad symbol table");
+            int count = s->sh_size / s->sh_entsize;
+            auto sym = reinterpret_cast<Elf64_be_Sym*>(&_file[0] + s->sh_offset);
+            auto end = sym + count;
+            for (sym += 1; sym != end; ++sym) {
+                if (ELF64_ST_BIND(sym->st_info) == STB_GLOBAL) {
+                    action(sym);
+                }
+            }
+            return;
+        }
+    }
+    throw std::runtime_error("no symbol table section present");
+}
+
+uint32_t ELFLoader::getSymbolValue(std::string name) {
+    auto bssfSection = findSectionByName(".bss");
+    if (!bssfSection) {
+        throw std::runtime_error("no bss section found");
+    }
+    uint32_t value = 0;
+    foreachGlobalSymbol([&](auto sym) {
+        if (sym->st_shndx != std::distance(_sections, bssfSection))
+            return;
+        if (getString(sym->st_name) == name)
+            value = sym->st_value;
+    });
+    return value;
 }
 

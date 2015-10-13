@@ -4,6 +4,16 @@
 #include <stdio.h>
 #include <stdexcept>
 #include "../ps3emu/PPU.h"
+#include <boost/chrono.hpp>
+#include <boost/log/trivial.hpp>
+
+using namespace boost::chrono;
+
+high_resolution_clock::time_point system_start;
+
+void init_sys_lib() {
+    system_start = high_resolution_clock::now();
+}
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     
@@ -32,7 +42,9 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
 }
 
 system_time_t sys_time_get_system_time() {
-    return time(NULL);
+    auto diff = high_resolution_clock::now() - system_start;
+    auto elapsed = duration_cast<microseconds>(diff);
+    return elapsed.count();
 }
 
 int _sys_process_atexitspawn() {
@@ -86,14 +98,17 @@ int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
 #define  SYS_TTYP_USER13       (SYS_TTYP15)
 
 int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
+    auto asChar = (const char*)buf;
     if (ch == SYS_TTYP_PPU_STDOUT) {
         fwrite(buf, 1, len, stdout);
         fflush(stdout);
+        BOOST_LOG_TRIVIAL(trace) << "stdout: " << std::string(asChar, asChar + len);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_PPU_STDERR) {
         fwrite(buf, 1, len, stderr);
         fflush(stderr);
+        BOOST_LOG_TRIVIAL(trace) << "stderr: " << std::string(asChar, asChar + len);
         return CELL_OK;
     }
     throw std::runtime_error(ssnprintf("unknown channel %d", ch));
@@ -109,5 +124,10 @@ int sys_prx_exitspawn_with_level(uint64_t level) {
 
 int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t* alloc_addr, PPU* ppu) {
     *alloc_addr = ppu->malloc(size);
+    return CELL_OK;
+}
+
+int sys_timer_usleep(usecond_t sleep_time) {
+    boost::this_thread::sleep_for( microseconds(sleep_time) );
     return CELL_OK;
 }

@@ -1,4 +1,5 @@
 #include "PPU.h"
+#include "utils.h"
 #include "../libs/sys.h"
 #include "../libs/graphics/gcm.h"
 #include <boost/type_traits.hpp>
@@ -112,6 +113,14 @@ STUB_2(cellVideoOutGetResolution);
 STUB_5(_cellGcmInitBody);
 STUB_1(cellGcmSetFlipMode);
 STUB_1(cellGcmGetConfiguration);
+STUB_2(cellGcmAddressToOffset);
+STUB_5(cellGcmSetDisplayBuffer);
+STUB_0(cellGcmGetControlRegister);
+STUB_1(cellGcmGetLabelAddress);
+STUB_1(sys_timer_usleep);
+STUB_1(cellGcmGetFlipStatus);
+STUB_1(cellGcmResetFlipStatus);
+STUB_1(_cellGcmSetFlipCommand);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -134,30 +143,40 @@ NCallEntry ncallTable[] {
     ENTRY(cellVideoOutGetResolution),
     ENTRY(cellGcmSetFlipMode),
     ENTRY(cellGcmGetConfiguration),
+    ENTRY(cellGcmAddressToOffset),
+    ENTRY(cellGcmSetDisplayBuffer),
+    ENTRY(cellGcmGetControlRegister),
+    ENTRY(cellGcmGetLabelAddress),
+    ENTRY(cellGcmGetFlipStatus),
+    ENTRY(cellGcmResetFlipStatus),
+    ENTRY(_cellGcmSetFlipCommand),
 };
 
 void PPU::ncall(uint32_t index) {
-    if (index == 0)
-        throw std::runtime_error("unknown ncall index");
+    if (index >= sizeof(ncallTable) / sizeof(NCallEntry))
+        throw std::runtime_error(ssnprintf("unknown ncall index %d", index));
     ncallTable[index].stub(this);
     setNIP(getLR());
 }
 
 void PPU::scall() {
-    switch (getGPR(11)) {
+    auto index = getGPR(11);
+    switch (index) {
         case 352: nstub_sys_memory_get_user_memory_size(this); break;
         case 403: nstub_sys_tty_write(this); break;
         case 988: nstub_sys_dbg_set_mask_to_ppu_exception_handler(this); break;
         case 348: nstub_sys_memory_allocate(this); break;
-        default: throw std::runtime_error("unknown syscall");
+        case 141: nstub_sys_timer_usleep(this); break;
+        default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }
 
 uint32_t PPU::findNCallEntryIndex(std::string name) {
     auto count = sizeof(ncallTable) / sizeof(NCallEntry);
     for (uint32_t i = 0; i < count; ++i) {
-        if (ncallTable[i].name == name)
+        if (ncallTable[i].name == name) {
             return i;
+        }
     }
     return 0;
 }

@@ -10,3 +10,15 @@ std::string ssnprintf(const char* f, Args... args) {
     snprintf(buf, sizeof buf, f, args...);
     return std::string(buf);
 }
+
+template <typename S, typename D>
+union union_cast {
+    static_assert(sizeof(S) == sizeof(D), "invalid cast");
+    union_cast(S s) : _s(s) { }
+    operator D() const {
+        return _d;
+    }
+private:
+    S _s;
+    D _d;
+};

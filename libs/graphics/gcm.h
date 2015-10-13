@@ -57,7 +57,16 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint3
 emu_void_t cellGcmSetFlipMode(uint32_t mode);
 emu_void_t cellGcmGetConfiguration(CellGcmConfig *config);
 int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t *offset);
-
 emu_void_t cellGcmSetSurface(const CellGcmSurface *surface);
+int32_t cellGcmSetDisplayBuffer(const uint8_t id,
+                                const uint32_t offset,
+                                const uint32_t pitch,
+                                const uint32_t width,
+                                const uint32_t height);
+ps3_uintptr_t cellGcmGetControlRegister();
+ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index);
+uint32_t cellGcmGetFlipStatus(PPU* ppu);
+emu_void_t cellGcmResetFlipStatus(PPU* ppu);
+emu_void_t _cellGcmSetFlipCommand(PPU* ppu);
 
 }}

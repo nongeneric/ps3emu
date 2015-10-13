@@ -208,7 +208,7 @@ EMU(BCLR, XLForm_2) {
 
 PRINT(BCCTR, XLForm_2) {
     std::string extMnemonic;
-    auto mtype = getExtBranchMnemonic(i->LK.u(), 0, true, false, i->BO, i->BI, extMnemonic);
+    auto mtype = getExtBranchMnemonic(i->LK.u(), 0, false, true, i->BO, i->BI, extMnemonic);
     if (mtype == BranchMnemonicType::Generic) {
         auto mnemonic = i->LK.u() ? "bcctrl" : "bcctr";
         *result = ssnprintf("%s %d,%s,%d",
@@ -1715,6 +1715,19 @@ EMU(CNTLZD, XForm_11) {
         update_CR0(res, ppu);
 }
 
+PRINT(CNTLZW, XForm_11) {
+    *result = format_nn(i->Rc.u() ? "cntlzw." : "cntlzw", i->RA, i->RS);
+}
+
+EMU(CNTLZW, XForm_11) {
+    static_assert(sizeof(unsigned int) == 4, "");
+    auto rs = ppu->getGPR(i->RS);
+    auto res = !rs ? 32 : __builtin_clz(rs);
+    ppu->setGPR(i->RA, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
 PRINT(LFS, DForm_8) {
     *result = format_br_nnn("lfs", i->FRT, i->D, i->RA);
 }
@@ -2128,6 +2141,20 @@ EMU(FMADDS, AForm_1) {
     completeFPInstr(a, b, c, r, i->Rc, ppu);
 }
 
+PRINT(FMSUBS, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fsubs." : "fmsubs", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FMSUBS, AForm_1) {
+    float a = ppu->getFPRd(i->FRA);
+    float b = ppu->getFPRd(i->FRB);
+    float c = ppu->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a * c - b;
+    ppu->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, ppu);
+}
+
 PRINT(FCFID, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fcfid." : "fcfid", i->FRT, i->FRB);
 }
@@ -2216,6 +2243,14 @@ EMU(MTFSF, XFLForm) {
     ppu->setFPSCRF(n, r);
     if (i->Rc.u())
         update_CRFSign<1>(r, ppu);
+}
+
+PRINT(SYNC, XForm_24) {
+    *result = format_n("sync", i->L);
+}
+
+EMU(SYNC, XForm_24) {
+    __sync_synchronize();
 }
 
 enum class DasmMode {
@@ -2364,6 +2399,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 144: invoke(MTOCRF);
                 case 278: invoke(DCBT);
                 case 58: invoke(CNTLZD);
+                case 26: invoke(CNTLZW);
                 case 824: invoke(SRAWI);
                 case 459: invoke(DIVWU);
                 case 235: invoke(MULLW);
@@ -2382,6 +2418,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 983: invoke(STFIWX);
                 case 491: invoke(DIVW);
                 case 73: invoke(MULHD);
+                case 598: invoke(SYNC);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;
@@ -2423,6 +2460,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 21: invoke(FADDS);
                 case 25: invoke(FMULS);
                 case 18: invoke(FDIVS);
+                case 28: invoke(FMSUBS);
                 case 29: invoke(FMADDS);
                 case 20: invoke(FSUBS);
                 default: throw std::runtime_error("unknown extented opcode");

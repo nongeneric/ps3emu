@@ -25,12 +25,22 @@ bool mergeAcrossPages(PPU* ppu, F f, ps3_uintptr_t va,
 
 void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
     if (coversRsxRegsRange(va, len)) {
-        if (va + len < GcmControlRegisters + sizeof(emu::CellGcmControl))
-            throw std::runtime_error("incomplete rsx regs update not implemented");
-        auto regs = (emu::CellGcmControl*)((char*)buf + (GcmControlRegisters - va));
-        if (_rsx) {
-            _rsx->setRegs(regs);
+        if (!_rsx) {
+            throw std::runtime_error("rsx not set");
         }
+        if (len == 4) {
+            uint32_t val = *(boost::endian::big_uint32_t*)buf;
+            if (va == GcmControlRegisters) {
+                _rsx->setPut(val);
+            } else if (va == GcmControlRegisters + 4) {
+                _rsx->setGet(val);
+            } else {
+                throw std::runtime_error("only put and get rsx registers are supported");
+            }
+        } else {
+            throw std::runtime_error("only one rsx register can be set at a time");
+        }
+        return;
     }
     
     assert(va != 0 || len == 0);
@@ -156,4 +166,30 @@ void PPU::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
         srcPage.dealloc();
         srcPage.ptr = destPage.ptr;
     }
+}
+
+void PPU::setELFLoader(ELFLoader* elfLoader) {
+    _elfLoader = elfLoader;
+}
+
+ELFLoader* PPU::getELFLoader() {
+    return _elfLoader;
+}
+
+void PPU::allocPage(void** ptr, ps3_uintptr_t* va) {
+    *va = malloc(DefaultMainMemoryPageSize);
+    VirtualAddress split { *va };
+    assert(split.offset.u() == 0);
+    *ptr = _pages[split.page.u()].ptr;
+}
+
+uint8_t* PPU::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
+    VirtualAddress split { va };
+    auto page = _pages[split.page.u()];
+    if (!page.ptr)
+        throw std::runtime_error("getting memory pointer for not allocated memory");
+    auto offset = split.offset.u();
+    if (offset + len > DefaultMainMemoryPageSize)
+        throw std::runtime_error("getting memory pointer acress page boundaries");
+    return page.ptr + offset;
 }

@@ -345,3 +345,45 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "fmadds f0,f0,f29,f28");
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x4e, 0x80, 0x00, 0x21 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "blrl");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x4e, 0x80, 0x04, 0x21 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "bctrl");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7d, 0x6b, 0x00, 0x34 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "cntlzw r11,r11");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x00, 0x04, 0xac };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "sync 0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x9f, 0xf0, 0x50 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "subf r4,r31,r30");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0xec, 0x0a, 0x58, 0x38 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "fmsubs f0,f10,f0,f11");
+}

@@ -14,4 +14,6 @@ set(SRC
     graphics/graphics.cpp
     graphics/GL/src/glad.c
 )
+
 add_library(libs ${SRC})
+target_link_libraries(libs ps3emu)

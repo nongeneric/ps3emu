@@ -1573,3 +1573,27 @@ TEST_CASE("extend sign") {
     REQUIRE( ppu.getGPR(7) == 0xffffffff81228384 );
     REQUIRE( ppu.getGPR(8) == 0x11223344 );
 }
+
+TEST_CASE("blrl") {
+    PPU ppu;
+    ppu.setLR(0x33114450);
+    uint8_t instr[] = { 0x4e, 0x80, 0x00, 0x21 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getNIP() == 0x33114450 );
+}
+
+TEST_CASE("bctrl") {
+    PPU ppu;
+    ppu.setCTR(0x33114450);
+    uint8_t instr[] = { 0x4e, 0x80, 0x04, 0x21 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getNIP() == 0x33114450 );
+}
+
+TEST_CASE("cntlzw r11,r11") {
+    PPU ppu;
+    ppu.setGPR(11, 0x8000);
+    uint8_t instr[] = { 0x7d, 0x6b, 0x00, 0x34 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( ppu.getGPR(11) == 16 );
+}

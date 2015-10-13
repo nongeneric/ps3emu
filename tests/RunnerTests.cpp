@@ -182,3 +182,12 @@ TEST_CASE("float_printf") {
         "double = 4.179412e-01\n"
     );
 }
+
+TEST_CASE("gcm_context_size") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_context_size/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output ==  "1bff\n" );
+}

@@ -1,14 +1,19 @@
 #include "../ps3emu/PPU.h"
 #include "../ps3emu/ELFLoader.h"
+#include "../ps3emu/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
 #include "stdio.h"
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/trivial.hpp>
 
 void emulate(const char* path, std::vector<std::string> args) {
     PPU ppu;
     ELFLoader elf;
+    Rsx rsx(&ppu);
     elf.load(path);
-    elf.map(&ppu, args, [](auto){});
-    elf.link(&ppu, [](auto){});
+    elf.map(&ppu, args);
+    elf.link(&ppu);
+    ppu.setRsx(&rsx);
     
     try {
         for(;;) {
@@ -21,7 +26,8 @@ void emulate(const char* path, std::vector<std::string> args) {
     } catch (ProcessFinishedException& e) {
         return;
     } catch (std::exception& e) {
-        printf("exception: %s (NIP=%" PRIx64 ")\n", e.what(), ppu.getNIP());
+        BOOST_LOG_TRIVIAL(error) << 
+            ssnprintf("exception: %s (NIP=%" PRIx64 ")\n", e.what(), ppu.getNIP());
     }
 }
 
@@ -30,6 +36,9 @@ int main(int argc, char* argv[]) {
         printf("specify elf path\n");
         return 1;
     }
+    
+    boost::log::add_file_log("/tmp/ps3run.log");
+    
     auto path = argv[1];
     try {
         std::vector<std::string> args;

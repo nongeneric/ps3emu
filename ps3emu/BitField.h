@@ -21,18 +21,18 @@ class BitField {
     static_assert(Next - Pos != 0, "zero length");
     static_assert(Next > Pos, "bad range");
     uint32_t _v;
-    uint64_t v() {
+    uint64_t v() const {
         return (_v >> (32 - Next)) & ~(~0ull << (Next - Pos));
     }
 public:
     static constexpr int P = Pos;
     static constexpr int W = Next - Pos;
     
-    inline uint64_t u() {
+    inline uint64_t u() const {
         return v();
     }
     
-    inline int64_t s() {
+    inline int64_t s() const {
         auto r = v();
         if (r & (1 << (Next - Pos - 1))) {
             return r | (~0ull << (Next - Pos));
@@ -40,19 +40,19 @@ public:
         return r;
     }
     
-    inline int64_t native() {
+    inline int64_t native() const {
         return T == BitFieldType::Signed ?
             (*this << Shift) : (u() << Shift);
     }
     
-    inline const char* prefix() {
+    inline const char* prefix() const {
         return T == BitFieldType::CR ? "cr"
              : T == BitFieldType::GPR ? "r"
              : T == BitFieldType::FPR ? "f"
              : "";
     }
     
-    inline int64_t operator<<(unsigned shift) {
+    inline int64_t operator<<(unsigned shift) const {
         return static_cast<uint64_t>(s()) << shift;
     }
 };
@@ -62,7 +62,9 @@ inline uint64_t mask(int x, int y) {
     static_assert(Width <= 64, "");
     assert(x < Width && y < Width);
     assert(x >= 0 && y >= 0);
+#pragma GCC diagnostic ignored "-Wstrict-overflow"
     if (x > y)
+#pragma GCC diagnostic pop
         return mask<Width>(0, y) | mask<Width>(x, Width - 1);
     return ((~0ull >> x) & (~0ull << (63 - y))) >> (64 - Width);
 }

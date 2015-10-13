@@ -3,6 +3,7 @@
 #include "Rsx.h"
 #include "BitField.h"
 #include "constants.h"
+#include "utils.h"
 #include <stdint.h>
 #include <memory>
 #include <type_traits>
@@ -129,6 +130,7 @@ union XER_t {
 };
 static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 
+class ELFLoader;
 class PPU {
     uint64_t _LR;
     uint64_t _CTR;
@@ -141,6 +143,7 @@ class PPU {
     
     std::unique_ptr<MemoryPage[]> _pages;
     Rsx* _rsx = nullptr;
+    ELFLoader* _elfLoader = nullptr;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -162,6 +165,7 @@ public:
     void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
     ps3_uintptr_t malloc(ps3_uintptr_t size);
+    void allocPage(void** ptr, ps3_uintptr_t* va);
     void reset();
     void ncall(uint32_t index);
     void scall();
@@ -169,7 +173,11 @@ public:
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);
     void setRsx(Rsx* rsx);
+    void setELFLoader(ELFLoader* elfLoader);
+    ELFLoader* getELFLoader();
     void map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size);
+    
+    uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
@@ -190,21 +198,21 @@ public:
     }
     
     void storef(ps3_uintptr_t va, float value) {
-        store<sizeof(float)>(va, *reinterpret_cast<uint32_t*>(&value));
+        store<sizeof(float)>(va, union_cast<float, uint32_t>(value));
     }
     
     void stored(ps3_uintptr_t va, double value) {
-        store<sizeof(double)>(va, *reinterpret_cast<uint64_t*>(&value));
+        store<sizeof(double)>(va, union_cast<double, uint64_t>(value));
     }
     
     float loadf(ps3_uintptr_t va) {
         auto f = (uint32_t)load<sizeof(float)>(va);
-        return *reinterpret_cast<float*>(&f);
+        return union_cast<uint32_t, float>(f);
     }
     
     double loadd(ps3_uintptr_t va) {
         auto f = (uint64_t)load<sizeof(double)>(va);
-        return *reinterpret_cast<double*>(&f);
+        return union_cast<uint64_t, double>(f);
     }
     
     void run();

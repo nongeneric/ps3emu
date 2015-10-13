@@ -39,6 +39,8 @@ typedef struct lwmutex_attr {
     char name[SYS_SYNC_NAME_SIZE]; /**< lwmutex name for debugging */
 } sys_lwmutex_attribute_t;
 
+void init_sys_lib();
+
 extern int sys_lwmutex_create(sys_lwmutex_t * mutex_id,
                               sys_lwmutex_attribute_t * attr);
 extern int sys_lwmutex_destroy(sys_lwmutex_t * lwmutex_id);
@@ -79,3 +81,4 @@ typedef big_uint32_t sys_addr_t;
 #define SYS_MEMORY_GRANULARITY_MASK      0x0000000000000f00ULL
 
 int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);
+int sys_timer_usleep(usecond_t sleep_time);

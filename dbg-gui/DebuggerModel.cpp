@@ -251,13 +251,12 @@ void DebuggerModel::loadFile(QString path, QStringList args) {
     _ppu->reset();
     auto str = path.toStdString();
     _elf.load(str);
-    auto stdStringLog = [=](std::string s){ log(s); };
     std::vector<std::string> argsVec;
     for (auto arg : args) {
         argsVec.push_back(arg.toStdString());
     }
-    _elf.map(_ppu.get(), argsVec, stdStringLog);
-    _elf.link(_ppu.get(), stdStringLog);
+    _elf.map(_ppu.get(), argsVec);
+    _elf.link(_ppu.get());
     _gprModel->update();
     _dasmModel->update();
     _dasmModel->navigate(_ppu->getNIP());
@@ -293,9 +292,20 @@ void DebuggerModel::stepOver() {}
 void DebuggerModel::run() {
     try {
         for (int i = 0; i < 500; ++i) {
-            stepIn();
+            uint32_t instr;
+            auto cia = _ppu->getNIP();
+            _ppu->readMemory(cia, &instr, sizeof instr);
+            _ppu->setNIP(cia + sizeof instr);
+            ppu_dasm<DasmMode::Emulate>(&instr, cia, _ppu.get());
         }
-    } catch (...) { }
+        _gprModel->update();
+        _dasmModel->update();
+        _dasmModel->navigate(_ppu->getNIP());
+    } catch (std::exception& e) {
+        auto msg = QString("error: %1 (NIP: %2)")
+            .arg(e.what()).arg(_ppu->getNIP(), 16, 16);
+        BOOST_LOG_TRIVIAL(fatal) << msg.toStdString();
+    }
 }
 
 void DebuggerModel::restart() {}
