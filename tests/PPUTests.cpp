@@ -1,5 +1,6 @@
 #include "../ps3emu/PPU.h"
 #include "../ps3emu/ppu_dasm.h"
+#include <vector>
 #include <catch.hpp>
 
 TEST_CASE("read write memory") {
@@ -28,6 +29,22 @@ TEST_CASE("map memory") {
     ppu.store<4>(102 * mb - 2, 0xffffffff);
     REQUIRE( ppu.load<4>(102 * mb - 2) == 0xffffffff );
     REQUIRE( ppu.load<4>(202 * mb - 2) == 0xffff0000 );
+}
+
+TEST_CASE("provide memory") {
+    PPU ppu;
+    ppu.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1, true);
+    ppu.store<4>(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
+    std::vector<uint8_t> vec(DefaultMainMemoryPageSize * 4);
+    ppu.provideMemory(DefaultMainMemoryPageSize * 2, DefaultMainMemoryPageSize * 4, vec.data());
+    REQUIRE( ppu.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0x11223344 );
+    REQUIRE( *(uint32_t*)&vec[DefaultMainMemoryPageSize * 3 + 0x300] == 0x44332211 );
+    uint8_t* buf = &vec[DefaultMainMemoryPageSize * 3 + 0x300];
+    buf[0] = 0xaa;
+    buf[1] = 0xbb;
+    buf[2] = 0xcc;
+    buf[3] = 0xdd;
+    REQUIRE( ppu.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0xaabbccdd );
 }
 
 TEST_CASE("fixed loads") {

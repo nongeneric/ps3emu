@@ -2,7 +2,7 @@
 
 #include <QProcess>
 
-QString runnerPath = "../ps3run/ps3run";
+static const char* runnerPath = "../ps3run/ps3run";
 
 TEST_CASE("simple_printf") {
     QProcess proc;
@@ -190,4 +190,17 @@ TEST_CASE("gcm_context_size") {
     proc.waitForFinished();
     auto output = QString(proc.readAll()).toStdString();
     REQUIRE( output ==  "1bff\n" );
+}
+
+TEST_CASE("gcm_memory_mapping") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_memory_mapping/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "host_addr to offset: 0\n"
+        "offset 0 to address == host_addr?: 1\n"
+        "address 0xc0000005 to offset: 5\n"
+    );
 }

@@ -3,7 +3,13 @@
 #include "PPU.h"
 #include "utils.h"
 #include <atomic>
+#include <vector>
+#include <fstream>
 #include <boost/log/trivial.hpp>
+#include "../libs/graphics/graphics.h"
+
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
 union MethodHeader {
     uint32_t val;
@@ -30,6 +36,8 @@ bool isScale(uint32_t value, uint32_t base, uint32_t step, uint32_t maxIndex, ui
 }
 
 int64_t Rsx::interpret(uint32_t get) {
+    initGcm();
+    
     MethodHeader header { _ppu->load<4>(GcmLocalMemoryBase + get) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
@@ -60,6 +68,9 @@ int64_t Rsx::interpret(uint32_t get) {
     auto len = 4;
     const char* name = nullptr;
     switch (offset) {
+        case EmuFlipCommandMethod:
+            EmuFlip(readarg(1));
+            break;
         case 0x00000050:
             name = "CELL_GCM_NV406E_SET_REFERENCE";
             break;
@@ -418,7 +429,7 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_SET_VIEWPORT_HORIZONTAL";
             auto arg1 = readarg(1);
             auto arg2 = readarg(2);
-            SurfaceClipHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
+            ViewportHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
             break;
         }
         case 0x00000a04:
@@ -1254,7 +1265,12 @@ int64_t Rsx::interpret(uint32_t get) {
                         1, // ?
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM";
-                TransformProgram(readarg(1), readarg(2), readarg(3), readarg(4));
+                assert(count <= 32);
+                uint32_t args[32];
+                for (auto i = 0u; i < count; ++i) {
+                    args[i] = readarg(i + 1);
+                }
+                TransformProgram(args, count);
                 break;
             }
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("illegal method offset %x", offset);
@@ -1268,12 +1284,8 @@ int64_t Rsx::interpret(uint32_t get) {
     return len;
 }
 
-enum class SurfaceColorLocation {
+enum class MemoryLocation {
     Main, Local
-};
-
-enum class DepthFunc {
-    Never, Less, Equal, LessOrEqual, Greater, NotEqual, GreaterOrEqual, Always
 };
 
 enum class ShadeMode {
@@ -1288,10 +1300,26 @@ enum class SurfaceDepthFormat {
     z16, z24s8
 };
 
+struct VertexDataArrayFormatInfo {
+    uint16_t frequency;
+    uint8_t stride;
+    uint8_t size;
+    uint8_t type;
+    MemoryLocation location;
+    uint32_t offset;
+    GLuint binding = 0;
+};
+
 class RsxContext {
 public:
-    SurfaceColorLocation surfaceColorLocation;
-    SurfaceColorLocation surfaceDepthLocation;
+    uint32_t gcmIoSize;
+    ps3_uintptr_t gcmIoAddress;
+    bool init = false;
+    Window window;
+    GLuint buffer;
+    uint8_t* bufferMappedMemory;
+    MemoryLocation surfaceColorLocation;
+    MemoryLocation surfaceDepthLocation;
     unsigned surfaceWidth;
     unsigned surfaceHeight;
     unsigned surfaceColorPitch[4];
@@ -1312,13 +1340,44 @@ public:
     float viewPortOffset[4];
     uint32_t colorMask;
     bool isDepthTestEnabled;
-    DepthFunc depthFunc;
+    uint32_t depthFunc;
     bool isCullFaceEnabled;
     ShadeMode shadeMode;
     uint32_t colorClearValue;
     uint32_t clearSurfaceMask;
     bool isFlipInProgress = false;
+    VertexDataArrayFormatInfo vertexDataArrays[16];
+    uint32_t vertexArrayMode;
+    std::vector<uint8_t> lastFrame;
 };
+
+void glcheck(int line, const char* call) {
+    BOOST_LOG_TRIVIAL(trace) << "glcall: " << call;
+    auto err = glGetError();
+    if (err) {
+        auto msg = err == GL_INVALID_ENUM ? "GL_INVALID_ENUM"
+                 : err == GL_INVALID_VALUE ? "GL_INVALID_VALUE"
+                 : err == GL_INVALID_OPERATION ? "GL_INVALID_OPERATION"
+                 : err == GL_INVALID_FRAMEBUFFER_OPERATION ? "GL_INVALID_FRAMEBUFFER_OPERATION"
+                 : err == GL_OUT_OF_MEMORY ? "GL_OUT_OF_MEMORY"
+                 : "unknown";
+        throw std::runtime_error(ssnprintf("[%d] error: %x (%s)\n", line, err, msg));
+    }
+}
+
+void check_shader(GLuint shader) {
+    GLint param;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &param);
+    if (param != GL_TRUE) {
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &param);
+        std::string s(param + 1, 0);
+        GLsizei len;
+        glGetShaderInfoLog(shader, param, &len, &s[0]);
+        throw std::runtime_error(ssnprintf("shader error: %s\n", s.c_str()));
+    }
+}
+
+#define glcall(a) { a; glcheck(__LINE__, #a); }
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu) {
     _context.reset(new RsxContext());
@@ -1343,15 +1402,15 @@ void Rsx::loop() {
     for (;;) {
         _cv.wait(lock);
         BOOST_LOG_TRIVIAL(trace) << "rsx loop update recieved";
-        if (_shutdown) {
-            BOOST_LOG_TRIVIAL(trace) << "rsx loop shutdown";
+        if (_shutdown)
             return;
-        }
         while (_get < _put) {
             auto get = _get;
             lock.unlock();
             auto len = interpret(get);
             lock.lock();
+            if (_shutdown)
+                return;
             _get += len;
         }
     }
@@ -1415,6 +1474,8 @@ void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) 
     _context->viewPortY = y;
     _context->viewPortWidth = w;
     _context->viewPortHeight = h;
+    glcall(glViewport(x, y, w, h));
+    _context->lastFrame.resize(w * h * 4);
 }
 
 void Rsx::SurfacePitchC(uint32_t pitchC, uint32_t pitchD, uint32_t offsetC, uint32_t offsetD) {
@@ -1561,8 +1622,11 @@ void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgramLoad(%x, %x)", load, start);
 }
 
-void Rsx::TransformProgram(uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(%x, %x, %x, %x)", d0, d1, d2, d3);
+void Rsx::TransformProgram(uint32_t* args, unsigned count) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", count);
+    for (auto i = 0u; i < count; ++i) {
+        BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", args[i]);   
+    }
 }
 
 void Rsx::VertexAttribInputMask(uint32_t mask) {
@@ -1574,7 +1638,10 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
 }
 
 void Rsx::ShaderProgram(uint32_t locationOffset) {
+    // loads fragment program byte code from locationOffset-1 upto the last command
+    // (the "#last command" bit)
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _ppu->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
 }
 
 void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -1630,7 +1697,7 @@ void Rsx::ContextDmaColorD(uint32_t context) {
 void Rsx::ContextDmaZeta(uint32_t context) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaZeta(%x)", context);
     assert(context - CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER == CELL_GCM_LOCATION_LOCAL); // only local is supported
-    _context->surfaceDepthLocation = SurfaceColorLocation::Local;
+    _context->surfaceDepthLocation = MemoryLocation::Local;
 }
 
 void Rsx::SurfaceFormat(uint8_t colorFormat,
@@ -1679,23 +1746,48 @@ void Rsx::SurfaceColorTarget(uint32_t mask) {
 void Rsx::ColorMask(uint32_t mask) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorMask(%x)", mask);
     _context->colorMask = mask;
+    glcall(glColorMask(
+        (mask & CELL_GCM_COLOR_MASK_R) ? GL_TRUE : GL_FALSE,
+        (mask & CELL_GCM_COLOR_MASK_G) ? GL_TRUE : GL_FALSE,
+        (mask & CELL_GCM_COLOR_MASK_B) ? GL_TRUE : GL_FALSE,
+        (mask & CELL_GCM_COLOR_MASK_A) ? GL_TRUE : GL_FALSE
+    ));
 }
 
 void Rsx::DepthTestEnable(bool enable) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DepthTestEnable(%d)", enable);
     _context->isDepthTestEnabled = enable;
+    if (enable) {
+        glcall(glEnable(GL_DEPTH_TEST));
+    } else {
+        glcall(glDisable(GL_DEPTH_TEST));
+    }
 }
 
 void Rsx::DepthFunc(uint32_t zf) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DepthFunc(%d)", zf);
-    assert(zf == CELL_GCM_LESS);
-    _context->depthFunc = ::DepthFunc::Less;
+    _context->depthFunc = zf;
+    auto glfunc = zf == CELL_GCM_NEVER ? GL_NEVER
+                : zf == CELL_GCM_LESS ? GL_LESS
+                : zf == CELL_GCM_EQUAL ? GL_EQUAL
+                : zf == CELL_GCM_LEQUAL ? GL_LEQUAL
+                : zf == CELL_GCM_GREATER ? GL_GREATER
+                : zf == CELL_GCM_NOTEQUAL ? GL_NOTEQUAL
+                : zf == CELL_GCM_GEQUAL ? GL_GEQUAL
+                : zf == CELL_GCM_ALWAYS ? GL_ALWAYS
+                : 0;
+    glcall(glDepthFunc(glfunc));
 }
 
 void Rsx::CullFaceEnable(bool enable) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("CullFaceEnable(%d)", enable);
     assert(!enable);
     _context->isCullFaceEnabled = enable;
+    if (enable) {
+        glcall(glEnable(GL_CULL_FACE));
+    } else {
+        glcall(glDisable(GL_CULL_FACE));
+    }
 }
 
 void Rsx::ShadeMode(uint32_t sm) {
@@ -1712,11 +1804,28 @@ void Rsx::ShadeMode(uint32_t sm) {
 void Rsx::ColorClearValue(uint32_t color) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorClearValue(%x)", color);
     _context->colorClearValue = color;
+    union {
+        uint32_t val;
+        BitField<0, 8> a;
+        BitField<8, 16> r;
+        BitField<16, 24> g;
+        BitField<24, 32> b;
+    } c = { color };
+    glcall(glClearColor(c.r.u() / 255., c.g.u() / 255., c.b.u() / 255., c.a.u() / 255.));
 }
 
 void Rsx::ClearSurface(uint32_t mask) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClearSurface(%x)", mask);
     _context->clearSurfaceMask = mask;
+    assert(mask & CELL_GCM_CLEAR_R);
+    assert(mask & CELL_GCM_CLEAR_G);
+    assert(mask & CELL_GCM_CLEAR_B);
+    auto glmask = GL_COLOR_BUFFER_BIT;
+    if (mask & CELL_GCM_CLEAR_Z)
+        glmask |= GL_DEPTH_BUFFER_BIT;
+    if (mask & CELL_GCM_CLEAR_S)
+        glmask |= GL_STENCIL_BUFFER_BIT;
+    glcall(glClear(glmask));
 }
 
 void Rsx::setSurfaceColorLocation(uint32_t context) {
@@ -1724,9 +1833,9 @@ void Rsx::setSurfaceColorLocation(uint32_t context) {
     context -= CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER;
     assert(context == CELL_GCM_LOCATION_LOCAL);
     if (context == CELL_GCM_LOCATION_LOCAL) {
-        _context->surfaceColorLocation = SurfaceColorLocation::Local;   
+        _context->surfaceColorLocation = MemoryLocation::Local;   
     } else if (context == CELL_GCM_LOCATION_MAIN) {
-        _context->surfaceColorLocation = SurfaceColorLocation::Main;
+        _context->surfaceColorLocation = MemoryLocation::Main;
     } else {
         assert(false);
     }
@@ -1739,19 +1848,42 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
                                 uint8_t type) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataArrayFormat(%x, %x, %x, %x, %x)",
         index, frequency, stride, size, type);
+    auto& format = _context->vertexDataArrays[index];
+    format.frequency = frequency;
+    format.stride = stride;
+    format.size = size;
+    format.type = type;
+    assert(type == CELL_GCM_VERTEX_UB || type == CELL_GCM_VERTEX_F);
+    auto gltype = type == CELL_GCM_VERTEX_UB ? GL_UNSIGNED_BYTE
+                : type == CELL_GCM_VERTEX_F ? GL_FLOAT
+                : 0;
+    auto normalize = gltype == GL_UNSIGNED_BYTE;
+    glcall(glVertexAttribFormat(index, size, gltype, normalize, 0));
 }
 
 void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataArrayOffset(%x, %x, %x)",
         index, location, offset);
+    auto& array = _context->vertexDataArrays[index];
+    array.location = location == CELL_GCM_LOCATION_LOCAL ?
+        MemoryLocation::Local : MemoryLocation::Main;
+    array.offset = offset;
+    array.binding = index + 1;
+    assert(location == CELL_GCM_LOCATION_LOCAL);
+    glcall(glBindVertexBuffer(array.binding, _context->buffer, offset, array.stride));
+    glcall(glVertexAttribBinding(index, array.binding));
+    glcall(glEnableVertexAttribArray(index));
 }
 
 void Rsx::BeginEnd(uint32_t mode) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("BeginEnd(%x)", mode);
+    _context->vertexArrayMode = mode;
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
+    assert(_context->vertexArrayMode == CELL_GCM_PRIMITIVE_TRIANGLES);
+    glcall(glDrawArrays(GL_TRIANGLES, first, count + 1));
 }
 
 bool Rsx::isFlipInProgress() const {
@@ -1762,4 +1894,93 @@ bool Rsx::isFlipInProgress() const {
 void Rsx::resetFlipStatus() {
     boost::unique_lock<boost::mutex> lock(_mutex);
     _context->isFlipInProgress = true;
+}
+
+void Rsx::initGcm() {
+    if (_context->init)
+        return;
+    _context->init = true;
+    _context->window.Init();
+    glcall(glCreateBuffers(1, &_context->buffer));
+    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT |
+                    GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
+    glcall(glNamedBufferStorage(_context->buffer, GcmLocalMemorySize, NULL, mapFlags));
+    _context->bufferMappedMemory = (uint8_t*)glMapNamedBuffer(_context->buffer, GL_READ_WRITE);
+    _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->bufferMappedMemory);
+    // remap io to point to the buffer as well
+    _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
+    
+    // temp shaders
+    const char* vs[] = {
+        "#version 450 core\n"
+        "layout (location = 0) in vec4 position;\n"
+        "layout (location = 3) in vec4 color;\n"
+        "out vec4 vs_color;\n"
+        "float reverse(float f) {\n"
+        "    unsigned int bits = floatBitsToUint(f);\n"
+        "    unsigned int rev = ((bits & 0xff) << 24)\n"
+        "                     | ((bits & 0xff00) << 8)\n"
+        "                     | ((bits & 0xff0000) >> 8)\n"
+        "                     | ((bits & 0xff000000) >> 24);\n"
+        "    return uintBitsToFloat(rev);\n"
+        "}\n"
+        "void main(void) {\n"
+        "    vec4 revpos = vec4 ( reverse(position.x),\n"
+        "                         reverse(position.y),\n"
+        "                         reverse(position.z),\n"
+        "                         position.w );\n"
+        "    gl_Position = revpos;\n"
+        "    vs_color = color.bgra;\n"
+        "}\n" };
+    const char* fs[] = {
+        "#version 450 core\n"
+        "in vec4 vs_color;\n"
+        "out vec4 color;\n"
+        "void main(void) {\n"
+        "    color = vs_color;\n"
+        "}\n" };
+    auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, vs, NULL);
+    glCompileShader(vertexShader);
+    check_shader(vertexShader);
+    auto fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, fs, NULL);
+    glCompileShader(fragmentShader);
+    check_shader(fragmentShader);
+    auto program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glcall(glLinkProgram(program));
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    glcall(glUseProgram(program));
+}
+
+void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
+    _context->gcmIoSize = ioSize;
+    _context->gcmIoAddress = ioAddress;
+}
+
+void Rsx::EmuFlip(bool setLabel) {
+    _context->window.SwapBuffers();
+    
+    auto& vec = _context->lastFrame;
+    glReadnPixels(_context->viewPortX,
+                  _context->viewPortY,
+                  _context->viewPortWidth,
+                  _context->viewPortHeight,
+                  GL_RGBA,
+                  GL_UNSIGNED_BYTE,
+                  vec.size(),
+                  &vec[0]);
+    
+    std::ofstream f("/tmp/ps3frame.rgba", std::ofstream::binary);
+    f.write((const char*)vec.data(), vec.size());
+    
+    if (setLabel) {
+        auto flipLabel = 1;
+        this->setLabel(flipLabel, 0);
+    }
+    boost::unique_lock<boost::mutex> lock(_mutex);
+    _context->isFlipInProgress = false;
 }

@@ -16,3 +16,7 @@ void Window::Init() {
     glfwMakeContextCurrent(_window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 }
+
+void Window::SwapBuffers() {
+    glfwSwapBuffers(_window);
+}

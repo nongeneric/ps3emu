@@ -105,7 +105,6 @@ void MainWindow::openFile() {
 #if DEBUG
     auto args = QStringList() << "a.elf" << "-3.4" << "-1" << "9";
     _model.loadFile("/g/ps3/reversing/runnertests/gcm_hello/a.elf", args);
-    //_model.loadFile("/g/ps3/reversing/runnertests/gcm_context_size/a.elf", args);
     return;
 #endif
     auto path = QFileDialog::getOpenFileName(this, "Open ELF executable");

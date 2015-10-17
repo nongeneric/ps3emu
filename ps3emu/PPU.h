@@ -8,6 +8,7 @@
 #include <memory>
 #include <type_traits>
 #include <stdexcept>
+#include <bitset>
 #include <boost/endian/arithmetic.hpp>
 
 class ProcessFinishedException : public std::exception { };
@@ -142,6 +143,7 @@ class PPU {
     XER_t _XER;
     
     std::unique_ptr<MemoryPage[]> _pages;
+    std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     Rsx* _rsx = nullptr;
     ELFLoader* _elfLoader = nullptr;
     
@@ -176,6 +178,7 @@ public:
     void setELFLoader(ELFLoader* elfLoader);
     ELFLoader* getELFLoader();
     void map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size);
+    void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
     
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
     

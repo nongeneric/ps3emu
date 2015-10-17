@@ -168,7 +168,7 @@ void ELFLoader::link(PPU* ppu) {
         count, getSectionName(lgfSection->sh_name));
     uint64_t vaFDescrs = 0x7f000000;
     ppu->setMemory(vaFDescrs, 0, count * 2, true);
-    uint32_t curUnknownNcall = 0x3ffffff;
+    uint32_t curUnknownNcall = 2000;
     for (auto i = 0u; i < count; ++i) {
         uint32_t lgfIdx = std::distance(_sections, lgfSection);
         auto symbol = getGlobalSymbolByValue(entries[i].sym, lgfIdx);

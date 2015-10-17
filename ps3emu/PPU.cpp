@@ -102,7 +102,10 @@ int PPU::allocatedPages() {
 void PPU::reset() {
     if (_pages) {
         for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
-            _pages[i].dealloc();
+            if (!_providedMemoryPages[i]) {
+                _pages[i].dealloc();
+            }
+            _providedMemoryPages[i] = false;
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
@@ -192,4 +195,21 @@ uint8_t* PPU::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
     if (offset + len > DefaultMainMemoryPageSize)
         throw std::runtime_error("getting memory pointer acress page boundaries");
     return page.ptr + offset;
+}
+
+void PPU::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
+    VirtualAddress split { src };
+    if (split.offset.u() != 0 || size % DefaultMainMemoryPageSize != 0)
+        throw std::runtime_error("expecting multiple of page size");
+    auto pageCount = size / DefaultMainMemoryPageSize;
+    auto firstPage = split.page.u();
+    for (auto i = 0u; i < pageCount; ++i) {
+        auto& page = _pages[firstPage + i];
+        auto memoryPtr = (uint8_t*)memory + i * DefaultMainMemoryPageSize;
+        if (page.ptr) {
+            memcpy(memoryPtr, page.ptr, DefaultMainMemoryPageSize);
+        }
+        page.ptr = memoryPtr;
+        _providedMemoryPages[firstPage + i] = true;
+    }
 }

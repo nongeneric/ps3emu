@@ -17,6 +17,8 @@ typedef struct {
 
 }
 
+constexpr uint32_t EmuFlipCommandMethod = 0xacac;
+
 class RsxContext;
 class PPU;
 class Rsx {
@@ -30,10 +32,11 @@ class Rsx {
     std::unique_ptr<boost::thread> _thread;
     std::unique_ptr<RsxContext> _context;
     std::map<uint32_t, uint32_t> _semaphores;
-    uint32_t _activeSemaphoreHandle = 0;
-    int64_t interpret(uint32_t get);
+    uint32_t _activeSemaphoreHandle = 0;int64_t interpret(uint32_t get);
     void loop();
     void setSurfaceColorLocation(uint32_t context);
+    void initGcm();
+    void EmuFlip(bool setLabel);
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
@@ -90,7 +93,7 @@ class Rsx {
                        uint8_t bs);
     void ShaderControl(uint32_t control, uint8_t registerCount);
     void TransformProgramLoad(uint32_t load, uint32_t start);
-    void TransformProgram(uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3);
+    void TransformProgram(uint32_t* args, unsigned count);
     void VertexAttribInputMask(uint32_t mask);
     void TransformTimeout(uint16_t count, uint16_t registerCount);
     void ShaderProgram(uint32_t locationOffset);
@@ -146,4 +149,5 @@ public:
     void setLabel(int index, uint32_t value);
     bool isFlipInProgress() const;
     void resetFlipStatus();
+    void setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress);
 };

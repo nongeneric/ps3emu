@@ -5,8 +5,6 @@
 #include <boost/log/trivial.hpp>
 #include "../../ps3emu/ELFLoader.h"
 
-Window window;
-
 using namespace boost::endian;
 
 namespace emu {
@@ -25,27 +23,9 @@ struct {
     TargetCellGcmContextData* context = nullptr;
 } emuGcmState;
 
-class TempGcmContext {
-    CellGcmContextData _hostContext;
-    uint32_t buffer[40];
-public:
-    TempGcmContext() {
-        _hostContext.begin = buffer;
-        _hostContext.end = buffer + sizeof(buffer) / sizeof(uint32_t) - 1;
-        _hostContext.current = buffer;
-    }
-    ~TempGcmContext() {
-        emuGcmState.context->current += (uintptr_t)_hostContext.current - (uintptr_t)_hostContext.begin;
-        emuGcmState.rsx->setPut(emuGcmState.context->current);
-    }
-    CellGcmContextData* getContext() {
-        return &_hostContext;
-    }
-};
-
 emu_void_t cellGcmSetFlipMode(uint32_t mode) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    assert(mode == CELL_GCM_DISPLAY_VSYNC);
+    //assert(mode == CELL_GCM_DISPLAY_VSYNC);
     return emu_void;
 }
 
@@ -71,15 +51,10 @@ int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t* of
     return CELL_OK;
 }
 
-emu_void_t cellGcmSetSurface(const CellGcmSurface* surface) {
-    TempGcmContext context;
-    ::cellGcmSetSurfaceUnsafeInline(context.getContext(), surface);
-    return emu_void;
-}
-
 uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     
+    ppu->getRsx()->setGcmContext(ioSize, ioAddress);
     ppu->setMemory(GcmLabelBaseOffset, 0, 1, true);
     ppu->setMemory(GcmLocalMemoryBase, 0, GcmLocalMemorySize, true);
     
@@ -103,7 +78,6 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint3
     emuGcmState.rsx->setPut(emuGcmState.context->current - ioAddress);
     auto rsxPrimaryDmaLabel = 3;
     emuGcmState.rsx->setLabel(rsxPrimaryDmaLabel, 1);
-    window.Init();
     return CELL_OK;  
 }
 
@@ -140,7 +114,24 @@ emu_void_t cellGcmResetFlipStatus(PPU* ppu) {
 }
 
 emu_void_t _cellGcmSetFlipCommand(PPU* ppu) {
+    assert(emuGcmState.context->end - emuGcmState.context->current >= 2);
+    uint32_t setLabel = 1;
+    uint32_t header = (1 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
+    emuGcmState.ppu->store<4>(emuGcmState.context->current, header);
+    emuGcmState.ppu->store<4>(emuGcmState.context->current + 4, setLabel);
+    emuGcmState.context->current += 2 * sizeof(uint32_t);
     return emu_void;
+}
+
+int32_t cellGcmIoOffsetToAddress(uint32_t offset, big_uint32_t* address) {
+    for (auto& m : emuGcmState.ioMaps) {
+        if (m.offset <= offset && offset < m.offset + m.size) {
+            *address = offset - m.offset + m.address;
+            return CELL_OK;
+        }
+    }
+    *address = GcmLocalMemoryBase + offset;
+    return CELL_OK;
 }
 
 }}

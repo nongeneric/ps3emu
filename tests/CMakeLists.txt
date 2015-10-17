@@ -13,6 +13,7 @@ set(SRC
     PPUSysCallsTests.cpp
     ShDasmTests.cpp
     RunnerTests.cpp
+    GraphicsTests.cpp
 )
 
 add_executable(tests ${SRC})

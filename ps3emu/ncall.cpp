@@ -121,6 +121,7 @@ STUB_1(sys_timer_usleep);
 STUB_1(cellGcmGetFlipStatus);
 STUB_1(cellGcmResetFlipStatus);
 STUB_1(_cellGcmSetFlipCommand);
+STUB_2(cellGcmIoOffsetToAddress);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -150,6 +151,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmGetFlipStatus),
     ENTRY(cellGcmResetFlipStatus),
     ENTRY(_cellGcmSetFlipCommand),
+    ENTRY(cellGcmIoOffsetToAddress),
 };
 
 void PPU::ncall(uint32_t index) {

@@ -7,4 +7,5 @@ class Window {
     GLFWwindow* _window;
 public:
     void Init();
+    void SwapBuffers();
 };
