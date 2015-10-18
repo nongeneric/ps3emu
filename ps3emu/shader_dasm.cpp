@@ -1,84 +1,295 @@
 #include "shader_dasm.h"
 #include "utils.h"
 #include <stdexcept>
+#include <boost/endian/arithmetic.hpp>
 #include "assert.h"
 
-struct fragment_opcode_t {
-    int op_count;
-    bool control;
-    bool nop;
-    bool tex;
-    const char* mnemonic;
+fragment_opcode_t fragment_opcodes[] = {
+    { 0, 1, 1, 0, "NOP", fragment_op_t::NOP },
+    { 1, 0, 0, 0, "MOV", fragment_op_t::MOV },
+    { 2, 0, 0, 0, "MUL", fragment_op_t::MUL },
+    { 2, 0, 0, 0, "ADD", fragment_op_t::ADD },
+    { 3, 0, 0, 0, "MAD", fragment_op_t::MAD },
+    { 2, 0, 0, 0, "DP3", fragment_op_t::DP3 },
+    { 2, 0, 0, 0, "DP4", fragment_op_t::DP4 },
+    { 2, 0, 0, 0, "DST", fragment_op_t::DST },
+    { 2, 0, 0, 0, "MIN", fragment_op_t::MIN },
+    { 2, 0, 0, 0, "MAX", fragment_op_t::MAX },
+    { 2, 0, 0, 0, "SLT", fragment_op_t::SLT },
+    { 2, 0, 0, 0, "SGE", fragment_op_t::SGE },
+    { 2, 0, 0, 0, "SLE", fragment_op_t::SLE },
+    { 2, 0, 0, 0, "SGT", fragment_op_t::SGT },
+    { 2, 0, 0, 0, "SNE", fragment_op_t::SNE },
+    { 2, 0, 0, 0, "SEQ", fragment_op_t::SEQ },
+    { 1, 0, 0, 0, "FRC", fragment_op_t::FRC },
+    { 1, 0, 0, 0, "FLR", fragment_op_t::FLR },
+    { 0, 1, 0, 0, "KIL", fragment_op_t::KIL },
+    { 1, 0, 0, 0, "PK4", fragment_op_t::PK4 },
+    { 1, 0, 0, 0, "UP4", fragment_op_t::UP4 },
+    { 1, 0, 0, 0, "DDX", fragment_op_t::DDX },
+    { 1, 0, 0, 0, "DDY", fragment_op_t::DDY },
+    { 1, 0, 0, 1, "TEX", fragment_op_t::TEX },
+    { 1, 0, 0, 1, "TXP", fragment_op_t::TXP },
+    { 3, 0, 0, 1, "TXD", fragment_op_t::TXD },
+    { 1, 0, 0, 0, "RCP", fragment_op_t::RCP },
+    { 1, 0, 0, 0, "RSQ", fragment_op_t::RSQ },
+    { 1, 0, 0, 0, "EX2", fragment_op_t::EX2 },
+    { 1, 0, 0, 0, "LG2", fragment_op_t::LG2 },
+    { 1, 0, 0, 0, "LIT", fragment_op_t::LIT },
+    { 3, 0, 0, 0, "LRP", fragment_op_t::LRP },
+    { 2, 0, 0, 0, "STR", fragment_op_t::STR },
+    { 2, 0, 0, 0, "SFL", fragment_op_t::SFL },
+    { 1, 0, 0, 0, "COS", fragment_op_t::COS },
+    { 1, 0, 0, 0, "SIN", fragment_op_t::SIN },
+    { 1, 0, 0, 0, "PK2", fragment_op_t::PK2 },
+    { 1, 0, 0, 0, "UP2", fragment_op_t::UP2 },
+    { 2, 0, 0, 0, "POW", fragment_op_t::POW },
+    { 1, 0, 0, 0, "PKB", fragment_op_t::PKB },
+    { 1, 0, 0, 0, "UPB", fragment_op_t::UPB },
+    { 1, 0, 0, 0, "PK16", fragment_op_t::PK16 },
+    { 1, 0, 0, 0, "UP16", fragment_op_t::UP16 },
+    { 3, 0, 0, 0, "BEM", fragment_op_t::BEM },
+    { 1, 0, 0, 0, "PKG", fragment_op_t::PKG },
+    { 1, 0, 0, 0, "UPG", fragment_op_t::UPG },
+    { 3, 0, 0, 0, "DP2A", fragment_op_t::DP2A },
+    { 3, 0, 0, 1, "TXL", fragment_op_t::TXL },
+    { 0, 0, 0, 0, "illegal" },
+    { 3, 0, 0, 1, "TXB", fragment_op_t::TXB },
+    { 0, 0, 0, 0, "illegal" },
+    { 3, 0, 0, 1, "TEXBEM", fragment_op_t::TEXBEM },
+    { 3, 0, 0, 1, "TXPBEM", fragment_op_t::TXPBEM },
+    { 3, 0, 0, 0, "BEMLUM", fragment_op_t::BEMLUM },
+    { 2, 0, 0, 0, "REFL", fragment_op_t::REFL },
+    { 1, 0, 0, 1, "TIMESWTEX", fragment_op_t::TIMESWTEX },
+    { 2, 0, 0, 0, "DP2", fragment_op_t::DP2 },
+    { 1, 0, 0, 0, "NRM", fragment_op_t::NRM },
+    { 2, 0, 0, 0, "DIV", fragment_op_t::DIV },
+    { 2, 0, 0, 0, "DIVSQ", fragment_op_t::DIVSQ },
+    { 1, 0, 0, 0, "LIF", fragment_op_t::LIF },
+    { 0, 1, 0, 0, "FENCT", fragment_op_t::FENCT },
+    { 0, 1, 0, 0, "FENCB", fragment_op_t::FENCB },
+    { 0, 0, 0, 0, "illegal" },
+    { 0, 1, 0, 0, "BRK", fragment_op_t::BRK },
+    { 0, 1, 0, 0, "CAL", fragment_op_t::CAL },
+    { 0, 1, 0, 0, "IFE", fragment_op_t::IFE },
+    { 0, 1, 0, 0, "LOOP", fragment_op_t::LOOP },
+    { 0, 1, 0, 0, "REP", fragment_op_t::REP },
+    { 0, 1, 0, 0, "RET", fragment_op_t::RET },
 };
 
-fragment_opcode_t fragment_opcodes[] = {
-    { 0, 1, 1, 0, "NOP" },
-    { 1, 0, 0, 0, "MOV" },
-    { 2, 0, 0, 0, "MUL" },
-    { 2, 0, 0, 0, "ADD" },
-    { 3, 0, 0, 0, "MAD" },
-    { 2, 0, 0, 0, "DP3" },
-    { 2, 0, 0, 0, "DP4" },
-    { 2, 0, 0, 0, "DST" },
-    { 2, 0, 0, 0, "MIN" },
-    { 2, 0, 0, 0, "MAX" },
-    { 2, 0, 0, 0, "SLT" },
-    { 2, 0, 0, 0, "SGE" },
-    { 2, 0, 0, 0, "SLE" },
-    { 2, 0, 0, 0, "SGT" },
-    { 2, 0, 0, 0, "SNE" },
-    { 2, 0, 0, 0, "SEQ" },
-    { 1, 0, 0, 0, "FRC" },
-    { 1, 0, 0, 0, "FLR" },
-    { 0, 1, 0, 0, "KIL" },
-    { 1, 0, 0, 0, "PK4" },
-    { 1, 0, 0, 0, "UP4" },
-    { 1, 0, 0, 0, "DDX" },
-    { 1, 0, 0, 0, "DDY" },
-    { 1, 0, 0, 1, "TEX" },
-    { 1, 0, 0, 1, "TXP" },
-    { 3, 0, 0, 1, "TXD" },
-    { 1, 0, 0, 0, "RCP" },
-    { 1, 0, 0, 0, "RSQ" },
-    { 1, 0, 0, 0, "EX2" },
-    { 1, 0, 0, 0, "LG2" },
-    { 1, 0, 0, 0, "LIT" },
-    { 3, 0, 0, 0, "LRP" },
-    { 2, 0, 0, 0, "STR" },
-    { 2, 0, 0, 0, "SFL" },
-    { 1, 0, 0, 0, "COS" },
-    { 1, 0, 0, 0, "SIN" },
-    { 1, 0, 0, 0, "PK2" },
-    { 1, 0, 0, 0, "UP2" },
-    { 2, 0, 0, 0, "POW" },
-    { 1, 0, 0, 0, "PKB" },
-    { 1, 0, 0, 0, "UPB" },
-    { 1, 0, 0, 0, "PK16" },
-    { 1, 0, 0, 0, "UP16" },
-    { 3, 0, 0, 0, "BEM" },
-    { 1, 0, 0, 0, "PKG" },
-    { 1, 0, 0, 0, "UPG" },
-    { 3, 0, 0, 0, "DP2A" },
-    { 3, 0, 0, 1, "TXL" },
-    { 3, 0, 0, 1, "TXB" },
-    { 3, 0, 0, 1, "TEXBEM" },
-    { 3, 0, 0, 1, "TXPBEM" },
-    { 3, 0, 0, 0, "BEMLUM" },
-    { 2, 0, 0, 0, "REFL" },
-    { 1, 0, 0, 1, "TIMESWTEX" },
-    { 2, 0, 0, 0, "DP2" },
-    { 1, 0, 0, 0, "NRM" },
-    { 2, 0, 0, 0, "DIV" },
-    { 2, 0, 0, 0, "DIVSQ" },
-    { 1, 0, 0, 0, "LIF" },
-    { 0, 1, 0, 0, "FENCT" },
-    { 0, 1, 0, 0, "FENCB" },
-    { 0, 1, 0, 0, "BRK" },
-    { 0, 1, 0, 0, "CAL" },
-    { 0, 1, 0, 0, "IFE" },
-    { 0, 1, 0, 0, "LOOP" },
-    { 0, 1, 0, 0, "REP" },
-    { 0, 1, 0, 0, "RET" }
+struct fragment_instr_t {
+    union {
+        BitField<0, 1> RegType;
+        BitField<1, 7> RegNum;
+        BitField<7, 8> LastInstr;
+        BitField<11, 12> Op0wMask;
+        BitField<12, 13> Op0zMask;
+        BitField<13, 14> Op0yMask;
+        BitField<14, 15> Op0xMask;
+        BitField<15, 16> C0;
+        BitField<16, 18> Clamp;
+        BitField<18, 19> Bx2;
+        BitField<24, 25> Sat;
+        BitField<25, 26> RegC;
+        BitField<26, 32> Opcode16;
+        
+        BitField<8, 11> InputAttr8_10;
+        BitField<23, 24> InputAttr23;
+    } b0;
+    union {
+        BitField<0, 6> Op1RegNum;
+        BitField<6, 8> Op1Type;
+        BitField<15, 16> Op1RegType;
+        BitField<19, 22> Cond;
+        BitField<22, 23> Op1Neg;
+        BitField<24, 25> C1;
+        BitField<25, 26> CondC1;
+        BitField<26, 27> Op1Abs;
+        
+        BitField<17, 19> CxMask;
+        BitField<16, 17> CyMask16;
+        BitField<31, 32> CyMask31;
+        BitField<27, 29> CwMask;
+        BitField<29, 31> CzMask;
+        
+        BitField<9, 11> Op1zMask;
+        BitField<11, 13> Op1yMask;
+        BitField<13, 15> Op1xMask;
+        BitField<8, 9> Op1wMask8;
+        BitField<23, 24> Op1wMask23;
+    } b1;
+    union {
+        BitField<24, 25> Opcode0;
+        BitField<25, 28> Scale;
+        
+        BitField<0, 6> Op2RegNum;
+        BitField<6, 8> Op2Type;
+        BitField<15, 16> Op2RegType;
+        BitField<22, 23> Op2Neg;
+        BitField<26, 27> Op2Abs;
+        
+        BitField<9, 11> Op2zMask;
+        BitField<11, 13> Op2yMask;
+        BitField<13, 15> Op2xMask;
+        BitField<8, 9> Op2wMask8;
+        BitField<23, 24> Op2wMask23;
+    } b2;
+    union {
+        BitField<24, 25> PerspCorr;
+        BitField<25, 26> AL;
+        BitField<18, 29> ALIndex;
+        
+        BitField<0, 6> Op3RegNum;
+        BitField<6, 8> Op3Type;
+        BitField<15, 16> Op3RegType;
+        BitField<22, 23> Op3Neg;
+        BitField<26, 27> Op3Abs;
+        
+        BitField<9, 11> Op3zMask;
+        BitField<11, 13> Op3yMask;
+        BitField<13, 15> Op3xMask;
+        BitField<8, 9> Op3wMask8;
+        BitField<23, 24> Op3wMask23;
+    } b3;
+    
+    inline unsigned Opcode() {
+        return (b2.Opcode0.u() << 6) | b0.Opcode16.u();
+    }
+    
+    inline clamp_t Clamp() {
+        return static_cast<clamp_t>(b0.Clamp.u());
+    }
+    
+    inline control_mod_t Control() {
+        if (b0.C0.u()) {
+            if (b1.C1.u()) {
+                return control_mod_t::C1;
+            } else {
+                return control_mod_t::C0;
+            }
+        }
+        return control_mod_t::None;
+    }
+    
+    inline scale_t Scale() {
+        return static_cast<scale_t>(b2.Scale.u());
+    }
+    
+    inline cond_t Cond() {
+        return static_cast<cond_t>(b1.Cond.u());
+    }
+    
+    inline persp_corr_t PerspCorr() {
+        return static_cast<persp_corr_t>(b3.PerspCorr.u());
+    }
+    
+    inline int ALIndex() {
+        return b3.ALIndex.u() + 4;
+    }
+    
+    inline input_attr_t InputAttr() {
+        auto v = b0.InputAttr8_10.u() | (b0.InputAttr23.u() << 3);
+        return static_cast<input_attr_t>(v);
+    }
+    
+    inline reg_type_t RegType() {
+        return static_cast<reg_type_t>(b0.RegType.u());
+    }
+    
+    inline op_type_t OpType(int n) {
+        int t;
+        if (n == 0) {
+            t = b1.Op1Type.u();
+        } else if (n == 1) {
+            t = b2.Op2Type.u();
+        } else {
+            t = b3.Op3Type.u();
+        }
+        return static_cast<op_type_t>(t);
+    }
+    
+    inline bool OpNeg(int n) {
+        if (n == 0) {
+            return b1.Op1Neg.u();
+        } else if (n == 1) {
+            return b2.Op2Neg.u();
+        }
+        return b3.Op3Neg.u();
+    }
+    
+    inline bool OpAbs(int n) {
+        if (n == 0) {
+            return b1.Op1Abs.u();
+        } else if (n == 1) {
+            return b2.Op2Abs.u();
+        }
+        return b3.Op3Abs.u();
+    }
+    
+    inline int OpRegNum(int n) {
+        if (n == 0) {
+            return b1.Op1RegNum.u();
+        } else if (n == 1) {
+            return b2.Op2RegNum.u();
+        }
+        return b3.Op3RegNum.u();
+    }
+    
+    inline reg_type_t OpRegType(int n) {
+        int t;
+        if (n == 0) {
+            t = b1.Op1RegType.u();
+        } else if (n == 1) {
+            t = b2.Op2RegType.u();
+        } else {
+            t = b3.Op3RegType.u();
+        }
+        return static_cast<reg_type_t>(t);
+    }
+    
+    inline swizzle2bit_t OpMaskX(int n) {
+        if (n == 0)
+            return static_cast<swizzle2bit_t>(b1.Op1xMask.u());
+        if (n == 1)
+            return static_cast<swizzle2bit_t>(b2.Op2xMask.u());
+        return static_cast<swizzle2bit_t>(b3.Op3xMask.u());   
+    }
+    
+    inline swizzle2bit_t OpMaskY(int n) {
+        if (n == 0)
+            return static_cast<swizzle2bit_t>(b1.Op1yMask.u());
+        if (n == 1)
+            return static_cast<swizzle2bit_t>(b2.Op2yMask.u());
+        return static_cast<swizzle2bit_t>(b3.Op3yMask.u());   
+    }
+    
+    inline swizzle2bit_t OpMaskZ(int n) {
+        if (n == 0)
+            return static_cast<swizzle2bit_t>(b1.Op1zMask.u());
+        if (n == 1)
+            return static_cast<swizzle2bit_t>(b2.Op2zMask.u());
+        return static_cast<swizzle2bit_t>(b3.Op3zMask.u());   
+    }
+    
+    inline swizzle2bit_t OpMaskW(int n) {
+        auto _23 = 0u;
+        auto _8 = 0u;
+        if (n == 0) {
+            _23 = b1.Op1wMask23.u();
+            _8 = b1.Op1wMask8.u();
+        } else if (n == 1) {
+            _23 = b2.Op2wMask23.u();
+            _8 = b2.Op2wMask8.u();
+        } else {
+            _23 = b3.Op3wMask23.u();
+            _8 = b3.Op3wMask8.u();
+        }
+        return static_cast<swizzle2bit_t>((_23 << 1) | _8);
+    }
+    
+    inline int CyMask() {
+        return b1.CyMask16.u() | (b1.CyMask31.u() << 1);
+    }
 };
 
 std::string print_op0_mask(fragment_instr_t* instr) {
@@ -239,12 +450,12 @@ int fragment_dasm(uint8_t* instr, std::string& res) {
     auto cond = i->Cond();
     if (cond != cond_t::TR && !opcode.nop) {
         auto x = i->b1.CxMask.u();
-        auto y = i->b1.CyMask.u();
+        auto y = i->CyMask();
         auto z = i->b1.CzMask.u();
         auto w = i->b1.CwMask.u();
         auto swizzle = print_swizzle(x, y, z, w);
         auto creg = i->b1.CondC1.u() ? "1" : "";
-        res += ssnprintf("(%s%s%s)", print_cond(cond), creg, swizzle);
+        res += ssnprintf("(%s%s%s)", print_cond(cond), creg, swizzle.c_str());
     }
     int size = 16;
     for (int n = 0; n < opcode.op_count; ++n) {
@@ -275,7 +486,20 @@ int fragment_dasm(uint8_t* instr, std::string& res) {
             }
             res += "]";
         } else if (optype == op_type_t::Const) {
-            // ?
+            size += 16;
+            uint8_t cbuf[16];
+            // exch words and then reverse bytes to make le dwords
+            for (auto i = 0u; i < sizeof(cbuf); i += 4) {
+                cbuf[i + 0] = instr[i + 16 + 1];
+                cbuf[i + 1] = instr[i + 16 + 0];
+                cbuf[i + 2] = instr[i + 16 + 3];
+                cbuf[i + 3] = instr[i + 16 + 2];
+            }
+            auto cu = (uint32_t*)cbuf;
+            auto cf = (float*)cbuf;
+            res += ssnprintf("{0x%08x(%g), 0x%08x(%g), 0x%08x(%g), 0x%08x(%g)}",
+                cu[0], cf[0], cu[1], cf[1], cu[2], cf[2], cu[3], cf[3]
+            );
         } else {
             auto r = opregtype == reg_type_t::H ? "H" : "R";
             res += ssnprintf("%s%lu", r, opregnum);
@@ -284,9 +508,30 @@ int fragment_dasm(uint8_t* instr, std::string& res) {
         if (opabs)
             res += "|";
         // TEX
-        res += ";";
-        if (i->b0.LastInstr.u())
-            res += " # last instruction";
     }
+    res += ";";
+    if (i->b0.LastInstr.u())
+        res += " # last instruction";
     return size;
 }
+
+FragmentInstr fragment_dasm_instr(uint8_t* instr) {
+    uint8_t buf[16];
+    for (auto i = 0u; i < sizeof(buf); i += 4) {
+        buf[i + 0] = instr[i + 2];
+        buf[i + 1] = instr[i + 3];
+        buf[i + 2] = instr[i + 0];
+        buf[i + 3] = instr[i + 1];
+    }
+    
+    auto i = (fragment_instr_t*)buf;
+    auto opcode = fragment_opcodes[i->Opcode()];
+    
+    FragmentInstr res;
+    res.opcode = opcode;
+    res.clamp = i->Clamp();
+    
+    return res;
+}
+
+
