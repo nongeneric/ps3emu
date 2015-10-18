@@ -53,17 +53,11 @@ enum class fragment_op_t {
     FENCB, BRK, CAL, IFE, LOOP, REP, RET
 };
 
-enum class swizzle_type_t {
-    rgba, xyzw
-};
-
 struct swizzle_t {
-    swizzle_type_t type;
-    int components[4];
+    swizzle2bit_t comp[4];
 };
 
 struct FragmentCondition {
-    bool is_present;
     cond_t relation;
     bool is_C1;
     swizzle_t swizzle;
@@ -71,8 +65,12 @@ struct FragmentCondition {
 
 struct fragment_argument_t {
     op_type_t type;
+    bool is_neg;
+    bool is_abs;
     swizzle_t swizzle;
-    int id;
+    int reg_num;
+    reg_type_t reg_type;
+    uint32_t imm_val[4];
 };
 
 struct fragment_opcode_t {
@@ -84,12 +82,32 @@ struct fragment_opcode_t {
     fragment_op_t instr;
 };
 
+struct dest_mask_t {
+    bool val[4];
+};
+
 struct FragmentInstr {
     fragment_opcode_t opcode;
     FragmentCondition condition;
     clamp_t clamp;
+    control_mod_t control;
+    scale_t scale;
+    dest_mask_t dest_mask;
+    bool is_bx2;
+    bool is_sat;
+    reg_type_t reg;
+    bool is_reg_c;
+    int reg_num;
+    persp_corr_t persp_corr;
+    bool is_al;
+    int al_index;
+    input_attr_t intput_attr;
+    bool is_last;
     fragment_argument_t arguments[3];
 };
 
-int fragment_dasm(uint8_t* instr, std::string& res);
-FragmentInstr fragment_dasm_instr(uint8_t* instr);
+std::string print_dest_mask(dest_mask_t mask);
+const char* print_attr(input_attr_t attr);
+std::string print_swizzle(swizzle_t swizzle);
+void fragment_dasm(FragmentInstr const& i, std::string& res);
+int fragment_dasm_instr(uint8_t* instr, FragmentInstr& res);

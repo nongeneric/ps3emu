@@ -14,6 +14,8 @@ set(SRC
     utils.h
     shader_dasm.h
     shader_dasm.cpp
+    ShaderRewriter.h
+    ShaderRewriter.cpp
     Rsx.h
     Rsx.cpp
 )

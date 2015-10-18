@@ -14,6 +14,7 @@ set(SRC
     ShDasmTests.cpp
     RunnerTests.cpp
     GraphicsTests.cpp
+    ShaderRewriterTests.cpp
 )
 
 add_executable(tests ${SRC})

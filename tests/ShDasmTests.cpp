@@ -1,13 +1,20 @@
 #include "../ps3emu/shader_dasm.h"
 #include <catch.hpp>
 
+int dasm_print(uint8_t* ptr, std::string& res) {
+    FragmentInstr instr;
+    auto size = fragment_dasm_instr(ptr, instr);
+    fragment_dasm(instr, res);
+    return size;
+}
+
 TEST_CASE() {
     uint8_t instr[] = { 
         0x3E, 0x01, 0x01, 0x00, 0xC8, 0x01, 0x1C, 0x9D, 
         0xC8, 0x00, 0x00, 0x01, 0xC8, 0x00, 0x3F, 0xE1
     };
     std::string res;
-    fragment_dasm(instr, res);
+    dasm_print(instr, res);
     REQUIRE(res == "MOVR R0, f[COL0]; # last instruction");
 }
 
@@ -48,103 +55,103 @@ TEST_CASE() {
     
     std::string res;
     int pos = 0, size;
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 32 );
     REQUIRE(res == "MULR R0.xy, f[WPOS], {0x3ca3d70a(0.02), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.x;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "FRCR R0.xy, R0;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 32 );
     REQUIRE(res == "MULR R0.xy, R0, {0x42480000(50), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.x;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVRC RC.xy, R0;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "FLRR R0.zw, |R0.xxxy|;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVR R1.w, R0;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVR R0.x, R0.z;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVR R1.w(LT.y), -R0;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVR R0.x(LT.x), -R0.z;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVR R0.y, R1.w;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 32 );
     REQUIRE(res == "ADDR R0.zw, R0.xxxy, {0xc1c80000(-25), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.x;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "MOVR R0.xy, f[TEX0];");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "DP2R R1.x, R0.zwzz, R0.zwzz;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 32 );
     REQUIRE(res == "SLTRC RC.x, R1, {0x43c80000(400), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.x;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 32 );
     REQUIRE(res == "MOVR R0.zw, {0x00000000(0), 0x00000000(0), 0x3f800000(1), 0x00000000(0)}.yzyz;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 16 );
     REQUIRE(res == "FENCBR;");
     res.clear();
     
-    size = fragment_dasm(instr + pos, res);
+    size = dasm_print(instr + pos, res);
     pos += size;
     REQUIRE( size == 32 );
     REQUIRE(res == "MOVR R0(NE.x), {0x3f666666(0.9), 0x3f800000(1), 0x00000000(0), 0x00000000(0)}.xxxy; # last instruction");

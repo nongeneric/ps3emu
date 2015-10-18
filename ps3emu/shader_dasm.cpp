@@ -292,11 +292,11 @@ struct fragment_instr_t {
     }
 };
 
-std::string print_op0_mask(fragment_instr_t* instr) {
-    auto x = instr->b0.Op0xMask.u();
-    auto y = instr->b0.Op0yMask.u();
-    auto z = instr->b0.Op0zMask.u();
-    auto w = instr->b0.Op0wMask.u();
+std::string print_dest_mask(dest_mask_t mask) {
+    auto x = mask.val[0];
+    auto y = mask.val[1];
+    auto z = mask.val[2];
+    auto w = mask.val[3];
     if (x && y && z && w)
         return "";
     std::string res = ".";
@@ -360,19 +360,10 @@ const char* print_attr(input_attr_t attr) {
     return "v15";
 }
 
-int fragment_dasm(uint8_t* instr, std::string& res) {
-    uint8_t buf[16];
-    for (auto i = 0u; i < sizeof(buf); i += 4) {
-        buf[i + 0] = instr[i + 2];
-        buf[i + 1] = instr[i + 3];
-        buf[i + 2] = instr[i + 0];
-        buf[i + 3] = instr[i + 1];
-    }
-    auto i = (fragment_instr_t*)buf;
-    auto opcode = fragment_opcodes[i->Opcode()];
-    res += opcode.mnemonic;
+void fragment_dasm(FragmentInstr const& i, std::string& res) {
+    res += i.opcode.mnemonic;
     const char* clamp;
-    switch (i->Clamp()) {
+    switch (i.clamp) {
         case clamp_t::B:
             clamp = "B";
             break;
@@ -388,7 +379,7 @@ int fragment_dasm(uint8_t* instr, std::string& res) {
     }
     res += clamp;
     auto control = "";
-    switch (i->Control()) {
+    switch (i.control) {
         case control_mod_t::C0:
             control = "C";
             break;
@@ -398,9 +389,9 @@ int fragment_dasm(uint8_t* instr, std::string& res) {
         case control_mod_t::None: break;
     }
     res += control;
-    if (!opcode.control) {
+    if (!i.opcode.control) {
         auto scale = "";
-        switch (i->Scale()) {
+        switch (i.scale) {
             case scale_t::None:
                 break;
             case scale_t::M2:
@@ -427,95 +418,72 @@ int fragment_dasm(uint8_t* instr, std::string& res) {
             default: assert(false);
         }
         res += scale;
-        if (i->b0.Bx2.u()) {
+        if (i.is_bx2) {
             res += "_bx2";
         }
-        if (i->b0.Sat.u()) {
+        if (i.is_sat) {
             res += "_sat";
         }
         res += " ";
-        if (i->RegType() == reg_type_t::H) {
+        if (i.reg == reg_type_t::H) {
             res += "H";
         } else {
             res += "R";
         }
-        if (i->b0.RegC.u()) {
+        if (i.is_reg_c) {
             res += "C";
         } else {
-            res += ssnprintf("%d", i->b0.RegNum.u());
+            res += ssnprintf("%d", i.reg_num);
         }
-        res += print_op0_mask(i);
+        res += print_dest_mask(i.dest_mask);
+        if (i.condition.relation != cond_t::TR && !i.opcode.nop) {
+            auto swizzle = print_swizzle(i.condition.swizzle);
+            auto creg = i.condition.is_C1 ? "1" : "";
+            res += ssnprintf("(%s%s%s)", print_cond(i.condition.relation), creg, swizzle.c_str());
+        }
     }
     // LOOP, REP, RET, CAL
-    auto cond = i->Cond();
-    if (cond != cond_t::TR && !opcode.nop) {
-        auto x = i->b1.CxMask.u();
-        auto y = i->CyMask();
-        auto z = i->b1.CzMask.u();
-        auto w = i->b1.CwMask.u();
-        auto swizzle = print_swizzle(x, y, z, w);
-        auto creg = i->b1.CondC1.u() ? "1" : "";
-        res += ssnprintf("(%s%s%s)", print_cond(cond), creg, swizzle.c_str());
-    }
-    int size = 16;
-    for (int n = 0; n < opcode.op_count; ++n) {
+    for (int n = 0; n < i.opcode.op_count; ++n) {
+        auto& arg = i.arguments[n];
         res += ", ";
-        auto optype = i->OpType(n);
-        auto opregnum = i->OpRegNum(n);
-        auto opregtype = i->OpRegType(n);
-        auto opneg = i->OpNeg(n);
-        auto opabs = i->OpAbs(n);
-        auto x = i->OpMaskX(n);
-        auto y = i->OpMaskY(n);
-        auto z = i->OpMaskZ(n);
-        auto w = i->OpMaskW(n);
-        if (opneg)
+        if (arg.is_neg)
             res += "-";
-        if (opabs)
+        if (arg.is_abs)
             res += "|";
-        if (optype == op_type_t::Attr) {
-            if (i->PerspCorr() == persp_corr_t::F) {
+        if (arg.type == op_type_t::Attr) {
+            if (i.persp_corr == persp_corr_t::F) {
                 res += "f[";
             } else {
                 res += "g[";
             }
-            if (i->b3.AL.u()) {
-                res += ssnprintf("aL+%d", i->ALIndex());
+            if (i.is_al) {
+                res += ssnprintf("aL+%d", i.al_index);
             } else {
-                res += print_attr(i->InputAttr());
+                res += print_attr(i.intput_attr);
             }
             res += "]";
-        } else if (optype == op_type_t::Const) {
-            size += 16;
-            uint8_t cbuf[16];
-            // exch words and then reverse bytes to make le dwords
-            for (auto i = 0u; i < sizeof(cbuf); i += 4) {
-                cbuf[i + 0] = instr[i + 16 + 1];
-                cbuf[i + 1] = instr[i + 16 + 0];
-                cbuf[i + 2] = instr[i + 16 + 3];
-                cbuf[i + 3] = instr[i + 16 + 2];
-            }
-            auto cu = (uint32_t*)cbuf;
-            auto cf = (float*)cbuf;
+        } else if (arg.type == op_type_t::Const) {
+            auto cu = i.arguments[n].imm_val;
+            auto cf = (float*)cu;
             res += ssnprintf("{0x%08x(%g), 0x%08x(%g), 0x%08x(%g), 0x%08x(%g)}",
                 cu[0], cf[0], cu[1], cf[1], cu[2], cf[2], cu[3], cf[3]
             );
         } else {
-            auto r = opregtype == reg_type_t::H ? "H" : "R";
-            res += ssnprintf("%s%lu", r, opregnum);
+            auto r = arg.reg_type == reg_type_t::H ? "H" : "R";
+            res += ssnprintf("%s%lu", r, arg.reg_num);
         }
-        res += print_swizzle((int)x, (int)y, (int)z, (int)w);
-        if (opabs)
+        res += print_swizzle(arg.swizzle);
+        if (arg.is_abs)
             res += "|";
         // TEX
     }
     res += ";";
-    if (i->b0.LastInstr.u())
+    if (i.is_last) {
         res += " # last instruction";
-    return size;
+    }
 }
 
-FragmentInstr fragment_dasm_instr(uint8_t* instr) {
+int fragment_dasm_instr(uint8_t* instr, FragmentInstr& res) {
     uint8_t buf[16];
     for (auto i = 0u; i < sizeof(buf); i += 4) {
         buf[i + 0] = instr[i + 2];
@@ -526,12 +494,68 @@ FragmentInstr fragment_dasm_instr(uint8_t* instr) {
     
     auto i = (fragment_instr_t*)buf;
     auto opcode = fragment_opcodes[i->Opcode()];
-    
-    FragmentInstr res;
+   
     res.opcode = opcode;
     res.clamp = i->Clamp();
-    
-    return res;
+    res.control = i->Control();
+    if (!opcode.control) {
+        res.scale = i->Scale();
+        res.is_bx2 = i->b0.Bx2.u();
+        res.is_sat = i->b0.Sat.u();
+        res.reg = i->RegType();
+        res.is_reg_c = i->b0.RegC.u();
+        res.reg_num = i->b0.RegNum.u();
+        res.dest_mask.val[0] = i->b0.Op0xMask.u();
+        res.dest_mask.val[1] = i->b0.Op0yMask.u();
+        res.dest_mask.val[2] = i->b0.Op0zMask.u();
+        res.dest_mask.val[3] = i->b0.Op0wMask.u();
+        res.condition.relation = i->Cond();
+        res.condition.is_C1 = i->b1.CondC1.u();
+        res.condition.swizzle.comp[0] = static_cast<swizzle2bit_t>(i->b1.CxMask.u());
+        res.condition.swizzle.comp[1] = static_cast<swizzle2bit_t>(i->CyMask());
+        res.condition.swizzle.comp[2] = static_cast<swizzle2bit_t>(i->b1.CzMask.u());
+        res.condition.swizzle.comp[3] = static_cast<swizzle2bit_t>(i->b1.CwMask.u());
+        res.persp_corr = i->PerspCorr();
+        res.is_al = i->b3.AL.u();
+        res.al_index = i->ALIndex();
+        res.intput_attr = i->InputAttr();
+    }
+    res.is_last = i->b0.LastInstr.u();
+    int size = 16;
+    for (int n = 0; n < opcode.op_count; ++n) {
+        auto& arg = res.arguments[n];
+        arg.type =  i->OpType(n);
+        arg.reg_num = i->OpRegNum(n);
+        arg.reg_type = i->OpRegType(n);
+        arg.is_neg = i->OpNeg(n);
+        arg.is_abs = i->OpAbs(n);
+        arg.swizzle.comp[0] = i->OpMaskX(n);
+        arg.swizzle.comp[1] = i->OpMaskY(n);
+        arg.swizzle.comp[2] = i->OpMaskZ(n);
+        arg.swizzle.comp[3] = i->OpMaskW(n);
+        if (arg.type == op_type_t::Const) {
+            size += 16;
+            uint8_t cbuf[16];
+            // exch words and then reverse bytes to make le dwords
+            for (auto i = 0u; i < sizeof(cbuf); i += 4) {
+                cbuf[i + 0] = instr[i + 16 + 1];
+                cbuf[i + 1] = instr[i + 16 + 0];
+                cbuf[i + 2] = instr[i + 16 + 3];
+                cbuf[i + 3] = instr[i + 16 + 2];
+            }
+            memcpy(arg.imm_val, cbuf, sizeof(cbuf));
+        }
+    }
+    return size;
+}
+
+std::string print_swizzle(swizzle_t swizzle) {
+    return print_swizzle(
+        (int)swizzle.comp[0],
+        (int)swizzle.comp[1],
+        (int)swizzle.comp[2],
+        (int)swizzle.comp[3]
+    );
 }
 
 
