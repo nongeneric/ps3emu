@@ -336,11 +336,11 @@ const char* print_swizzle2bit(int bits) {
     return "w";
 }
 
-std::string print_swizzle(int x, int y, int z, int w) {
+std::string print_swizzle(bool allComponents, int x, int y, int z, int w) {
     if (x == 0 && y == 1 && z == 2 && w == 3)
         return "";
     std::string res = ".";
-    if (x == y && y == z && z == w) {
+    if (!allComponents && x == y && y == z && z == w) {
         res += print_swizzle2bit(x);
     } else {
         res += print_swizzle2bit(x);
@@ -437,7 +437,7 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
         }
         res += print_dest_mask(i.dest_mask);
         if (i.condition.relation != cond_t::TR && !i.opcode.nop) {
-            auto swizzle = print_swizzle(i.condition.swizzle);
+            auto swizzle = print_swizzle(i.condition.swizzle, false);
             auto creg = i.condition.is_C1 ? "1" : "";
             res += ssnprintf("(%s%s%s)", print_cond(i.condition.relation), creg, swizzle.c_str());
         }
@@ -472,7 +472,7 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             auto r = arg.reg_type == reg_type_t::H ? "H" : "R";
             res += ssnprintf("%s%lu", r, arg.reg_num);
         }
-        res += print_swizzle(arg.swizzle);
+        res += print_swizzle(arg.swizzle, false);
         if (arg.is_abs)
             res += "|";
         // TEX
@@ -483,7 +483,7 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
     }
 }
 
-int fragment_dasm_instr(uint8_t* instr, FragmentInstr& res) {
+int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
     uint8_t buf[16];
     for (auto i = 0u; i < sizeof(buf); i += 4) {
         buf[i + 0] = instr[i + 2];
@@ -549,13 +549,13 @@ int fragment_dasm_instr(uint8_t* instr, FragmentInstr& res) {
     return size;
 }
 
-std::string print_swizzle(swizzle_t swizzle) {
+std::string print_swizzle(swizzle_t swizzle, bool allComponents) {
     return print_swizzle(
+        allComponents,
         (int)swizzle.comp[0],
         (int)swizzle.comp[1],
         (int)swizzle.comp[2],
         (int)swizzle.comp[3]
     );
 }
-
 

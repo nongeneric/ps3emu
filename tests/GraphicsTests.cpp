@@ -34,3 +34,12 @@ TEST_CASE("gcm_hello") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_hello/ps3frame.png");
 }
+
+TEST_CASE("gcm_simple_fshader") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_simple_fshader/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_simple_fshader/ps3frame.png");
+}

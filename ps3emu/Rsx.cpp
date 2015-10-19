@@ -1,6 +1,7 @@
 #include "Rsx.h"
 
 #include "PPU.h"
+#include "ShaderGenerator.h"
 #include "utils.h"
 #include <atomic>
 #include <vector>
@@ -1348,6 +1349,9 @@ public:
     bool isFlipInProgress = false;
     VertexDataArrayFormatInfo vertexDataArrays[16];
     uint32_t vertexArrayMode;
+    GLuint vertexShader = 0;
+    GLuint fragmentShader = 0;
+    std::vector<uint8_t> fragmentBytecode;
     std::vector<uint8_t> lastFrame;
 };
 
@@ -1638,10 +1642,30 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
 }
 
 void Rsx::ShaderProgram(uint32_t locationOffset) {
-    // loads fragment program byte code from locationOffset-1 upto the last command
+    // loads fragment program byte code from locationOffset-1 up to the last command
     // (the "#last command" bit)
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _ppu->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
+    _context->fragmentBytecode.resize(1000); // TODO:
+    auto& vec = _context->fragmentBytecode;
+    _ppu->readMemory(GcmLocalMemoryBase + locationOffset - 1, &vec[0], vec.size());
+    auto text = GenerateShader(vec);
+    
+    BOOST_LOG_TRIVIAL(trace) << text;
+    
+    if (_context->fragmentShader)
+        glDeleteShader(_context->fragmentShader);
+    
+    _context->fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char* textptr = text.c_str();
+    glShaderSource(_context->fragmentShader, 1, &textptr, NULL);
+    glCompileShader(_context->fragmentShader);
+    check_shader(_context->fragmentShader);
+    auto program = glCreateProgram();
+    glAttachShader(program, _context->vertexShader);
+    glAttachShader(program, _context->fragmentShader);
+    glcall(glLinkProgram(program));
+    glcall(glUseProgram(program));
 }
 
 void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -1915,7 +1939,8 @@ void Rsx::initGcm() {
         "#version 450 core\n"
         "layout (location = 0) in vec4 position;\n"
         "layout (location = 3) in vec4 color;\n"
-        "out vec4 vs_color;\n"
+        "out vec4 attr_COL0;\n"
+        "out vec4 attr_TEX0;\n"
         "float reverse(float f) {\n"
         "    unsigned int bits = floatBitsToUint(f);\n"
         "    unsigned int rev = ((bits & 0xff) << 24)\n"
@@ -1930,30 +1955,15 @@ void Rsx::initGcm() {
         "                         reverse(position.z),\n"
         "                         position.w );\n"
         "    gl_Position = revpos;\n"
-        "    vs_color = color.bgra;\n"
+        "    attr_COL0 = color.bgra;\n"
+        "    attr_TEX0 = revpos;\n"
         "}\n" };
-    const char* fs[] = {
-        "#version 450 core\n"
-        "in vec4 vs_color;\n"
-        "out vec4 color;\n"
-        "void main(void) {\n"
-        "    color = vs_color;\n"
-        "}\n" };
+        
     auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, vs, NULL);
     glCompileShader(vertexShader);
     check_shader(vertexShader);
-    auto fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, fs, NULL);
-    glCompileShader(fragmentShader);
-    check_shader(fragmentShader);
-    auto program = glCreateProgram();
-    glAttachShader(program, vertexShader);
-    glAttachShader(program, fragmentShader);
-    glcall(glLinkProgram(program));
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-    glcall(glUseProgram(program));
+    _context->vertexShader = vertexShader;
 }
 
 void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {

@@ -108,6 +108,6 @@ struct FragmentInstr {
 
 std::string print_dest_mask(dest_mask_t mask);
 const char* print_attr(input_attr_t attr);
-std::string print_swizzle(swizzle_t swizzle);
+std::string print_swizzle(swizzle_t swizzle, bool allComponents);
 void fragment_dasm(FragmentInstr const& i, std::string& res);
-int fragment_dasm_instr(uint8_t* instr, FragmentInstr& res);
+int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res);
