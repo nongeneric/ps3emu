@@ -3,6 +3,8 @@
 #include "BitField.h"
 #include <string>
 #include <stdint.h>
+#include <array>
+#include <vector>
 
 enum class clamp_t {
     R, H, X, B
@@ -82,6 +84,23 @@ struct fragment_opcode_t {
     fragment_op_t instr;
 };
 
+enum class vertex_op_t {
+    MUL, ADD, MAD, DP3, DPH, DP4, DST, MIN, MAX, SLT,
+    SGE, ARL, FRC, FLR, SEQ, SFL, SGT, SLE, SNE, STR,
+    SSG, ARR, ARA, TXL, NOP, MOV, POP, RCP, RCC, RSQ,
+    EXP, LOG, LIT, BRA, BRI, CAL, CLI, RET, LG2, EX2,
+    SIN, COS, BRB, CLB, PSH
+};
+
+struct vertex_opcode_t {
+    int op_count;
+    bool control;
+    bool addr_reg;
+    bool tex;
+    const char* mnemonic;
+    vertex_op_t instr;
+};
+
 struct dest_mask_t {
     bool val[4];
 };
@@ -106,8 +125,45 @@ struct FragmentInstr {
     fragment_argument_t arguments[3];
 };
 
+struct VertexArgument {
+    bool is_neg;
+    bool is_abs;
+    swizzle_t swizzle;
+    int reg_num;
+    int reg_type;
+};
+
+struct VertexInstr {
+    bool flag1;
+    bool is_complex_offset;
+    int output_reg_num;
+    int dest_reg_num;
+    int addr_data_reg_num;
+    int mask1;
+    int mask2;
+    VertexArgument args[3];
+    uint32_t v_displ;
+    int input_v_num;
+    int opcode1;
+    int opcode2;
+    int disp_component;
+    swizzle_t cond_swizzle;
+    cond_t cond_relation;
+    bool flag2;
+    bool has_cond;
+    bool is_addr_reg;
+    bool is_cond_c1;
+    bool is_sat;
+    bool v_index_has_displ;
+    bool output_has_complex_offset;
+    bool sets_c;
+    int mask_selector;
+};
+
 std::string print_dest_mask(dest_mask_t mask);
 const char* print_attr(input_attr_t attr);
 std::string print_swizzle(swizzle_t swizzle, bool allComponents);
 void fragment_dasm(FragmentInstr const& i, std::string& res);
 int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res);
+void vertex_dasm_instr(const uint8_t* instr, VertexInstr& res);
+std::vector<std::string> vertex_dasm(VertexInstr const& instr);
