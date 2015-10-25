@@ -8,16 +8,15 @@ int dasm_print(uint8_t* ptr, std::string& res) {
     return size;
 }
 
-void vdasm_print(uint8_t* ptr, std::string& res) {
-    VertexInstr instr;
-    vertex_dasm_instr(ptr, instr);
-    auto vec = vertex_dasm(instr);
-    if (vec.size()) {
-        res += vec.front();
-        if (vec.size() == 2) {
-            res += " " + vec.back();
-        }
+bool vdasm_print(uint8_t* ptr, std::string& res) {
+    std::array<VertexInstr, 2> instr;
+    int count = vertex_dasm_instr(ptr, instr);
+    bool last = false;
+    for (int i = 0; i < count; ++i) {
+        res += vertex_dasm(instr[i]);
+        last |= instr[i].is_last;
     }
+    return last;
 }
 
 TEST_CASE() {
@@ -172,6 +171,25 @@ TEST_CASE() {
 
 TEST_CASE() {
     unsigned char instr[] = {
+        0x3e, 0x84, 0x01, 0x40, 0xc8, 0x01, 0x1c, 0x9d, 0xc8, 0x00, 0x00, 0x01,
+        0xc8, 0x00, 0x3f, 0xe1, 0x1e, 0x01, 0x03, 0x00, 0xc9, 0x08, 0x1f, 0xf5,
+        0xc8, 0x08, 0x00, 0x01, 0xc8, 0x00, 0x00, 0x01
+    };
+    
+    std::string res;
+    int pos = 0, size;
+    size = dasm_print(instr + pos, res);
+    pos += size;
+    REQUIRE(res == "MOVH H2, f[COL0];");
+    res.clear();
+    size = dasm_print(instr + pos, res);
+    pos += size;
+    REQUIRE(res == "ADDR R0(NE.w), H2, R2; # last instruction");
+    res.clear();
+}
+
+TEST_CASE() {
+    unsigned char instr[] = {
         0x40, 0x1f, 0x9c, 0x6c, 0x00, 0xdd, 0x23, 0x55, 0x01, 0x86, 0xc0, 0x83,
         0x60, 0x41, 0xff, 0x84, 0x00, 0x00, 0x9c, 0x6c, 0x00, 0x5d, 0x20, 0x00,
         0x01, 0x86, 0xc0, 0x83, 0x60, 0x40, 0x7f, 0xfc, 0x40, 0x1f, 0x9c, 0x6c,
@@ -197,67 +215,67 @@ TEST_CASE() {
     };
     
     std::string res;
-    vdasm_print(instr, res);
+    REQUIRE( !vdasm_print(instr, res) );
     REQUIRE(res == "ADD o[1], c[466].z, v[3];");
     res.clear();
     
-    vdasm_print(instr + 16, res);
+    REQUIRE( !vdasm_print(instr + 16, res) );
     REQUIRE(res == "MOV R1.zw, c[466].x;");
     res.clear();
     
-    vdasm_print(instr + 16 * 2, res);
-    REQUIRE(res == "COS R1.xy, c[467].x; MOV o[7], v[0];");
+    REQUIRE( !vdasm_print(instr + 16 * 2, res) );
+    REQUIRE(res == "COS R1.xy, c[467].x;MOV o[7], v[0];");
     res.clear();
     
-    vdasm_print(instr + 16 * 3, res);
+    REQUIRE( !vdasm_print(instr + 16 * 3, res) );
     REQUIRE(res == "MOV R0.zw, c[466].x;");
     res.clear();
     
-    vdasm_print(instr + 16 * 4, res);
+    REQUIRE( !vdasm_print(instr + 16 * 4, res) );
     REQUIRE(res == "SIN R0.x, c[467].x;");
     res.clear();
     
-    vdasm_print(instr + 16 * 5, res);
+    REQUIRE( !vdasm_print(instr + 16 * 5, res) );
     REQUIRE(res == "MOV R0.y, R1.y;");
     res.clear();
     
-    vdasm_print(instr + 16 * 6, res);
+    REQUIRE( !vdasm_print(instr + 16 * 6, res) );
     REQUIRE(res == "MOV R1.y, -R0.x;");
     res.clear();
     
-    vdasm_print(instr + 16 * 7, res);
+    REQUIRE( !vdasm_print(instr + 16 * 7, res) );
     REQUIRE(res == "MUL R0, v[0].y, R0;");
     res.clear();    
     
-    vdasm_print(instr + 16 * 8, res);
+    REQUIRE( !vdasm_print(instr + 16 * 8, res) );
     REQUIRE(res == "MAD R0, v[0].x, R1, R0;");
     res.clear();
     
-    vdasm_print(instr + 16 * 9, res);
+    REQUIRE( !vdasm_print(instr + 16 * 9, res) );
     REQUIRE(res == "MAD R0, v[0].z, c[466].xxyx, R0;");
     res.clear();
     
-    vdasm_print(instr + 16 * 10, res);
+    REQUIRE( !vdasm_print(instr + 16 * 10, res) );
     REQUIRE(res == "MAD R0, v[0].w, c[466].xxxy, R0;");
     res.clear();
     
-    vdasm_print(instr + 16 * 11, res);
+    REQUIRE( !vdasm_print(instr + 16 * 11, res) );
     REQUIRE(res == "MOV o[8], c[465];");
     res.clear();
     
-    vdasm_print(instr + 16 * 12, res);
+    REQUIRE( !vdasm_print(instr + 16 * 12, res) );
     REQUIRE(res == "MUL R1, R0.y, c[257];");
     res.clear();
     
-    vdasm_print(instr + 16 * 13, res);
+    REQUIRE( !vdasm_print(instr + 16 * 13, res) );
     REQUIRE(res == "MAD R1, R0.x, c[256], R1;");
     res.clear();
     
-    vdasm_print(instr + 16 * 14, res);
+    REQUIRE( !vdasm_print(instr + 16 * 14, res) );
     REQUIRE(res == "MAD R1, R0.z, c[258], R1;");
     res.clear();
     
-    vdasm_print(instr + 16 * 15, res);
+    REQUIRE( vdasm_print(instr + 16 * 15, res) );
     REQUIRE(res == "MAD o[0], R0.w, c[259], R1;");
     res.clear();
 }

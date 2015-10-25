@@ -8,7 +8,7 @@ void compareLastFrame(const char* expected) {
     QProcess proc;
     auto args = QStringList() << "-depth" << "8"
                               << "-size" << "1280x720"
-                              << "-rotate" << "180"
+                              << "-flip"
                               << "/tmp/ps3frame.rgba"
                               << "/tmp/ps3frame.png";
     proc.start("convert", args);
@@ -42,4 +42,13 @@ TEST_CASE("gcm_simple_fshader") {
     proc.waitForFinished();
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_simple_fshader/ps3frame.png");
+}
+
+TEST_CASE("gcm_simple_shaders") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_simple_shaders/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_simple_shaders/ps3frame.png");
 }

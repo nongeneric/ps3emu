@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <array>
 #include <vector>
+#include <boost/variant.hpp>
 
 enum class clamp_t {
     R, H, X, B
@@ -57,6 +58,19 @@ enum class fragment_op_t {
 
 struct swizzle_t {
     swizzle2bit_t comp[4];
+    inline bool is_xyzw() const {
+        return comp[0] == swizzle2bit_t::X
+            && comp[1] == swizzle2bit_t::Y
+            && comp[2] == swizzle2bit_t::Z
+            && comp[3] == swizzle2bit_t::W;
+    }
+};
+
+constexpr swizzle_t swizzle_xyzw = {
+    swizzle2bit_t::X,
+    swizzle2bit_t::Y,
+    swizzle2bit_t::Z,
+    swizzle2bit_t::W
 };
 
 struct FragmentCondition {
@@ -125,39 +139,82 @@ struct FragmentInstr {
     fragment_argument_t arguments[3];
 };
 
-struct VertexArgument {
+struct vertex_arg_address_ref {
+    int a;
+    int component;
+    int d;
+};
+
+typedef boost::variant<vertex_arg_address_ref, int> vertex_arg_ref_t;
+
+struct vertex_arg_tex_ref_t {
+    int tex;
+};
+
+struct vertex_arg_label_ref_t {
+    int l;
+};
+
+struct vertex_arg_cond_reg_ref_t {
+    int c;
+    int mask;
+};
+
+struct vertex_arg_address_reg_ref_t {
+    int a;
+    int mask;
+};
+
+struct vertex_arg_output_ref_t {
+    vertex_arg_ref_t ref;
+    int mask;
+};
+
+struct vertex_arg_input_ref_t {
+    vertex_arg_ref_t ref;
     bool is_neg;
     bool is_abs;
     swizzle_t swizzle;
-    int reg_num;
-    int reg_type;
+};
+
+struct vertex_arg_const_ref_t {
+    vertex_arg_ref_t ref;
+    bool is_neg;
+    bool is_abs;
+    swizzle_t swizzle;
+};
+
+struct vertex_arg_temp_reg_ref_t {
+    vertex_arg_ref_t ref;
+    bool is_neg;
+    bool is_abs;
+    swizzle_t swizzle;
+    int mask;
+};
+
+typedef boost::variant<
+    vertex_arg_output_ref_t,
+    vertex_arg_input_ref_t,
+    vertex_arg_const_ref_t,
+    vertex_arg_temp_reg_ref_t,
+    vertex_arg_address_reg_ref_t,
+    vertex_arg_cond_reg_ref_t,
+    vertex_arg_label_ref_t,
+    vertex_arg_tex_ref_t
+> VertexVariantArg;
+
+enum class vertex_instr_cond_mode_t {
+    None, C0, C1
 };
 
 struct VertexInstr {
-    bool flag1;
-    bool is_complex_offset;
-    int output_reg_num;
-    int dest_reg_num;
-    int addr_data_reg_num;
-    int mask1;
-    int mask2;
-    VertexArgument args[3];
-    uint32_t v_displ;
-    int input_v_num;
-    int opcode1;
-    int opcode2;
-    int disp_component;
-    swizzle_t cond_swizzle;
-    cond_t cond_relation;
-    bool flag2;
-    bool has_cond;
-    bool is_addr_reg;
-    bool is_cond_c1;
+    int op_count;
     bool is_sat;
-    bool v_index_has_displ;
-    bool output_has_complex_offset;
-    bool sets_c;
-    int mask_selector;
+    VertexVariantArg args[4];
+    vertex_op_t operation;
+    const char* mnemonic;
+    bool is_last;
+    vertex_instr_cond_mode_t cond_mode;
 };
 
 std::string print_dest_mask(dest_mask_t mask);
@@ -165,5 +222,5 @@ const char* print_attr(input_attr_t attr);
 std::string print_swizzle(swizzle_t swizzle, bool allComponents);
 void fragment_dasm(FragmentInstr const& i, std::string& res);
 int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res);
-void vertex_dasm_instr(const uint8_t* instr, VertexInstr& res);
-std::vector<std::string> vertex_dasm(VertexInstr const& instr);
+int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res);
+std::string vertex_dasm(VertexInstr const& instr);

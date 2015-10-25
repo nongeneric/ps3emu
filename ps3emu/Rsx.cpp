@@ -743,9 +743,15 @@ int64_t Rsx::interpret(uint32_t get) {
             TransformTimeout(arg & 0xffff, arg >> 16);
             break;
         }
-        case 0x00001efc:
+        case 0x00001efc: {
             name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD";
+            std::vector<uint32_t> vec(count - 1);
+            for (auto i = 0u; i < vec.size(); ++i) {
+                vec[i] = readarg(i + 2);
+            }
+            TransformConstantLoad(readarg(1), vec);
             break;
+        }
         case 0x00001f00:
             name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT";
             break;
@@ -1267,11 +1273,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM";
                 assert(count <= 32);
-                uint32_t args[32];
-                for (auto i = 0u; i < count; ++i) {
-                    args[i] = readarg(i + 1);
-                }
-                TransformProgram(args, count);
+                TransformProgram(get + 4, count);
                 break;
             }
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("illegal method offset %x", offset);
@@ -1310,6 +1312,8 @@ struct VertexDataArrayFormatInfo {
     uint32_t offset;
     GLuint binding = 0;
 };
+
+typedef std::array<float, 4> glvec4_t;
 
 class RsxContext {
 public:
@@ -1351,8 +1355,15 @@ public:
     uint32_t vertexArrayMode;
     GLuint vertexShader = 0;
     GLuint fragmentShader = 0;
+    GLuint vertexConstBuffer;
+    float* vertexConstBufferMappedMamory;
+    GLuint shaderProgram = 0;
+    bool vertexShaderDirty = false;
     std::vector<uint8_t> fragmentBytecode;
     std::vector<uint8_t> lastFrame;
+    std::array<VertexShaderInputFormat, 16> vertexInputs;
+    std::array<uint8_t, 512 * 16> vertexInstructions;
+    uint32_t vertexLoadOffset = 0;
 };
 
 void glcheck(int line, const char* call) {
@@ -1405,17 +1416,11 @@ void Rsx::loop() {
     boost::unique_lock<boost::mutex> lock(_mutex);
     for (;;) {
         _cv.wait(lock);
-        BOOST_LOG_TRIVIAL(trace) << "rsx loop update recieved";
+        BOOST_LOG_TRIVIAL(trace) << "rsx loop update received";
         if (_shutdown)
             return;
         while (_get < _put) {
-            auto get = _get;
-            lock.unlock();
-            auto len = interpret(get);
-            lock.lock();
-            if (_shutdown)
-                return;
-            _get += len;
+            _get += interpret(_get);
         }
     }
 }
@@ -1624,13 +1629,18 @@ void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
 
 void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgramLoad(%x, %x)", load, start);
+    assert(load == 0);
+    assert(start == 0); // TODO: handle one-parameter invocation without resetting start
+    _context->vertexLoadOffset = load;
 }
 
-void Rsx::TransformProgram(uint32_t* args, unsigned count) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", count);
-    for (auto i = 0u; i < count; ++i) {
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", args[i]);   
-    }
+void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", size);
+    auto bytes = size * 4;
+    auto src = _ppu->getMemoryPointer(GcmLocalMemoryBase + locationOffset, bytes);
+    memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], src, bytes);
+    _context->vertexShaderDirty = true;
+    _context->vertexLoadOffset += bytes;
 }
 
 void Rsx::VertexAttribInputMask(uint32_t mask) {
@@ -1643,17 +1653,17 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
 
 void Rsx::ShaderProgram(uint32_t locationOffset) {
     // loads fragment program byte code from locationOffset-1 up to the last command
-    // (the "#last command" bit)
+    // (with the "#last command" bit)
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _ppu->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
-    _context->fragmentBytecode.resize(1000); // TODO:
+    _context->fragmentBytecode.resize(1000); // TODO: compute size exactly
     auto& vec = _context->fragmentBytecode;
     _ppu->readMemory(GcmLocalMemoryBase + locationOffset - 1, &vec[0], vec.size());
-    auto text = GenerateShader(vec);
+    auto text = GenerateFragmentShader(vec);
     
     BOOST_LOG_TRIVIAL(trace) << text;
     
-    if (_context->fragmentShader)
+    if (_context->fragmentShader) // TODO: raii
         glDeleteShader(_context->fragmentShader);
     
     _context->fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -1661,11 +1671,7 @@ void Rsx::ShaderProgram(uint32_t locationOffset) {
     glShaderSource(_context->fragmentShader, 1, &textptr, NULL);
     glCompileShader(_context->fragmentShader);
     check_shader(_context->fragmentShader);
-    auto program = glCreateProgram();
-    glAttachShader(program, _context->vertexShader);
-    glAttachShader(program, _context->fragmentShader);
-    glcall(glLinkProgram(program));
-    glcall(glUseProgram(program));
+    linkShaderProgram();
 }
 
 void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -1882,6 +1888,9 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
                 : type == CELL_GCM_VERTEX_F ? GL_FLOAT
                 : 0;
     auto normalize = gltype == GL_UNSIGNED_BYTE;
+    auto& vinput = _context->vertexInputs[index];
+    vinput.typeSize = gltype == GL_FLOAT ? 4 : 1; // TODO: other types
+    vinput.rank = size;
     glcall(glVertexAttribFormat(index, size, gltype, normalize, 0));
 }
 
@@ -1892,7 +1901,7 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
     array.location = location == CELL_GCM_LOCATION_LOCAL ?
         MemoryLocation::Local : MemoryLocation::Main;
     array.offset = offset;
-    array.binding = index + 1;
+    array.binding = index + 1; // 0 means no binding
     assert(location == CELL_GCM_LOCATION_LOCAL);
     glcall(glBindVertexBuffer(array.binding, _context->buffer, offset, array.stride));
     glcall(glVertexAttribBinding(index, array.binding));
@@ -1907,6 +1916,30 @@ void Rsx::BeginEnd(uint32_t mode) {
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
     assert(_context->vertexArrayMode == CELL_GCM_PRIMITIVE_TRIANGLES);
+    
+    if (_context->vertexShaderDirty) {
+        _context->vertexShaderDirty = false;
+        auto text = GenerateVertexShader(_context->vertexInstructions.data(),
+                                         _context->vertexInputs);
+        
+        BOOST_LOG_TRIVIAL(trace) << text;
+        
+        if (_context->vertexShader) // TODO: raii
+            glDeleteShader(_context->vertexShader);
+        
+        auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
+        const char* textptr = text.c_str();
+        glShaderSource(vertexShader, 1, &textptr, NULL);
+        glCompileShader(vertexShader);
+        check_shader(vertexShader);
+        _context->vertexShader = vertexShader;
+        if (linkShaderProgram()) {
+            glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
+                                    VertexShaderConstantBinding,
+                                    _context->vertexConstBuffer));
+        }
+    }
+    
     glcall(glDrawArrays(GL_TRIANGLES, first, count + 1));
 }
 
@@ -1934,36 +1967,11 @@ void Rsx::initGcm() {
     // remap io to point to the buffer as well
     _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
     
-    // temp shaders
-    const char* vs[] = {
-        "#version 450 core\n"
-        "layout (location = 0) in vec4 position;\n"
-        "layout (location = 3) in vec4 color;\n"
-        "out vec4 attr_COL0;\n"
-        "out vec4 attr_TEX0;\n"
-        "float reverse(float f) {\n"
-        "    unsigned int bits = floatBitsToUint(f);\n"
-        "    unsigned int rev = ((bits & 0xff) << 24)\n"
-        "                     | ((bits & 0xff00) << 8)\n"
-        "                     | ((bits & 0xff0000) >> 8)\n"
-        "                     | ((bits & 0xff000000) >> 24);\n"
-        "    return uintBitsToFloat(rev);\n"
-        "}\n"
-        "void main(void) {\n"
-        "    vec4 revpos = vec4 ( reverse(position.x),\n"
-        "                         reverse(position.y),\n"
-        "                         reverse(position.z),\n"
-        "                         position.w );\n"
-        "    gl_Position = revpos;\n"
-        "    attr_COL0 = color.bgra;\n"
-        "    attr_TEX0 = revpos;\n"
-        "}\n" };
-        
-    auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, vs, NULL);
-    glCompileShader(vertexShader);
-    check_shader(vertexShader);
-    _context->vertexShader = vertexShader;
+    glcall(glCreateBuffers(1, &_context->vertexConstBuffer));
+    size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
+    glcall(glNamedBufferStorage(_context->vertexConstBuffer, constBufferSize, NULL, mapFlags));
+    _context->vertexConstBufferMappedMamory = 
+        (float*)glMapNamedBuffer(_context->vertexConstBuffer, GL_READ_WRITE); // TODO: writeonly
 }
 
 void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
@@ -1991,6 +1999,29 @@ void Rsx::EmuFlip(bool setLabel) {
         auto flipLabel = 1;
         this->setLabel(flipLabel, 0);
     }
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    //boost::unique_lock<boost::mutex> lock(_mutex);
     _context->isFlipInProgress = false;
+}
+
+void Rsx::TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformConstantLoad(%x, %d)", loadAt, vals.size());
+    assert(vals.size() % 4 == 0);
+    auto dest = _context->vertexConstBufferMappedMamory + loadAt * 4;
+    memcpy(dest, vals.data(), vals.size() * sizeof(uint32_t));
+}
+
+bool Rsx::linkShaderProgram() {
+    if (!_context->fragmentShader || !_context->vertexShader)
+        return false;
+    
+    if (_context->shaderProgram) {
+        glcall(glDeleteProgram(_context->shaderProgram));
+    }
+    auto program = glCreateProgram();
+    glAttachShader(program, _context->vertexShader);
+    glAttachShader(program, _context->fragmentShader);
+    glcall(glLinkProgram(program));
+    glcall(glUseProgram(program));
+    _context->shaderProgram = program;
+    return true;
 }

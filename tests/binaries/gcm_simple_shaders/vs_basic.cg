@@ -1,0 +1,23 @@
+void main
+(
+    float4 position : POSITION,
+    float4 color : COLOR,
+    uniform float4x4 modelViewProj,
+	uniform float phi,
+	out float4 texPos0 : TEXCOORD0,
+	out float4 oColor2 : TEXCOORD1,
+    out float4 oPosition : POSITION,
+    out float4 oColor : COLOR
+)
+{
+	float4x4 m = {
+	    cos(phi), -sin(phi), 0, 0, 
+	    sin(phi), cos(phi), 0, 0,
+	    0, 0, 1, 0,
+	    0, 0, 0, 1
+	};
+    oPosition = mul(mul(position, m), modelViewProj);
+    oColor = color + 0.1;
+	texPos0 = position;
+	oColor2 = float4(0.3, 0.7, 0.1, 1);
+}

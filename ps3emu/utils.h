@@ -4,10 +4,20 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+template <typename T>
+struct AdaptString {
+    T const& adapt(T const& t) { return t; }
+};
+
+template <>
+struct AdaptString<std::string> { 
+    const char* adapt(std::string const& str) { return str.c_str(); }
+};
+
 template <typename... Args>
 std::string ssnprintf(const char* f, Args... args) {
     char buf[300];
-    snprintf(buf, sizeof buf, f, args...);
+    snprintf(buf, sizeof buf, f, AdaptString<decltype(args)>().adapt(args)...);
     return std::string(buf);
 }
 

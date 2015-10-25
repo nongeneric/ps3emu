@@ -20,3 +20,6 @@ constexpr ps3_uintptr_t MaxMainMemoryAddress = 0xffffffff;
 constexpr uint32_t DefaultMainMemoryOffsetBits = 32 - DefaultMainMemoryPageBits;
 constexpr uint32_t DefaultMainMemoryPageSize = 1u << DefaultMainMemoryOffsetBits;
 constexpr uint32_t DefaultMainMemoryPageCount = MaxMainMemoryAddress / DefaultMainMemoryPageSize;
+
+constexpr unsigned VertexShaderConstantCount = 468;
+constexpr unsigned VertexShaderConstantBinding = 7;

@@ -559,7 +559,7 @@ std::string print_swizzle(swizzle_t swizzle, bool allComponents) {
     );
 }
 
-struct vertex_instr_t {
+struct vertex_raw_instr_t {
     union {
         BitField<1, 2> mask_selector;
         BitField<2, 3> sets_c;
@@ -618,11 +618,46 @@ struct vertex_instr_t {
         BitField<19, 25> dest_reg_num;
         BitField<25, 30> output_reg_num;
         BitField<30, 31> is_comp_offset;
-        BitField<31, 32> flag1;
+        BitField<31, 32> is_last;
     } b3;
 };
 
-void vertex_dasm_instr(const uint8_t* instr, VertexInstr& res) {
+struct vertex_decoded_arg_t {
+    bool is_neg;
+    bool is_abs;
+    swizzle_t swizzle;
+    int reg_num;
+    int reg_type;
+};
+
+struct vertex_decoded_instr_t {
+    bool is_last;
+    bool is_complex_offset;
+    int output_reg_num;
+    int dest_reg_num;
+    int addr_data_reg_num;
+    uint16_t mask1;
+    uint16_t mask2;
+    vertex_decoded_arg_t args[3];
+    uint32_t v_displ;
+    int input_v_num;
+    int opcode1;
+    int opcode2;
+    int disp_component;
+    swizzle_t cond_swizzle;
+    cond_t cond_relation;
+    bool flag2;
+    bool has_cond;
+    bool is_addr_reg;
+    bool is_cond_c1;
+    bool is_sat;
+    bool v_index_has_displ;
+    bool output_has_complex_offset;
+    bool sets_c;
+    int mask_selector;
+};
+
+void vertex_dasm_instr(const uint8_t* instr, vertex_decoded_instr_t& res) {
     uint8_t buf[16];
     for (auto i = 0u; i < sizeof(buf); i += 4) {
         buf[i + 0] = instr[i + 3];
@@ -630,10 +665,10 @@ void vertex_dasm_instr(const uint8_t* instr, VertexInstr& res) {
         buf[i + 2] = instr[i + 1];
         buf[i + 3] = instr[i + 0];
     }
-    auto typed = (const vertex_instr_t*)buf;
+    auto typed = (const vertex_raw_instr_t*)buf;
     
     res.has_cond = typed->b0.has_cond.u();
-    res.flag1 = typed->b3.flag1.u();
+    res.is_last = typed->b3.is_last.u();
     res.is_complex_offset = typed->b3.is_comp_offset.u();
     res.output_reg_num = typed->b3.output_reg_num.u();
     res.dest_reg_num = typed->b3.dest_reg_num.u();
@@ -757,9 +792,9 @@ std::string print_mask(uint8_t mask) {
     return res;
 }
 
-std::string vertex_dasm(VertexInstr const& instr, int slot) {
+int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
     const vertex_opcode_t* opcode;
-    const VertexArgument *args[] = {
+    const vertex_decoded_arg_t *args[] = {
         &instr.args[0], &instr.args[1], &instr.args[2]
     };
     if (slot) {
@@ -770,124 +805,215 @@ std::string vertex_dasm(VertexInstr const& instr, int slot) {
         opcode = &vertex_opcodes_0[instr.opcode2];
         args[0] = &instr.args[2];
     }
-    std::string res = opcode->mnemonic;
+    res.is_sat = instr.is_sat;
+    res.operation = opcode->instr;
+    res.mnemonic = opcode->mnemonic;
+    res.cond_mode = vertex_instr_cond_mode_t::None;
+    res.is_last = instr.is_last;
     if (instr.flag2 && !(slot ^ instr.sets_c)) {
-        res += "C";
-        if (instr.is_cond_c1)
-            res += "1";
+        res.cond_mode = instr.is_cond_c1 ?
+            vertex_instr_cond_mode_t::C1 :
+            vertex_instr_cond_mode_t::C0;
     }
-    if (instr.is_sat)
-        res += "_sat";
+    int res_arg = 0;
     if (instr.output_reg_num != 31) {
         if (!(slot ^ instr.mask_selector)) {
             int regnum = instr.output_reg_num & 0x1f;
+            vertex_arg_ref_t ref;
             if (instr.output_has_complex_offset) {
-                res += ssnprintf(" o[A%d.%c+%d]", 
-                                 instr.is_addr_reg,
-                                 displ_components[instr.disp_component],
-                                 regnum);
+                ref = vertex_arg_address_ref { 
+                    instr.is_addr_reg, instr.disp_component, regnum
+                };
             } else {
-                res += ssnprintf(" o[%d]", regnum);
+                ref = regnum;
             }
-            if (instr.mask_selector) {
-                res += print_mask(instr.mask1);
-            } else {
-                res += print_mask(instr.mask2);
-            }
+            uint16_t mask = instr.mask_selector ? instr.mask1 : instr.mask2;
+            res.args[res_arg] = vertex_arg_output_ref_t { ref, mask };
+            res_arg++;
         }
     }
     if (!opcode->control && !slot && opcode->instr != vertex_op_t::PSH) {
         if (instr.addr_data_reg_num != 63 || instr.mask_selector || instr.output_reg_num == 31) {
+            auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask2;
             if (instr.dest_reg_num == 63) {
-                res += " RC";
+                res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
             } else if (opcode->addr_reg) {
-                res += ssnprintf(" A%d", instr.dest_reg_num);
+                res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.dest_reg_num, mask };
             } else {
-                res += ssnprintf(" R%d", instr.dest_reg_num);
+                res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
+                    instr.dest_reg_num,
+                    false,
+                    false,
+                    swizzle_xyzw,
+                    mask
+                };
             }
-            if (opcode->instr != vertex_op_t::PSH)
-                res += print_mask(instr.mask2);
+            res_arg++;
         }
     } else if (instr.addr_data_reg_num != 0x3f) {
-        res += ssnprintf(opcode->addr_reg ? " A%d" : " R%d", instr.addr_data_reg_num);
-        if (opcode->instr != vertex_op_t::PSH)
-            res += print_mask(instr.mask1);
-    } else if (!instr.mask_selector || instr.output_reg_num == 31) {
-        res += " RC";
-        if (opcode->instr != vertex_op_t::PSH)
-            res += print_mask(instr.mask1);
-    }
-    if (!opcode->control) {
-        if (instr.has_cond) {
-            auto cond = print_cond(instr.cond_relation);
-            auto swizzle = print_swizzle(instr.cond_swizzle, false);
-            res += ssnprintf("(%s%d%s)", cond, instr.is_cond_c1, swizzle);
-        } else if (opcode->instr == vertex_op_t::BRB || opcode->instr == vertex_op_t::CLB) {
-            res += " ";
-            if (!(instr.args[0].reg_num & 0x20)) {
-                res += "!";
-            }
-            res += ssnprintf("b%d,", instr.args[0].reg_num & 0x1f);
+        auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
+        if (opcode->addr_reg) {
+            res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.addr_data_reg_num, mask };
+        } else {
+            res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
+                instr.addr_data_reg_num,
+                false,
+                false,
+                swizzle_xyzw,
+                mask
+            };
         }
+        res_arg++;
+    } else if (!instr.mask_selector || instr.output_reg_num == 31) {
+        auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
+        res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
     }
-    for (auto i = 0; i < opcode->op_count; ++i) {
+//     if (!opcode->control) {
+//         if (instr.has_cond) {
+//             auto cond = print_cond(instr.cond_relation);
+//             auto swizzle = print_swizzle(instr.cond_swizzle, false);
+//             res += ssnprintf("(%s%d%s)", cond, instr.is_cond_c1, swizzle);
+//         } else if (opcode->instr == vertex_op_t::BRB || opcode->instr == vertex_op_t::CLB) {
+//             res += " ";
+//             if (!(instr.args[0].reg_num & 0x20)) {
+//                 res += "!";
+//             }
+//             res += ssnprintf("b%d,", instr.args[0].reg_num & 0x1f);
+//         }
+//     }
+    for (auto i = 0; i < opcode->op_count; ++i, ++res_arg) {
         auto arg = args[i];
         if (opcode->control) {
-            res += ssnprintf(" L%d", instr.is_addr_reg);
+            res.args[res_arg] = vertex_arg_label_ref_t { instr.is_addr_reg };
         } else if (opcode->instr == vertex_op_t::ARA || opcode->instr == vertex_op_t::PSH) {
-            if (opcode->instr == vertex_op_t::PSH) {
-                res += " ";
-            } else {
-                res += ", ";
-            }
-            res += ssnprintf(" A%d", instr.is_addr_reg);
+            res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.is_addr_reg };
         } else {
             if (opcode->op_count == 1 && opcode->tex) {
-                res += ssnprintf(", TEX%d", args[1]->reg_num & 3);
+                res.args[res_arg] = vertex_arg_tex_ref_t { args[1]->reg_num & 3 };
             } else {
-                if (opcode->instr != vertex_op_t::PSH) {
-                    res += ", ";
-                }
-                if (arg->is_neg)
-                    res += "-";
-                if (arg->is_abs)
-                    res += "|";
                 if (arg->reg_type == 2) {
+                    vertex_arg_ref_t ref;
                     if (instr.v_index_has_displ) {
-                        res += ssnprintf("v[A%d.%c+%d]",
-                                         instr.is_addr_reg,
-                                         displ_components[instr.disp_component],
-                                         instr.v_displ);
+                        ref = vertex_arg_address_ref { 
+                            instr.is_addr_reg, instr.disp_component, (int)instr.v_displ
+                        };
                     } else {
-                        res += ssnprintf("v[%d]", instr.v_displ);
+                        ref = instr.v_displ;
                     }
+                    res.args[res_arg] = vertex_arg_input_ref_t {
+                        ref, arg->is_neg, arg->is_abs, arg->swizzle
+                    };
                 } else if (arg->reg_type == 3) {
+                    vertex_arg_ref_t ref;
                     if (instr.is_complex_offset) {
-                        res += ssnprintf("c[A%d.%c+%d]",
-                                         instr.is_addr_reg,
-                                         displ_components[instr.disp_component],
-                                         instr.input_v_num);
+                        ref = vertex_arg_address_ref { 
+                            instr.is_addr_reg, instr.disp_component, instr.input_v_num
+                        };
                     } else {
-                        res += ssnprintf("c[%d]", instr.input_v_num);
+                        ref = instr.input_v_num;
                     }
+                    res.args[res_arg] = vertex_arg_const_ref_t {
+                        ref, arg->is_neg, arg->is_abs, arg->swizzle
+                    };
                 } else {
-                    res += ssnprintf("R%lu", arg->reg_num);
+                    res.args[res_arg] = vertex_arg_temp_reg_ref_t {
+                        arg->reg_num, arg->is_neg, arg->is_abs, arg->swizzle, 0xf
+                    };
                 }
-                res += print_swizzle(arg->swizzle, false);
-                if (arg->is_abs)
-                    res += "|";
             }
         }
     }
-    res += ";";
-    return res;
+    return res_arg;
 }
 
-std::vector<std::string> vertex_dasm(VertexInstr const& instr) {
-    std::vector<std::string> res;
-    if (instr.opcode2)
-        res.push_back(vertex_dasm(instr, 0));
-    if (instr.opcode1)
-        res.push_back(vertex_dasm(instr, 1));
-    return res;
+int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res) {
+    vertex_decoded_instr_t decoded;
+    vertex_dasm_instr(instr, decoded);
+    int i = 0;
+    if (decoded.opcode2) {
+        res[i].op_count = vertex_dasm_slot(decoded, 0, res[i]);
+        i++;
+    }
+    if (decoded.opcode1) {
+        res[i].op_count = vertex_dasm_slot(decoded, 1, res[i]);
+        i++;
+    }
+    return i;
+}
+
+class ref_visitor : public boost::static_visitor<std::string> {
+public:
+    std::string operator()(vertex_arg_address_ref x) const {
+        return ssnprintf("A%d.%s+%d", x.a, displ_components[x.component], x.d);
+    }
+    
+    std::string operator()(int x) const {
+        return ssnprintf("%d", x);
+    }
+};
+
+class arg_visitor : public boost::static_visitor<std::string> {
+public:
+    std::string operator()(vertex_arg_output_ref_t x) const {
+        auto ref = apply_visitor(ref_visitor(), x.ref);
+        return ssnprintf("o[%s]%s", ref, print_mask(x.mask));
+    }
+    
+    std::string print(char reg, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
+        auto refstr = apply_visitor(ref_visitor(), ref);
+        auto res = ssnprintf("%c[%s]", reg, refstr);
+        if (abs)
+            res = ssnprintf("|%s|", res);
+        if (neg)
+            res = "-" + res;
+        return res + print_swizzle(sw, false);
+    }
+    
+    std::string operator()(vertex_arg_input_ref_t x) const {
+        return print('v', x.ref, x.is_neg, x.is_abs, x.swizzle);
+    }
+    
+    std::string operator()(vertex_arg_const_ref_t x) const {
+        return print('c', x.ref, x.is_neg, x.is_abs, x.swizzle);
+    }
+    
+    std::string operator()(vertex_arg_temp_reg_ref_t x) const {
+        auto ref = apply_visitor(ref_visitor(), x.ref);
+        auto res = ssnprintf("R%s", ref);
+        if (x.is_abs)
+            res = ssnprintf("|%s|", res);
+        if (x.is_neg)
+            res = "-" + res;
+        auto mask = print_mask(x.mask);
+        auto swizzle = print_swizzle(x.swizzle, false);
+        return res + mask + swizzle;
+    }
+    
+    std::string operator()(vertex_arg_address_reg_ref_t x) const {
+        return ssnprintf("A%d%s", x.a, print_mask(x.mask));
+    }
+    
+    std::string operator()(vertex_arg_cond_reg_ref_t x) const {
+        return "RC";
+    }
+    
+    std::string operator()(vertex_arg_label_ref_t x) const {
+        return ssnprintf("L%d", x.l);
+    }
+    
+    std::string operator()(vertex_arg_tex_ref_t x) const {
+        return ssnprintf("TEX%d", x.tex);
+    }
+};
+
+std::string vertex_dasm(const VertexInstr& instr) {
+    std::string res = instr.mnemonic;
+    res += " ";
+    for (int i = 0; i < instr.op_count; ++i) {
+        if (i > 0) {
+            res += ", ";
+        }
+        res += apply_visitor(arg_visitor(), instr.args[i]);
+    }
+    return res + ";";
 }

@@ -1,0 +1,14 @@
+void main
+(
+    float4 color_in : COLOR,
+	float4 position : TEXCOORD0,
+	int2 wpos : WPOS,
+    out float4 color_out : COLOR
+)
+{
+     float2 pos = float2(wpos.x % 50, wpos.y % 50) - float2(25.0);
+     float dist_squared = dot(pos, pos);
+     color_out = (dist_squared < 400.0) 
+         ? float4(.90, .90, .90, 1.0)
+         : float4( position.x, position.y, 0, 1 );
+}

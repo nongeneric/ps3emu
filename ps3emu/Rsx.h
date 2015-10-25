@@ -37,6 +37,7 @@ class Rsx {
     void setSurfaceColorLocation(uint32_t context);
     void initGcm();
     void EmuFlip(bool setLabel);
+    bool linkShaderProgram();
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
@@ -93,7 +94,7 @@ class Rsx {
                        uint8_t bs);
     void ShaderControl(uint32_t control, uint8_t registerCount);
     void TransformProgramLoad(uint32_t load, uint32_t start);
-    void TransformProgram(uint32_t* args, unsigned count);
+    void TransformProgram(uint32_t locationOffset, unsigned size);
     void VertexAttribInputMask(uint32_t mask);
     void TransformTimeout(uint16_t count, uint16_t registerCount);
     void ShaderProgram(uint32_t locationOffset);
@@ -140,6 +141,7 @@ class Rsx {
     void VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset);
     void BeginEnd(uint32_t mode);
     void DrawArrays(unsigned first, unsigned count);
+    void TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals);
 public:
     Rsx(PPU* ppu);
     ~Rsx();

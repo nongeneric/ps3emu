@@ -9,9 +9,10 @@ namespace ShaderRewriter {
     enum class FunctionName {
         vec4,
         mul, add, abs, neg, ternary,
-        fract, floor, dot2, lessThan,
+        fract, floor, dot2, lessThan, cos, sin,
         cast_float,
-        gt, ge, eq, ne, lt, le
+        gt, ge, eq, ne, lt, le,
+        reverse4f
     };
     
     class IExpressionVisitor;
@@ -36,15 +37,18 @@ namespace ShaderRewriter {
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
+    enum class AstRegType {
+        r, h, vertex_o, cond,
+        vertex_c, vertex_v, vertex_r
+    };
+    
     class RegisterReference : public Variable {
-        reg_type_t _reg;
-        bool _isC;
+        AstRegType _reg;
         int _n;
     public:
-        RegisterReference(reg_type_t reg, bool isC, int n);
-        reg_type_t reg();
+        RegisterReference(AstRegType reg, int n);
+        AstRegType reg();
         int num();
-        bool isC();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
@@ -157,6 +161,7 @@ namespace ShaderRewriter {
     };
     
     std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i);
+    std::vector<std::unique_ptr<Statement>> MakeStatement(VertexInstr const& i);
     std::string PrintStatement(Statement* stat);
     int GetLastRegisterNum(Expression* expr);
 }
