@@ -7,12 +7,13 @@
 
 namespace ShaderRewriter {
     enum class FunctionName {
-        vec4,
-        mul, add, abs, neg, ternary,
-        fract, floor, dot2, lessThan, cos, sin,
-        cast_float,
+        vec4, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
+        mul, add, abs, neg, ternary, exp2, lg2, min, max, pow, inversesqrt,
+        fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
+        cast_float, clamp4i, sign,
         gt, ge, eq, ne, lt, le,
-        reverse4f
+        reverse4f,
+        branch, call, ret
     };
     
     class IExpressionVisitor;
@@ -24,31 +25,12 @@ namespace ShaderRewriter {
     };
     
     class Variable : public Expression {
+        std::string _name;
+        std::unique_ptr<Expression> _index;
     public:
+        Variable(std::string name, Expression* index);
         std::string name();
-    };
-    
-    class AttributeReference : public Variable {
-        input_attr_t _attr;
-        persp_corr_t _persp;
-    public:
-        AttributeReference(input_attr_t attr, persp_corr_t persp);
-        input_attr_t attribute();
-        virtual void accept(IExpressionVisitor* visitor) override;
-    };
-    
-    enum class AstRegType {
-        r, h, vertex_o, cond,
-        vertex_c, vertex_v, vertex_r
-    };
-    
-    class RegisterReference : public Variable {
-        AstRegType _reg;
-        int _n;
-    public:
-        RegisterReference(AstRegType reg, int n);
-        AstRegType reg();
-        int num();
+        Expression* index();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
@@ -71,8 +53,8 @@ namespace ShaderRewriter {
         std::unique_ptr<Expression> _expr;
         std::vector<std::unique_ptr<Statement>> _statements;
     public:
-        IfStatement(std::unique_ptr<Expression> expr, 
-                    std::vector<std::unique_ptr<Statement>> statements);
+        IfStatement(Expression* expr, 
+                    std::vector<Statement*> statements);
         std::vector<Statement*> statements();
         Expression* condition();
         virtual void accept(IExpressionVisitor* visitor) override;
@@ -83,6 +65,14 @@ namespace ShaderRewriter {
     public:
         FloatLiteral(float val);
         float value();
+        virtual void accept(IExpressionVisitor* visitor) override;
+    };
+    
+    class IntegerLiteral : public Expression {
+        int _val;
+    public:
+        IntegerLiteral(int val);
+        int value();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
@@ -126,8 +116,8 @@ namespace ShaderRewriter {
     class BinaryOperator : public Invocation {
     public:
         BinaryOperator(FunctionName name,
-                       std::unique_ptr<Expression> left,
-                       std::unique_ptr<Expression> right);
+                       Expression* left,
+                       Expression* right);
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
@@ -136,9 +126,9 @@ namespace ShaderRewriter {
         std::unique_ptr<Expression> _trueBranch;
         std::unique_ptr<Expression> _falseBranch;
     public:
-        TernaryOperator(std::unique_ptr<Expression> cond,
-                        std::unique_ptr<Expression> trueBranch,
-                        std::unique_ptr<Expression> falseBranch);
+        TernaryOperator(Expression* cond,
+                        Expression* trueBranch,
+                        Expression* falseBranch);
     };
     
     class BasicBlock {
@@ -149,19 +139,19 @@ namespace ShaderRewriter {
     class IExpressionVisitor {
     public:
         virtual void visit(FloatLiteral* literal) = 0;
+        virtual void visit(IntegerLiteral* literal) = 0;
         virtual void visit(BinaryOperator* op) = 0;
         virtual void visit(UnaryOperator* op) = 0;
         virtual void visit(Swizzle* swizzle) = 0;
         virtual void visit(Assignment* assignment) = 0;
-        virtual void visit(AttributeReference* ref) = 0;
-        virtual void visit(RegisterReference* ref) = 0;
+        virtual void visit(Variable* ref) = 0;
         virtual void visit(Invocation* invocation) = 0;
         virtual void visit(ComponentMask* mask) = 0;
         virtual void visit(IfStatement* mask) = 0;
     };
     
     std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i);
-    std::vector<std::unique_ptr<Statement>> MakeStatement(VertexInstr const& i);
+    std::vector<std::unique_ptr<Statement>> MakeStatement(VertexInstr const& i, unsigned address);
     std::string PrintStatement(Statement* stat);
     int GetLastRegisterNum(Expression* expr);
 }

@@ -15,4 +15,5 @@ struct VertexShaderInputFormat {
 };
 
 std::string GenerateVertexShader(const uint8_t* bytecode, 
-                                 std::array<VertexShaderInputFormat, 16> const& inputs);
+                                 std::array<VertexShaderInputFormat, 16> const& inputs,
+                                 unsigned loadOffset);

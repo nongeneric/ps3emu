@@ -23,10 +23,15 @@ namespace ShaderRewriter {
             { ExprType::vec4, ExprType::fp32, ExprType::fp32, ExprType::fp32, ExprType::fp32 } },
         { FunctionName::fract, { ExprType::notype, ExprType::notype } },
         { FunctionName::floor, { ExprType::notype, ExprType::notype } },
+        { FunctionName::ceil, { ExprType::notype, ExprType::notype } },
         { FunctionName::cast_float, { ExprType::fp32, ExprType::notype } },
         { FunctionName::dot2, { ExprType::fp32, ExprType::vec2, ExprType::vec2 } },
+        { FunctionName::dot3, { ExprType::fp32, ExprType::vec3, ExprType::vec3 } },
+        { FunctionName::dot4, { ExprType::fp32, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::abs, { ExprType::notype, ExprType::notype } },
         { FunctionName::cos, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::min, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::max, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::sin, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
     };
@@ -85,13 +90,6 @@ namespace ShaderRewriter {
     
     Swizzle::Swizzle(Expression* expr, swizzle_t swizzle) 
         : _swizzle(swizzle), _expr(expr) { }
-
-    AttributeReference::AttributeReference(input_attr_t attr, persp_corr_t persp)
-        : _attr(attr), _persp(persp) { }
-    
-    RegisterReference::RegisterReference(AstRegType reg, int n) 
-        : _reg(reg), _n(n) 
-    { }
     
     Assignment::Assignment(Expression* dest, Expression* expr)
         : _expr(expr), _dest(dest) { }
@@ -99,12 +97,11 @@ namespace ShaderRewriter {
     Expression::~Expression() { }
     
     BinaryOperator::BinaryOperator(FunctionName name,
-                                   std::unique_ptr<Expression> left,
-                                   std::unique_ptr<Expression> right) 
-        : Invocation(name, { left.release(), right.release() }) { }
+                                   Expression* left,
+                                   Expression* right) 
+        : Invocation(name, { left, right }) { }
         
-    void AttributeReference::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void RegisterReference::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void Variable::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void Assignment::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void FloatLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void Swizzle::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
@@ -113,6 +110,7 @@ namespace ShaderRewriter {
     void BinaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void ComponentMask::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IfStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     
     float FloatLiteral::value() {
         return _val;
@@ -145,18 +143,6 @@ namespace ShaderRewriter {
         return _dest.get();
     }
     
-    input_attr_t AttributeReference::attribute() {
-        return _attr;
-    }
-
-    AstRegType RegisterReference::reg() {
-        return _reg;
-    }
-    
-    int RegisterReference::num() {
-        return _n;
-    }
-    
     class PrintVisitor : public IExpressionVisitor {
         std::string _ret;
         
@@ -182,6 +168,10 @@ namespace ShaderRewriter {
         
         virtual void visit(FloatLiteral* literal) override {
             _ret = ssnprintf("%g", literal->value());
+        }
+        
+        virtual void visit(IntegerLiteral* literal) override {
+            _ret = ssnprintf("%d", literal->value());
         }
         
         virtual void visit(BinaryOperator* op) override {
@@ -210,35 +200,13 @@ namespace ShaderRewriter {
             _ret = ssnprintf("%s = %s;", var.c_str(), expr.c_str());
         }
         
-        virtual void visit(AttributeReference* ref) override {
-            auto attr = print_attr(ref->attribute());
-            _ret = ssnprintf("f_%s", attr);
-        }
-        
-        virtual void visit(RegisterReference* ref) override {
-            const char* reg;
-            switch (ref->reg()) {
-                case AstRegType::cond: reg = "c"; break;
-                case AstRegType::vertex_c: {
-                    _ret = ssnprintf("constants.c[%d]", ref->num());
-                    return;
-                }
-                case AstRegType::vertex_r: {
-                    _ret = ssnprintf("r[%d]", ref->num());
-                    return;
-                }
-                case AstRegType::vertex_v: {
-                    _ret = ssnprintf("v_in[%d]", ref->num());
-                    return;
-                }
-                case AstRegType::vertex_o: {
-                    _ret = ssnprintf("v_out[%d]", ref->num());
-                    return;
-                }
-                case AstRegType::h: reg = "h"; break;
-                case AstRegType::r: reg = "r"; break;
+        virtual void visit(Variable* var) override {
+            if (!var->index()) {
+                _ret = var->name();
+                return;
             }
-            _ret = ssnprintf("%s%d", reg, ref->num());
+            auto index = accept(var->index());
+            _ret = ssnprintf("%s[%s]", var->name(), index);
         }
         
         virtual void visit(Invocation* invocation) override {
@@ -255,6 +223,7 @@ namespace ShaderRewriter {
                 case FunctionName::vec4: name = "vec4"; break;
                 case FunctionName::fract: name = "fract"; break;
                 case FunctionName::floor: name = "floor"; break;
+                case FunctionName::ceil: name = "ceil"; break;
                 case FunctionName::dot2: name = "dot"; break;
                 case FunctionName::lessThan: name = "lessThan"; break;
                 case FunctionName::abs: name = "abs"; break;
@@ -326,6 +295,10 @@ namespace ShaderRewriter {
             _ret = ExprType::fp32;
         }
         
+        virtual void visit(IntegerLiteral* literal) override {
+            _ret = ExprType::int32;
+        }
+        
         virtual void visit(BinaryOperator* op) override {
             auto leftType = accept(op->args().at(0));
             auto rightType = accept(op->args().at(1));
@@ -351,11 +324,7 @@ namespace ShaderRewriter {
             _ret = ExprType::notype;
         }
         
-        virtual void visit(AttributeReference* ref) override {
-            _ret = ExprType::vec4;
-        }
-        
-        virtual void visit(RegisterReference* ref) override {
+        virtual void visit(Variable* ref) override {
             _ret = ExprType::vec4;
         }
         
@@ -417,8 +386,8 @@ namespace ShaderRewriter {
             swizzle->expr()->accept(this);
         }
         
-        virtual void visit(AttributeReference* ref) override { }
-        virtual void visit(RegisterReference* ref) override { }
+        virtual void visit(Variable* ref) override { }
+        virtual void visit(IntegerLiteral* ref) override { }
         
         virtual void visit(ComponentMask* mask) override {
             mask->expr()->accept(this);
@@ -509,9 +478,10 @@ namespace ShaderRewriter {
     
     class InfoCollectorVisitor : public DefaultVisitor {
         int _lastRegisterUsed = -1;
-        virtual void visit(RegisterReference* ref) override {
-            if (ref->reg() != AstRegType::cond) {
-                _lastRegisterUsed = std::max(_lastRegisterUsed, ref->num());
+        virtual void visit(Variable* ref) override {
+            auto num = dynamic_cast<IntegerLiteral*>(ref->index());
+            if (ref->name() == "r" && num) {
+                _lastRegisterUsed = std::max(_lastRegisterUsed, num->value());
             }
         }
     public:
@@ -537,17 +507,22 @@ namespace ShaderRewriter {
         return _mask;
     }
     
-    TernaryOperator::TernaryOperator(std::unique_ptr<Expression> cond, 
-                                     std::unique_ptr<Expression> trueBranch,
-                                     std::unique_ptr<Expression> falseBranch)
+    TernaryOperator::TernaryOperator(Expression* cond, 
+                                     Expression* trueBranch,
+                                     Expression* falseBranch)
         : Invocation(FunctionName::ternary, { }),
-          _cond(std::move(cond)), 
-          _trueBranch(std::move(trueBranch)),
-          _falseBranch(std::move(falseBranch)) { }
+          _cond(cond), 
+          _trueBranch(trueBranch),
+          _falseBranch(falseBranch) { }
 
-    IfStatement::IfStatement(std::unique_ptr<Expression> expr,
-                             std::vector<std::unique_ptr<Statement>> statements)
-        : _expr(std::move(expr)), _statements(std::move(statements)) { }
+    IfStatement::IfStatement(Expression* expr,
+                             std::vector<Statement*> statements)
+        : _expr(expr)
+    {
+        for (auto st : statements) {
+            _statements.emplace_back(st);
+        }
+    }
         
     std::vector<Statement*> IfStatement::statements() {
         std::vector<Statement*> res;
@@ -560,7 +535,7 @@ namespace ShaderRewriter {
         return _expr.get();
     }
     
-    std::unique_ptr<Expression> ConvertArgument(FragmentInstr const& i, int n) {
+    Expression* ConvertArgument(FragmentInstr const& i, int n) {
         assert(n < i.opcode.op_count);
         auto& arg = i.arguments[n];
         assert(arg.is_abs + arg.is_neg <= 1);
@@ -578,10 +553,14 @@ namespace ShaderRewriter {
             );
         }
         if (arg.type == op_type_t::Attr) {
-            expr = new AttributeReference(i.intput_attr, i.persp_corr);
+            assert(i.persp_corr == persp_corr_t::F);
+            auto name = ssnprintf("f_%s", print_attr(i.input_attr));
+            expr = new Variable(name, nullptr);
         }
         if (arg.type == op_type_t::Temp) {
-            expr = new RegisterReference((AstRegType)arg.reg_type, arg.reg_num);
+            auto name = arg.reg_type == reg_type_t::H ? "h" : "r";
+            auto index = new IntegerLiteral(arg.reg_num);
+            expr = new Variable(name, index);
         }
         if (arg.is_abs) {
             expr = new Invocation(FunctionName::abs, { expr });
@@ -599,7 +578,7 @@ namespace ShaderRewriter {
             }
         }
         
-        return std::unique_ptr<Expression>(expr);
+        return expr;
     }
     
     std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i) {
@@ -619,24 +598,29 @@ namespace ShaderRewriter {
         if (fit != end(functions)) {
             std::vector<Expression*> args;
             for (int a = 0; a < i.opcode.op_count; ++a) {
-                args.push_back(ConvertArgument(i, a).release());
+                args.push_back(ConvertArgument(i, a));
             }
             rhs = new Invocation(fit->second, args);
         }
         
         if (i.opcode.instr == fragment_op_t::MOV) {
-            rhs = ConvertArgument(i, 0).release();
+            rhs = ConvertArgument(i, 0);
         }
         
         assert(rhs && "not implemented op");
         
         rhs = new ComponentMask(rhs, i.dest_mask);
         
-        int regnum = i.reg_num;
-        if (i.is_reg_c)
+        int regnum;
+        const char* regname;
+        if (i.is_reg_c) {
             regnum = i.control == control_mod_t::C0 ? 0 : 1;
-        auto ast_reg = i.is_reg_c ? AstRegType::cond : (AstRegType)i.reg;
-        auto dest = new RegisterReference(ast_reg, regnum);
+            regname = "c";
+        } else {
+            regnum = i.reg_num;
+            regname = i.reg == reg_type_t::H ? "h" : "r";
+        }
+        auto dest = new Variable(regname, new IntegerLiteral(regnum));
         auto mask = new ComponentMask(dest, i.dest_mask);
         auto assign = new Assignment(mask, rhs);
         
@@ -645,9 +629,9 @@ namespace ShaderRewriter {
         
         if (i.control != control_mod_t::None && !i.is_reg_c) {
             auto cregnum = i.control == control_mod_t::C0 ? 0 : 1;
-            auto cdest = new RegisterReference(AstRegType::cond, cregnum);
+            auto cdest = new Variable("c", new IntegerLiteral(cregnum));
             auto maskedCdest = new ComponentMask(cdest, i.dest_mask);
-            auto rhs = new RegisterReference(ast_reg, i.reg_num);
+            auto rhs = new Variable(regname, new IntegerLiteral(regnum));
             auto maskedRhs = new ComponentMask(rhs, i.dest_mask);
             auto cassign = new Assignment(maskedCdest, maskedRhs);
             res.emplace_back(cassign);
@@ -660,12 +644,14 @@ namespace ShaderRewriter {
                    sw.comp[1] == sw.comp[2] &&
                    sw.comp[2] == sw.comp[3]);
             auto regnum = i.condition.is_C1 ? 1 : 0;
-            auto reg = new RegisterReference(AstRegType::cond, regnum);
+            auto reg = new Variable("c", new IntegerLiteral(regnum));
             auto swexpr = new Swizzle(reg, i.condition.swizzle);
-            std::unique_ptr<Expression> maskExpr(new ComponentMask(swexpr, { 1, 0, 0, 0 }));
-            std::unique_ptr<Expression> expr(
-                new BinaryOperator(func, std::move(maskExpr), std::make_unique<FloatLiteral>(0)));
-            auto ifstat = new IfStatement(std::move(expr), std::move(res));
+            auto maskExpr = new ComponentMask(swexpr, { 1, 0, 0, 0 });
+            auto expr = new BinaryOperator(func, maskExpr, new FloatLiteral(0));
+            std::vector<Statement*> sts;
+            for (auto& st : res)
+                sts.push_back(st.release());
+            auto ifstat = new IfStatement(expr, sts);
             res = std::vector<std::unique_ptr<Statement>>();
             res.emplace_back(ifstat);
         }
@@ -694,15 +680,15 @@ namespace ShaderRewriter {
         return visitor.lastRegisterUsed();
     }
 
-    class VertexRefVisitor : public boost::static_visitor<int> {
+    class VertexRefVisitor : public boost::static_visitor<Expression*> {
     public:
-        int operator()(vertex_arg_address_ref x) const {
+        Expression* operator()(vertex_arg_address_ref x) const {
             assert(false);
             return 0;
         }
         
-        int operator()(int x) const {
-            return x;
+        Expression* operator()(int x) const {
+            return new IntegerLiteral(x);
         }
     };
     
@@ -710,15 +696,15 @@ namespace ShaderRewriter {
     public:
         Expression* operator()(vertex_arg_output_ref_t x) const {
             auto ref = apply_visitor(VertexRefVisitor(), x.ref);
-            auto refExpr = new RegisterReference(AstRegType::vertex_o, ref);
+            auto refExpr = new Variable("v_out", ref);
             return new ComponentMask(refExpr,
                 { x.mask & 8, x.mask & 4, x.mask & 2, x.mask & 1 }
             );
         }
         
-        Expression* convert(AstRegType reg, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
+        Expression* convert(std::string name, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
             auto refNum = apply_visitor(VertexRefVisitor(), ref);
-            Expression* expr = new RegisterReference(reg, refNum);
+            Expression* expr = new Variable(name, refNum);
             if (abs)
                 expr = new UnaryOperator(FunctionName::abs, expr);
             if (neg)
@@ -729,15 +715,15 @@ namespace ShaderRewriter {
         }
         
         Expression* operator()(vertex_arg_input_ref_t x) const {
-            return convert(AstRegType::vertex_v, x.ref, x.is_neg, x.is_abs, x.swizzle);
+            return convert("v_in", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
         
         Expression* operator()(vertex_arg_const_ref_t x) const {
-            return convert(AstRegType::vertex_c, x.ref, x.is_neg, x.is_abs, x.swizzle);
+            return convert("constants.c", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
         
         Expression* operator()(vertex_arg_temp_reg_ref_t x) const {
-            auto expr = convert(AstRegType::vertex_r, x.ref, x.is_neg, x.is_abs, x.swizzle);
+            auto expr = convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle);
             if (x.mask != 0xf) {
                 expr = new ComponentMask(expr, 
                     { x.mask & 8, x.mask & 4, x.mask & 2, x.mask & 1 });
@@ -766,46 +752,194 @@ namespace ShaderRewriter {
         }
     };
     
-    std::vector<std::unique_ptr<Statement>> MakeStatement(const VertexInstr& i) {
+    std::vector<std::unique_ptr<Statement>> MakeStatement(const VertexInstr& i, unsigned address) {
         Expression* args[4];
+        VertexArgVisitor argVisitor;
         for (int j = 0; j < i.op_count; ++j) {
-            args[j] = apply_visitor(VertexArgVisitor(), i.args[j]);
+            args[j] = apply_visitor(argVisitor, i.args[j]);
         }
         std::vector<std::unique_ptr<Statement>> vec;
-        Expression* rhs;
+        Expression* rhs, *lhs = nullptr;
+        
         switch (i.operation) {
-            case vertex_op_t::MOV: {
-                rhs = args[1];
-                break;
-            }
             case vertex_op_t::ADD: {
-                rhs = new BinaryOperator(FunctionName::add, 
-                    std::unique_ptr<Expression>(args[1]),
-                    std::unique_ptr<Expression>(args[2]));
-                break;
-            }
-            case vertex_op_t::MUL: {
-                rhs = new BinaryOperator(FunctionName::mul, 
-                    std::unique_ptr<Expression>(args[1]),
-                    std::unique_ptr<Expression>(args[2]));
+                rhs = new BinaryOperator(FunctionName::add, args[1], args[2]);
                 break;
             }
             case vertex_op_t::MAD: {
-                auto mul = new BinaryOperator(FunctionName::mul,
-                    std::unique_ptr<Expression>(args[1]),
-                    std::unique_ptr<Expression>(args[2]));
-                auto add = new BinaryOperator(FunctionName::add,
-                    std::unique_ptr<Expression>(mul),
-                    std::unique_ptr<Expression>(args[3]));
+                auto mul = new BinaryOperator(FunctionName::mul, args[1], args[2]);
+                auto add = new BinaryOperator(FunctionName::add, mul, args[3]);
                 rhs = add;
+                break;
+            }
+            case vertex_op_t::ARL: {
+                rhs = new Invocation(FunctionName::floor, { args[1] });
+                break;
+            }
+            case vertex_op_t::ARR: {
+                rhs = new Invocation(FunctionName::ceil, { args[1] });
+                break;
+            }
+            case vertex_op_t::BRB:
+            case vertex_op_t::BRI: {
+                lhs = new Variable("void_var", nullptr);
+                rhs = new Invocation(FunctionName::branch, { args[0] });
+                break;
+            }
+            case vertex_op_t::CLI:
+            case vertex_op_t::CLB: {
+                lhs = new Variable("void_var", nullptr);
+                rhs = new Invocation(FunctionName::call, { args[0] });
                 break;
             }
             case vertex_op_t::COS: {
                 rhs = new Invocation(FunctionName::cos, { args[1] });
                 break;
             }
+            case vertex_op_t::DP3: {
+                rhs = new Invocation(FunctionName::dot3, { args[1] });
+                break;
+            }
+            case vertex_op_t::DP4: {
+                rhs = new Invocation(FunctionName::dot4, { args[1] });
+                break;
+            }
+            case vertex_op_t::DST: {
+                auto c0 = new FloatLiteral(1);
+                auto c1 = new BinaryOperator(
+                    FunctionName::mul,
+                    new ComponentMask(args[1], { 0, 1, 0, 0 }),
+                    new ComponentMask(args[2], { 0, 1, 0, 0 })
+                );
+                auto c2 = new ComponentMask(args[1], { 0, 0, 1, 0 });
+                auto c3 = new ComponentMask(args[2], { 0, 0, 0, 1 });
+                rhs = new Invocation(FunctionName::vec4, { c0, c1, c2, c3 });
+                break;
+            }
+            case vertex_op_t::EXP:
+            case vertex_op_t::EX2: {
+                rhs = new Invocation(FunctionName::exp2, { args[1] });
+                break;
+            }
+            case vertex_op_t::FLR: {
+                rhs = new Invocation(FunctionName::floor, { args[1] });
+                break;
+            }
+            case vertex_op_t::FRC: {
+                rhs = new Invocation(FunctionName::fract, { args[1] });
+                break;
+            }
+            case vertex_op_t::LG2:
+            case vertex_op_t::LOG: {
+                rhs = new Invocation(FunctionName::lg2, { args[1] });
+                break;
+            }
+            case vertex_op_t::LIT: {
+                auto c0 = new FloatLiteral(1);
+                auto c1 = new ComponentMask(args[1], { 1, 0, 0, 0 });
+                auto arg1Clone1 = apply_visitor(argVisitor, i.args[1]);
+                auto arg1Clone2 = apply_visitor(argVisitor, i.args[1]);
+                auto arg1Clone3 = apply_visitor(argVisitor, i.args[1]);
+                auto mul = new BinaryOperator(
+                    FunctionName::mul,
+                    new ComponentMask(arg1Clone2, { 0, 0, 0, 1 }),
+                    new Invocation(
+                        FunctionName::lg2,
+                        { new ComponentMask(arg1Clone3, { 0, 1, 0, 0 }) }
+                    )
+                );
+                auto c2 = new TernaryOperator(
+                    new BinaryOperator(
+                        FunctionName::gt,
+                        new ComponentMask(arg1Clone1, { 1, 0, 0, 0 }),
+                        new FloatLiteral(0)
+                    ),
+                    new Invocation(FunctionName::exp2, { mul }),
+                    new FloatLiteral(0)
+                );
+                auto c3 = new FloatLiteral(1);
+                rhs = new Invocation(FunctionName::vec4, { c0, c1, c2, c3 });
+                break;
+            }
+            case vertex_op_t::MIN: {
+                rhs = new Invocation(FunctionName::min, { args[1] });
+                break;
+            }
+            case vertex_op_t::MAX: {
+                rhs = new Invocation(FunctionName::max, { args[1] });
+                break;
+            }
+            case vertex_op_t::MOV: {
+                rhs = args[1];
+                break;
+            }
+            case vertex_op_t::MUL: {
+                rhs = new BinaryOperator(FunctionName::mul, args[1], args[2]);
+                break;
+            }
+            case vertex_op_t::MVA: {
+                auto arg1Clone = apply_visitor(argVisitor, i.args[1]);
+                auto x = new Swizzle(args[1], { swizzle2bit_t::X, swizzle2bit_t::Y });
+                auto y = new Swizzle(arg1Clone, { swizzle2bit_t::Z, swizzle2bit_t::W });
+                auto sum = new BinaryOperator(FunctionName::add, x, y);
+                auto sw = new Swizzle(sum, {
+                    swizzle2bit_t::X, swizzle2bit_t::Y, swizzle2bit_t::X, swizzle2bit_t::Y 
+                });
+                rhs = new Invocation(FunctionName::clamp4i, { sw });
+                break;
+            }
+            case vertex_op_t::RCP: {
+                rhs = new Invocation(FunctionName::pow, { args[1], new FloatLiteral(-1) });
+                break;
+            }
+            case vertex_op_t::RSQ: {
+                rhs = new Invocation(FunctionName::inversesqrt, { args[1] });
+                break;
+            }
+            case vertex_op_t::SEQ: {
+                rhs = new Invocation(FunctionName::equal, { args[1], args[2] });
+                break;
+            }
+            case vertex_op_t::SFL: {
+                rhs = new Invocation(FunctionName::vec4, { 
+                    new FloatLiteral(0), new FloatLiteral(0),
+                    new FloatLiteral(0), new FloatLiteral(0)
+                });
+                break;
+            }
+            case vertex_op_t::SGE: {
+                rhs = new Invocation(FunctionName::greaterThanEqual, { args[1], args[2] });
+                break;
+            }
+            case vertex_op_t::SGT: {
+                rhs = new Invocation(FunctionName::greaterThan, { args[1], args[2] });
+                break;
+            }
             case vertex_op_t::SIN: {
                 rhs = new Invocation(FunctionName::sin, { args[1] });
+                break;
+            }
+            case vertex_op_t::SLE: {
+                rhs = new Invocation(FunctionName::lessThanEqual, { args[1], args[2] });
+                break;
+            }
+            case vertex_op_t::SLT: {
+                rhs = new Invocation(FunctionName::lessThan, { args[1], args[2] });
+                break;
+            }
+            case vertex_op_t::SNE: {
+                rhs = new Invocation(FunctionName::notEqual, { args[1], args[2] });
+                break;
+            }
+            case vertex_op_t::SSG: {
+                rhs = new Invocation(FunctionName::sign, { args[1] });
+                break;
+            }
+            case vertex_op_t::STR: {
+                rhs = new Invocation(FunctionName::vec4, { 
+                    new FloatLiteral(1), new FloatLiteral(1),
+                    new FloatLiteral(1), new FloatLiteral(1)
+                });
                 break;
             }
             default: assert(false);
@@ -814,9 +948,26 @@ namespace ShaderRewriter {
         if (mask) {
             rhs = new ComponentMask(rhs, mask->mask());
         }
-        vec.emplace_back(new Assignment(args[0], rhs));
+        vec.emplace_back(new Assignment(lhs ? lhs : args[0], rhs));
         TypeFixerVisitor fixer;
         vec.back()->accept(&fixer);
         return vec;
+    }
+
+    IntegerLiteral::IntegerLiteral(int val) : _val(val) { }
+    
+    int IntegerLiteral::value() {
+        return _val;
+    }
+    
+    Variable::Variable(std::string name, Expression* index) 
+        : _name(name), _index(index) { }
+    
+    std::string Variable::name() {
+        return _name;
+    }
+    
+    Expression* Variable::index() {
+        return _index.get();
     }
 }

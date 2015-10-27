@@ -459,7 +459,7 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             if (i.is_al) {
                 res += ssnprintf("aL+%d", i.al_index);
             } else {
-                res += print_attr(i.intput_attr);
+                res += print_attr(i.input_attr);
             }
             res += "]";
         } else if (arg.type == op_type_t::Const) {
@@ -518,7 +518,7 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
         res.persp_corr = i->PerspCorr();
         res.is_al = i->b3.AL.u();
         res.al_index = i->ALIndex();
-        res.intput_attr = i->InputAttr();
+        res.input_attr = i->InputAttr();
     }
     res.is_last = i->b0.LastInstr.u();
     int size = 16;
@@ -774,6 +774,8 @@ vertex_opcode_t vertex_opcodes_0[] = {
     { 1, 0, 0, 0, "PSH", vertex_op_t::PSH },
     { 1, 0, 0, 0, "POP", vertex_op_t::POP }
 };
+
+// TODO: add MVA
 
 const char* displ_components = "xyzw";
 

@@ -67,44 +67,44 @@ TEST_CASE() {
     pos += fragment_dasm_instr(instr + pos, fi);
     auto st = MakeStatement(fi);
     auto str = printStatements(st);
-    REQUIRE( str == "r0.xy = (f_WPOS * (vec4(0.02, 0, 0, 0).xxxx)).xy;" );
+    REQUIRE( str == "r[0].xy = (f_WPOS * (vec4(0.02, 0, 0, 0).xxxx)).xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.xy = fract(r0).xy;" );
+    REQUIRE( str == "r[0].xy = fract(r[0]).xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.xy = (r0 * (vec4(50, 0, 0, 0).xxxx)).xy;" );
+    REQUIRE( str == "r[0].xy = (r[0] * (vec4(50, 0, 0, 0).xxxx)).xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "c0.xy = r0.xy;" );
+    REQUIRE( str == "c[0].xy = r[0].xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.zw = floor((abs(r0).xxxy)).zw;" );
+    REQUIRE( str == "r[0].zw = floor((abs(r[0]).xxxy)).zw;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r1.w = r0.w;" );
+    REQUIRE( str == "r[1].w = r[0].w;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.x = (r0.zzzz).x;" );
+    REQUIRE( str == "r[0].x = (r[0].zzzz).x;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
     REQUIRE( str == 
-        "if (((c0.yyyy).x < 0)) {\n"
-        "    r1.w = (-r0).w;\n"
+        "if (((c[0].yyyy).x < 0)) {\n"
+        "    r[1].w = (-r[0]).w;\n"
         "}"
     );
     
@@ -112,40 +112,40 @@ TEST_CASE() {
     st = MakeStatement(fi);
     str = printStatements(st);
     REQUIRE( str == 
-        "if (((c0.xxxx).x < 0)) {\n"
-        "    r0.x = ((-r0).zzzz).x;\n"
+        "if (((c[0].xxxx).x < 0)) {\n"
+        "    r[0].x = ((-r[0]).zzzz).x;\n"
         "}"
     );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.y = (r1.wwww).y;" );
+    REQUIRE( str == "r[0].y = (r[1].wwww).y;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.zw = ((r0.xxxy) + (vec4(-25, 0, 0, 0).xxxx)).zw;" );
+    REQUIRE( str == "r[0].zw = ((r[0].xxxy) + (vec4(-25, 0, 0, 0).xxxx)).zw;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.xy = f_TEX0.xy;" );
+    REQUIRE( str == "r[0].xy = f_TEX0.xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r1.x = dot((r0.zwzz).xy, (r0.zwzz).xy).x;" );
+    REQUIRE( str == "r[1].x = dot((r[0].zwzz).xy, (r[0].zwzz).xy).x;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "c0.x = float(lessThan(r1, (vec4(400, 0, 0, 0).xxxx)).x);" );
+    REQUIRE( str == "c[0].x = float(lessThan(r[1], (vec4(400, 0, 0, 0).xxxx)).x);" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
     str = printStatements(st);
-    REQUIRE( str == "r0.zw = (vec4(0, 0, 1, 0).yzyz).zw;" );
+    REQUIRE( str == "r[0].zw = (vec4(0, 0, 1, 0).yzyz).zw;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi);
@@ -156,8 +156,8 @@ TEST_CASE() {
     st = MakeStatement(fi);
     str = printStatements(st);
     REQUIRE( str == 
-        "if (((c0.xxxx).x != 0)) {\n"
-        "    r0 = (vec4(0.9, 1, 0, 0).xxxy);\n"
+        "if (((c[0].xxxx).x != 0)) {\n"
+        "    r[0] = (vec4(0.9, 1, 0, 0).xxxy);\n"
         "}"
     );
 }
@@ -192,70 +192,70 @@ TEST_CASE() {
     
     auto count = vertex_dasm_instr(instr, res);
     REQUIRE( count == 1 );
-    auto st = MakeStatement(res[0]);
+    auto st = MakeStatement(res[0], 0);
     auto str = printStatements(st);
     REQUIRE(str == "v_out[1] = ((constants.c[466].zzzz) + v_in[3]);");
     
     count = vertex_dasm_instr(instr + 16, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[1].zw = (constants.c[466].xxxx).zw;");
     
     count = vertex_dasm_instr(instr + 16 * 2, res);
     REQUIRE( count == 2 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[1].xy = cos((constants.c[467].xxxx)).xy;");
-    st = MakeStatement(res[1]);
+    st = MakeStatement(res[1], 0);
     str = printStatements(st);
     REQUIRE(str == "v_out[7] = v_in[0];");
     
     count = vertex_dasm_instr(instr + 16 * 3, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0].zw = (constants.c[466].xxxx).zw;");
     
     count = vertex_dasm_instr(instr + 16 * 4, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0].x = sin((constants.c[467].xxxx)).x;");
     
     count = vertex_dasm_instr(instr + 16 * 5, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0].y = (r[1].yyyy).y;");
     
     count = vertex_dasm_instr(instr + 16 * 6, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[1].y = ((-r[0]).xxxx).y;");
     
     count = vertex_dasm_instr(instr + 16 * 7, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0] = ((v_in[0].yyyy) * r[0]);");
     
     count = vertex_dasm_instr(instr + 16 * 8, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0] = (((v_in[0].xxxx) * r[1]) + r[0]);");
     
     count = vertex_dasm_instr(instr + 16 * 9, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0] = (((v_in[0].zzzz) * (constants.c[466].xxyx)) + r[0]);");
     
     count = vertex_dasm_instr(instr + 16 * 10, res);
     REQUIRE( count == 1 );
-    st = MakeStatement(res[0]);
+    st = MakeStatement(res[0], 0);
     str = printStatements(st);
     REQUIRE(str == "r[0] = (((v_in[0].wwww) * (constants.c[466].xxxy)) + r[0]);");
 }

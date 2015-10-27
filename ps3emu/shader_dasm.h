@@ -103,7 +103,7 @@ enum class vertex_op_t {
     SGE, ARL, FRC, FLR, SEQ, SFL, SGT, SLE, SNE, STR,
     SSG, ARR, ARA, TXL, NOP, MOV, POP, RCP, RCC, RSQ,
     EXP, LOG, LIT, BRA, BRI, CAL, CLI, RET, LG2, EX2,
-    SIN, COS, BRB, CLB, PSH
+    SIN, COS, BRB, CLB, PSH, MVA
 };
 
 struct vertex_opcode_t {
@@ -134,7 +134,7 @@ struct FragmentInstr {
     persp_corr_t persp_corr;
     bool is_al;
     int al_index;
-    input_attr_t intput_attr;
+    input_attr_t input_attr;
     bool is_last;
     fragment_argument_t arguments[3];
 };

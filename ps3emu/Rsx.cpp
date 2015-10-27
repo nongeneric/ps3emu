@@ -1920,7 +1920,7 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     if (_context->vertexShaderDirty) {
         _context->vertexShaderDirty = false;
         auto text = GenerateVertexShader(_context->vertexInstructions.data(),
-                                         _context->vertexInputs);
+                                         _context->vertexInputs, 0); // TODO: loadAt
         
         BOOST_LOG_TRIVIAL(trace) << text;
         

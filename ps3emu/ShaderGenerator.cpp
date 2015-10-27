@@ -40,26 +40,22 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode) {
     line("in vec4 f_SSA;");
     line("void main(void) {");
     line("    vec4 f_WPOS = gl_FragCoord;");
-    line("    vec4 c0 = vec4(0);");
-    line("    vec4 c1 = vec4(0);");
-    for (int i = 0; i <= lastReg; ++i) {
-        line(ssnprintf("    vec4 r%d = vec4(0);", i));
-        line(ssnprintf("    vec4 h%d = vec4(0);", 2*i));
-        line(ssnprintf("    vec4 h%d = vec4(0);", 2*i + 1));
-    }
-    
+    line("    vec4 c[2];");
+    line(ssnprintf("    vec4 r[%d];", lastReg + 1));
+    line(ssnprintf("    vec4 h[%d];", 2 * (lastReg + 1)));
     for (auto& st : sts) {
         auto str = PrintStatement(st.get());
         line(str);
     }
     
-    line("    color = r0;\n");
+    line("    color = r[0];\n");
     line("}");
     return res;
 }
 
 std::string GenerateVertexShader(const uint8_t* bytecode, 
-                                 std::array<VertexShaderInputFormat, 16> const& inputs)
+                                 std::array<VertexShaderInputFormat, 16> const& inputs,
+                                 unsigned loadOffset)
 {   
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
@@ -124,23 +120,29 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("void main(void) {");
     line("    vec4 v_in[16];");
     line("    vec4 v_out[16];");
-    line("    vec4 r[16];");
+    line("    ivec4 a[2];");
+    line("    vec4 r[32];");
+    line("    vec4 stack[8];");
+    line("    int stack_ptr = 8;");
+    line("    vec4 cc[16];");
+    line("    bool b[32];");
+    line("    vec4 void_var;");
     for (size_t i = 0; i < inputs.size(); ++i) {
         auto suffix = inputs[i].typeSize == 4 ? "f" : "b";
         line(ssnprintf("    v_in[%d] = reverse%d%s(v%din);", i, inputs[i].rank, suffix, i));
     }
     std::array<VertexInstr, 2> instr;
     bool isLast = false;
-    int i = 0;
     while (!isLast) {
-        int count = vertex_dasm_instr(bytecode + i, instr);
+        int count = vertex_dasm_instr(bytecode, instr);
         for (int n = 0; n < count; ++n) {
-            for (auto const& st : MakeStatement(instr[n])) {
+            for (auto const& st : MakeStatement(instr[n], loadOffset)) {
                 line(PrintStatement(st.get()));
             }
             isLast |= instr[n].is_last;
         }
-        i += 16;
+        loadOffset++;
+        bytecode += 16;
     }
     line("    gl_Position = v_out[0];");
     line("    f_COL0 = v_out[1];");
