@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BitField.h"
+#include "../BitField.h"
 #include <string>
 #include <stdint.h>
 #include <array>

@@ -1,4 +1,4 @@
-#include "../ps3emu/shader_dasm.h"
+#include "../ps3emu/shaders/shader_dasm.h"
 #include <catch.hpp>
 
 int dasm_print(uint8_t* ptr, std::string& res) {

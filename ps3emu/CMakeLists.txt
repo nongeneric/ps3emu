@@ -12,12 +12,14 @@ set(SRC
     ppu_dasm_forms.h
     ncall.cpp
     utils.h
-    shader_dasm.h
-    shader_dasm.cpp
-    ShaderRewriter.h
-    ShaderRewriter.cpp
-    ShaderGenerator.h
-    ShaderGenerator.cpp
+    shaders/shader_dasm.h
+    shaders/shader_dasm.cpp
+    shaders/ShaderRewriter.h
+    shaders/ShaderRewriter.cpp
+    shaders/ShaderGenerator.h
+    shaders/ShaderGenerator.cpp
+    shaders/AST.h
+    shaders/AST.cpp
     Rsx.h
     Rsx.cpp
 )

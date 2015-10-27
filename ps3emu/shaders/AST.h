@@ -149,9 +149,4 @@ namespace ShaderRewriter {
         virtual void visit(ComponentMask* mask) = 0;
         virtual void visit(IfStatement* mask) = 0;
     };
-    
-    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i);
-    std::vector<std::unique_ptr<Statement>> MakeStatement(VertexInstr const& i, unsigned address);
-    std::string PrintStatement(Statement* stat);
-    int GetLastRegisterNum(Expression* expr);
 }

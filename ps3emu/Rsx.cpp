@@ -1,7 +1,7 @@
 #include "Rsx.h"
 
 #include "PPU.h"
-#include "ShaderGenerator.h"
+#include "shaders/ShaderGenerator.h"
 #include "utils.h"
 #include <atomic>
 #include <vector>

@@ -1,8 +1,8 @@
 #include "ShaderRewriter.h"
+#include "../utils.h"
 #include <map>
 #include <vector>
 #include <algorithm>
-#include "utils.h"
 
 namespace ShaderRewriter {
     
@@ -36,24 +36,6 @@ namespace ShaderRewriter {
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
     };
     
-    std::vector<fragment_op_t> nops = {
-        fragment_op_t::NOP,
-        fragment_op_t::FENCB,
-        fragment_op_t::FENCT
-    };
-    
-    std::map<fragment_op_t, FunctionName> operators = {
-        { fragment_op_t::MUL, FunctionName::mul },
-        { fragment_op_t::ADD, FunctionName::add },
-    };
-    
-    std::map<fragment_op_t, FunctionName> functions = {
-        { fragment_op_t::FRC, FunctionName::fract },
-        { fragment_op_t::FLR, FunctionName::floor },
-        { fragment_op_t::DP2, FunctionName::dot2 },
-        { fragment_op_t::SLT, FunctionName::lessThan },
-    };
-    
     int getSingleComponent(swizzle_t s) {
         if (s.comp[0] == s.comp[1] &&
             s.comp[1] == s.comp[2] &&
@@ -73,74 +55,6 @@ namespace ShaderRewriter {
             case cond_t::NE: return FunctionName::ne;
             default: assert(false); return FunctionName::ternary;
         }
-    }
-
-    FloatLiteral::FloatLiteral(float val) : _val(val) { }
-    
-    Invocation::Invocation(FunctionName name, std::vector<Expression*> args)
-        : _name(name) 
-    {
-        for (auto arg : args) {
-            _args.emplace_back(arg);
-        }
-    }
-    
-    UnaryOperator::UnaryOperator(FunctionName name, Expression* arg)
-        : Invocation(name, { arg }) { }
-    
-    Swizzle::Swizzle(Expression* expr, swizzle_t swizzle) 
-        : _swizzle(swizzle), _expr(expr) { }
-    
-    Assignment::Assignment(Expression* dest, Expression* expr)
-        : _expr(expr), _dest(dest) { }
-        
-    Expression::~Expression() { }
-    
-    BinaryOperator::BinaryOperator(FunctionName name,
-                                   Expression* left,
-                                   Expression* right) 
-        : Invocation(name, { left, right }) { }
-        
-    void Variable::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void Assignment::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void FloatLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void Swizzle::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void Invocation::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void UnaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void BinaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void ComponentMask::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void IfStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
-    
-    float FloatLiteral::value() {
-        return _val;
-    }
-    
-    FunctionName Invocation::name() {
-        return _name;
-    }
-
-    std::vector<Expression*> Invocation::args() {
-        std::vector<Expression*> exprs;
-        for (auto& expr : _args)
-            exprs.push_back(expr.get());
-        return exprs;
-    }
-    
-    Expression* Swizzle::expr() {
-        return _expr.get();
-    }
-    
-    swizzle_t Swizzle::swizzle() {
-        return _swizzle;
-    }
-    
-    Expression* Assignment::expr() {
-        return _expr.get();
-    }
-    
-    Expression* Assignment::dest() {
-        return _dest.get();
     }
     
     class PrintVisitor : public IExpressionVisitor {
@@ -494,46 +408,7 @@ namespace ShaderRewriter {
         PrintVisitor visitor;
         stat->accept(&visitor);
         return visitor.result();
-    }
-    
-    ComponentMask::ComponentMask(Expression* expr, dest_mask_t mask)
-        : _expr(expr), _mask(mask) { }
-    
-    Expression* ComponentMask::expr() {
-        return _expr.get();
-    }
-    
-    dest_mask_t ComponentMask::mask() {
-        return _mask;
-    }
-    
-    TernaryOperator::TernaryOperator(Expression* cond, 
-                                     Expression* trueBranch,
-                                     Expression* falseBranch)
-        : Invocation(FunctionName::ternary, { }),
-          _cond(cond), 
-          _trueBranch(trueBranch),
-          _falseBranch(falseBranch) { }
-
-    IfStatement::IfStatement(Expression* expr,
-                             std::vector<Statement*> statements)
-        : _expr(expr)
-    {
-        for (auto st : statements) {
-            _statements.emplace_back(st);
-        }
-    }
-        
-    std::vector<Statement*> IfStatement::statements() {
-        std::vector<Statement*> res;
-        for (auto& st : _statements)
-            res.push_back(st.get());
-        return res;
-    }
-    
-    Expression* IfStatement::condition() {
-        return _expr.get();
-    }
+    }    
     
     Expression* ConvertArgument(FragmentInstr const& i, int n) {
         assert(n < i.opcode.op_count);
@@ -582,32 +457,126 @@ namespace ShaderRewriter {
     }
     
     std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i) {
-        if (std::find(begin(nops), end(nops), i.opcode.instr) != end(nops)) {
-            return { };
-        }
         Expression* rhs = nullptr;
-        auto it = operators.find(i.opcode.instr);
-        if (it != end(operators)) {
-            rhs = new BinaryOperator(
-                it->second,
-                ConvertArgument(i, 0),
-                ConvertArgument(i, 1)
-            );
+        Expression* args[4];
+        for (int n = 0; n < i.opcode.op_count; ++n) {
+            args[n] = ConvertArgument(i, n);
         }
-        auto fit = functions.find(i.opcode.instr);
-        if (fit != end(functions)) {
-            std::vector<Expression*> args;
-            for (int a = 0; a < i.opcode.op_count; ++a) {
-                args.push_back(ConvertArgument(i, a));
+        switch (i.opcode.instr) {
+            case fragment_op_t::NOP:
+            case fragment_op_t::FENCB:
+            case fragment_op_t::FENCT:
+                return { };
+            case fragment_op_t::ADD: {
+                rhs = new BinaryOperator(FunctionName::add, args[0], args[1]);
+                break;
             }
-            rhs = new Invocation(fit->second, args);
+            case fragment_op_t::COS: {
+                rhs = new Invocation(FunctionName::cos, { args[0] });
+                break;
+            }
+            case fragment_op_t::DP2: {
+                rhs = new Invocation(FunctionName::dot2, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::DP3: {
+                rhs = new Invocation(FunctionName::dot3, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::DP4: {
+                rhs = new Invocation(FunctionName::dot4, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::EX2: {
+                rhs = new Invocation(FunctionName::exp2, { args[0] });
+                break;
+            }
+            case fragment_op_t::FLR: {
+                rhs = new Invocation(FunctionName::floor, { args[0] });
+                break;
+            }
+            case fragment_op_t::FRC: {
+                rhs = new Invocation(FunctionName::fract, { args[0] });
+                break;
+            }
+            case fragment_op_t::LG2: {
+                rhs = new Invocation(FunctionName::lg2, { args[0] });
+                break;
+            }
+            case fragment_op_t::MAD: {
+                auto mul = new BinaryOperator(FunctionName::mul, args[0], args[1]);
+                auto add = new BinaryOperator(FunctionName::add, mul, args[2]);
+                rhs = add;
+                break;
+            }
+            case fragment_op_t::MAX: {
+                rhs = new Invocation(FunctionName::max, { args[0] });
+                break;
+            }
+            case fragment_op_t::MIN: {
+                rhs = new Invocation(FunctionName::min, { args[0] });
+                break;
+            }
+            case fragment_op_t::MOV: {
+                rhs = args[0];
+                break;
+            }
+            case fragment_op_t::MUL: {
+                rhs = new BinaryOperator(FunctionName::mul, args[0], args[1]);
+                break;
+            }
+            case fragment_op_t::RCP: {
+                rhs = new Invocation(FunctionName::pow, { args[0], new FloatLiteral(-1) });
+                break;
+            }
+            case fragment_op_t::RSQ: {
+                rhs = new Invocation(FunctionName::inversesqrt, { args[0] });
+                break;
+            }
+            case fragment_op_t::SEQ: {
+                rhs = new Invocation(FunctionName::equal, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::SFL: {
+                rhs = new Invocation(FunctionName::vec4, { 
+                    new FloatLiteral(0), new FloatLiteral(0),
+                    new FloatLiteral(0), new FloatLiteral(0)
+                });
+                break;
+            }
+            case fragment_op_t::SGE: {
+                rhs = new Invocation(FunctionName::greaterThanEqual, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::SGT: {
+                rhs = new Invocation(FunctionName::greaterThan, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::SIN: {
+                rhs = new Invocation(FunctionName::sin, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::SLE: {
+                rhs = new Invocation(FunctionName::lessThanEqual, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::SLT: {
+                rhs = new Invocation(FunctionName::lessThan, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::SNE: {
+                rhs = new Invocation(FunctionName::notEqual, { args[0], args[1] });
+                break;
+            }
+            case fragment_op_t::STR: {
+                rhs = new Invocation(FunctionName::vec4, { 
+                    new FloatLiteral(1), new FloatLiteral(1),
+                    new FloatLiteral(1), new FloatLiteral(1)
+                });
+                break;
+            }
+            default: assert(false);
         }
-        
-        if (i.opcode.instr == fragment_op_t::MOV) {
-            rhs = ConvertArgument(i, 0);
-        }
-        
-        assert(rhs && "not implemented op");
         
         rhs = new ComponentMask(rhs, i.dest_mask);
         
@@ -662,16 +631,6 @@ namespace ShaderRewriter {
         }
         
         return res;
-    }
-
-    void Assignment::releaseAndReplaceExpr(Expression* expr) {
-        _expr.release();
-        _expr.reset(expr);
-    }
-
-    void Invocation::releaseAndReplaceArg(int n, Expression* expr) {
-        _args.at(n).release();
-        _args.at(n).reset(expr);
     }
 
     int GetLastRegisterNum(Expression* expr) {
@@ -952,22 +911,5 @@ namespace ShaderRewriter {
         TypeFixerVisitor fixer;
         vec.back()->accept(&fixer);
         return vec;
-    }
-
-    IntegerLiteral::IntegerLiteral(int val) : _val(val) { }
-    
-    int IntegerLiteral::value() {
-        return _val;
-    }
-    
-    Variable::Variable(std::string name, Expression* index) 
-        : _name(name), _index(index) { }
-    
-    std::string Variable::name() {
-        return _name;
-    }
-    
-    Expression* Variable::index() {
-        return _index.get();
     }
 }
