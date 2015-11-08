@@ -17,8 +17,9 @@ namespace ShaderRewriter {
     };
     
     FunctionInfo functionInfos[] {
-        { FunctionName::lessThan, 
-            { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::lessThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::greaterThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::lessThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::vec4, 
             { ExprType::vec4, ExprType::fp32, ExprType::fp32, ExprType::fp32, ExprType::fp32 } },
         { FunctionName::fract, { ExprType::notype, ExprType::notype } },
@@ -34,6 +35,11 @@ namespace ShaderRewriter {
         { FunctionName::max, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::sin, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::reverse3f, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::txl0, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
+        { FunctionName::txl1, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
+        { FunctionName::txl2, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
+        { FunctionName::txl3, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
     };
     
     int getSingleComponent(swizzle_t s) {
@@ -139,12 +145,20 @@ namespace ShaderRewriter {
                 case FunctionName::floor: name = "floor"; break;
                 case FunctionName::ceil: name = "ceil"; break;
                 case FunctionName::dot2: name = "dot"; break;
+                case FunctionName::dot4: name = "dot"; break;
                 case FunctionName::lessThan: name = "lessThan"; break;
+                case FunctionName::greaterThan: name = "greaterThan"; break;
+                case FunctionName::lessThanEqual: name = "lessThanEqual"; break;
                 case FunctionName::abs: name = "abs"; break;
                 case FunctionName::cast_float: name = "float"; break;
                 case FunctionName::cos: name = "cos"; break;
                 case FunctionName::sin: name = "sin"; break;
                 case FunctionName::reverse4f: name = "reverse4f"; break;
+                case FunctionName::reverse3f: name = "reverse3f"; break;
+                case FunctionName::txl0: name = "txl0"; break;
+                case FunctionName::txl1: name = "txl1"; break;
+                case FunctionName::txl2: name = "txl2"; break;
+                case FunctionName::txl3: name = "txl3"; break;
                 default: assert(false);
             }
             _ret = ssnprintf("%s(%s)", name, str.c_str());
@@ -360,8 +374,16 @@ namespace ShaderRewriter {
                 auto mask = new ComponentMask(expr, { 1, 0, 0, 0 });
                 return mask;
             }
+            if (current == ExprType::notype)
+                return expr;
             assert(false);
             return expr;
+        }
+        
+        virtual void visit(ComponentMask* mask) override {
+            mask->expr()->accept(this);
+            if (getType(mask->expr()) == ExprType::fp32)
+                mask->mask() = { 1, 0, 0, 0 };
         }
         
         virtual void visit(Assignment* assignment) override {
@@ -454,6 +476,42 @@ namespace ShaderRewriter {
         }
         
         return expr;
+    }
+    
+    void appendCondition(condition_t cond, std::vector<std::unique_ptr<Statement>>& res) {
+        if (cond.relation == cond_t::TR)
+            return;
+        auto func = relationToFunction(cond.relation);
+        auto sw = cond.swizzle;
+        assert(sw.comp[0] == sw.comp[1] && 
+        sw.comp[1] == sw.comp[2] &&
+        sw.comp[2] == sw.comp[3]);
+        auto regnum = cond.is_C1 ? 1 : 0;
+        auto reg = new Variable("c", new IntegerLiteral(regnum));
+        auto swexpr = new Swizzle(reg, cond.swizzle);
+        auto maskExpr = new ComponentMask(swexpr, { 1, 0, 0, 0 });
+        auto expr = new BinaryOperator(func, maskExpr, new FloatLiteral(0));
+        std::vector<Statement*> sts;
+        for (auto& st : res)
+            sts.push_back(st.release());
+        auto ifstat = new IfStatement(expr, sts);
+        res.clear();
+        res.emplace_back(ifstat);
+    }
+    
+    void appendCAssignment(control_mod_t mod, bool isRegC, dest_mask_t mask,
+                           const char* regname, int regnum,
+                           std::vector<std::unique_ptr<Statement>>& res)
+    {
+        if (mod != control_mod_t::None && !isRegC) {
+            auto cregnum = mod == control_mod_t::C0 ? 0 : 1;
+            auto cdest = new Variable("c", new IntegerLiteral(cregnum));
+            auto maskedCdest = new ComponentMask(cdest, mask);
+            auto rhs = new Variable(regname, new IntegerLiteral(regnum));
+            auto maskedRhs = new ComponentMask(rhs, mask);
+            auto cassign = new Assignment(maskedCdest, maskedRhs);
+            res.emplace_back(cassign);
+        }
     }
     
     std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i) {
@@ -596,34 +654,8 @@ namespace ShaderRewriter {
         std::vector<std::unique_ptr<Statement>> res;
         res.emplace_back(assign);
         
-        if (i.control != control_mod_t::None && !i.is_reg_c) {
-            auto cregnum = i.control == control_mod_t::C0 ? 0 : 1;
-            auto cdest = new Variable("c", new IntegerLiteral(cregnum));
-            auto maskedCdest = new ComponentMask(cdest, i.dest_mask);
-            auto rhs = new Variable(regname, new IntegerLiteral(regnum));
-            auto maskedRhs = new ComponentMask(rhs, i.dest_mask);
-            auto cassign = new Assignment(maskedCdest, maskedRhs);
-            res.emplace_back(cassign);
-        }
-        
-        if (i.condition.relation != cond_t::TR) {
-            auto func = relationToFunction(i.condition.relation);
-            auto sw = i.condition.swizzle;
-            assert(sw.comp[0] == sw.comp[1] && 
-                   sw.comp[1] == sw.comp[2] &&
-                   sw.comp[2] == sw.comp[3]);
-            auto regnum = i.condition.is_C1 ? 1 : 0;
-            auto reg = new Variable("c", new IntegerLiteral(regnum));
-            auto swexpr = new Swizzle(reg, i.condition.swizzle);
-            auto maskExpr = new ComponentMask(swexpr, { 1, 0, 0, 0 });
-            auto expr = new BinaryOperator(func, maskExpr, new FloatLiteral(0));
-            std::vector<Statement*> sts;
-            for (auto& st : res)
-                sts.push_back(st.release());
-            auto ifstat = new IfStatement(expr, sts);
-            res = std::vector<std::unique_ptr<Statement>>();
-            res.emplace_back(ifstat);
-        }
+        appendCAssignment(i.control, i.is_reg_c, i.dest_mask, regname, regnum, res);
+        appendCondition(i.condition, res);
         
         TypeFixerVisitor typeFixer;
         for (auto& st : res) {
@@ -642,8 +674,8 @@ namespace ShaderRewriter {
     class VertexRefVisitor : public boost::static_visitor<Expression*> {
     public:
         Expression* operator()(vertex_arg_address_ref x) const {
-            assert(false);
-            return 0;
+            //assert(false);
+            return new IntegerLiteral(0);
         }
         
         Expression* operator()(int x) const {
@@ -696,8 +728,9 @@ namespace ShaderRewriter {
         }
         
         Expression* operator()(vertex_arg_cond_reg_ref_t x) const {
-            assert(false);
-            return nullptr;
+            auto mask = dest_mask_t { x.mask & 8, x.mask & 4, x.mask & 2, x.mask & 1 };
+            auto index = new IntegerLiteral(x.c);
+            return new ComponentMask(new Variable("c", index), mask);
         }
         
         Expression* operator()(vertex_arg_label_ref_t x) const {
@@ -706,8 +739,7 @@ namespace ShaderRewriter {
         }
         
         Expression* operator()(vertex_arg_tex_ref_t x) const {
-            assert(false);
-            return nullptr;
+            return new IntegerLiteral(x.tex);
         }
     };
     
@@ -756,11 +788,11 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::DP3: {
-                rhs = new Invocation(FunctionName::dot3, { args[1] });
+                rhs = new Invocation(FunctionName::dot3, { args[1], args[2] });
                 break;
             }
             case vertex_op_t::DP4: {
-                rhs = new Invocation(FunctionName::dot4, { args[1] });
+                rhs = new Invocation(FunctionName::dot4, { args[1], args[2] });
                 break;
             }
             case vertex_op_t::DST: {
@@ -901,13 +933,29 @@ namespace ShaderRewriter {
                 });
                 break;
             }
+            case vertex_op_t::TXL: {
+                auto txl = dynamic_cast<IntegerLiteral*>(args[2]);
+                assert(txl);
+                auto func = txl->value() == 0 ? FunctionName::txl0
+                          : txl->value() == 1 ? FunctionName::txl1
+                          : txl->value() == 2 ? FunctionName::txl2
+                          : FunctionName::txl3;
+                rhs = new Invocation(func, { args[1] });
+                break;
+            }
             default: assert(false);
         }
         auto mask = dynamic_cast<ComponentMask*>(args[0]);
         if (mask) {
             rhs = new ComponentMask(rhs, mask->mask());
         }
+        bool isRegC = i.op_count > 1 && boost::get<vertex_arg_cond_reg_ref_t>(&i.args[0]);
+        auto maskVal = mask ? mask->mask() : dest_mask_t { 1, 1, 1, 1 };
         vec.emplace_back(new Assignment(lhs ? lhs : args[0], rhs));
+        
+        appendCAssignment(i.control, isRegC, maskVal, "abc", 1, vec); // TODO:
+        appendCondition(i.condition, vec);
+        
         TypeFixerVisitor fixer;
         vec.back()->accept(&fixer);
         return vec;

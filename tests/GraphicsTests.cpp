@@ -52,3 +52,12 @@ TEST_CASE("gcm_simple_shaders") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_simple_shaders/ps3frame.png");
 }
+
+TEST_CASE("gcm_vertex_texture_wrapping") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_vertex_texture_wrapping/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_vertex_texture_wrapping/ps3frame.png");
+}

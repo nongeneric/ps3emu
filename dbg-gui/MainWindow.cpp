@@ -55,6 +55,12 @@ void MainWindow::setupDocks() {
     dasmGrid->setArrowsColumn(2);
     dasmGrid->setScrollable(true);
     setCentralWidget(dasmGrid);
+    
+    #if DEBUG
+    auto args = QStringList() << "a.elf" << "-3.4" << "-1" << "9";
+    _model.loadFile("../tests/binaries/gcm_vertex_texture_wrapping/a.elf", args);
+    return;
+    #endif
 }
 
 void MainWindow::setupMenu() {
@@ -102,11 +108,6 @@ void MainWindow::setupMenu() {
 }
 
 void MainWindow::openFile() {
-#if DEBUG
-    auto args = QStringList() << "a.elf" << "-3.4" << "-1" << "9";
-    _model.loadFile("../tests/binaries/gcm_simple_shaders/a.elf", args);
-    return;
-#endif
     auto path = QFileDialog::getOpenFileName(this, "Open ELF executable");
     if (!path.isEmpty()) {
         _model.loadFile(path, {});

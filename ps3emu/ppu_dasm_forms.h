@@ -234,11 +234,15 @@ union XOForm_3 {
     Rc_t Rc;
 };
 
-
 union XFXForm_1 {
     RT_t RT;
     BitField<11, 21> spr;
     BitField<21, 31> XO;
+};
+
+union XFXForm_2 {
+    RT_t RT;
+    BitField<11, 21> tbr;
 };
 
 union XFXForm_3 {
@@ -364,4 +368,21 @@ union AForm_4 {
     FRT_t FRT;
     FRB_t FRB;
     Rc_t Rc;
+};
+
+union SIMDForm {
+    RA_t rA;
+    RB_t rB;
+    BitField<21, 22> Rc;
+    BitField<11, 16, BitFieldType::Vector> vA;
+    BitField<16, 21, BitFieldType::Vector> vB;
+    BitField<21, 26, BitFieldType::Vector> vC;
+    BitField<6, 11, BitFieldType::Vector> vD;
+    BitField<6, 11, BitFieldType::Vector> vS;
+    BitField<22, 26, BitFieldType::Unsigned> SHB;
+    BitField<11, 16, BitFieldType::Signed> SIMM;
+    BitField<11, 16> UIMM;
+    BitField<26, 32> VA_XO;
+    BitField<21, 32> VX_XO;
+    BitField<22, 32> VXR_XO;
 };

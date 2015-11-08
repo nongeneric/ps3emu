@@ -1,3 +1,4 @@
+#include "ConcurrentQueue.h"
 #include "../ps3emu/utils.h"
 #include "sys.h"
 #include <time.h>
@@ -5,15 +6,13 @@
 #include <stdexcept>
 #include "../ps3emu/PPU.h"
 #include <boost/chrono.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 #include <boost/log/trivial.hpp>
+#include <memory>
+#include <map>
 
-using namespace boost::chrono;
-
-high_resolution_clock::time_point system_start;
-
-void init_sys_lib() {
-    system_start = high_resolution_clock::now();
-}
+void init_sys_lib() { }
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     
@@ -41,10 +40,9 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     return CELL_OK;
 }
 
-system_time_t sys_time_get_system_time() {
-    auto diff = high_resolution_clock::now() - system_start;
-    auto elapsed = duration_cast<microseconds>(diff);
-    return elapsed.count();
+system_time_t sys_time_get_system_time(PPU* ppu) {
+    auto sec = (float)ppu->getTimeBase() / (float)ppu->getFrequency();
+    return sec * 1000000;
 }
 
 int _sys_process_atexitspawn() {
@@ -98,6 +96,8 @@ int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
 #define  SYS_TTYP_USER13       (SYS_TTYP15)
 
 int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
+    if (len == 0)
+        return CELL_OK;
     auto asChar = (const char*)buf;
     if (ch == SYS_TTYP_PPU_STDOUT) {
         fwrite(buf, 1, len, stdout);
@@ -128,6 +128,91 @@ int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t* alloc_addr, PPU
 }
 
 int sys_timer_usleep(usecond_t sleep_time) {
-    boost::this_thread::sleep_for( microseconds(sleep_time) );
+    boost::this_thread::sleep_for( boost::chrono::microseconds(sleep_time) );
     return CELL_OK;
 }
+
+// TODO: filesystem impl / tests
+
+CellFsErrno sys_fs_open_impl(const char* path,
+                             uint32_t flags,
+                             big_uint32_t* fd,
+                             uint64_t mode,
+                             const void* arg,
+                             uint64_t size)
+{
+    return 1;
+}
+
+boost::mutex eventQueueVectorMutex;
+typedef ConcurrentQueue<sys_event_t> queue_t;
+std::map<sys_event_queue_t, std::unique_ptr<queue_t>> queues;
+
+struct queue_port_t {
+    big_uint64_t name;
+    int type;
+    queue_t* queue = nullptr;
+};
+
+std::map<sys_event_port_t, queue_port_t> ports;
+
+#define   SYS_SYNC_FIFO                     0x00001
+#define   SYS_SYNC_PRIORITY                 0x00002
+#define SYS_EVENT_QUEUE_LOCAL 0x00
+#define SYS_EVENT_PORT_NO_NAME 0x00
+#define SYS_EVENT_PORT_LOCAL   0x01
+
+int sys_event_queue_create(sys_event_queue_t* equeue_id,
+                           sys_event_queue_attribute_t* attr,
+                           sys_ipc_key_t event_queue_key,
+                           uint32_t size)
+{
+    assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
+    assert(attr->attr_protocol == SYS_SYNC_PRIORITY ||
+           attr->attr_protocol == SYS_SYNC_FIFO);
+    auto order = attr->attr_protocol == SYS_SYNC_PRIORITY ?
+        QueueReceivingOrder::Priority : QueueReceivingOrder::Fifo;
+    auto queue = std::make_unique<queue_t>(order, size);
+    
+    boost::lock_guard<boost::mutex> lock(eventQueueVectorMutex);
+    auto it = std::max_element(begin(queues), end(queues), [](auto& a, auto& b) {
+        return a.first < b.first;
+    });
+    auto maxid = it == end(queues) ? sys_event_queue_t() : it->first;
+    *equeue_id = maxid + 1;
+    queues[maxid + 1] = std::move(queue);
+    return CELL_OK;
+}
+
+int sys_event_port_create(sys_event_port_t* eport_id, int port_type, uint64_t name) {
+    boost::lock_guard<boost::mutex> lock(eventQueueVectorMutex);
+    auto it = std::max_element(begin(ports), end(ports), [](auto& a, auto& b) {
+        return a.first < b.first;
+    });
+    auto maxid = it == end(ports) ? sys_event_port_t() : it->first;
+    *eport_id = maxid + 1;
+    ports[maxid + 1] = { name, port_type };
+    return CELL_OK;
+}
+
+int sys_event_port_connect_local(sys_event_port_t event_port_id, 
+                                 sys_event_queue_t event_queue_id)
+{
+    boost::lock_guard<boost::mutex> lock(eventQueueVectorMutex);
+    assert(ports.find(event_port_id) != end(ports));
+    assert(queues.find(event_queue_id) != end(queues));
+    assert(ports[event_port_id].type == SYS_EVENT_PORT_LOCAL);
+    ports[event_port_id].queue = queues[event_queue_id].get();
+    return CELL_OK;
+}
+
+uint64_t sys_time_get_timebase_frequency(PPU* ppu) {
+    return ppu->getFrequency();
+}
+
+int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info) {
+    info->pst_addr = StackBase;
+    info->pst_size = StackSize;
+    return CELL_OK;
+}
+

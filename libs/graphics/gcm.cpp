@@ -4,6 +4,7 @@
 #include "../../ps3emu/PPU.h"
 #include <boost/log/trivial.hpp>
 #include "../../ps3emu/ELFLoader.h"
+#include <algorithm>
 
 using namespace boost::endian;
 
@@ -21,6 +22,7 @@ struct {
     Rsx* rsx;
     std::vector<IOMapping> ioMaps;
     TargetCellGcmContextData* context = nullptr;
+    ps3_uintptr_t defaultCommandBuffer = 0;
 } emuGcmState;
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode) {
@@ -51,22 +53,26 @@ int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t* of
     return CELL_OK;
 }
 
+void setCurrentCommandBuffer(PPU* ppu, ps3_uintptr_t va) {
+    auto contextVa = ppu->getELFLoader()->getSymbolValue("gCellGcmCurrentContext");
+    ppu->store<4>(contextVa, va);
+}
+
 uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     
     ppu->getRsx()->setGcmContext(ioSize, ioAddress);
+    ppu->getRsx()->init();
     ppu->setMemory(GcmLabelBaseOffset, 0, 1, true);
-    ppu->setMemory(GcmLocalMemoryBase, 0, GcmLocalMemorySize, true);
     
     ps3_uintptr_t pageVa;
     void* pagePtr;
     ppu->allocPage(&pagePtr, &pageVa);
     emuGcmState.context = (TargetCellGcmContextData*)pagePtr;
-    auto contextVa = ppu->getELFLoader()->getSymbolValue("gCellGcmCurrentContext");
-    ppu->store<4>(contextVa, pageVa);
+    emuGcmState.defaultCommandBuffer = pageVa;
+    setCurrentCommandBuffer(ppu, pageVa);
     emuGcmState.ppu = ppu;
     emuGcmState.rsx = ppu->getRsx();
-    emuGcmState.ppu->map(ioAddress, GcmLocalMemoryBase, ioSize);
     emuGcmState.ioMaps.push_back({ ioAddress, ioSize, 0 });
     ppu->writeMemory(ioAddress, gcmResetCommands, gcmResetCommandsSize);
     ppu->writeMemory(ioAddress + gcmResetCommandsSize, gcmInitCommands, gcmInitCommandsSize);
@@ -113,13 +119,18 @@ emu_void_t cellGcmResetFlipStatus(PPU* ppu) {
     return emu_void;
 }
 
-emu_void_t _cellGcmSetFlipCommand(PPU* ppu) {
-    assert(emuGcmState.context->end - emuGcmState.context->current >= 2);
-    uint32_t setLabel = 1;
-    uint32_t header = (1 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
+void setFlipCommand(PPU* ppu, uint32_t label, uint32_t labelValue, uint32_t buffer) {
+    assert(emuGcmState.context->end - emuGcmState.context->current >= 4);
+    uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
     emuGcmState.ppu->store<4>(emuGcmState.context->current, header);
-    emuGcmState.ppu->store<4>(emuGcmState.context->current + 4, setLabel);
-    emuGcmState.context->current += 2 * sizeof(uint32_t);
+    emuGcmState.ppu->store<4>(emuGcmState.context->current + 4, buffer);
+    emuGcmState.ppu->store<4>(emuGcmState.context->current + 8, label);
+    emuGcmState.ppu->store<4>(emuGcmState.context->current + 12, labelValue);
+    emuGcmState.context->current += 4 * sizeof(uint32_t);
+}
+
+emu_void_t _cellGcmSetFlipCommand(PPU* ppu, uint32_t buffer) {
+    setFlipCommand(ppu, -1, 0, buffer);
     return emu_void;
 }
 
@@ -132,6 +143,73 @@ int32_t cellGcmIoOffsetToAddress(uint32_t offset, big_uint32_t* address) {
     }
     *address = GcmLocalMemoryBase + offset;
     return CELL_OK;
+}
+
+uint32_t cellGcmGetTiledPitchSize(uint32_t size) {
+    return size;
+}
+
+int32_t cellGcmSetTileInfo(uint8_t index,
+                           uint8_t location,
+                           uint32_t offset,
+                           uint32_t size, 
+                           uint32_t pitch,
+                           uint8_t comp,
+                           uint16_t base,
+                           uint8_t bank)
+{
+    return CELL_OK;
+}
+
+uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, PPU* ppu) {
+    setFlipCommand(ppu, labelindex, labelvalue, id);
+    return CELL_OK;
+}
+
+int32_t cellGcmBindTile(uint8_t index) {
+    return CELL_OK;
+}
+
+int32_t cellGcmUnbindTile(uint8_t index) {
+    return CELL_OK;
+}
+
+int32_t cellGcmBindZcull(uint8_t index, 
+                         uint32_t offset, 
+                         uint32_t width, 
+                         uint32_t height, 
+                         uint32_t cullStart, 
+                         uint32_t zFormat, 
+                         uint32_t aaFormat,
+                         uint32_t zCullDir, 
+                         uint32_t zCullFormat, 
+                         uint32_t sFunc, 
+                         uint32_t sRef, 
+                         uint32_t sMask) {
+    return CELL_OK;
+}
+
+int32_t cellGcmMapMainMemory(ps3_uintptr_t address, uint32_t size, big_uint32_t* offset, PPU* ppu) {
+    auto& maps = emuGcmState.ioMaps;
+    auto lastOffsetMapping = std::max_element(begin(maps), end(maps), [](auto& a, auto& b) {
+        return a.offset + a.size < b.offset + b.size;
+    });
+    assert(lastOffsetMapping != end(maps));
+    auto firstFreeOffset = lastOffsetMapping->offset + lastOffsetMapping->size;
+    maps.push_back({address, size, firstFreeOffset});
+    *offset = GcmLocalMemoryBase + firstFreeOffset;
+    ppu->map(address, *offset, size);
+    return CELL_OK;
+}
+
+emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler) {
+    // TODO: implement
+    return emu_void;
+}
+
+emu_void_t cellGcmSetDefaultCommandBuffer(PPU* ppu) {
+    setCurrentCommandBuffer(ppu, emuGcmState.defaultCommandBuffer);
+    return emu_void;
 }
 
 }}

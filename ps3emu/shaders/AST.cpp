@@ -76,7 +76,7 @@ namespace ShaderRewriter {
         return _expr.get();
     }
     
-    dest_mask_t ComponentMask::mask() {
+    dest_mask_t& ComponentMask::mask() {
         return _mask;
     }
     

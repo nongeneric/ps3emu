@@ -34,9 +34,9 @@ typedef struct sys_lwmutex {
 } sys_lwmutex_t;
 
 typedef struct lwmutex_attr {
-    sys_protocol_t attr_protocol;   /**< Policy for waiting threads */
-    sys_recursive_t attr_recursive; /**< Whether recursive locks are effective */
-    char name[SYS_SYNC_NAME_SIZE]; /**< lwmutex name for debugging */
+    sys_protocol_t attr_protocol;
+    sys_recursive_t attr_recursive;
+    char name[SYS_SYNC_NAME_SIZE];
 } sys_lwmutex_attribute_t;
 
 void init_sys_lib();
@@ -59,7 +59,7 @@ int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
 
 typedef big_int64_t system_time_t;
 
-extern system_time_t sys_time_get_system_time();
+extern system_time_t sys_time_get_system_time(PPU* ppu);
 extern int _sys_process_atexitspawn();
 extern int _sys_process_at_Exitspawn();
 
@@ -82,3 +82,49 @@ typedef big_uint32_t sys_addr_t;
 
 int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);
 int sys_timer_usleep(usecond_t sleep_time);
+
+typedef uint32_t CellFsErrno;
+CellFsErrno sys_fs_open_impl(const char *path,
+                             uint32_t flags,
+                             big_uint32_t *fd,
+                             uint64_t mode,
+                             const void *arg,
+                             uint64_t size);
+
+typedef struct sys_event_queue_attr {
+    sys_protocol_t attr_protocol;
+    big_uint32_t type;
+    char name[SYS_SYNC_NAME_SIZE];
+} sys_event_queue_attribute_t;
+
+typedef struct sys_event {
+    big_uint64_t source;
+    big_uint64_t data1;
+    big_uint64_t data2;
+    big_uint64_t data3;
+} sys_event_t;
+
+typedef big_uint32_t sys_event_queue_t;
+typedef big_uint32_t sys_event_port_t;
+typedef big_uint32_t sys_event_type_t;
+typedef big_uint64_t sys_ipc_key_t;
+
+int sys_event_queue_create(sys_event_queue_t* equeue_id,
+                           sys_event_queue_attribute_t* attr,
+                           sys_ipc_key_t event_queue_key,
+                           uint32_t size);
+
+int sys_event_port_create(sys_event_port_t* eport_id,
+                          int port_type, uint64_t name);
+
+int sys_event_port_connect_local(sys_event_port_t event_port_id,
+                                 sys_event_queue_t event_queue_id);
+
+uint64_t sys_time_get_timebase_frequency(PPU* ppu);
+
+typedef struct {
+    big_uint32_t pst_addr;
+    big_uint32_t pst_size;
+} sys_ppu_thread_stack_t;
+
+int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info);

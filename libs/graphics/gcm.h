@@ -66,7 +66,37 @@ ps3_uintptr_t cellGcmGetControlRegister();
 ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index);
 uint32_t cellGcmGetFlipStatus(PPU* ppu);
 emu_void_t cellGcmResetFlipStatus(PPU* ppu);
-emu_void_t _cellGcmSetFlipCommand(PPU* ppu);
+emu_void_t _cellGcmSetFlipCommand(PPU* ppu, uint32_t buffer);
 int32_t cellGcmIoOffsetToAddress(uint32_t offset, boost::endian::big_uint32_t *address);
+uint32_t cellGcmGetTiledPitchSize(uint32_t size);
+int32_t cellGcmSetTileInfo(uint8_t index,
+                           uint8_t location,
+                           uint32_t offset,
+                           uint32_t size,
+                           uint32_t pitch,
+                           uint8_t comp,
+                           uint16_t base,
+                           uint8_t bank);
+uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, PPU* ppu);
+int32_t cellGcmBindTile(uint8_t index);
+int32_t cellGcmUnbindTile(uint8_t index);
+int32_t cellGcmBindZcull(uint8_t index,
+                         uint32_t offset,
+                         uint32_t width,
+                         uint32_t height,
+                         uint32_t cullStart,
+                         uint32_t zFormat,
+                         uint32_t aaFormat,
+                         uint32_t zCullDir, 
+                         uint32_t zCullFormat,
+                         uint32_t sFunc,
+                         uint32_t sRef,
+                         uint32_t sMask);
+int32_t cellGcmMapMainMemory(ps3_uintptr_t address, 
+                             uint32_t size, 
+                             boost::endian::big_uint32_t *offset,
+                             PPU* ppu);
+emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler);
+emu_void_t cellGcmSetDefaultCommandBuffer(PPU* ppu);
 
 }}

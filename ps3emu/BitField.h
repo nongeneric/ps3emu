@@ -12,7 +12,7 @@ template <typename BF, int = BF::P>
 inline uint64_t getUValue(BF bf) { return bf.u(); }
 
 enum class BitFieldType {
-    Signed, Unsigned, GPR, CR, FPR, None
+    Signed, Unsigned, GPR, CR, FPR, Vector, None
 };
 
 template <int Pos, int Next, BitFieldType T = BitFieldType::None, int Shift = 0>
@@ -49,6 +49,7 @@ public:
         return T == BitFieldType::CR ? "cr"
              : T == BitFieldType::GPR ? "r"
              : T == BitFieldType::FPR ? "f"
+             : T == BitFieldType::Vector ? "v"
              : "";
     }
     

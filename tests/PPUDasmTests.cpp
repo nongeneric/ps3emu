@@ -387,3 +387,66 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "fmsubs f0,f10,f0,f11");
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x49, 0x59, 0xce };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "stvx v2,r9,r11");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x00, 0x48, 0xce };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "lvx v0,r0,r9");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x10, 0x40, 0x00, 0x2c };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "vsldoi v2,v0,v0,0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x10, 0x00, 0x04, 0xc4 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "vxor v0,v0,v0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7c, 0x1f, 0x00, 0x8e };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "lvewx v0,r31,r0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x10, 0x00, 0x02, 0x8C };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "vspltw v0,v0,0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x10, 0x01, 0x01, 0x84 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "vslw v0,v1,v0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x10, 0x0D, 0x00, 0x6E };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "vmaddfp v0,v13,v1,v0");
+}
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0xfc, 0x00, 0x06, 0x5e };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "fctidz f0,f0");
+}

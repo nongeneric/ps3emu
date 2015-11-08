@@ -73,7 +73,7 @@ constexpr swizzle_t swizzle_xyzw = {
     swizzle2bit_t::W
 };
 
-struct FragmentCondition {
+struct condition_t {
     cond_t relation;
     bool is_C1;
     swizzle_t swizzle;
@@ -106,22 +106,13 @@ enum class vertex_op_t {
     SIN, COS, BRB, CLB, PSH, MVA
 };
 
-struct vertex_opcode_t {
-    int op_count;
-    bool control;
-    bool addr_reg;
-    bool tex;
-    const char* mnemonic;
-    vertex_op_t instr;
-};
-
 struct dest_mask_t {
     bool val[4];
 };
 
 struct FragmentInstr {
     fragment_opcode_t opcode;
-    FragmentCondition condition;
+    condition_t condition;
     clamp_t clamp;
     control_mod_t control;
     scale_t scale;
@@ -203,10 +194,6 @@ typedef boost::variant<
     vertex_arg_tex_ref_t
 > VertexVariantArg;
 
-enum class vertex_instr_cond_mode_t {
-    None, C0, C1
-};
-
 struct VertexInstr {
     int op_count;
     bool is_sat;
@@ -214,7 +201,8 @@ struct VertexInstr {
     vertex_op_t operation;
     const char* mnemonic;
     bool is_last;
-    vertex_instr_cond_mode_t cond_mode;
+    control_mod_t control;
+    condition_t condition;
 };
 
 std::string print_dest_mask(dest_mask_t mask);

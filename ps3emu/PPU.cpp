@@ -56,7 +56,7 @@ void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate
 }
 
 void PPU::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
-    std::unique_ptr<uint8_t> buf(new uint8_t[len]);
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[len]);
     memset(buf.get(), value, len);
     writeMemory(va, buf.get(), len, allocate);
 }
@@ -70,6 +70,7 @@ void PPU::run() {
 }
 
 void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
+    assert(buf);
     if (coversRsxRegsRange(va, len)) {
         throw std::runtime_error("reading rsx registers not implemented");
     }
@@ -109,7 +110,13 @@ void PPU::reset() {
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
-    memset(_GPR, 0xcc, 8 * 32);
+    for (auto& r : _GPR)
+        r = 0;
+    for (auto& r : _FPR)
+        r = 0;
+    for (auto& r : _V)
+        r = 0;
+    _systemStart = boost::chrono::high_resolution_clock::now();
 }
 
 ps3_uintptr_t PPU::malloc(ps3_uintptr_t size) {
@@ -212,4 +219,15 @@ void PPU::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
         page.ptr = memoryPtr;
         _providedMemoryPages[firstPage + i] = true;
     }
+}
+
+uint64_t PPU::getFrequency() {
+    return 79800000;
+}
+
+uint64_t PPU::getTimeBase() {
+    auto now = boost::chrono::high_resolution_clock::now();
+    auto diff = now - _systemStart;
+    auto us = boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
+    return 1000000 * us.count() * getFrequency();
 }

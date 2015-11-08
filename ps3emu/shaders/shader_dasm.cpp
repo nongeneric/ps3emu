@@ -721,6 +721,15 @@ void vertex_dasm_instr(const uint8_t* instr, vertex_decoded_instr_t& res) {
     res.args[0].reg_type = typed->b2.arg0_reg_type.u();
 }
 
+struct vertex_opcode_t {
+    int op_count;
+    bool control;
+    bool addr_reg;
+    bool tex;
+    const char* mnemonic;
+    vertex_op_t instr;
+};
+
 vertex_opcode_t vertex_opcodes_1[] = {
     { 0, 0, 0, 0, "NOP", vertex_op_t::NOP },
     { 1, 0, 0, 0, "MOV", vertex_op_t::MOV },
@@ -737,6 +746,7 @@ vertex_opcode_t vertex_opcodes_1[] = {
     { 2, 0, 0, 0, "SGE", vertex_op_t::SGE },
     { 1, 0, 1, 0, "ARL", vertex_op_t::ARL },
     { 1, 0, 0, 0, "FRC", vertex_op_t::FRC },
+    { 1, 0, 0, 0, "FLR", vertex_op_t::FLR },
     { 2, 0, 0, 0, "SEQ", vertex_op_t::SEQ },
     { 2, 0, 0, 0, "SFL", vertex_op_t::SFL },
     { 2, 0, 0, 0, "SGT", vertex_op_t::SGT },
@@ -810,12 +820,12 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
     res.is_sat = instr.is_sat;
     res.operation = opcode->instr;
     res.mnemonic = opcode->mnemonic;
-    res.cond_mode = vertex_instr_cond_mode_t::None;
+    res.control = control_mod_t::None;
     res.is_last = instr.is_last;
     if (instr.flag2 && !(slot ^ instr.sets_c)) {
-        res.cond_mode = instr.is_cond_c1 ?
-            vertex_instr_cond_mode_t::C1 :
-            vertex_instr_cond_mode_t::C0;
+        res.control = instr.is_cond_c1 ?
+            control_mod_t::C1 :
+            control_mod_t::C0;
     }
     int res_arg = 0;
     if (instr.output_reg_num != 31) {
@@ -869,20 +879,22 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
     } else if (!instr.mask_selector || instr.output_reg_num == 31) {
         auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
         res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
+        res_arg++;
     }
-//     if (!opcode->control) {
-//         if (instr.has_cond) {
-//             auto cond = print_cond(instr.cond_relation);
-//             auto swizzle = print_swizzle(instr.cond_swizzle, false);
-//             res += ssnprintf("(%s%d%s)", cond, instr.is_cond_c1, swizzle);
-//         } else if (opcode->instr == vertex_op_t::BRB || opcode->instr == vertex_op_t::CLB) {
+    res.condition.relation = cond_t::TR;
+    if (!opcode->control) {
+        if (instr.has_cond) {
+            res.condition.relation = instr.cond_relation;
+            res.condition.swizzle = instr.cond_swizzle;
+            res.condition.is_C1 = instr.is_cond_c1;
+        } else if (opcode->instr == vertex_op_t::BRB || opcode->instr == vertex_op_t::CLB) {
 //             res += " ";
 //             if (!(instr.args[0].reg_num & 0x20)) {
 //                 res += "!";
 //             }
 //             res += ssnprintf("b%d,", instr.args[0].reg_num & 0x1f);
-//         }
-//     }
+        }
+    }
     for (auto i = 0; i < opcode->op_count; ++i, ++res_arg) {
         auto arg = args[i];
         if (opcode->control) {
@@ -890,7 +902,7 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
         } else if (opcode->instr == vertex_op_t::ARA || opcode->instr == vertex_op_t::PSH) {
             res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.is_addr_reg };
         } else {
-            if (opcode->op_count == 1 && opcode->tex) {
+            if (i == 1 && opcode->tex) {
                 res.args[res_arg] = vertex_arg_tex_ref_t { args[1]->reg_num & 3 };
             } else {
                 if (arg->reg_type == 2) {
@@ -996,7 +1008,7 @@ public:
     }
     
     std::string operator()(vertex_arg_cond_reg_ref_t x) const {
-        return "RC";
+        return ssnprintf("RC%s", print_mask(x.mask));
     }
     
     std::string operator()(vertex_arg_label_ref_t x) const {
@@ -1010,12 +1022,23 @@ public:
 
 std::string vertex_dasm(const VertexInstr& instr) {
     std::string res = instr.mnemonic;
+    if (instr.control != control_mod_t::None) {
+        res += "C";
+        if (instr.control == control_mod_t::C1) {
+            res += "1";
+        }
+    }
     res += " ";
     for (int i = 0; i < instr.op_count; ++i) {
         if (i > 0) {
             res += ", ";
         }
         res += apply_visitor(arg_visitor(), instr.args[i]);
+        if (i == 0 && instr.condition.relation != cond_t::TR) {
+            auto cond = print_cond(instr.condition.relation);
+            auto sw = print_swizzle(instr.condition.swizzle, false);
+            res += ssnprintf("(%s%s)", cond, sw);
+        }
     }
     return res + ";";
 }

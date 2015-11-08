@@ -5,7 +5,7 @@
 #include <vector>
 #include <array>
 
-std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode);
+std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode, bool isFlatColorShading);
 
 struct VertexShaderInputFormat {
     int typeSize = 4;
@@ -16,4 +16,5 @@ struct VertexShaderInputFormat {
 
 std::string GenerateVertexShader(const uint8_t* bytecode, 
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
+                                 std::array<int, 4> const& samplerSizes,
                                  unsigned loadOffset);

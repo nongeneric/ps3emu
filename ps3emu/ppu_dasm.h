@@ -1667,6 +1667,19 @@ EMU(MULHW, XOForm_1) {
         update_CR0(res, ppu);
 }
 
+PRINT(MULHDU, XOForm_1) {
+    *result = format_nnn(i->Rc.u() ? "mulhdu." : "mulhdu", i->RT, i->RA, i->RB);
+}
+
+EMU(MULHDU, XOForm_1) {
+    unsigned __int128 prod = (unsigned __int128)ppu->getGPR(i->RA) * 
+                             (unsigned __int128)ppu->getGPR(i->RB);
+    auto res = prod >> 64;
+    ppu->setGPR(i->RT, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
 PRINT(MULLI, DForm_2) {
     *result = format_nnn("mulli", i->RT, i->RA, i->SI);
 }
@@ -2212,6 +2225,27 @@ EMU(FCTIWZ, XForm_27) {
         update_CRFSign<1>(res, ppu);
 }
 
+PRINT(FCTIDZ, XForm_27) { // test, change rounding mode
+    *result = format_nn(i->Rc.u() ? "fctidz." : "fctidz", i->FRT, i->FRB);
+}
+
+EMU(FCTIDZ, XForm_27) {
+    auto b = ppu->getFPRd(i->FRB);
+    int32_t res = b > 2147483647. ? 0x7fffffff
+    : b < -2147483648. ? 0x80000000
+    : (int32_t)b;
+    // TODO invalid operation, XX
+    auto fpscr = ppu->getFPSCR();
+    if (issignaling(b)) {
+        fpscr.f.FX = 1;
+        fpscr.f.VXSNAN = 1;
+    }
+    ppu->setFPR(i->FRT, res);
+    ppu->setFPSCR(fpscr.v);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, ppu);
+}
+
 PRINT(FRSP, XForm_27) {
     *result = format_nn(i->Rc.u() ? "frsp." : "frsp", i->FRT, i->FRB);
 }
@@ -2253,6 +2287,408 @@ EMU(SYNC, XForm_24) {
     __sync_synchronize();
 }
 
+PRINT(MFTB, XFXForm_2) {
+    *result = format_n("mftb", i->tbr);
+}
+
+EMU(MFTB, XFXForm_2) {
+    auto tbr = i->tbr.u();
+    auto tb = ppu->getTimeBase();
+    assert(tbr == 392 || tbr == 424);
+    if (tbr == 424)
+        tb &= 0xffffffff;
+    ppu->setGPR(i->RT, tb);
+}
+
+PRINT(STVX, SIMDForm) {
+    *result = format_nnn("stvx", i->vS, i->rA, i->rB);
+}
+
+EMU(STVX, SIMDForm) {
+    auto b = getB(i->rA, ppu);
+    auto ea = b + ppu->getGPR(i->rB);
+    ppu->store16(ea, ppu->getV(i->vS));
+}
+
+PRINT(LVX, SIMDForm) {
+    *result = format_nnn("lvx", i->vD, i->rA, i->rB);
+}
+
+EMU(LVX, SIMDForm) {
+    auto b = getB(i->rA, ppu);
+    auto ea = b + ppu->getGPR(i->rB);
+    ppu->setV(i->vD, ppu->load16(ea));
+}
+
+PRINT(LVLX, SIMDForm) {
+    *result = format_nnn("lvlx", i->vD, i->rA, i->rB);
+}
+
+EMU(LVLX, SIMDForm) {
+    auto b = getB(i->rA, ppu);
+    auto ea = b + ppu->getGPR(i->rB);
+    uint8_t be[16];
+    ppu->readMemory(ea, be, 16);
+    ppu->setV(i->vD, be);
+}
+
+PRINT(VSLDOI, SIMDForm) {
+    *result = format_nnnn("vsldoi", i->vD, i->vA, i->vB, i->SHB);
+}
+
+EMU(VSLDOI, SIMDForm) {
+    assert(i->SHB.u() <= 16);
+    uint8_t be[32];
+    ppu->getV(i->vA, be);
+    ppu->getV(i->vB, be + 16);
+    ppu->setV(i->vD, be + i->SHB.u());
+}
+
+PRINT(LVEWX, SIMDForm) { // TODO: test
+    *result = format_nnn("lvewx", i->vD, i->rA, i->rB);
+}
+
+EMU(LVEWX, SIMDForm) {
+    auto b = getB(i->rA, ppu);
+    auto ea = b + ppu->getGPR(i->rB);
+    uint8_t be[16];
+    ppu->readMemory(ea, be, 16);
+    ppu->setV(i->vD, be);
+}
+
+PRINT(VSPLTW, SIMDForm) { // TODO: test
+    *result = format_nnn("vspltw", i->vD, i->vB, i->UIMM);
+}
+
+EMU(VSPLTW, SIMDForm) {
+    uint32_t be[4];
+    ppu->getV(i->vB, (uint8_t*)be);
+    auto b = i->UIMM.u();
+    be[0] = be[b];
+    be[1] = be[b];
+    be[2] = be[b];
+    be[3] = be[b];
+    ppu->setV(i->vD, (uint8_t*)be);
+}
+
+PRINT(VSPLTISW, SIMDForm) { // TODO: test
+    *result = format_nn("vspltisw", i->vD, i->SIMM);
+}
+
+EMU(VSPLTISW, SIMDForm) {
+    int32_t v = i->SIMM.s();
+    big_uint32_t be[4] = { v, v, v, v };
+    ppu->setV(i->vD, (uint8_t*)be);
+}
+
+inline void endian_reverse_v(void* vbe) {
+    auto ui = (uint32_t*)vbe;
+    for (int i = 0; i < 4; ++i) {
+        endian_reverse_inplace(ui[i]);
+    }
+}
+
+PRINT(VMADDFP, SIMDForm) {
+    *result = format_nnnn("vmaddfp", i->vD, i->vA, i->vC, i->vB);
+}
+
+EMU(VMADDFP, SIMDForm) {
+    float abe[4];
+    float bbe[4];
+    float cbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    ppu->getV(i->vC, (uint8_t*)cbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    endian_reverse_v(cbe);
+    float dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = abe[i] * cbe[i] + bbe[i];
+    }
+    endian_reverse_v(dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VNMSUBFP, SIMDForm) { // TODO: test
+    *result = format_nnnn("vnmsubfp", i->vD, i->vA, i->vB, i->vC);
+}
+
+EMU(VNMSUBFP, SIMDForm) {
+    float abe[4];
+    float bbe[4];
+    float cbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    ppu->getV(i->vC, (uint8_t*)cbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    endian_reverse_v(cbe);
+    float dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = -(abe[i] * cbe[i] - bbe[i]);
+    }
+    endian_reverse_v(dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VXOR, SIMDForm) {
+    *result = format_nnn("vxor", i->vD, i->vA, i->vB);
+}
+
+EMU(VXOR, SIMDForm) {
+    auto d = ppu->getV(i->vA) ^ ppu->getV(i->vB);
+    ppu->setV(i->vD, d);
+}
+
+PRINT(VAND, SIMDForm) {
+    *result = format_nnn("vand", i->vD, i->vA, i->vB);
+}
+
+EMU(VAND, SIMDForm) {
+    auto d = ppu->getV(i->vA) & ppu->getV(i->vB);
+    ppu->setV(i->vD, d);
+}
+
+PRINT(VSEL, SIMDForm) { // TODO: test
+    *result = format_nnnn("vsel", i->vD, i->vA, i->vB, i->vC);
+}
+
+EMU(VSEL, SIMDForm) {
+    auto m = ppu->getV(i->vC);
+    auto a = ppu->getV(i->vA);
+    auto b = ppu->getV(i->vB);
+    auto d = (m & b) | (~m & a);
+    ppu->setV(i->vD, d);
+}
+
+PRINT(VADDFP, SIMDForm) {
+    *result = format_nnn("vaddfp", i->vD, i->vA, i->vB);
+}
+
+EMU(VADDFP, SIMDForm) {
+    float abe[4];
+    float bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    float dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = abe[i] + bbe[i];
+    }
+    endian_reverse_v(dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VSUBFP, SIMDForm) {
+    *result = format_nnn("vsubfp", i->vD, i->vA, i->vB);
+}
+
+EMU(VSUBFP, SIMDForm) {
+    float abe[4];
+    float bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    float dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = abe[i] - bbe[i];
+    }
+    endian_reverse_v(dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VRSQRTEFP, SIMDForm) {
+    *result = format_nn("vrsqrtefp", i->vD, i->vB);
+}
+
+EMU(VRSQRTEFP, SIMDForm) {
+    float bbe[4];
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(bbe);
+    float dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = 1.f / sqrt(bbe[i]);
+    }
+    endian_reverse_v(dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VCTSXS, SIMDForm) { // TODO: test, set sat
+    *result = format_nnn("vctsxs", i->vD, i->vB, i->UIMM);
+}
+
+EMU(VCTSXS, SIMDForm) {
+    float bbe[4];
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(bbe);
+    unsigned __int128 mult = 1;
+    mult <<= i->UIMM.u();
+    big_uint32_t dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = bbe[i] * mult;
+    }
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VCFSX, SIMDForm) { // TODO: test, set sat
+    *result = format_nnn("vcfsx", i->vD, i->vB, i->UIMM);
+}
+
+EMU(VCFSX, SIMDForm) {
+    big_int32_t bbe[4];
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    float div = 1u << i->UIMM.u();
+    float dbe[4];
+    for (int n = 0; n < 4; ++n) {
+        dbe[n] = bbe[n];
+        dbe[n] /= div;
+    }
+    endian_reverse_v(dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VADDUWM, SIMDForm) { // TODO: test
+    *result = format_nnn("vadduwm", i->vD, i->vA, i->vB);
+}
+
+EMU(VADDUWM, SIMDForm) {
+    uint32_t abe[4];
+    uint32_t bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    big_uint32_t dbe[4];
+    for (int n = 0; n < 4; ++n) {
+        dbe[n] = abe[n] + bbe[n];
+    }
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VCMPEQUW, SIMDForm) { // TODO: test
+    *result = format_nnn(i->Rc.u() ? "vcmpequw." : "vcmpequw", i->vD, i->vA, i->vB);
+}
+
+EMU(VCMPEQUW, SIMDForm) {
+    uint32_t abe[4];
+    uint32_t bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    big_uint32_t dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = abe[i] == bbe[i] ? ~0u : 0u;
+    }
+    ppu->setV(i->vD, (uint8_t*)dbe);
+    if (i->Rc.u()) {
+        auto ui = *(unsigned __int128*)dbe;
+        auto t = ui + 1 == 0;
+        auto f = ui == 0;
+        auto c = t << 3 | f << 1;
+        ppu->setCRF(6, c);   
+    }
+}
+
+PRINT(VCMPEQFP, SIMDForm) { // TODO: test
+    *result = format_nnn(i->Rc.u() ? "vcmpeqfp." : "vcmpeqfp", i->vD, i->vA, i->vB);
+}
+
+EMU(VCMPEQFP, SIMDForm) {
+    float abe[4];
+    float bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    float dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = abe[i] == bbe[i] ? ~0u : 0u;
+    }
+    ppu->setV(i->vD, (uint8_t*)dbe);
+    if (i->Rc.u()) {
+        auto ui = *(unsigned __int128*)dbe;
+        auto t = ui + 1 == 0;
+        auto f = ui == 0;
+        auto c = t << 3 | f << 1;
+        ppu->setCRF(6, c);   
+    }
+}
+
+
+PRINT(VSLW, SIMDForm) { // TODO: test
+    *result = format_nnn("vslw", i->vD, i->vA, i->vB);
+}
+
+EMU(VSLW, SIMDForm) {
+    uint32_t abe[4];
+    uint32_t bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    endian_reverse_v(abe);
+    endian_reverse_v(bbe);
+    big_uint32_t dbe[4];
+    for (int i = 0; i < 4; ++i) {
+        dbe[i] = abe[i] << (bbe[i] & 31);
+    }
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VMRGHW, SIMDForm) { // TODO: test
+    *result = format_nnn("vmrghw", i->vD, i->vA, i->vB);
+}
+
+EMU(VMRGHW, SIMDForm) {
+    uint32_t abe[4];
+    uint32_t bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    uint32_t dbe[4];
+    dbe[0] = abe[0];
+    dbe[1] = bbe[0];
+    dbe[2] = abe[1];
+    dbe[3] = bbe[1];
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VMRGLW, SIMDForm) { // TODO: test
+    *result = format_nnn("vmrglw", i->vD, i->vA, i->vB);
+}
+
+EMU(VMRGLW, SIMDForm) {
+    uint32_t abe[4];
+    uint32_t bbe[4];
+    ppu->getV(i->vA, (uint8_t*)abe);
+    ppu->getV(i->vB, (uint8_t*)bbe);
+    uint32_t dbe[4];
+    dbe[0] = abe[2];
+    dbe[1] = bbe[2];
+    dbe[2] = abe[3];
+    dbe[3] = bbe[3];
+    ppu->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VPERM, SIMDForm) { // TODO: test
+    *result = format_nnnn("vperm", i->vD, i->vA, i->vB, i->vC);
+}
+
+EMU(VPERM, SIMDForm) {
+    uint8_t be[32];
+    ppu->getV(i->vA, be);
+    ppu->getV(i->vB, be + 16);
+    uint8_t cbe[16];
+    ppu->getV(i->vC, cbe);
+    uint8_t dbe[16];
+    for (int i = 0; i < 15; ++i) {
+        auto b = cbe[i] & 31;
+        dbe[i] = be[b];
+    }
+    ppu->setV(i->vD, dbe);
+}
+
 enum class DasmMode {
     Print, Emulate, Name
 };
@@ -2283,6 +2719,39 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
         case 1: invoke(NCALL);
+        case 4: {
+            auto simd = reinterpret_cast<SIMDForm*>(&x);
+            switch (simd->VA_XO.u()) {
+                case 46: invoke(VMADDFP);
+                case 47: invoke(VNMSUBFP);
+                case 42: invoke(VSEL);
+                case 43: invoke(VPERM);
+                case 44: invoke(VSLDOI);
+                default:
+                    switch (simd->VXR_XO.u()) {
+                        case 198: invoke(VCMPEQFP);
+                        default:
+                            switch (simd->VX_XO.u()) {
+                                case 1220: invoke(VXOR);
+                                case 652: invoke(VSPLTW);
+                                case 908: invoke(VSPLTISW);
+                                case 10: invoke(VADDFP);
+                                case 74: invoke(VSUBFP);
+                                case 970: invoke(VCTSXS);
+                                case 1028: invoke(VAND);
+                                case 128: invoke(VADDUWM);
+                                case 134: invoke(VCMPEQUW);
+                                case 388: invoke(VSLW);
+                                case 842: invoke(VCFSX);
+                                case 140: invoke(VMRGHW);
+                                case 396: invoke(VMRGLW);
+                                case 330: invoke(VRSQRTEFP);
+                                default: throw std::runtime_error("unknown extented opcode");
+                            }
+                    }
+            }
+            break;
+        }
         case 8: invoke(SUBFIC);
         case 7: invoke(MULLI);
         case 10: invoke(CMPLI);
@@ -2419,6 +2888,12 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 491: invoke(DIVW);
                 case 73: invoke(MULHD);
                 case 598: invoke(SYNC);
+                case 231: invoke(STVX);
+                case 103: invoke(LVX);
+                case 519: invoke(LVLX);
+                case 371: invoke(MFTB);
+                case 9: invoke(MULHDU);
+                case 71: invoke(LVEWX);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;
@@ -2498,6 +2973,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 846: invoke(FCFID);
                 case 0: invoke(FCMPU);
                 case 15: invoke(FCTIWZ);
+                case 815: invoke(FCTIDZ);
                 case 12: invoke(FRSP);
                 case 583: invoke(MFFS);
                 case 711: invoke(MTFSF);

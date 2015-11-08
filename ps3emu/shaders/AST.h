@@ -12,8 +12,9 @@ namespace ShaderRewriter {
         fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
         cast_float, clamp4i, sign,
         gt, ge, eq, ne, lt, le,
-        reverse4f,
-        branch, call, ret
+        reverse4f, reverse3f, reverse2f,
+        branch, call, ret,
+        txl0, txl1, txl2, txl3
     };
     
     class IExpressionVisitor;
@@ -92,7 +93,7 @@ namespace ShaderRewriter {
     public:
         ComponentMask(Expression* expr, dest_mask_t mask);
         Expression* expr();
-        dest_mask_t mask();
+        dest_mask_t& mask();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     

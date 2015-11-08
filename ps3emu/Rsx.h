@@ -24,11 +24,14 @@ class PPU;
 class Rsx {
     uint32_t _get = 0xffffffff;
     uint32_t _put = 0;
-    uint32_t _ret = 0xffffffff;
+    uint32_t _ret = 0;
     bool _shutdown = false;
+    bool _initialized = false;
     PPU* _ppu;
     mutable boost::mutex _mutex;
     boost::condition_variable _cv;
+    mutable boost::mutex _initMutex;
+    boost::condition_variable _initCv;
     std::unique_ptr<boost::thread> _thread;
     std::unique_ptr<RsxContext> _context;
     std::map<uint32_t, uint32_t> _semaphores;
@@ -36,8 +39,10 @@ class Rsx {
     void loop();
     void setSurfaceColorLocation(uint32_t context);
     void initGcm();
-    void EmuFlip(bool setLabel);
+    void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
     bool linkShaderProgram();
+    void updateShaders();
+    void updateTextures();
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
@@ -142,6 +147,22 @@ class Rsx {
     void BeginEnd(uint32_t mode);
     void DrawArrays(unsigned first, unsigned count);
     void TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals);
+    void RestartIndexEnable(bool enable);
+    void RestartIndex(uint32_t index);
+    void IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type);
+    void DrawIndexArray(uint32_t first, uint32_t count);
+    void VertexTextureOffset(unsigned index, 
+                             uint32_t offset, 
+                             uint8_t mipmap,
+                             uint8_t format,
+                             uint8_t dimension,
+                             uint8_t location);
+    void VertexTextureControl3(unsigned index, uint32_t pitch);
+    void VertexTextureImageRect(unsigned index, uint16_t width, uint16_t height);
+    void VertexTextureControl0(unsigned index, bool enable, float minlod, float maxlod);
+    void VertexTextureAddress(unsigned index, uint8_t wraps, uint8_t wrapt);
+    void VertexTextureFilter(unsigned index, float bias);
+    void VertexTextureBorderColor(unsigned index, std::array<float, 4> argb);
 public:
     Rsx(PPU* ppu);
     ~Rsx();
@@ -152,4 +173,5 @@ public:
     bool isFlipInProgress() const;
     void resetFlipStatus();
     void setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress);
+    void init();
 };

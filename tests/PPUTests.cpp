@@ -14,6 +14,13 @@ TEST_CASE("read write memory") {
     REQUIRE(ppu.load<4>(0x400) == 0x55667788);
 }
 
+TEST_CASE("read memory 128") {
+    PPU ppu;
+    ppu.setMemory(0x400, 0, 16, true);
+    unsigned __int128 i128 = 0;
+    REQUIRE((ppu.load16(0x400) == i128));
+}
+
 TEST_CASE("map memory") {
     PPU ppu;
     auto mb = 1024 * 1024;
@@ -1357,7 +1364,7 @@ TEST_CASE("fixed mulls") {
         , 0x7c, 0xc2, 0x19, 0xd6
         , 0x7c, 0xe2, 0x18, 0x92
         , 0x7d, 0x02, 0x18, 0x96
-        //, 0x7d, 0x22, 0x18, 0x12
+        , 0x7d, 0x22, 0x18, 0x12
         //, 0x7d, 0x42, 0x18, 0x16
         , 0x1d, 0x62, 0xff, 0x38
     };
@@ -1373,14 +1380,19 @@ TEST_CASE("fixed mulls") {
     REQUIRE( ppu.getGPR(6) == 0x9a54a01930824100 );
     REQUIRE( ppu.getGPR(7) == 0xb7fa0b30583d7de );
     REQUIRE( (ppu.getGPR(8) & 0xffffffff) == 0x89037f9 );
-    //REQUIRE( ppu.getGPR(9) == 0x8888889088884b80 );
+    REQUIRE( ppu.getGPR(9) == 0xb7fa0b30583d7de );
     //REQUIRE( ppu.getGPR(10) == 0x8888889088884b80 );
     REQUIRE( ppu.getGPR(11) == 0xc71c71b9c71cd780 );
-    
+        
     ppu.setGPR(2, 0xffffffffffff8a69ull);
     ppu.setGPR(3, 0x14f8b589ull);
     ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &ppu);
     REQUIRE( (ppu.getGPR(8) & 0xffffffffull) == 0xfffff65dull);
+    
+    ppu.setGPR(2, ~0ull);
+    ppu.setGPR(3, 10);
+    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &ppu);
+    REQUIRE( (ppu.getGPR(9) ) == 9);
 }
 
 TEST_CASE("rlwinm r0,r9,0,17,27") {
@@ -1613,4 +1625,37 @@ TEST_CASE("cntlzw r11,r11") {
     uint8_t instr[] = { 0x7d, 0x6b, 0x00, 0x34 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
     REQUIRE( ppu.getGPR(11) == 16 );
+}
+
+TEST_CASE("vsldoi") {
+    PPU ppu;
+    unsigned __int128 i = 0x1122334455667788ull;
+    i <<= 64;
+    i |= 0xaabbccddeeff0099ull;
+    
+    unsigned __int128 res = 0x22334455667788aaull;
+    res <<= 64;
+    res |= 0xbbccddeeff009911ull;
+    
+    ppu.setV(0, i);
+    // vsldoi v2,v0,v0,1
+    uint8_t instr[] = { 0x10, 0x40, 0x00, 0x6c };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( (ppu.getV(2) == res) );
+    
+    // vsldoi v2,v0,v0,0
+    uint8_t instr2[] = { 0x10, 0x40, 0x00, 0x2c };
+    ppu_dasm<DasmMode::Emulate>(instr2, 0, &ppu);
+    REQUIRE( (ppu.getV(2) == i) );
+}
+
+TEST_CASE("vxor v0,v0,v0") {
+    PPU ppu;
+    unsigned __int128 i = 0x1122334455667788ull;
+    i <<= 64;
+    i |= 0xaabbccddeeff0099ull;
+    ppu.setV(0, i);
+    uint8_t instr[] = { 0x10, 0x00, 0x04, 0xc4 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
+    REQUIRE( (ppu.getV(0) == 0) );
 }

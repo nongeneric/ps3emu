@@ -5,7 +5,7 @@
 
 using namespace ShaderRewriter;
 
-std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode) {
+std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode, bool isFlatColorShading) {
     std::vector<std::unique_ptr<Statement>> sts;
     auto pos = 0u;
     int lastReg = 0;
@@ -24,7 +24,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode) {
     auto line = [&](std::string s) { res += s + "\n"; };
     line("#version 450 core");
     line("out vec4 color;");
-    line("in vec4 f_COL0;");
+    line(ssnprintf("%sin vec4 f_COL0;", isFlatColorShading ? "flat " : ""));
     line("in vec4 f_COL1;");
     line("in vec4 f_FOGC;");
     line("in vec4 f_TEX0;");
@@ -55,6 +55,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode) {
 
 std::string GenerateVertexShader(const uint8_t* bytecode, 
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
+                                 std::array<int, 4> const& samplerSizes,
                                  unsigned loadOffset)
 {   
     std::string res;
@@ -67,6 +68,11 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                    VertexShaderConstantBinding));
     line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
     line("} constants;");
+    line(ssnprintf("layout(std140, binding = %d) uniform SamplersInfo {",
+                   VertexShaderSamplesInfoBinding));
+    line("    ivec3 wrapMode;");
+    line("    vec4 borderColor;");
+    line("} samplersInfo[4];");
     line("out vec4 f_COL0;");
     line("out vec4 f_COL1;");
     line("out vec4 f_FOGC;");
@@ -81,6 +87,9 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("out vec4 f_TEX8;");
     line("out vec4 f_TEX9;");
     line("out vec4 f_SSA;");
+    for (auto i = 0u; i < samplerSizes.size(); ++i) {
+        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;", i, samplerSizes[i], i));
+    }
     line("float reverse(float f) {");
     line("    unsigned int bits = floatBitsToUint(f);");
     line("    unsigned int rev = ((bits & 0xff) << 24)");
@@ -117,6 +126,71 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    return v;"); // each component representation is in the wrong order,
                            // not the order of components
     line("}");
+    line("float wrap(float x, int type, float size) {");
+    line("    bool first = -1 <= x && x <= 1;");
+    line("    if (type == 6) type = first ? 2 : 3;");
+    line("    if (type == 7) type = first ? 2 : 4;"); // 4 isn't handled here
+    line("    if (type == 8) type = first ? 2 : 5;");
+    line("    switch (type) {");
+    line("        case 1: {");
+    line("            x = mod(x, 1.0);");
+    line("            break;");
+    line("        }");
+    line("        case 2: {");
+    line("            float temp = floor(x);");
+    line("            if (mod(temp, 2.0) != 0) {");
+    line("                x = 1.0 - (mod(x, 1.0));");
+    line("            } else {");
+    line("                x = mod(x, 1.0);");
+    line("            }");
+    line("            break;");
+    line("        }");
+    line("        case 5:");
+    line("        case 3: {");
+    line("            float h = 1.0 / (2.0 * size);");
+    line("            x = x < 0 ? h : x > 1 ? 1 - h : x;");
+    line("            break;");
+    line("        }");
+    line("    }");
+    line("    return x;");
+    line("}");
+    line("vec4 borderWrap(float x, vec4 color, vec4 border) {");
+    line("    if (0 <= x && x <= 1) return color;");
+    line("    return border;");
+    line("}");
+    auto txl = [&](int size, int s) {
+        line(ssnprintf("vec4 txl%d(vec4 uv) {", s, size));
+        line(ssnprintf("    ivec%d size = textureSize(s%d, 0);", size, s));
+        line(ssnprintf("    ivec3 type = samplersInfo[%d].wrapMode;", s));
+        line(ssnprintf("    uv = vec4("));
+        for (int i = 0; i < size; ++i) {
+            if (i != 0)
+                line(",");
+            auto c = i == 0 ? "x" : i == 1 ? "y" : "z";
+            line(ssnprintf("        wrap(uv.%s, type[%d], size.%s)", c, i, c));
+        }
+        for (int i = 0; i < 4 - size; ++i) {
+            line("        , 0");
+        }
+        line(");");
+        auto sw = size == 1 ? "x" : size == 2 ? "xy" : "xyz";
+        line(ssnprintf("    vec4 texel = reverse4f(texture(s%d, uv.%s));", s, sw));
+        line(ssnprintf("    if (type[0] == 4 || (uv.x < -1 || uv.x > 1 && type[0] == 7))"));
+        line(ssnprintf("        texel = borderWrap(uv.x, texel, samplersInfo[%d].borderColor);", s));
+        if (size > 1) {
+            line(ssnprintf("    if (type[1] == 4 || (uv.y < -1 || uv.y > 1 && type[1] == 7))"));
+            line(ssnprintf("        texel = borderWrap(uv.y, texel, samplersInfo[%d].borderColor);", s));   
+        }
+        if (size > 2) {
+            line(ssnprintf("    if (type[2] == 4 || (uv.z < -1 || uv.z > 1 && type[2] == 7))"));
+            line(ssnprintf("        texel = borderWrap(uv.z, texel, samplersInfo[%d].borderColor);", s));   
+        }
+        line(ssnprintf("    return texel;"));
+        line(ssnprintf("};"));
+    };
+    for (auto i = 0u; i < samplerSizes.size(); ++i) {
+        txl(samplerSizes[i], i);   
+    }
     line("void main(void) {");
     line("    vec4 v_in[16];");
     line("    vec4 v_out[16];");
@@ -124,7 +198,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    vec4 r[32];");
     line("    vec4 stack[8];");
     line("    int stack_ptr = 8;");
-    line("    vec4 cc[16];");
+    line("    vec4 c[2];");
     line("    bool b[32];");
     line("    vec4 void_var;");
     for (size_t i = 0; i < inputs.size(); ++i) {

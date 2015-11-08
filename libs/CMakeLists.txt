@@ -5,6 +5,9 @@ project(libs)
 set(SRC
     sys.cpp
     sys.h
+    ConcurrentQueue.cpp
+    Controller.cpp
+    Sysutil.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp

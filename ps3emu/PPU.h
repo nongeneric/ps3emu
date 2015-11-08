@@ -8,8 +8,11 @@
 #include <memory>
 #include <type_traits>
 #include <stdexcept>
+#include <algorithm>
+#include <array>
 #include <bitset>
 #include <boost/endian/arithmetic.hpp>
+#include <boost/chrono.hpp>
 
 class ProcessFinishedException : public std::exception { };
 
@@ -68,7 +71,7 @@ union CR_t {
         uint32_t SO : 1;
         uint32_t sign : 3;
     } af;
-    uint32_t v;
+    uint32_t v = 0;
 };
 static_assert(sizeof(CR_t) == sizeof(uint32_t), "");
 
@@ -114,7 +117,7 @@ union FPSCR_t {
         uint32_t _ : 13;
         uint32_t v : 4;
     } fpcc;
-    uint32_t v;
+    uint32_t v = 0;
 };
 static_assert(sizeof(FPSCR_t) == sizeof(uint32_t), "");
 
@@ -127,17 +130,18 @@ union XER_t {
         uint64_t SO : 1;
         uint64_t _ : 32;
     } f;
-    uint64_t v;
+    uint64_t v = 0;
 };
 static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 
 class ELFLoader;
 class PPU {
-    uint64_t _LR;
-    uint64_t _CTR;
-    uint64_t _NIP;
-    uint64_t _GPR[32];
-    double _FPR[32];
+    uint64_t _LR = 0;
+    uint64_t _CTR = 0;
+    uint64_t _NIP = 0;
+    std::array<uint64_t, 32> _GPR;
+    std::array<double, 32> _FPR;
+    std::array<unsigned __int128, 32> _V;
     FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
@@ -146,6 +150,7 @@ class PPU {
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     Rsx* _rsx = nullptr;
     ELFLoader* _elfLoader = nullptr;
+    boost::chrono::high_resolution_clock::time_point _systemStart;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -182,6 +187,9 @@ public:
     
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
     
+    uint64_t getFrequency();
+    uint64_t getTimeBase();
+    
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
         typename BytesToBEType<Bytes>::beType res;
@@ -200,6 +208,12 @@ public:
         writeMemory(va, &x, Bytes);
     }
     
+    void store16(uint64_t va, unsigned __int128 value) {
+        uint8_t *bytes = (uint8_t*)&value;
+        std::reverse(bytes, bytes + 16);
+        writeMemory(va, bytes, 16);
+    }
+    
     void storef(ps3_uintptr_t va, float value) {
         store<sizeof(float)>(va, union_cast<float, uint32_t>(value));
     }
@@ -211,6 +225,13 @@ public:
     float loadf(ps3_uintptr_t va) {
         auto f = (uint32_t)load<sizeof(float)>(va);
         return union_cast<uint32_t, float>(f);
+    }
+    
+    unsigned __int128 load16(uint64_t va) {
+        unsigned __int128 i = load<8>(va);
+        i <<= 64;
+        i |= load<8>(va + 8);
+        return i;
     }
     
     double loadd(ps3_uintptr_t va) {
@@ -231,6 +252,30 @@ public:
     }
     
     template <typename V>
+    inline void setV(V i, unsigned __int128 value) {
+        _V[getUValue(i)] = value;
+    }
+    
+    template <typename V>
+    inline void setV(V i, uint8_t* be) {
+        assert(getUValue(i) < _V.size());
+        auto v = (uint8_t*)&_V[getUValue(i)];
+        std::reverse_copy(be, be + 16, v);
+    }
+    
+    template <typename V>
+    inline void getV(V i, uint8_t* be) {
+        assert(getUValue(i) < _V.size());
+        auto v = (uint8_t*)&_V[getUValue(i)];
+        std::reverse_copy(v, v + 16, be);
+    }
+    
+    template <typename V>
+    inline unsigned __int128 getV(V i) {
+        return _V[getUValue(i)];
+    }
+    
+    template <typename V>
     inline void setFPRd(V i, double value) {
         _FPR[getUValue(i)] = value;
     }
@@ -243,13 +288,13 @@ public:
     template <typename V>
     inline void setFPR(V i, uint64_t value) {
         auto idx = getUValue(i);
-        *reinterpret_cast<uint64_t*>(_FPR + idx) = value;
+        *reinterpret_cast<uint64_t*>(&_FPR[idx]) = value;
     }
     
     template <typename V>
     inline uint64_t getFPR(V i) {
         auto idx = getUValue(i);
-        return *reinterpret_cast<uint64_t*>(_FPR + idx);
+        return *reinterpret_cast<uint64_t*>(&_FPR[idx]);
     }
     
     inline void setFPSCR(uint32_t value) {

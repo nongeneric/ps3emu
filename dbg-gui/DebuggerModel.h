@@ -22,6 +22,7 @@ class DebuggerModel : public QWidget {
     void log(std::string str);
     void printMemory(uint64_t va);
     void traceTo(ps3_uintptr_t va);
+    void updateUI();
 public:
     DebuggerModel();
     ~DebuggerModel();
@@ -33,7 +34,7 @@ public:
     void toggleFPR();
     void loadFile(QString path, QStringList args);
     void exec(QString command);
-    void stepIn();
+    void stepIn(bool updateUI = true);
     void stepOver();
     void run();
     void runToLR();

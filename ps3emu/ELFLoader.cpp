@@ -113,7 +113,7 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args) {
     auto procParamSectionName = ".sys_proc_param"; // ppu/include/sys/process.h
     auto procParamSection = findSectionByName(procParamSectionName);
     if (procParamSection) {
-        throw std::runtime_error("proc param section not implemented");
+        BOOST_LOG_TRIVIAL(error) << "proc param section not implemented";
     }
     
     // PPU_ABI-Specifications_e

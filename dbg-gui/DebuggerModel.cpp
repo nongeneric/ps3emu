@@ -42,7 +42,7 @@ QString printHex(void* ptr, int len) {
 class GPRModel : public MonospaceGridModel {
     PPU* _ppu;
     GridModelChangeTracker _tracker;
-    bool _isFPR = false;
+    int _view = 1;
 public:
     GPRModel(PPU* ppu) : _ppu(ppu), _tracker(this) {
         _tracker.track();
@@ -50,7 +50,7 @@ public:
     }
     
     void toggleFPR() {
-        _isFPR = !_isFPR;
+        _view = (_view + 1) % 4;
         _tracker.track();
         _tracker.track();
         update();
@@ -126,13 +126,37 @@ public:
             }
         }
         if (col == 2) {
-            return QString("%1PR%2").arg(_isFPR ? "F" : "G").arg(row);
+            switch (_view) {
+                case 0: return QString("FPR%1").arg(row);
+                case 1: return QString("GPR%1").arg(row);
+                case 2: return QString("V%1").arg(row);
+                case 3: return QString("Vf%1").arg(row);
+            }
         }
         if (col == 3) {
-            if (_isFPR) {
+            if (_view == 0) {
                 return QString("%1").arg(_ppu->getFPRd(row));
+            } else if (_view == 1) {
+                return print(_ppu->getGPR(row));
+            } else if (_view == 2) {
+                uint8_t be[16];
+                auto be64 = (big_uint64_t*)be;
+                _ppu->getV(row, be);
+                return QString::fromStdString(
+                    ssnprintf("%016" PRIx64 "%016" PRIx64,
+                              (uint64_t)be64[0], 
+                              (uint64_t)be64[1]));
+            } else if (_view == 3) {
+                uint8_t be[16];
+                _ppu->getV(row, be);
+                auto ui32 = (uint32_t*)be;
+                auto fs = (float*)be;
+                for (int i = 0; i < 4; ++i) {
+                    boost::endian::endian_reverse_inplace(ui32[i]);
+                }
+                return QString::fromStdString(
+                    ssnprintf("%g:%g:%g:%g", fs[0], fs[1], fs[2], fs[3]));
             }
-            return print(_ppu->getGPR(row));
         }
         throw std::runtime_error("bad column");
     }
@@ -257,14 +281,12 @@ void DebuggerModel::loadFile(QString path, QStringList args) {
     }
     _elf.map(_ppu.get(), argsVec);
     _elf.link(_ppu.get());
-    _gprModel->update();
-    _dasmModel->update();
-    _dasmModel->navigate(_ppu->getNIP());
+    updateUI();
     _elfLoaded = true;
     emit message(QString("Loaded %1").arg(path));
 }
 
-void DebuggerModel::stepIn() {
+void DebuggerModel::stepIn(bool updateUI) {
     if (!_elfLoaded)
         return;
     uint32_t instr;
@@ -273,9 +295,9 @@ void DebuggerModel::stepIn() {
         _ppu->readMemory(cia, &instr, sizeof instr);
         _ppu->setNIP(cia + sizeof instr);
         ppu_dasm<DasmMode::Emulate>(&instr, cia, _ppu.get());
-        _gprModel->update();
-        _dasmModel->update();
-        _dasmModel->navigate(_ppu->getNIP());
+        if (updateUI) {
+            this->updateUI();
+        }
     } catch (ProcessFinishedException&) {
         emit message("process terminated");
     } catch (std::exception& exc) {
@@ -291,16 +313,14 @@ void DebuggerModel::stepOver() {}
 
 void DebuggerModel::run() {
     try {
-        for (int i = 0; i < 500; ++i) {
+        for (int i = 0; i < 15000; ++i) {
             uint32_t instr;
             auto cia = _ppu->getNIP();
             _ppu->readMemory(cia, &instr, sizeof instr);
             _ppu->setNIP(cia + sizeof instr);
             ppu_dasm<DasmMode::Emulate>(&instr, cia, _ppu.get());
         }
-        _gprModel->update();
-        _dasmModel->update();
-        _dasmModel->navigate(_ppu->getNIP());
+        updateUI();
     } catch (std::exception& e) {
         auto msg = QString("error: %1 (NIP: %2)")
             .arg(e.what()).arg(_ppu->getNIP(), 16, 16);
@@ -332,13 +352,15 @@ void DebuggerModel::exec(QString command) {
                 return;
             } else if (name == "runto") {
                 while (_ppu->getNIP() != va)
-                    stepIn();
+                    stepIn(false);
+                updateUI();
                 return;
             } else if (name == "mem") {
                 printMemory(va);
                 return;
             } else if (name == "traceto") {
                 traceTo(va);
+                updateUI();
                 return;
             }
         } catch (...) {
@@ -387,7 +409,7 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
         counts[name]++;
         fprintf(f, "%08x  %s\n", nip, str.c_str());
-        stepIn();
+        stepIn(false);
     }
     fprintf(f, "\ninstruction frequencies:\n");
     std::vector<std::pair<std::string, int>> sorted;
@@ -401,4 +423,10 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
         fprintf(f, "%-10s%-5d\n", p.first.c_str(), p.second);
     }
     fclose(f);
+}
+
+void DebuggerModel::updateUI() {
+    _gprModel->update();
+    _dasmModel->update();
+    _dasmModel->navigate(_ppu->getNIP());
 }
