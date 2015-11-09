@@ -1,6 +1,5 @@
 #pragma once
-
-#include "Rsx.h"
+#include "rsx/Rsx.h"
 #include "BitField.h"
 #include "constants.h"
 #include "utils.h"

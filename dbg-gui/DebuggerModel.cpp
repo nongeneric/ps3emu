@@ -1,5 +1,5 @@
 #include "DebuggerModel.h"
-#include "../ps3emu/Rsx.h"
+#include "../ps3emu/rsx/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
 #include <boost/log/trivial.hpp>
 #include <QStringList>

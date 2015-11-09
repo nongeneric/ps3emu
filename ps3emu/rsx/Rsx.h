@@ -1,7 +1,7 @@
 #pragma once
 
-#include "constants.h"
-#include "../libs/graphics/gcm.h"
+#include "../constants.h"
+#include "../../libs/graphics/gcm.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <memory>

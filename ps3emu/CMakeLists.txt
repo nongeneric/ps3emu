@@ -20,8 +20,9 @@ set(SRC
     shaders/ShaderGenerator.cpp
     shaders/AST.h
     shaders/AST.cpp
-    Rsx.h
-    Rsx.cpp
+    rsx/Rsx.h
+    rsx/Rsx.cpp
+    rsx/RsxLoop.cpp
 )
 add_library(ps3emu ${SRC})
 target_link_libraries(ps3emu libs ${Boost_LIBRARIES} glfw pthread)

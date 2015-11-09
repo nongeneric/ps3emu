@@ -1,6 +1,6 @@
 #include "../ps3emu/PPU.h"
 #include "../ps3emu/ELFLoader.h"
-#include "../ps3emu/Rsx.h"
+#include "../ps3emu/rsx/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
 #include "stdio.h"
 #include <boost/log/utility/setup/file.hpp>
