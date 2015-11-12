@@ -126,43 +126,49 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    return v;"); // each component representation is in the wrong order,
                            // not the order of components
     line("}");
-    line("float wrap(float x, int type, float size) {");
-    line("    bool first = -1 <= x && x <= 1;");
-    line("    if (type == 6) type = first ? 2 : 3;");
-    line("    if (type == 7) type = first ? 2 : 4;"); // 4 isn't handled here
-    line("    if (type == 8) type = first ? 2 : 5;");
+    line("int wrap(float x, int type, float size) {");
+    line("    int i = int(floor(x * size));");
+    line("    int is = int(size);");
+    line("    bool first = -is < i && i < is;");
+    line("    if (type == 6) type = first ? 2 : 63;");
+    line("    if (type == 7) type = first ? 2 : 4;");
+    line("    if (type == 8) type = first ? 2 : 63;");
     line("    switch (type) {");
     line("        case 1: {");
-    line("            x = mod(x, 1.0);");
+    line("            i = i < 0 ? is - 1 - ((abs(i) - 1) % is) : i;");
+    line("            i = i % is;");
     line("            break;");
     line("        }");
     line("        case 2: {");
-    line("            float temp = floor(x);");
-    line("            if (mod(temp, 2.0) != 0) {");
-    line("                x = 1.0 - (mod(x, 1.0));");
+    line("            if (i < 0) i = abs(i) - 1;");
+    line("            if (i % (2 * is) >= is) {");
+    line("                i = is - (i % is) - 1;");
     line("            } else {");
-    line("                x = mod(x, 1.0);");
+    line("                i = i % is;");
     line("            }");
+    line("            break;");
+    line("        }");
+    line("        case 4: {");
+    line("            i = i < 0 || i >= is ? -1 : i;");
     line("            break;");
     line("        }");
     line("        case 5:");
     line("        case 3: {");
-    line("            float h = 1.0 / (2.0 * size);");
-    line("            x = x < 0 ? h : x > 1 ? 1 - h : x;");
+    line("            i = i < 0 ? 0 : i >= is ? is - 1 : i;");
+    line("            break;");
+    line("        }");
+    line("        case 63: {");
+    line("            i = i < 0 || i >= is ? is - 1 : i;");
     line("            break;");
     line("        }");
     line("    }");
-    line("    return x;");
-    line("}");
-    line("vec4 borderWrap(float x, vec4 color, vec4 border) {");
-    line("    if (0 <= x && x <= 1) return color;");
-    line("    return border;");
+    line("    return i;");
     line("}");
     auto txl = [&](int size, int s) {
         line(ssnprintf("vec4 txl%d(vec4 uv) {", s, size));
         line(ssnprintf("    ivec%d size = textureSize(s%d, 0);", size, s));
         line(ssnprintf("    ivec3 type = samplersInfo[%d].wrapMode;", s));
-        line(ssnprintf("    uv = vec4("));
+        line(ssnprintf("    ivec4 iuv = ivec4("));
         for (int i = 0; i < size; ++i) {
             if (i != 0)
                 line(",");
@@ -174,21 +180,13 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         }
         line(");");
         auto sw = size == 1 ? "x" : size == 2 ? "xy" : "xyz";
-        line(ssnprintf("    vec4 texel = reverse4f(texture(s%d, uv.%s));", s, sw));
-        line(ssnprintf("    if (type[0] == 4 || (uv.x < -1 || uv.x > 1 && type[0] == 7))"));
-        line(ssnprintf("        texel = borderWrap(uv.x, texel, samplersInfo[%d].borderColor);", s));
-        if (size > 1) {
-            line(ssnprintf("    if (type[1] == 4 || (uv.y < -1 || uv.y > 1 && type[1] == 7))"));
-            line(ssnprintf("        texel = borderWrap(uv.y, texel, samplersInfo[%d].borderColor);", s));   
-        }
-        if (size > 2) {
-            line(ssnprintf("    if (type[2] == 4 || (uv.z < -1 || uv.z > 1 && type[2] == 7))"));
-            line(ssnprintf("        texel = borderWrap(uv.z, texel, samplersInfo[%d].borderColor);", s));   
-        }
+        line(ssnprintf("    vec4 texel = reverse4f(texture(s%d, (iuv.%s + 0.5) / size, uv.w));", s, sw));
+        line(ssnprintf("    if (iuv.x == -1 || iuv.y == -1 || iuv.z == -1)"));
+        line(ssnprintf("        texel = samplersInfo[%d].borderColor;", s));
         line(ssnprintf("    return texel;"));
         line(ssnprintf("};"));
     };
-    for (auto i = 0u; i < samplerSizes.size(); ++i) {
+    for (auto i = 0u; i < std::min(size_t(2), samplerSizes.size()); ++i) {
         txl(samplerSizes[i], i);   
     }
     line("void main(void) {");

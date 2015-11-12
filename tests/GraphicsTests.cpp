@@ -61,3 +61,21 @@ TEST_CASE("gcm_vertex_texture_wrapping") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_vertex_texture_wrapping/ps3frame.png");
 }
+
+TEST_CASE("gcm_vertex_texture_wrapping3") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_vertex_texture_wrapping3/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_vertex_texture_wrapping3/ps3frame.png");
+}
+
+TEST_CASE("gcm_vertex_texture") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_vertex_texture/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_vertex_texture/ps3frame.png");
+}

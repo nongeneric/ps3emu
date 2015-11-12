@@ -1,0 +1,16 @@
+uniform float4x4 modelViewProj;
+uniform sampler2D texture;
+
+void main
+(
+	float4 position	: POSITION,
+	float2 texcoord	: TEXCOORD0,
+
+	out float4 oPosition : POSITION,
+	out float4 oColor    : COLOR
+)
+{
+	float3 rgb = tex2D(texture, texcoord).rgb;
+	oPosition = mul(modelViewProj, position);
+	oColor = float4( rgb, 1.f );
+}

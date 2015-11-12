@@ -316,3 +316,26 @@ TEST_CASE() {
     str = printStatements(st);
     REQUIRE(str == "v_out[0].w = dot(r[1], constants.c[259]).x;");
 }
+
+int wrapm(int i, int is) {
+    if (i < 0) i = abs(i) - 1;
+    if (i % (2 * is) >= is) {
+    i = is - (i % is) - 1;
+    } else {
+        i = i % is;
+    }
+    return i;
+}
+
+TEST_CASE() {
+    REQUIRE( wrapm(0, 3) == 0 );
+    REQUIRE( wrapm(1, 3) == 1 );
+    REQUIRE( wrapm(2, 3) == 2 );
+    REQUIRE( wrapm(3, 3) == 2 );
+    REQUIRE( wrapm(4, 3) == 1 );
+    REQUIRE( wrapm(5, 3) == 0 );
+    REQUIRE( wrapm(-1, 3) == 0 );
+    REQUIRE( wrapm(-2, 3) == 1 );
+    REQUIRE( wrapm(-3, 3) == 2 );
+    REQUIRE( wrapm(-4, 3) == 2 );
+}

@@ -1164,10 +1164,10 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<24, 32> b;
                 } arg = { readarg(1) };
                 std::array<float, 4> color { 
-                    (float)arg.a.u(), 
-                    (float)arg.r.u(), 
-                    (float)arg.g.u(),
-                    (float)arg.b.u()
+                    (float)arg.a.u() / 255, 
+                    (float)arg.r.u() / 255, 
+                    (float)arg.g.u() / 255,
+                    (float)arg.b.u() / 255
                 };
                 VertexTextureBorderColor(index, color);
                 break;

@@ -1,0 +1,8 @@
+void main
+(
+	float4 color_in : COLOR,
+	out float4 color : COLOR
+)
+{
+	color = color_in;
+}

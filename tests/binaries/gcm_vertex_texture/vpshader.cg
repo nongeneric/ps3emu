@@ -1,0 +1,42 @@
+uniform float4x4 modelViewProj;
+uniform sampler2D texture;
+
+// animation parameter
+//   x - if(x>1.f) animation on 
+//   y - lerp value between 0.0f - 1.0f
+//   z - if(z>1.f) texture is fp32x1, otherwize fp32x4
+//       TODO: static flow control
+// 
+uniform float4   animation;
+
+void main
+(
+	float4 position	: POSITION,
+	float2 texcoord	: TEXCOORD0,
+
+	out float4 oPosition : POSITION,
+	out float4 oColor    : COLOR
+)
+{
+	float3 rgb;
+	float4 pos = position;
+	float height_value;
+
+	// branch for texture format (fp32x1 or fp32x4)
+	if( animation.z > 1.f ) {
+		rgb = float3( 0.2, 0.4, 0.1 );
+		height_value = tex2D(texture, texcoord).x;
+	}
+	else {
+		rgb = tex2D(texture, texcoord).rgb;
+		//height_value = tex2D(texture, texcoord).a;
+		height_value = -20;
+	}
+
+	// branch for animation
+	pos.y = lerp(pos.y, height_value, animation.y);
+
+	oPosition = mul(modelViewProj, pos);
+
+	oColor = float4( rgb, 1.f );
+}

@@ -912,6 +912,8 @@ void Rsx::updateTextures() {
             glSamplerParameterf(sampler.glSampler, GL_TEXTURE_LOD_BIAS, sampler.bias);
             glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
             VertexShaderSamplerUniform info[] = { 
                 sampler.wraps, sampler.wrapt, 0, sampler.borderColor
