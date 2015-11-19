@@ -7,7 +7,7 @@
 using namespace boost::endian;
 
 bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
-    return va <= GcmControlRegisters && va + len >= GcmControlRegisters;
+    return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
 }
 
 template <class F>
@@ -71,7 +71,13 @@ void PPU::run() {
 
 void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
     assert(buf);
+    
     if (coversRsxRegsRange(va, len)) {
+        assert(len == 4);        
+        if (va == GcmControlRegisters + 8) {
+            *(big_uint32_t*)buf = _rsx->getRef();
+            return;
+        }
         throw std::runtime_error("reading rsx registers not implemented");
     }
     

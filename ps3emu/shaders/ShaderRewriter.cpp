@@ -40,6 +40,7 @@ namespace ShaderRewriter {
         { FunctionName::txl1, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
         { FunctionName::txl2, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
         { FunctionName::txl3, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
+        { FunctionName::ftex, { ExprType::vec4, ExprType::int32, ExprType::vec4 } },
     };
     
     int getSingleComponent(swizzle_t s) {
@@ -130,8 +131,15 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(Invocation* invocation) override {
-            std::string str;
             auto args = invocation->args();
+            
+            if (invocation->name() == FunctionName::ftex) {
+                assert(invocation->args().size() == 2);
+                _ret = ssnprintf("tex%s(%s)", accept(args[0]), accept(args[1]));
+                return;
+            }
+            
+            std::string str;
             for (auto i = 0u; i < args.size(); ++i) {
                 if (i > 0)
                     str += ", ";
@@ -438,7 +446,9 @@ namespace ShaderRewriter {
         assert(arg.is_abs + arg.is_neg <= 1);
         Expression* expr = nullptr;
         bool ignoreSwizzle = false;
-        if (arg.type == op_type_t::Const) {
+        if (i.opcode.tex && n == i.opcode.op_count - 1) {
+            expr = new IntegerLiteral(i.arguments[n].reg_num);
+        } else if (arg.type == op_type_t::Const) {
             expr = new Invocation(
                 FunctionName::vec4,
                 {
@@ -448,13 +458,11 @@ namespace ShaderRewriter {
                     new FloatLiteral(*(float*)&arg.imm_val[3])
                 }
             );
-        }
-        if (arg.type == op_type_t::Attr) {
+        } else if (arg.type == op_type_t::Attr) {
             assert(i.persp_corr == persp_corr_t::F);
             auto name = ssnprintf("f_%s", print_attr(i.input_attr));
             expr = new Variable(name, nullptr);
-        }
-        if (arg.type == op_type_t::Temp) {
+        } else if (arg.type == op_type_t::Temp) {
             auto name = arg.reg_type == reg_type_t::H ? "h" : "r";
             auto index = new IntegerLiteral(arg.reg_num);
             expr = new Variable(name, index);
@@ -631,6 +639,12 @@ namespace ShaderRewriter {
                     new FloatLiteral(1), new FloatLiteral(1),
                     new FloatLiteral(1), new FloatLiteral(1)
                 });
+                break;
+            }
+            case fragment_op_t::TEX: {
+                // TODO: txp
+                assert(dynamic_cast<IntegerLiteral*>(args[1]));
+                rhs = new Invocation(FunctionName::ftex, { args[1], args[0] });
                 break;
             }
             default: assert(false);

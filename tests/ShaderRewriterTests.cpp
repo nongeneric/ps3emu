@@ -52,18 +52,6 @@ TEST_CASE() {
     FragmentInstr fi;
     auto pos = 0;
     
-//     bool last = false;
-//     std::string allstr;
-//     while (!last) {
-//         pos += fragment_dasm_instr(instr + pos, fi);
-//         auto st = MakeStatement(fi);
-//         auto str = printStatements(st);
-//         allstr += str + "\n";
-//         last = fi.is_last;
-//     }
-//     
-//     REQUIRE( allstr == "" );
-    
     pos += fragment_dasm_instr(instr + pos, fi);
     auto st = MakeStatement(fi);
     auto str = printStatements(st);
@@ -317,25 +305,22 @@ TEST_CASE() {
     REQUIRE(str == "v_out[0].w = dot(r[1], constants.c[259]).x;");
 }
 
-int wrapm(int i, int is) {
-    if (i < 0) i = abs(i) - 1;
-    if (i % (2 * is) >= is) {
-    i = is - (i % is) - 1;
-    } else {
-        i = i % is;
-    }
-    return i;
-}
-
 TEST_CASE() {
-    REQUIRE( wrapm(0, 3) == 0 );
-    REQUIRE( wrapm(1, 3) == 1 );
-    REQUIRE( wrapm(2, 3) == 2 );
-    REQUIRE( wrapm(3, 3) == 2 );
-    REQUIRE( wrapm(4, 3) == 1 );
-    REQUIRE( wrapm(5, 3) == 0 );
-    REQUIRE( wrapm(-1, 3) == 0 );
-    REQUIRE( wrapm(-2, 3) == 1 );
-    REQUIRE( wrapm(-3, 3) == 2 );
-    REQUIRE( wrapm(-4, 3) == 2 );
+    unsigned char instr[] = {
+        0x82, 0x00, 0x17, 0x00, 0xc8, 0x01, 0x1c, 0x9d, 0xc8, 0x00, 0x00, 0x01,                                                            
+        0xc8, 0x00, 0x3f, 0xe1, 0x14, 0x00, 0x01, 0x40, 0xa0, 0x02, 0x1c, 0x9c,                                                            
+        0xc8, 0x00, 0x00, 0x01, 0xc8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,                                                            
+        0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,                                                            
+        0x1e, 0x7e, 0x7e, 0x00, 0xc8, 0x00, 0x1c, 0x9d, 0xc8, 0x00, 0x00, 0x01,                                                            
+        0xc8, 0x00, 0x00, 0x01, 0x0a, 0x01, 0x01, 0x40, 0x00, 0x00, 0x1c, 0x9c,                                                            
+        0xc8, 0x00, 0x00, 0x01, 0xc8, 0x00, 0x00, 0x01
+    };
+    
+    FragmentInstr fi;
+    auto pos = 0;
+    
+    pos += fragment_dasm_instr(instr + pos, fi);
+    auto st = MakeStatement(fi);
+    auto str = printStatements(st);
+    REQUIRE( str == "r[0].x = tex0(f_TEX0).x;" );
 }

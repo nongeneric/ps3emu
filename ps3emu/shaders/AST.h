@@ -14,7 +14,8 @@ namespace ShaderRewriter {
         gt, ge, eq, ne, lt, le,
         reverse4f, reverse3f, reverse2f,
         branch, call, ret,
-        txl0, txl1, txl2, txl3
+        txl0, txl1, txl2, txl3,
+        ftex, ftxb, ftxd, ftxl
     };
     
     class IExpressionVisitor;

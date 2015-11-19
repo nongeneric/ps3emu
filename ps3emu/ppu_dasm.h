@@ -1667,6 +1667,19 @@ EMU(MULHW, XOForm_1) {
         update_CR0(res, ppu);
 }
 
+PRINT(MULHWU, XOForm_1) {
+    *result = format_nnn(i->Rc.u() ? "mulhwu." : "mulhwu", i->RT, i->RA, i->RB);
+}
+
+EMU(MULHWU, XOForm_1) {
+    uint64_t prod = (uint64_t)(int32_t)ppu->getGPR(i->RA)
+                  * (uint64_t)(int32_t)ppu->getGPR(i->RB);
+    auto res = (uint64_t)((uint64_t)prod >> 32);
+    ppu->setGPR(i->RT, res);
+    if (i->Rc.u())
+        update_CR0(res, ppu);
+}
+
 PRINT(MULHDU, XOForm_1) {
     *result = format_nnn(i->Rc.u() ? "mulhdu." : "mulhdu", i->RT, i->RA, i->RB);
 }
@@ -2894,6 +2907,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 371: invoke(MFTB);
                 case 9: invoke(MULHDU);
                 case 71: invoke(LVEWX);
+                case 11: invoke(MULHWU);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

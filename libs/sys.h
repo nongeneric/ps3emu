@@ -8,7 +8,9 @@ using namespace boost::endian;
 typedef big_uint32_t _sys_sleep_queue_t;
 typedef big_uint32_t sys_protocol_t;
 typedef big_uint32_t sys_recursive_t;
+typedef big_uint32_t sys_process_shared_t;
 typedef big_uint64_t usecond_t;
+typedef big_uint32_t sys_adaptive_t;
 
 #define SYS_SYNC_NAME_LENGTH        7
 #define SYS_SYNC_NAME_SIZE          (SYS_SYNC_NAME_LENGTH + 1)
@@ -128,3 +130,26 @@ typedef struct {
 } sys_ppu_thread_stack_t;
 
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info);
+
+// mutex
+
+typedef big_uint32_t sys_mutex_t;
+
+typedef struct mutex_attr {
+    sys_protocol_t attr_protocol;
+    sys_recursive_t attr_recursive;
+    sys_process_shared_t attr_pshared;
+    sys_adaptive_t attr_adaptive;
+    sys_ipc_key_t key;
+    int flags;
+    big_uint32_t pad;
+    char name[SYS_SYNC_NAME_SIZE];
+} sys_mutex_attribute_t;
+
+int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr);
+int sys_mutex_destroy(sys_mutex_t mutex_id);
+int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout);
+int sys_mutex_trylock(sys_mutex_t mutex_id);
+int sys_mutex_unlock(sys_mutex_t mutex_id);
+
+uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);

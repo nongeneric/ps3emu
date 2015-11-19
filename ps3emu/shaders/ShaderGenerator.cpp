@@ -5,7 +5,9 @@
 
 using namespace ShaderRewriter;
 
-std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode, bool isFlatColorShading) {
+std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
+                                   std::array<int, 16> const& samplerSizes,
+                                   bool isFlatColorShading) {
     std::vector<std::unique_ptr<Statement>> sts;
     auto pos = 0u;
     int lastReg = 0;
@@ -38,6 +40,12 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode, bool is
     line("in vec4 f_TEX8;");
     line("in vec4 f_TEX9;");
     line("in vec4 f_SSA;");
+    for (auto i = 0u; i < samplerSizes.size(); ++i) {
+        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;", i + 4, samplerSizes[i], i));
+    }
+    line("vec4 tex0(vec4 uvp) {");
+    line("    return texture(s0, uvp.xy);");
+    line("}");
     line("void main(void) {");
     line("    vec4 f_WPOS = gl_FragCoord;");
     line("    vec4 c[2];");
@@ -61,9 +69,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
     line("#version 450 core");
-    for (int i = 0; i < 16; ++i) {
-        line(ssnprintf("layout (location = %d) in vec4 v%din;", i, i));
-    }
+    line(ssnprintf("layout (location = 0) in vec4 v_in_be[16];"));
     line(ssnprintf("layout(std140, binding = %d) uniform VertexConstants {", 
                    VertexShaderConstantBinding));
     line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
@@ -199,9 +205,14 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    vec4 c[2];");
     line("    bool b[32];");
     line("    vec4 void_var;");
+    for (int i = 0; i < 16; ++i) {
+        line(ssnprintf("    v_out[%d] = vec4(0,0,0,0);", i));
+    }
     for (size_t i = 0; i < inputs.size(); ++i) {
+        if (!inputs[i].enabled)
+            continue;
         auto suffix = inputs[i].typeSize == 4 ? "f" : "b";
-        line(ssnprintf("    v_in[%d] = reverse%d%s(v%din);", i, inputs[i].rank, suffix, i));
+        line(ssnprintf("    v_in[%d] = reverse%d%s(v_in_be[%d]);", i, inputs[i].rank, suffix, i));
     }
     std::array<VertexInstr, 2> instr;
     bool isLast = false;

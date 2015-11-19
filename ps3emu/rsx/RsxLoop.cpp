@@ -30,6 +30,23 @@ bool isScale(uint32_t value, uint32_t base, uint32_t step, uint32_t maxIndex, ui
     return diff % step == 0 && index < maxIndex;
 }
 
+std::array<float, 4> parseColor(uint32_t raw) {
+    union {
+        uint32_t val;
+        BitField<0, 8> a;
+        BitField<8, 16> r;
+        BitField<16, 24> g;
+        BitField<24, 32> b;
+    } arg = { raw };
+    std::array<float, 4> color {
+        (float)arg.a.u() / 255, 
+        (float)arg.r.u() / 255, 
+        (float)arg.g.u() / 255,
+        (float)arg.b.u() / 255
+    };
+    return color;
+}
+
 int64_t Rsx::interpret(uint32_t get) {
     MethodHeader header { _ppu->load<4>(GcmLocalMemoryBase + get) };
     auto count = header.count.u();
@@ -67,7 +84,8 @@ int64_t Rsx::interpret(uint32_t get) {
             EmuFlip(readarg(1), readarg(2), readarg(3));
             break;
         case 0x00000050:
-            name = "CELL_GCM_NV406E_SET_REFERENCE";
+            //name = "CELL_GCM_NV406E_SET_REFERENCE";
+            SetReference(readarg(1));
             break;
         case 0x00000060:
             //name = "CELL_GCM_NV406E_SET_CONTEXT_DMA_SEMAPHORE";
@@ -582,9 +600,6 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_SET_CULL_FACE_ENABLE";
             CullFaceEnable(readarg(1));
             break;
-        case 0x00001840:
-            name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL3";
-            break;
         case 0x00001880:
             name = "CELL_GCM_NV4097_SET_VERTEX_DATA2F_M";
             break;
@@ -597,14 +612,8 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001980:
             name = "CELL_GCM_NV4097_SET_VERTEX_DATA4S_M";
             break;
-        case 0x00001a00:
-            name = "CELL_GCM_NV4097_SET_TEXTURE_OFFSET";
-            break;
         case 0x00001a04:
             name = "CELL_GCM_NV4097_SET_TEXTURE_FORMAT";
-            break;
-        case 0x00001a10:
-            name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL1";
             break;
         case 0x00001c00:
             name = "CELL_GCM_NV4097_SET_VERTEX_DATA4F_M";
@@ -996,7 +1005,9 @@ int64_t Rsx::interpret(uint32_t get) {
                         32,
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
-                name = "CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT";
+                //name = "CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT";
+                auto arg = readarg(1);
+                TextureImageRect(index, arg >> 16, arg & 0xffff);
                 break;
             }
             if (isScale(offset,
@@ -1005,7 +1016,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR";
-                TextureBorderColor(index, readarg(1));
+                TextureBorderColor(index, parseColor(readarg(1)));
                 break;
             }
             if (isScale(offset,
@@ -1017,18 +1028,20 @@ int64_t Rsx::interpret(uint32_t get) {
                 union {
                     uint32_t val;
                     BitField<0, 1> enable;
-                    BitField<1, 13> minlod;
-                    BitField<13, 25> maxlod;
+                    BitField<1, 5> minlod_i;
+                    BitField<5, 13> minlod_d;
+                    BitField<13, 17> maxlod_i;
+                    BitField<17, 25> maxlod_d;
                     BitField<25, 28> maxaniso;
                     BitField<28, 30> alphakill;
                 } arg = { readarg(1) };
                 TextureControl0(
                     index,
-                    arg.enable.u(),
-                    arg.minlod.u(),
-                    arg.maxlod.u(),
+                    arg.alphakill.u(),
                     arg.maxaniso.u(),
-                    arg.alphakill.u()
+                    arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f,
+                    arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
+                    arg.enable.u()
                 );
                 break;
             }
@@ -1037,7 +1050,8 @@ int64_t Rsx::interpret(uint32_t get) {
                         32,
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
-                name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL1";
+                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL1";
+                TextureControl1(index, readarg(1));
                 break;
             }
             if (isScale(offset,
@@ -1055,11 +1069,12 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<4, 8> mag;
                     BitField<8, 16> min;
                     BitField<16, 19> conv;
-                    BitField<19, 32> bias;
+                    BitField<19, 24> biasInteger;
+                    BitField<24, 32> biasDecimal;
                 } arg = { readarg(1) };
                 TextureFilter(
                     index,
-                    arg.bias.u(),
+                    arg.biasInteger.s() + arg.biasDecimal.u() / 255.f,
                     arg.min.u(),
                     arg.mag.u(),
                     arg.conv.u(),
@@ -1156,20 +1171,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_BORDER_COLOR";
-                union {
-                    uint32_t val;
-                    BitField<0, 8> a;
-                    BitField<8, 16> r;
-                    BitField<16, 24> g;
-                    BitField<24, 32> b;
-                } arg = { readarg(1) };
-                std::array<float, 4> color { 
-                    (float)arg.a.u() / 255, 
-                    (float)arg.r.u() / 255, 
-                    (float)arg.g.u() / 255,
-                    (float)arg.b.u() / 255
-                };
-                VertexTextureBorderColor(index, color);
+                VertexTextureBorderColor(index, parseColor(readarg(1)));
                 break;
             }
             if (isScale(offset,
@@ -1189,8 +1191,8 @@ int64_t Rsx::interpret(uint32_t get) {
                 VertexTextureControl0(
                     index, 
                     arg.enable.u(), 
-                    arg.minlod_i.u() + (float)arg.minlod_d.u() / 255,
-                    arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255);
+                    arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
+                    arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f);
                 break;
             }
             if (isScale(offset,
@@ -1204,7 +1206,7 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<19, 24> integer;
                     BitField<24, 32> decimal;
                 } arg = { readarg(1) };
-                VertexTextureFilter(index, arg.integer.s() + (float)arg.decimal.u() / 255);
+                VertexTextureFilter(index, arg.integer.s() + (float)arg.decimal.u() / 255.f);
                 break;
             }
             if (isScale(offset,
@@ -1212,7 +1214,24 @@ int64_t Rsx::interpret(uint32_t get) {
                         32,
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
-                name = "CELL_GCM_NV4097_SET_TEXTURE_OFFSET";
+                //name = "CELL_GCM_NV4097_SET_TEXTURE_OFFSET";
+                union {
+                    uint32_t val;
+                    BitField<8, 16> mipmap;
+                    BitField<16, 24> format;
+                    BitField<24, 28> dimension;
+                    BitField<28, 29> border;
+                    BitField<29, 30> cubemap;
+                    BitField<30, 32> location;
+                } f = { readarg(2) };
+                TextureOffset(index, 
+                              readarg(1),
+                              f.mipmap.u(),
+                              f.format.u(),
+                              f.dimension.u(),
+                              f.border.u(),
+                              f.cubemap.u(),
+                              f.location.u());
                 break;
             }
             if (isScale(offset,
@@ -1220,7 +1239,13 @@ int64_t Rsx::interpret(uint32_t get) {
                         4,
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
-                name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL3";
+                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL3";
+                union {
+                    uint32_t val;
+                    BitField<0, 12> depth;
+                    BitField<12, 32> pitch;
+                } f = { readarg(1) };
+                TextureControl3(index, f.depth.u(), f.pitch.u());
                 break;
             }
             if (isScale(offset,
@@ -1277,8 +1302,14 @@ int64_t Rsx::interpret(uint32_t get) {
                         4,
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
-                name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL2";
-                TextureControl2(index, readarg(1));
+                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL2";
+                union {
+                    uint32_t val;
+                    BitField<24, 25> aniso;
+                    BitField<25, 26> iso;
+                    BitField<26, 32> slope;
+                } arg = { readarg(1) };
+                TextureControl2(index, arg.slope.u(), arg.iso.u(), arg.slope.u());
                 break;
             }
             if (isScale(offset,
@@ -1338,6 +1369,16 @@ void Rsx::setGet(uint32_t get) {
     boost::unique_lock<boost::mutex> lock(_mutex);
     _get = get;
     _cv.notify_all();
+}
+
+uint32_t Rsx::getRef() {
+    boost::unique_lock<boost::mutex> lock(_mutex);
+    return _ref;
+}
+
+void Rsx::setRef(uint32_t ref) {
+    boost::unique_lock<boost::mutex> lock(_mutex);
+    _ref = ref;
 }
 
 void Rsx::loop() {

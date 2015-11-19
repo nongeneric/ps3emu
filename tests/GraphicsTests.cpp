@@ -79,3 +79,12 @@ TEST_CASE("gcm_vertex_texture") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_vertex_texture/ps3frame.png");
 }
+
+TEST_CASE("gcm_cube") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_cube/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_cube/ps3frame.png");
+}

@@ -216,3 +216,64 @@ int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info) {
     return CELL_OK;
 }
 
+// mutex
+
+template <typename ID, typename T>
+class IDMap {
+    ID _maxId = 1;
+    std::map<ID, T> _map;
+public:
+    ID create(T&& t) {
+        assert(_maxId <= 2000); // TODO: implement id reuse
+        _map.insert(std::make_pair(_maxId, std::move(t)));
+        return _maxId++;
+    }
+    
+    void destroy(ID id) {
+        auto it = _map.find(id);
+        assert(it != end(_map));
+        _map.erase(it);
+    }
+    
+    T& get(ID id) {
+        auto it = _map.find(id);
+        assert(it != end(_map));
+        return it->second;
+    }
+};
+
+IDMap<sys_mutex_t, std::unique_ptr<boost::timed_mutex>> mutexes;
+
+int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
+    auto mutex = std::make_unique<boost::timed_mutex>();
+    *mutex_id = mutexes.create(std::move(mutex));
+    return CELL_OK;
+}
+
+int sys_mutex_destroy(sys_mutex_t mutex_id) {
+    mutexes.destroy(mutex_id);
+    return CELL_OK;
+}
+
+int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
+    if (timeout == 0)
+        mutexes.get(mutex_id)->lock();
+    else
+        mutexes.get(mutex_id)->try_lock_for( boost::chrono::microseconds(timeout) );
+    return CELL_OK;
+}
+
+int sys_mutex_trylock(sys_mutex_t mutex_id) {
+    bool locked = mutexes.get(mutex_id)->try_lock();
+    return locked ? CELL_OK : EBUSY;
+}
+
+int sys_mutex_unlock(sys_mutex_t mutex_id) {
+    mutexes.get(mutex_id)->unlock();
+    return CELL_OK;
+}
+
+uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3) {
+    *id = 0x123;
+    return CELL_OK;
+}

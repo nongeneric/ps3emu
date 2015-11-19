@@ -5,9 +5,12 @@
 #include <vector>
 #include <array>
 
-std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode, bool isFlatColorShading);
+std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
+                                   std::array<int, 16> const& samplerSizes,
+                                   bool isFlatColorShading);
 
 struct VertexShaderInputFormat {
+    bool enabled = false;
     int typeSize = 4;
     int rank = 4;
     //int mask;

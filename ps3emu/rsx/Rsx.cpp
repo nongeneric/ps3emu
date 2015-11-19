@@ -1,5 +1,6 @@
 #include "Rsx.h"
 
+#include "GLTexture.h"
 #include "../PPU.h"
 #include "../shaders/ShaderGenerator.h"
 #include "../utils.h"
@@ -36,21 +37,6 @@ struct VertexDataArrayFormatInfo {
 
 typedef std::array<float, 4> glvec4_t;
 
-
-void glcheck(int line, const char* call) {
-    BOOST_LOG_TRIVIAL(trace) << "glcall: " << call;
-    auto err = glGetError();
-    if (err) {
-        auto msg = err == GL_INVALID_ENUM ? "GL_INVALID_ENUM"
-        : err == GL_INVALID_VALUE ? "GL_INVALID_VALUE"
-        : err == GL_INVALID_OPERATION ? "GL_INVALID_OPERATION"
-        : err == GL_INVALID_FRAMEBUFFER_OPERATION ? "GL_INVALID_FRAMEBUFFER_OPERATION"
-        : err == GL_OUT_OF_MEMORY ? "GL_OUT_OF_MEMORY"
-        : "unknown";
-        throw std::runtime_error(ssnprintf("[%d] error: %x (%s)\n", line, err, msg));
-    }
-}
-
 void check_shader(GLuint shader) {
     GLint param;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &param);
@@ -63,49 +49,6 @@ void check_shader(GLuint shader) {
     }
 }
 
-#define glcall(a) { a; glcheck(__LINE__, #a); }
-
-struct TextureInfo {
-    uint32_t pitch;
-    uint16_t width;
-    uint16_t height;
-    uint32_t offset; 
-    uint8_t mipmap;
-    uint8_t format;
-    uint8_t dimension;
-    uint8_t location;
-};
-
-class GLTexture {
-    TextureInfo _info;
-    GLuint _handle;
-    GLTexture(GLTexture const&) = delete;
-    void operator=(GLTexture const&) = delete;
-public:
-    GLTexture(PPU* ppu, TextureInfo const& info) : _info(info) {
-        glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
-        glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height)); // TODO: format
-        auto size = info.pitch * info.height;
-        std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
-        ppu->readMemory(GcmLocalMemoryBase + info.offset, buf.get(), size);
-        glcall(glTextureSubImage2D(_handle,
-            0, 0, 0, info.width, info.height, GL_RGBA, GL_FLOAT, buf.get()
-        ));
-    }
-    
-    ~GLTexture() {
-        glcall(glDeleteTextures(1, &_handle));
-    }
-    
-    TextureInfo const& info() const {
-        return _info;
-    }
-    
-    void bind(GLuint samplerIndex) {
-        glcall(glBindTextureUnit(samplerIndex, _handle));
-    }
-};
-
 std::vector<std::unique_ptr<GLTexture>> textureCache;
 
 struct TextureSamplerInfo {
@@ -115,9 +58,16 @@ struct TextureSamplerInfo {
     float maxlod;
     uint32_t wraps;
     uint32_t wrapt;
+    uint8_t fragmentWrapr;
+    uint8_t fragmentZfunc;
+    uint8_t fragmentAnisoBias;
     float bias;
+    uint8_t fragmentMin;
+    uint8_t fragmentMag;
+    uint8_t fragmentConv;
+    uint8_t fragmentAlphaKill;
     std::array<float, 4> borderColor;
-    TextureInfo texture;
+    RsxTextureInfo texture;
 };
 
 class RsxContext {
@@ -171,7 +121,8 @@ public:
     uint32_t vertexLoadOffset = 0;
     uint32_t vertexIndexArrayOffset = 0;
     GLuint vertexIndexArrayGlType = 0;
-    TextureSamplerInfo textureSamplers[4];;
+    TextureSamplerInfo vertexTextureSamplers[4];
+    TextureSamplerInfo fragmentTextureSamplers[16];
 };
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
@@ -296,12 +247,8 @@ void Rsx::ReduceDstColor(bool enable) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ReduceDstColor(%d)", enable);
 }
 
-void Rsx::TextureControl2(unsigned int index, uint32_t control) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl2(%d, %x)", index, control);
-}
-
 void Rsx::FogMode(uint32_t mode) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl2(%x)", mode);
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("FogMode(%x)", mode);
 }
 
 void Rsx::AnisoSpread(unsigned int index,
@@ -324,43 +271,6 @@ void Rsx::AlphaFunc(uint32_t af, uint32_t ref) {
 
 void Rsx::AlphaTestEnable(bool enable) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("AlphaTestEnable(%d)", enable);
-}
-
-void Rsx::TextureAddress(unsigned index,
-                         uint8_t wraps,
-                         uint8_t wrapt,
-                         uint8_t wrapr,
-                         uint8_t unsignedRemap,
-                         uint8_t zfunc,
-                         uint8_t gamma,
-                         uint8_t anisoBias,
-                         uint8_t signedRemap) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureAddress(%d, ...)", index);
-}
-
-void Rsx::TextureBorderColor(unsigned index, uint32_t color) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureBorderColor(%d, %x)", index, color);
-}
-
-void Rsx::TextureControl0(unsigned index,
-                          uint8_t alphaKill,
-                          uint8_t maxaniso,
-                          uint16_t maxlod,
-                          uint16_t minlod,
-                          bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl0(%d, ...)", index);
-}
-
-void Rsx::TextureFilter(unsigned index,
-                        uint16_t bias,
-                        uint8_t min,
-                        uint8_t mag,
-                        uint8_t conv,
-                        uint8_t as,
-                        uint8_t rs,
-                        uint8_t gs,
-                        uint8_t bs) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureFilter(%d, ...)", index);
 }
 
 void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
@@ -615,6 +525,8 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
     auto& vinput = _context->vertexInputs[index];
     vinput.typeSize = gltype == GL_FLOAT ? 4 : 1; // TODO: other types
     vinput.rank = size;
+    vinput.enabled = true;
+    glcall(glEnableVertexAttribArray(index));
     glcall(glVertexAttribFormat(index, size, gltype, normalize, 0));
 }
 
@@ -625,11 +537,12 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
     array.location = location == CELL_GCM_LOCATION_LOCAL ?
         MemoryLocation::Local : MemoryLocation::Main;
     array.offset = offset;
-    array.binding = index + 1; // 0 means no binding
+    array.binding = index;
+    GLint maxBindings;
+    assert((GLint)array.binding < (glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBindings), maxBindings));
     assert(location == CELL_GCM_LOCATION_LOCAL);
-    glcall(glBindVertexBuffer(array.binding, _context->buffer, offset, array.stride));
     glcall(glVertexAttribBinding(index, array.binding));
-    glcall(glEnableVertexAttribArray(index));
+    glcall(glBindVertexBuffer(array.binding, _context->buffer, offset, array.stride));
 }
 
 void Rsx::BeginEnd(uint32_t mode) {
@@ -675,10 +588,11 @@ void Rsx::initGcm() {
     
     _context->window.Init();
     glcall(glCreateBuffers(1, &_context->buffer));
-    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT |
-                    GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
+    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT
+                  | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
     glcall(glNamedBufferStorage(_context->buffer, GcmLocalMemorySize, NULL, mapFlags));
-    _context->bufferMappedMemory = (uint8_t*)glMapNamedBuffer(_context->buffer, GL_READ_WRITE);
+    _context->bufferMappedMemory = (uint8_t*)glMapNamedBufferRange(
+        _context->buffer, 0, GcmLocalMemorySize, mapFlags & ~GL_DYNAMIC_STORAGE_BIT);
     _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->bufferMappedMemory);
     // remap io to point to the buffer as well
     _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
@@ -691,8 +605,11 @@ void Rsx::initGcm() {
     auto uniformSize = sizeof(VertexShaderSamplerUniform) * 4;
     glcall(glNamedBufferStorage(_context->vertexSamplersBuffer, uniformSize, NULL, GL_DYNAMIC_STORAGE_BIT));
     
-    for (int i = 0; i < 4; ++i) {
-        _context->textureSamplers[i].enable = false;
+    for (auto& s : _context->vertexTextureSamplers) {
+        s.enable = false;
+    }
+    for (auto& s : _context->fragmentTextureSamplers) {
+        s.enable = false;
     }
     
     boost::lock_guard<boost::mutex> lock(_initMutex);
@@ -800,8 +717,10 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
 void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
-        auto text = GenerateFragmentShader(_context->fragmentBytecode, _context->isFlatShadeMode);
-        
+        // TODO: handle sizes
+        std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
+        auto text = GenerateFragmentShader(_context->fragmentBytecode, sizes, _context->isFlatShadeMode);
+                
         BOOST_LOG_TRIVIAL(trace) << text;
         
         if (_context->fragmentShader) // TODO: raii
@@ -817,15 +736,15 @@ void Rsx::updateShaders() {
     if (_context->vertexShaderDirty) {
         _context->vertexShaderDirty = false;
         std::array<int, 4> samplerSizes = { 
-            _context->textureSamplers[0].texture.dimension,
-            _context->textureSamplers[1].texture.dimension,
-            _context->textureSamplers[2].texture.dimension,
-            _context->textureSamplers[3].texture.dimension
+            _context->vertexTextureSamplers[0].texture.dimension,
+            _context->vertexTextureSamplers[1].texture.dimension,
+            _context->vertexTextureSamplers[2].texture.dimension,
+            _context->vertexTextureSamplers[3].texture.dimension
         };
         auto text = GenerateVertexShader(_context->vertexInstructions.data(),
                                          _context->vertexInputs,
                                          samplerSizes, 0); // TODO: loadAt
-        
+
         BOOST_LOG_TRIVIAL(trace) << text;
         
         if (_context->vertexShader) // TODO: raii
@@ -857,47 +776,47 @@ void Rsx::VertexTextureOffset(unsigned index,
                               uint8_t location)
 {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureOffset(%d, %x, ...)", index, offset);
-    auto& t = _context->textureSamplers[index].texture;
+    auto& t = _context->vertexTextureSamplers[index].texture;
     t.offset = offset;
     t.mipmap = mipmap;
     t.format = format;
     t.dimension = dimension;
-    t.location = location;
+    t.location = location; // TODO: handle location
 }
 
 void Rsx::VertexTextureControl3(unsigned index, uint32_t pitch) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureControl3(%d, %x)", index, pitch);
-    _context->textureSamplers[index].texture.pitch = pitch;
+    _context->vertexTextureSamplers[index].texture.pitch = pitch;
 }
 
 void Rsx::VertexTextureImageRect(unsigned index, uint16_t width, uint16_t height) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureImageRect(%d, %d, %d)", index, width, height);
-    _context->textureSamplers[index].texture.width = width;
-    _context->textureSamplers[index].texture.height = height;
+    _context->vertexTextureSamplers[index].texture.width = width;
+    _context->vertexTextureSamplers[index].texture.height = height;
 }
 
 void Rsx::VertexTextureControl0(unsigned index, bool enable, float minlod, float maxlod) {
     BOOST_LOG_TRIVIAL(trace) << 
-        ssnprintf("VertexTextureControl0(%d, %d, %x, %x)", index, enable, minlod, maxlod);
-    _context->textureSamplers[index].enable = enable;
-    _context->textureSamplers[index].minlod = minlod;
-    _context->textureSamplers[index].maxlod = maxlod;
+        ssnprintf("VertexTextureControl0(%d, %d, %x, %x) [vertex]", index, enable, minlod, maxlod);
+    _context->vertexTextureSamplers[index].enable = enable;
+    _context->vertexTextureSamplers[index].minlod = minlod;
+    _context->vertexTextureSamplers[index].maxlod = maxlod;
 }
 
 void Rsx::VertexTextureAddress(unsigned index, uint8_t wraps, uint8_t wrapt) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureAddress(%d, %x, %x)", index, wraps, wrapt);
-    _context->textureSamplers[index].wraps = wraps;
-    _context->textureSamplers[index].wrapt = wrapt;
+    _context->vertexTextureSamplers[index].wraps = wraps;
+    _context->vertexTextureSamplers[index].wrapt = wrapt;
 }
 
 void Rsx::VertexTextureFilter(unsigned int index, float bias) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureFilter(%d, %x)", index, bias);
-    _context->textureSamplers[index].bias = bias;
+    _context->vertexTextureSamplers[index].bias = bias;
 }
 
 void Rsx::updateTextures() {
     int index = 0;
-    for (auto& sampler : _context->textureSamplers) {
+    for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
             auto texture = new GLTexture(_ppu, sampler.texture); // TODO: search cache
             texture->bind(index);
@@ -923,6 +842,32 @@ void Rsx::updateTextures() {
         }
         index++;
     }
+    for (auto& sampler : _context->fragmentTextureSamplers) {
+        if (sampler.enable) {
+            auto texture = new GLTexture(_ppu, sampler.texture); // TODO: search cache
+            texture->bind(index);
+            textureCache.emplace_back(texture);
+            
+            if (sampler.glSampler == 0xffffffff) {
+                glcall(glCreateSamplers(1, &sampler.glSampler));
+                glcall(glBindSampler(index, sampler.glSampler));
+            }
+            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_MIN_LOD, sampler.minlod);
+            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_MAX_LOD, sampler.maxlod);
+            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_LOD_BIAS, sampler.bias);
+            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            
+            //VertexShaderSamplerUniform info[] = { 
+            //    sampler.wraps, sampler.wrapt, sampler.fragmentWrapr, sampler.borderColor
+            //};
+            //auto infoSize = sizeof(info);
+            //glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, index * infoSize, infoSize, info));
+        }
+        index++;
+    }
 }
 
 void Rsx::init() {
@@ -937,7 +882,114 @@ void Rsx::init() {
     BOOST_LOG_TRIVIAL(trace) << "rsx loop completed initialization";
 }
 
-void Rsx::VertexTextureBorderColor(unsigned int index, std::array< float, int(4) > argb) {
+void Rsx::VertexTextureBorderColor(unsigned int index, std::array<float, int(4)> argb) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureBorderColor(%d, ...)", index);
-    _context->textureSamplers[index].borderColor = argb;
+    _context->vertexTextureSamplers[index].borderColor = argb;
+}
+
+void Rsx::TextureAddress(unsigned index,
+                         uint8_t wraps,
+                         uint8_t wrapt,
+                         uint8_t wrapr,
+                         uint8_t unsignedRemap,
+                         uint8_t zfunc,
+                         uint8_t gamma,
+                         uint8_t anisoBias,
+                         uint8_t signedRemap) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureAddress(%d, ...)", index);
+    auto& s = _context->fragmentTextureSamplers[index];
+    s.wraps = wraps;
+    s.wrapt = wrapt;
+    s.fragmentWrapr = wrapr;
+    s.fragmentZfunc = zfunc;
+    s.fragmentAnisoBias = anisoBias;
+    s.texture.fragmentUnsignedRemap = unsignedRemap;
+    s.texture.fragmentGamma = gamma;
+    s.texture.fragmentSignedRemap = signedRemap;
+}
+
+void Rsx::TextureBorderColor(unsigned index, std::array<float, int(4)> argb) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureBorderColor(%d, ...)", index);
+    _context->vertexTextureSamplers[index].borderColor = argb;
+}
+
+void Rsx::TextureFilter(unsigned index,
+                        float bias,
+                        uint8_t min,
+                        uint8_t mag,
+                        uint8_t conv,
+                        uint8_t as,
+                        uint8_t rs,
+                        uint8_t gs,
+                        uint8_t bs) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureFilter(%d, ...)", index);
+    auto& s = _context->fragmentTextureSamplers[index];
+    s.bias = bias;
+    s.fragmentMin = min;
+    s.fragmentMag = mag;
+    s.fragmentConv = conv;
+    s.texture.fragmentAs = as;
+    s.texture.fragmentRs = rs;
+    s.texture.fragmentGs = gs;
+    s.texture.fragmentBs = bs;
+}
+
+void Rsx::TextureOffset(unsigned index, 
+                        uint32_t offset, 
+                        uint16_t mipmap, 
+                        uint8_t format, 
+                        uint8_t dimension,
+                        bool border, 
+                        bool cubemap, 
+                        uint8_t location)
+{
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureOffset(...)");
+    auto& t = _context->fragmentTextureSamplers[index].texture;
+    t.offset = offset;
+    t.mipmap = mipmap;
+    t.format = format;
+    t.dimension = dimension;
+    t.fragmentBorder = border;
+    t.fragmentCubemap = cubemap;
+    t.location = location;
+}
+
+void Rsx::TextureImageRect(unsigned int index, uint16_t width, uint16_t height) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureImageRect(%d, %d, %d)", index, width, height);
+    _context->fragmentTextureSamplers[index].texture.width = width;
+    _context->fragmentTextureSamplers[index].texture.height = height;
+}
+
+void Rsx::TextureControl3(unsigned int index, uint16_t depth, uint32_t pitch) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl3(%d, %d, %d)", index, depth, pitch);
+    _context->fragmentTextureSamplers[index].texture.pitch = pitch;
+    _context->fragmentTextureSamplers[index].texture.fragmentDepth = depth;
+}
+
+void Rsx::TextureControl1(unsigned int index, uint32_t remap) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl1(%d, %x)", index, remap);
+    _context->fragmentTextureSamplers[index].texture.fragmentRemapCrossbarSelect = remap;
+}
+
+void Rsx::TextureControl2(unsigned int index, uint8_t slope, bool iso, bool aniso) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl2(%d, %d, %d, %d)", index, slope, iso, aniso);
+    // ignore these optimizations
+}
+
+void Rsx::TextureControl0(unsigned index,
+                          uint8_t alphaKill,
+                          uint8_t maxaniso,
+                          float maxlod,
+                          float minlod,
+                          bool enable) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl0(%d, ...)", index);
+    // ignore maxaniso
+    _context->fragmentTextureSamplers[index].fragmentAlphaKill = alphaKill;
+    _context->fragmentTextureSamplers[index].enable = enable;
+    _context->fragmentTextureSamplers[index].minlod = minlod;
+    _context->fragmentTextureSamplers[index].maxlod = maxlod;
+}
+
+void Rsx::SetReference(uint32_t ref) {
+    _ref = ref;
 }

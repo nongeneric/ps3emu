@@ -28,8 +28,8 @@ fragment_opcode_t fragment_opcodes[] = {
     { 1, 0, 0, 0, "UP4", fragment_op_t::UP4 },
     { 1, 0, 0, 0, "DDX", fragment_op_t::DDX },
     { 1, 0, 0, 0, "DDY", fragment_op_t::DDY },
-    { 1, 0, 0, 1, "TEX", fragment_op_t::TEX },
-    { 1, 0, 0, 1, "TXP", fragment_op_t::TXP },
+    { 2, 0, 0, 1, "TEX", fragment_op_t::TEX },
+    { 2, 0, 0, 1, "TXP", fragment_op_t::TXP },
     { 3, 0, 0, 1, "TXD", fragment_op_t::TXD },
     { 1, 0, 0, 0, "RCP", fragment_op_t::RCP },
     { 1, 0, 0, 0, "RSQ", fragment_op_t::RSQ },
@@ -442,7 +442,7 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             res += ssnprintf("(%s%s%s)", print_cond(i.condition.relation), creg, swizzle.c_str());
         }
     }
-    // LOOP, REP, RET, CAL
+    // TODO: LOOP, REP, RET, CAL
     for (int n = 0; n < i.opcode.op_count; ++n) {
         auto& arg = i.arguments[n];
         res += ", ";
@@ -450,7 +450,9 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             res += "-";
         if (arg.is_abs)
             res += "|";
-        if (arg.type == op_type_t::Attr) {
+        if (i.opcode.tex && n == i.opcode.op_count - 1) {
+            res += ssnprintf("TEX%d", i.arguments[n].reg_num);
+        } else if (arg.type == op_type_t::Attr) {
             if (i.persp_corr == persp_corr_t::F) {
                 res += "f[";
             } else {
@@ -475,7 +477,6 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
         res += print_swizzle(arg.swizzle, false);
         if (arg.is_abs)
             res += "|";
-        // TEX
     }
     res += ";";
     if (i.is_last) {

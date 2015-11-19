@@ -24,6 +24,7 @@ class PPU;
 class Rsx {
     uint32_t _get = 0xffffffff;
     uint32_t _put = 0;
+    uint32_t _ref = 0xffffffff;
     uint32_t _ret = 0;
     bool _shutdown = false;
     bool _initialized = false;
@@ -35,7 +36,8 @@ class Rsx {
     std::unique_ptr<boost::thread> _thread;
     std::unique_ptr<RsxContext> _context;
     std::map<uint32_t, uint32_t> _semaphores;
-    uint32_t _activeSemaphoreHandle = 0;int64_t interpret(uint32_t get);
+    uint32_t _activeSemaphoreHandle = 0;
+    int64_t interpret(uint32_t get);
     void loop();
     void setSurfaceColorLocation(uint32_t context);
     void initGcm();
@@ -60,7 +62,6 @@ class Rsx {
     void TexCoordControl(unsigned index, uint32_t control);
     void ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters);
     void ReduceDstColor(bool enable);
-    void TextureControl2(unsigned index, uint32_t control);
     void FogMode(uint32_t mode);
     void AnisoSpread(unsigned index,
                      bool reduceSamplesEnable,
@@ -72,31 +73,6 @@ class Rsx {
     void VertexDataBaseOffset(uint32_t baseOffset, uint32_t baseIndex);
     void AlphaFunc(uint32_t af, uint32_t ref);
     void AlphaTestEnable(bool enable);
-    void TextureAddress(unsigned index,
-                        uint8_t wraps,
-                        uint8_t wrapt,
-                        uint8_t wrapr,
-                        uint8_t unsignedRemap,
-                        uint8_t zfunc,
-                        uint8_t gamma,
-                        uint8_t anisoBias,
-                        uint8_t signedRemap);
-    void TextureBorderColor(unsigned index, uint32_t color);
-    void TextureControl0(unsigned index,
-                         uint8_t alphaKill,
-                         uint8_t maxaniso,
-                         uint16_t maxlod,
-                         uint16_t minlod,
-                         bool enable);
-    void TextureFilter(unsigned index,
-                       uint16_t bias,
-                       uint8_t min,
-                       uint8_t mag,
-                       uint8_t conv,
-                       uint8_t as,
-                       uint8_t rs,
-                       uint8_t gs,
-                       uint8_t bs);
     void ShaderControl(uint32_t control, uint8_t registerCount);
     void TransformProgramLoad(uint32_t load, uint32_t start);
     void TransformProgram(uint32_t locationOffset, unsigned size);
@@ -163,12 +139,52 @@ class Rsx {
     void VertexTextureAddress(unsigned index, uint8_t wraps, uint8_t wrapt);
     void VertexTextureFilter(unsigned index, float bias);
     void VertexTextureBorderColor(unsigned index, std::array<float, 4> argb);
+    void TextureOffset(unsigned index,
+                       uint32_t offset,
+                       uint16_t mipmap,
+                       uint8_t format,
+                       uint8_t dimension,
+                       bool border,
+                       bool cubemap,
+                       uint8_t location);
+    void TextureImageRect(unsigned index, uint16_t width, uint16_t height);
+    void TextureControl3(unsigned index, uint16_t depth, uint32_t pitch);
+    void TextureControl2(unsigned index, uint8_t slope, bool iso, bool aniso);
+    void TextureControl1(unsigned index, uint32_t remap);
+    void TextureAddress(unsigned index,
+                        uint8_t wraps,
+                        uint8_t wrapt,
+                        uint8_t wrapr,
+                        uint8_t unsignedRemap,
+                        uint8_t zfunc,
+                        uint8_t gamma,
+                        uint8_t anisoBias,
+                        uint8_t signedRemap);
+    void TextureBorderColor(unsigned index, std::array<float, int(4)> argb);
+    void TextureControl0(unsigned index,
+                         uint8_t alphaKill,
+                         uint8_t maxaniso,
+                         float maxlod,
+                         float minlod,
+                         bool enable);
+    void TextureFilter(unsigned index,
+                       float bias,
+                       uint8_t min,
+                       uint8_t mag,
+                       uint8_t conv,
+                       uint8_t as,
+                       uint8_t rs,
+                       uint8_t gs,
+                       uint8_t bs);
+    void SetReference(uint32_t ref);
 public:
     Rsx(PPU* ppu);
     ~Rsx();
     void shutdown();
     void setPut(uint32_t put);
     void setGet(uint32_t get);
+    uint32_t getRef();
+    void setRef(uint32_t ref);
     void setLabel(int index, uint32_t value);
     bool isFlipInProgress() const;
     void resetFlipStatus();

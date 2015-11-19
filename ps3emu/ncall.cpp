@@ -224,6 +224,13 @@ STUB_1(cellPadGetInfo2);
 STUB_1(cellKbGetInfo);
 STUB_1(cellMouseGetInfo);
 STUB_1(sys_ppu_thread_get_stack_information);
+STUB_1(cellGcmSetDebugOutputLevel);
+STUB_2(sys_mutex_create);
+STUB_1(sys_mutex_destroy);
+STUB_2(sys_mutex_lock);
+STUB_1(sys_mutex_trylock);
+STUB_1(sys_mutex_unlock);
+STUB_4(_sys_heap_create_heap);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -272,6 +279,8 @@ NCallEntry ncallTable[] {
     ENTRY(cellPadGetInfo2),
     ENTRY(cellKbGetInfo),
     ENTRY(cellMouseGetInfo),
+    ENTRY(cellGcmSetDebugOutputLevel),
+    ENTRY(_sys_heap_create_heap),
 };
 
 void PPU::ncall(uint32_t index) {
@@ -295,6 +304,11 @@ void PPU::scall() {
         case 136: nstub_sys_event_port_connect_local(this); break;
         case 147: nstub_sys_time_get_timebase_frequency(this); break;
         case 49: nstub_sys_ppu_thread_get_stack_information(this); break;
+        case 100: nstub_sys_mutex_create(this); break;
+        case 101: nstub_sys_mutex_destroy(this); break;
+        case 102: nstub_sys_mutex_lock(this); break;
+        case 103: nstub_sys_mutex_trylock(this); break;
+        case 104: nstub_sys_mutex_unlock(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

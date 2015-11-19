@@ -1,0 +1,31 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2007 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+struct v2fConnector
+{
+    float4 projCoord : POSITION;
+    float4 color     : COLOR0;
+    float4 tex       : TEX0;
+};
+
+struct f2fConnector
+{
+  float4 COL0 : COLOR0;
+};
+
+f2fConnector main
+(
+    v2fConnector v2f,
+    uniform texobj2D texture0
+)
+{
+    f2fConnector f2f;
+
+    float tex_col = f4tex2D(texture0, v2f.tex.xy).x;
+    f2f.COL0   = float4(tex_col, 0.0f, tex_col, 1.0f);
+    return f2f;
+}
+
+
