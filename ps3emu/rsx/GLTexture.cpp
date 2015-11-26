@@ -2,7 +2,6 @@
 #include "../PPU.h"
 
 #include <boost/log/trivial.hpp>
-#include <glm/glm.hpp>
 
 using namespace glm;
 
@@ -130,31 +129,67 @@ enum class FormatType {
 };
 
 struct FormatInfo {
-    unsigned size;
     FormatType type;
     std::function<void(const uint8_t*, u8vec4&)> u8read;
 };
 
+unsigned getTexelSize(uint32_t format) {
+    switch (format) {
+        case CELL_GCM_TEXTURE_A8R8G8B8:
+        case CELL_GCM_TEXTURE_D8R8G8B8:
+        case CELL_GCM_TEXTURE_DEPTH24_D8:
+        case CELL_GCM_TEXTURE_DEPTH24_D8_FLOAT:
+        case CELL_GCM_TEXTURE_Y16_X16:
+        case CELL_GCM_TEXTURE_X32_FLOAT:
+        case CELL_GCM_TEXTURE_Y16_X16_FLOAT:
+            return 4;
+        case CELL_GCM_TEXTURE_A1R5G5B5:
+        case CELL_GCM_TEXTURE_R5G5B5A1:
+        case CELL_GCM_TEXTURE_A4R4G4B4:
+        case CELL_GCM_TEXTURE_R5G6B5:
+        case CELL_GCM_TEXTURE_D1R5G5B5:
+        case CELL_GCM_TEXTURE_R6G5B5:
+        case CELL_GCM_TEXTURE_G8B8:        
+        case CELL_GCM_TEXTURE_DEPTH16:
+        case CELL_GCM_TEXTURE_DEPTH16_FLOAT:
+        case CELL_GCM_TEXTURE_X16:
+        case CELL_GCM_TEXTURE_COMPRESSED_HILO8:
+        case CELL_GCM_TEXTURE_COMPRESSED_HILO_S8:
+            return 2;
+        case CELL_GCM_TEXTURE_B8:
+            return 1;
+        case CELL_GCM_TEXTURE_W16_Z16_Y16_X16_FLOAT:
+        case CELL_GCM_TEXTURE_COMPRESSED_DXT1:
+            return 8;
+        case CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT:
+        case CELL_GCM_TEXTURE_COMPRESSED_DXT23:
+        case CELL_GCM_TEXTURE_COMPRESSED_DXT45:
+            return 16;
+        default: assert(false);
+    }
+    return {};
+}
+
 FormatInfo getFormat(uint32_t format) {
     switch (format) {
         case CELL_GCM_TEXTURE_A8R8G8B8:
-            return { 4, FormatType::u8x4, read_A8R8G8B8 };
+            return { FormatType::u8x4, read_A8R8G8B8 };
         case CELL_GCM_TEXTURE_D8R8G8B8:
-            return { 4, FormatType::u8x4, read_D8R8G8B8 };
+            return { FormatType::u8x4, read_D8R8G8B8 };
         case CELL_GCM_TEXTURE_A1R5G5B5:
-            return { 2, FormatType::u8x4, read_A1R5G5B5 };
+            return { FormatType::u8x4, read_A1R5G5B5 };
         case CELL_GCM_TEXTURE_R5G5B5A1:
-            return { 2, FormatType::u8x4, read_R5G5B5A1 };
+            return { FormatType::u8x4, read_R5G5B5A1 };
         case CELL_GCM_TEXTURE_A4R4G4B4:
-            return { 2, FormatType::u8x4, read_A4R4G4B4 };
+            return { FormatType::u8x4, read_A4R4G4B4 };
         case CELL_GCM_TEXTURE_R5G6B5:
-            return { 2, FormatType::u8x4, read_R5G6B5 };
+            return { FormatType::u8x4, read_R5G6B5 };
         case CELL_GCM_TEXTURE_D1R5G5B5:
-            return { 2, FormatType::u8x4, read_D1R5G5B5 };
+            return { FormatType::u8x4, read_D1R5G5B5 };
         case CELL_GCM_TEXTURE_R6G5B5:
-            return { 2, FormatType::u8x4, read_R6G5B5 };
+            return { FormatType::u8x4, read_R6G5B5 };
         case CELL_GCM_TEXTURE_B8:
-            return { 1, FormatType::u8x4, read_B8 };
+            return { FormatType::u8x4, read_B8 };
         
         case CELL_GCM_TEXTURE_G8B8:        
         case CELL_GCM_TEXTURE_DEPTH16:
@@ -220,87 +255,69 @@ float select(float f, uint32_t output) {
     }
 }
 
+class SurfaceWriter {
+    std::function<void(uint8_t*, vec4 const&)> _write;
+public:
+    SurfaceWriter(uint32_t format) : _write(make_write(format)) { }
+    
+    std::function<void(uint8_t*, vec4 const&)> make_write(uint32_t texelFormat) {
+        switch (texelFormat) {
+            case 0: return [](uint8_t* ptr, vec4 const& v) { };
+            case CELL_GCM_SURFACE_A8B8G8R8: return [](uint8_t* ptr, vec4 const& v) {
+                auto typed = (uint32_t*)ptr;
+                union {
+                    uint32_t val;
+                    BitField<0, 8> a;
+                    BitField<8, 16> r;
+                    BitField<16, 24> g;
+                    BitField<24, 32> b;
+                } t = { *typed };
+                t.a.set(v[3] * 255);
+                t.r.set(v[0] * 255);
+                t.g.set(v[1] * 255);
+                t.b.set(v[2] * 255);
+                *typed = t.val;
+            };
+            case CELL_GCM_SURFACE_F_W32Z32Y32X32: return [](uint8_t* ptr, vec4 const& v) {
+                auto f = (float*)ptr;
+                f[0] = v[3];
+                f[1] = v[2];
+                f[2] = v[1];
+                f[3] = v[0];
+            };
+            default: throw std::runtime_error("unknown format");
+        }
+    }
+};
+
 GLTexture::GLTexture(PPU* ppu, const RsxTextureInfo& info): _info(info) {
     auto size = info.pitch * info.height;
     std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
     ppu->readMemory(GcmLocalMemoryBase + info.offset, buf.get(), size);
     
     std::unique_ptr<vec4[]> conv(new vec4[info.width * info.height]);
-    union {
-        uint32_t v;
-        BitField<0, 16> order;
-        BitField<16, 18> outB;
-        BitField<18, 20> outG;
-        BitField<20, 22> outR;
-        BitField<22, 24> outA;
-        BitField<24, 26> inB;
-        BitField<26, 28> inG;
-        BitField<28, 30> inR;
-        BitField<30, 32> inA;
-    } remapParams = { info.fragmentRemapCrossbarSelect };
-    // TODO: swizzle textures
+
     assert(info.format & CELL_GCM_TEXTURE_LN);
     
     auto texelFormat = info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     
-    if (texelFormat == CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT) {
-        assert((uint32_t)size == (uint32_t)(info.width * info.height * sizeof(vec4)));
-        memcpy(conv.get(), buf.get(), size);
-    } else {
-        auto format = getFormat(texelFormat);
-        if (format.type == FormatType::u8x4) {
-            unsigned i = 0;
-            for (auto r = 0u; r < info.height; ++r) {
-                for (auto c = 0u; c < info.pitch; c += format.size) {
-                    u8vec4 readout;
-                    format.u8read(&buf[info.pitch * r + c], readout);
-                    vec4 tex = {
-                        remap(readout.r, 
-                            info.fragmentSignedRemap, 
-                            info.fragmentUnsignedRemap,
-                            info.fragmentRs,
-                            info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_R),
-                        remap(readout.g,
-                            info.fragmentSignedRemap, 
-                            info.fragmentUnsignedRemap,
-                            info.fragmentGs,
-                            info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_G),
-                        remap(readout.b,
-                            info.fragmentSignedRemap, 
-                            info.fragmentUnsignedRemap,
-                            info.fragmentBs,
-                            info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_B),
-                        remap(readout.a,
-                            info.fragmentSignedRemap, 
-                            info.fragmentUnsignedRemap,
-                            info.fragmentAs,
-                            info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_A)
-                    };
-                    tex = { crossbar(tex, remapParams.inR.u()),
-                            crossbar(tex, remapParams.inG.u()),
-                            crossbar(tex, remapParams.inB.u()),
-                            crossbar(tex, remapParams.inA.u()) };
-                    tex = { select(tex.r, remapParams.outR.u()),
-                            select(tex.g, remapParams.outG.u()),
-                            select(tex.b, remapParams.outB.u()),
-                            select(tex.a, remapParams.outA.u()) };
-                    conv[i] = tex;
-                    i++;
-                }
-            }
-        }
+    TextureReader reader(texelFormat, info);
+    TextureIterator it(&buf[0], info.pitch, info.width, getTexelSize(texelFormat));
+    for (auto i = 0; i < info.width * info.height; ++i) {
+        reader.read(*it, conv[i]);
+        ++it;
     }
-    // remap order for 2x16 and 32 ...
     
     glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
     glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
     glcall(glTextureSubImage2D(_handle,
         0, 0, 0, info.width, info.height, GL_RGBA, GL_FLOAT, conv.get()
-     ));
+    ));
 }
 
 GLTexture::~GLTexture() {
-    glcall(glDeleteTextures(1, &_handle));
+    //glcall(glDeleteTextures(1, &_handle));
+    glDeleteTextures(1, &_handle);
 }
 
 const RsxTextureInfo& GLTexture::info() const {
@@ -323,4 +340,123 @@ void glcheck(int line, const char* call) {
                    : "unknown";
         throw std::runtime_error(ssnprintf("[%d] error: %x (%s)\n", line, err, msg));
     }
+}
+
+TextureReader::TextureReader(uint32_t format, const RsxTextureInfo& info)
+    : _read(make_read(format, info)) { }
+    
+std::function<glm::vec4(uint8_t*)> TextureReader::make_read(uint32_t texelFormat, 
+                                                            RsxTextureInfo const& info)
+{
+    if (texelFormat == CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT) {
+        return [](uint8_t* p) {
+            auto fp = (float*)p;
+            return vec4(fp[0], fp[1], fp[2], fp[3]);
+        };
+    } else {
+        auto format = getFormat(texelFormat);
+        if (format.type == FormatType::u8x4) {
+            union {
+                uint32_t v;
+                BitField<0, 16> order;
+                BitField<16, 18> outB;
+                BitField<18, 20> outG;
+                BitField<20, 22> outR;
+                BitField<22, 24> outA;
+                BitField<24, 26> inB;
+                BitField<26, 28> inG;
+                BitField<28, 30> inR;
+                BitField<30, 32> inA;
+            } remapParams = { info.fragmentRemapCrossbarSelect };
+            return [=](uint8_t* p) {
+                u8vec4 readout;
+                format.u8read(p, readout);
+                vec4 tex = {
+                    remap(readout.r,
+                    info.fragmentSignedRemap,
+                    info.fragmentUnsignedRemap,
+                    info.fragmentRs,
+                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_R),
+                    remap(readout.g,
+                    info.fragmentSignedRemap,
+                    info.fragmentUnsignedRemap,
+                    info.fragmentGs,
+                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_G),
+                    remap(readout.b,
+                    info.fragmentSignedRemap,
+                    info.fragmentUnsignedRemap,
+                    info.fragmentBs,
+                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_B),
+                    remap(readout.a,
+                    info.fragmentSignedRemap,
+                    info.fragmentUnsignedRemap,
+                    info.fragmentAs,
+                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_A)
+                };
+                tex = { crossbar(tex, remapParams.inR.u()),
+                        crossbar(tex, remapParams.inG.u()),
+                        crossbar(tex, remapParams.inB.u()),
+                        crossbar(tex, remapParams.inA.u())
+                      };
+                tex = { select(tex.r, remapParams.outR.u()),
+                        select(tex.g, remapParams.outG.u()),
+                        select(tex.b, remapParams.outB.u()),
+                        select(tex.a, remapParams.outA.u())
+                      };
+                return tex;
+            };
+        }
+    }
+    throw std::runtime_error("");
+}
+
+void TextureReader::read(uint8_t* ptr, vec4& tex) {
+    tex = _read(ptr);
+}
+
+TextureIterator::TextureIterator(uint8_t* buf, unsigned int pitch, unsigned width, unsigned size)
+    : _ptr(buf), _pitch(pitch), _width(width), _size(size) { }
+    
+TextureIterator& TextureIterator::operator++() {
+    _pos += _size;
+    if (_pos >= _pitch) {
+        _pos = 0;
+        _ptr += _pitch;
+    }
+    return *this;
+}
+
+bool TextureIterator::operator==(const TextureIterator& other) {
+    return _ptr == other._ptr;
+}
+
+uint8_t* TextureIterator::operator*() {
+    return _ptr + _pos;
+}
+
+GLSimpleTexture::GLSimpleTexture ( unsigned int width, unsigned int height, GLuint format )
+    : _width (width), _height (height), _format (format)
+{
+    glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
+    glcall(glTextureStorage2D(_handle, 1, format, width, height));
+}
+
+GLSimpleTexture::~GLSimpleTexture() {
+    glDeleteTextures(1, &_handle);
+}
+
+GLuint GLSimpleTexture::handle() {
+    return _handle;
+}
+
+unsigned GLSimpleTexture::width() {
+    return _width;
+}
+
+unsigned GLSimpleTexture::height() {
+    return _height;
+}
+
+GLuint GLSimpleTexture::format() {
+    return _format;
 }

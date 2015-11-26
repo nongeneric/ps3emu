@@ -1,5 +1,6 @@
 #include "Rsx.h"
 
+#include "GLFramebuffer.h"
 #include "GLTexture.h"
 #include "../PPU.h"
 #include "../shaders/ShaderGenerator.h"
@@ -12,18 +13,6 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
-enum class MemoryLocation {
-    Main, Local
-};
-
-enum class DepthFormat {
-    Fixed, Float
-};
-
-enum class SurfaceDepthFormat {
-    z16, z24s8
-};
 
 struct VertexDataArrayFormatInfo {
     uint16_t frequency;
@@ -49,11 +38,82 @@ void check_shader(GLuint shader) {
     }
 }
 
+enum class GLShaderType {
+    vertex, fragment
+};
+
+template <typename H, void (*Deleter)(H)>
+class HandleWrapper {
+    H _handle = H();
+public:
+    HandleWrapper(H handle) : _handle(handle) { }
+    
+    HandleWrapper(HandleWrapper&& other) {
+        _handle = other._handle;
+        other._handle = H();
+    }
+    
+    HandleWrapper& operator=(HandleWrapper&& other) {
+        std::swap(_handle, other._handle);
+        return *this;
+    }
+    
+    virtual ~HandleWrapper() {
+        if (_handle != H()) {
+            Deleter(_handle);
+        }
+    }
+    
+    GLuint handle() {
+        return _handle;
+    }
+};
+
+void deleteShader(GLuint handle) {
+    glDeleteShader(handle);
+}
+
+class GLShader : public HandleWrapper<GLuint, deleteShader> {
+public:
+    GLShader() : HandleWrapper(0) { }
+    GLShader(GLShaderType type) : HandleWrapper(init(type)) { }
+    GLuint init(GLShaderType type) {
+        auto glType = type == GLShaderType::fragment ? 
+            GL_FRAGMENT_SHADER : GL_VERTEX_SHADER;
+        return glCreateShader(glType);
+    }
+};
+
+void deleteProgram(GLuint handle) {
+    glDeleteProgram(handle);
+}
+
+class GLProgram : public HandleWrapper<GLuint, deleteProgram> {
+public:
+    GLProgram(GLuint handle) : HandleWrapper(handle) { }
+    GLProgram() : HandleWrapper(glCreateProgram()) { }
+};
+
+void deleteSampler(GLuint handle) {
+    glDeleteSamplers(1, &handle);
+}
+
+class GLSampler : public HandleWrapper<GLuint, deleteSampler> {
+public:
+    GLSampler(GLuint handle) : HandleWrapper(handle) { }
+    GLSampler() : HandleWrapper(init()) { }
+    GLuint init() {
+        GLuint handle;
+        glcall(glCreateSamplers(1, &handle));
+        return handle;
+    }
+};
+
 std::vector<std::unique_ptr<GLTexture>> textureCache;
 
 struct TextureSamplerInfo {
     bool enable;
-    GLuint glSampler = -1;
+    GLSampler glSampler = GLSampler(0);
     float minlod;
     float maxlod;
     uint32_t wraps;
@@ -70,6 +130,15 @@ struct TextureSamplerInfo {
     RsxTextureInfo texture;
 };
 
+struct DisplayBufferInfo {
+    ps3_uintptr_t offset;
+    uint32_t pitch;
+    uint32_t width;
+    uint32_t height;
+};
+
+class GLFramebuffer;
+class TextureRenderer;
 class RsxContext {
 public:
     uint32_t gcmIoSize;
@@ -77,18 +146,7 @@ public:
     Window window;
     GLuint buffer;
     uint8_t* bufferMappedMemory;
-    MemoryLocation surfaceColorLocation;
-    MemoryLocation surfaceDepthLocation;
-    unsigned surfaceWidth;
-    unsigned surfaceHeight;
-    unsigned surfaceColorPitch[4];
-    unsigned surfaceColorOffset[4];
-    unsigned surfaceDepthPitch;
-    unsigned surfaceDepthOffset;
-    unsigned surfaceWindowOriginX;
-    unsigned surfaceWindowOriginY;
-    DepthFormat depthFormat;
-    SurfaceDepthFormat surfaceDepthFormat;
+    SurfaceInfo surface;
     unsigned viewPortX;
     unsigned viewPortY;
     unsigned viewPortWidth;
@@ -102,16 +160,16 @@ public:
     uint32_t depthFunc;
     bool isCullFaceEnabled;
     bool isFlatShadeMode;
-    uint32_t colorClearValue;
-    uint32_t clearSurfaceMask;
+    glm::vec4 colorClearValue;
+    GLuint glClearSurfaceMask;
     bool isFlipInProgress = false;
     VertexDataArrayFormatInfo vertexDataArrays[16];
     GLuint glVertexArrayMode;
-    GLuint vertexShader = 0;
-    GLuint fragmentShader = 0;
+    GLShader vertexShader;
+    GLShader fragmentShader;
     GLuint vertexConstBuffer;
     GLuint vertexSamplersBuffer;
-    GLuint shaderProgram = 0;
+    GLProgram shaderProgram = GLProgram(0);
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     std::vector<uint8_t> fragmentBytecode;
@@ -123,6 +181,9 @@ public:
     GLuint vertexIndexArrayGlType = 0;
     TextureSamplerInfo vertexTextureSamplers[4];
     TextureSamplerInfo fragmentTextureSamplers[16];
+    DisplayBufferInfo displayBuffers[8];
+    std::unique_ptr<GLFramebuffer> framebuffer;
+    std::unique_ptr<TextureRenderer> textureRenderer;
 };
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
@@ -130,6 +191,74 @@ Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
 Rsx::~Rsx() {
     shutdown();
 }
+
+class TextureRenderer {
+    GLProgram _program;
+    GLSampler _sampler;
+    // TODO: buffer management
+    GLuint _buffer;
+public:
+    TextureRenderer() {
+        GLShader fragmentShader(GLShaderType::fragment);
+        GLShader vertexShader(GLShaderType::vertex);
+        
+        auto fragmentCode =
+            "#version 450 core\n"
+            "out vec4 color;\n"
+            "layout (binding = 20) uniform sampler2D tex;\n"
+            "void main(void) {\n"
+            "    vec2 size = textureSize(tex, 0);\n"
+            "    color = texture(tex, gl_FragCoord.xy / size, 0);\n"
+            "}";
+
+        auto vertexCode =
+            "#version 450 core\n"
+            "layout (location = 0) in vec2 pos;\n"
+            "void main(void) {\n"
+            "    gl_Position = vec4(pos, 0, 1);\n"
+            "}\n";
+        
+        auto fs = fragmentShader.handle();
+        auto vs = vertexShader.handle();
+        
+        glShaderSource(fs, 1, &fragmentCode, NULL);
+        glShaderSource(vs, 1, &vertexCode, NULL);
+        glCompileShader(fs);
+        glCompileShader(vs);
+        check_shader(fs);
+        check_shader(vs);
+        
+        glAttachShader(_program.handle(), fs);
+        glAttachShader(_program.handle(), vs);
+        glcall(glLinkProgram(_program.handle()));
+        
+        glm::vec2 vertices[] {
+            { -1.f, 1.f }, { -1.f, -1.f }, { 1.f, -1.f },
+            { -1.f, 1.f }, { 1.f, 1.f }, { 1.f, -1.f }
+        };
+        
+        glcall(glCreateBuffers(1, &_buffer));
+        glcall(glNamedBufferStorage(_buffer, sizeof(vertices), vertices, 0));
+    }
+    
+    void render(GLSimpleTexture* tex) {
+        glcall(glEnableVertexAttribArray(0));
+        glcall(glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0));
+        glcall(glVertexAttribBinding(0, 0));
+        glcall(glBindVertexBuffer(0, _buffer, 0, sizeof(glm::vec2)));
+        
+        auto samplerIndex = 20;
+        glcall(glBindTextureUnit(samplerIndex, tex->handle()));
+        glcall(glBindSampler(samplerIndex, _sampler.handle()));
+        glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glcall(glUseProgram(_program.handle()));
+        
+        glcall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        
+        // TODO: restore vertex attrib if required
+    }
+};
 
 void Rsx::setLabel(int index, uint32_t value) {
     auto offset = index * 0x10;
@@ -168,57 +297,12 @@ void Rsx::SemaphoreRelease(uint32_t value) {
     atomic->store(boost::endian::native_to_big(value));
 }
 
-void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceClipHorizontal(%d, %d, %d, %d)", x, w, y, h);
-    _context->viewPortX = x;
-    _context->viewPortY = y;
-    _context->viewPortWidth = w;
-    _context->viewPortHeight = h;
-    glcall(glViewport(x, y, w, h));
-    _context->lastFrame.resize(w * h * 4);
-}
-
-void Rsx::SurfacePitchC(uint32_t pitchC, uint32_t pitchD, uint32_t offsetC, uint32_t offsetD) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfacePitchC(%d, %d, %d, %d)",
-        pitchC, pitchD, offsetC, offsetD);
-    _context->surfaceColorPitch[2] = pitchC;
-    _context->surfaceColorPitch[3] = pitchD;
-    _context->surfaceColorOffset[2] = offsetC;
-    _context->surfaceColorOffset[3] = offsetD;
-}
-
-void Rsx::SurfaceCompression(uint32_t x) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceCompression(%d)", x);
-}
-
-void Rsx::WindowOffset(uint16_t x, uint16_t y) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("WindowOffset(%d, %d)", x, y);
-    _context->surfaceWindowOriginX = x;
-    _context->surfaceWindowOriginY = y;
-}
-
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClearRectHorizontal(%d, %d, %d, %d)", x, w, y, h);
 }
 
 void Rsx::ClipIdTestEnable(uint32_t x) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClipIdTestEnable(%d)", x);
-}
-
-void Rsx::Control0(uint32_t x) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Control0(%x)", x);
-    if (x & 0x00100000) {
-        auto depthFormat = (x & ~0x00100000) >> 12;
-        if (depthFormat == CELL_GCM_DEPTH_FORMAT_FIXED) {
-            BOOST_LOG_TRIVIAL(trace) << "CELL_GCM_DEPTH_FORMAT_FIXED";
-        } else if (depthFormat == CELL_GCM_DEPTH_FORMAT_FLOAT) {
-            BOOST_LOG_TRIVIAL(trace) << "CELL_GCM_DEPTH_FORMAT_FLOAT";
-        } else {
-            assert(false);
-        }
-    } else {
-        BOOST_LOG_TRIVIAL(error) << "unknown control0";
-    }
 }
 
 void Rsx::FlatShadeOp(uint32_t x) {
@@ -235,12 +319,6 @@ void Rsx::FrequencyDividerOperation(uint16_t op) {
 
 void Rsx::TexCoordControl(unsigned int index, uint32_t control) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TexCoordControl(%d, %x)", index, control);
-}
-
-void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderWindow(%d, %x, %x)", height, origin, pixelCenters);
-    assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
-    assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
 }
 
 void Rsx::ReduceDstColor(bool enable) {
@@ -341,76 +419,6 @@ void Rsx::ViewportOffset(float offset0,
     _context->viewPortScale[3] = scale3;
 }
 
-void Rsx::ContextDmaColorA(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorA(%x)", context);
-    setSurfaceColorLocation(context);
-}
-
-void Rsx::ContextDmaColorB(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorB(%x)", context);
-    setSurfaceColorLocation(context);
-}
-
-void Rsx::ContextDmaColorC(uint32_t contextC, uint32_t contextD) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorC(%x, %x)", contextC, contextD);
-    setSurfaceColorLocation(contextC);
-    setSurfaceColorLocation(contextD);
-}
-
-void Rsx::ContextDmaColorD(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorD(%x)", context);
-    setSurfaceColorLocation(context);
-}
-
-void Rsx::ContextDmaZeta(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaZeta(%x)", context);
-    assert(context - CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER == CELL_GCM_LOCATION_LOCAL); // only local is supported
-    _context->surfaceDepthLocation = MemoryLocation::Local;
-}
-
-void Rsx::SurfaceFormat(uint8_t colorFormat,
-                        uint8_t depthFormat,
-                        uint8_t antialias,
-                        uint8_t type,
-                        uint8_t width,
-                        uint8_t height,
-                        uint32_t pitchA,
-                        uint32_t offsetA,
-                        uint32_t offsetZ,
-                        uint32_t offsetB,
-                        uint32_t pitchB) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceFormat(%x, ...)", colorFormat);
-    assert(colorFormat == CELL_GCM_SURFACE_A8R8G8B8);
-    if (depthFormat == CELL_GCM_SURFACE_Z16) {
-        _context->surfaceDepthFormat = SurfaceDepthFormat::z16;
-    } else if (depthFormat == CELL_GCM_SURFACE_Z24S8) {
-        _context->surfaceDepthFormat = SurfaceDepthFormat::z24s8;
-    } else {
-        assert(false);
-    }
-    assert(antialias == CELL_GCM_SURFACE_CENTER_1);
-    assert(type == CELL_GCM_SURFACE_PITCH);
-    _context->surfaceWidth = 1 << (width + 1);
-    _context->surfaceHeight = 1 << (height + 1);
-    assert(_context->surfaceWidth == 2048);
-    assert(_context->surfaceHeight == 1024);
-    _context->surfaceColorPitch[0] = pitchA;
-    _context->surfaceColorPitch[1] = pitchB;
-    _context->surfaceColorOffset[0] = offsetA;
-    _context->surfaceColorOffset[1] = offsetB;
-    _context->surfaceDepthOffset = offsetZ;
-}
-
-void Rsx::SurfacePitchZ(uint32_t pitch) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfacePitchZ(%d)", pitch);
-    _context->surfaceDepthPitch = pitch;
-}
-
-void Rsx::SurfaceColorTarget(uint32_t mask) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceColorTarget(%x)", mask);
-    assert(mask == CELL_GCM_SURFACE_TARGET_0);
-}
-
 void Rsx::ColorMask(uint32_t mask) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorMask(%x)", mask);
     _context->colorMask = mask;
@@ -467,7 +475,6 @@ void Rsx::ShadeMode(uint32_t sm) {
 
 void Rsx::ColorClearValue(uint32_t color) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorClearValue(%x)", color);
-    _context->colorClearValue = color;
     union {
         uint32_t val;
         BitField<0, 8> a;
@@ -475,12 +482,11 @@ void Rsx::ColorClearValue(uint32_t color) {
         BitField<16, 24> g;
         BitField<24, 32> b;
     } c = { color };
-    glcall(glClearColor(c.r.u() / 255., c.g.u() / 255., c.b.u() / 255., c.a.u() / 255.));
+    _context->colorClearValue = { c.r.u() / 255., c.g.u() / 255., c.b.u() / 255., c.a.u() / 255. };
 }
 
 void Rsx::ClearSurface(uint32_t mask) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClearSurface(%x)", mask);
-    _context->clearSurfaceMask = mask;
     assert(mask & CELL_GCM_CLEAR_R);
     assert(mask & CELL_GCM_CLEAR_G);
     assert(mask & CELL_GCM_CLEAR_B);
@@ -489,20 +495,10 @@ void Rsx::ClearSurface(uint32_t mask) {
         glmask |= GL_DEPTH_BUFFER_BIT;
     if (mask & CELL_GCM_CLEAR_S)
         glmask |= GL_STENCIL_BUFFER_BIT;
+    _context->glClearSurfaceMask = glmask;
+    auto& c = _context->colorClearValue;
+    glcall(glClearColor(c.r, c.g, c.b, c.a));
     glcall(glClear(glmask));
-}
-
-void Rsx::setSurfaceColorLocation(uint32_t context) {
-    // all color locations must be the same, so A=B=C=D
-    context -= CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER;
-    assert(context == CELL_GCM_LOCATION_LOCAL);
-    if (context == CELL_GCM_LOCATION_LOCAL) {
-        _context->surfaceColorLocation = MemoryLocation::Local;   
-    } else if (context == CELL_GCM_LOCATION_MAIN) {
-        _context->surfaceColorLocation = MemoryLocation::Main;
-    } else {
-        assert(false);
-    }
 }
 
 void Rsx::VertexDataArrayFormat(uint8_t index,
@@ -525,9 +521,13 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
     auto& vinput = _context->vertexInputs[index];
     vinput.typeSize = gltype == GL_FLOAT ? 4 : 1; // TODO: other types
     vinput.rank = size;
-    vinput.enabled = true;
-    glcall(glEnableVertexAttribArray(index));
-    glcall(glVertexAttribFormat(index, size, gltype, normalize, 0));
+    vinput.enabled = size != 0;
+    if (vinput.enabled) {
+        glcall(glEnableVertexAttribArray(index));
+        glcall(glVertexAttribFormat(index, size, gltype, normalize, 0));
+    } else {
+        glcall(glDisableVertexAttribArray(index));
+    }
 }
 
 void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset) {
@@ -583,48 +583,17 @@ struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
     std::array<float, 4> borderColor;
 };
 
-void Rsx::initGcm() {
-    BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
-    
-    _context->window.Init();
-    glcall(glCreateBuffers(1, &_context->buffer));
-    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT
-                  | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
-    glcall(glNamedBufferStorage(_context->buffer, GcmLocalMemorySize, NULL, mapFlags));
-    _context->bufferMappedMemory = (uint8_t*)glMapNamedBufferRange(
-        _context->buffer, 0, GcmLocalMemorySize, mapFlags & ~GL_DYNAMIC_STORAGE_BIT);
-    _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->bufferMappedMemory);
-    // remap io to point to the buffer as well
-    _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
-    
-    glcall(glCreateBuffers(1, &_context->vertexConstBuffer));
-    size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
-    glcall(glNamedBufferStorage(_context->vertexConstBuffer, constBufferSize, NULL, GL_DYNAMIC_STORAGE_BIT));
-    
-    glcall(glCreateBuffers(1, &_context->vertexSamplersBuffer));
-    auto uniformSize = sizeof(VertexShaderSamplerUniform) * 4;
-    glcall(glNamedBufferStorage(_context->vertexSamplersBuffer, uniformSize, NULL, GL_DYNAMIC_STORAGE_BIT));
-    
-    for (auto& s : _context->vertexTextureSamplers) {
-        s.enable = false;
-    }
-    for (auto& s : _context->fragmentTextureSamplers) {
-        s.enable = false;
-    }
-    
-    boost::lock_guard<boost::mutex> lock(_initMutex);
-    BOOST_LOG_TRIVIAL(trace) << "rsx initialized";
-    _initialized = true;
-    _initCv.notify_all();
-}
-
 void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
     _context->gcmIoSize = ioSize;
     _context->gcmIoAddress = ioAddress;
 }
 
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
-    assert(buffer == 0 || buffer == 1);
+    auto va = _context->displayBuffers[buffer].offset + GcmLocalMemoryBase;
+    auto tex = _context->framebuffer->findTexture(va);
+    _context->framebuffer->bindDefault();
+    updateFramebuffer();
+    _context->textureRenderer->render(tex);
     
     _context->window.SwapBuffers();
     
@@ -657,18 +626,15 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& va
 }
 
 bool Rsx::linkShaderProgram() {
-    if (!_context->fragmentShader || !_context->vertexShader)
+    if (!_context->fragmentShader.handle() || !_context->vertexShader.handle())
         return false;
     
-    if (_context->shaderProgram) {
-        glcall(glDeleteProgram(_context->shaderProgram));
-    }
-    auto program = glCreateProgram();
-    glAttachShader(program, _context->vertexShader);
-    glAttachShader(program, _context->fragmentShader);
-    glcall(glLinkProgram(program));
-    glcall(glUseProgram(program));
-    _context->shaderProgram = program;
+    GLProgram program;
+    glAttachShader(program.handle(), _context->vertexShader.handle());
+    glAttachShader(program.handle(), _context->fragmentShader.handle());
+    glcall(glLinkProgram(program.handle()));
+    glcall(glUseProgram(program.handle()));
+    _context->shaderProgram = std::move(program);
     return true;
 }
 
@@ -723,14 +689,11 @@ void Rsx::updateShaders() {
                 
         BOOST_LOG_TRIVIAL(trace) << text;
         
-        if (_context->fragmentShader) // TODO: raii
-            glDeleteShader(_context->fragmentShader);
-        
-        _context->fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+        _context->fragmentShader = GLShader(GLShaderType::fragment);
         const char* textptr = text.c_str();
-        glShaderSource(_context->fragmentShader, 1, &textptr, NULL);
-        glCompileShader(_context->fragmentShader);
-        check_shader(_context->fragmentShader);
+        glShaderSource(_context->fragmentShader.handle(), 1, &textptr, NULL);
+        glCompileShader(_context->fragmentShader.handle());
+        check_shader(_context->fragmentShader.handle());
     }
     
     if (_context->vertexShaderDirty) {
@@ -747,15 +710,12 @@ void Rsx::updateShaders() {
 
         BOOST_LOG_TRIVIAL(trace) << text;
         
-        if (_context->vertexShader) // TODO: raii
-            glDeleteShader(_context->vertexShader);
-        
-        auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
+        GLShader vertexShader(GLShaderType::vertex);
         const char* textptr = text.c_str();
-        glShaderSource(vertexShader, 1, &textptr, NULL);
-        glCompileShader(vertexShader);
-        check_shader(vertexShader);
-        _context->vertexShader = vertexShader;
+        glShaderSource(vertexShader.handle(), 1, &textptr, NULL);
+        glCompileShader(vertexShader.handle());
+        check_shader(vertexShader.handle());
+        _context->vertexShader = std::move(vertexShader);
     }
     
     if (linkShaderProgram()) {
@@ -822,17 +782,19 @@ void Rsx::updateTextures() {
             texture->bind(index);
             textureCache.emplace_back(texture);
             
-            if (sampler.glSampler == 0xffffffff) {
-                glcall(glCreateSamplers(1, &sampler.glSampler));
-                glcall(glBindSampler(index, sampler.glSampler));
+            auto handle = sampler.glSampler.handle();
+            if (!handle) {
+                sampler.glSampler = GLSampler();
+                handle = sampler.glSampler.handle();
+                glcall(glBindSampler(index, handle));
             }
-            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_MIN_LOD, sampler.minlod);
-            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_MAX_LOD, sampler.maxlod);
-            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_LOD_BIAS, sampler.bias);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD, sampler.minlod);
+            glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD, sampler.maxlod);
+            glSamplerParameterf(handle, GL_TEXTURE_LOD_BIAS, sampler.bias);
+            glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
             VertexShaderSamplerUniform info[] = { 
                 sampler.wraps, sampler.wrapt, 0, sampler.borderColor
@@ -848,17 +810,19 @@ void Rsx::updateTextures() {
             texture->bind(index);
             textureCache.emplace_back(texture);
             
-            if (sampler.glSampler == 0xffffffff) {
-                glcall(glCreateSamplers(1, &sampler.glSampler));
-                glcall(glBindSampler(index, sampler.glSampler));
+            auto handle = sampler.glSampler.handle();
+            if (!handle) {
+                sampler.glSampler = GLSampler();
+                handle = sampler.glSampler.handle();
+                glcall(glBindSampler(index, handle));
             }
-            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_MIN_LOD, sampler.minlod);
-            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_MAX_LOD, sampler.maxlod);
-            glSamplerParameterf(sampler.glSampler, GL_TEXTURE_LOD_BIAS, sampler.bias);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glSamplerParameteri(sampler.glSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD, sampler.minlod);
+            glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD, sampler.maxlod);
+            glSamplerParameterf(handle, GL_TEXTURE_LOD_BIAS, sampler.bias);
+            glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
             //VertexShaderSamplerUniform info[] = { 
             //    sampler.wraps, sampler.wrapt, sampler.fragmentWrapr, sampler.borderColor
@@ -871,9 +835,9 @@ void Rsx::updateTextures() {
 }
 
 void Rsx::init() {
-    _thread.reset(new boost::thread([=]{ loop(); }));
-    
     BOOST_LOG_TRIVIAL(trace) << "waiting for rsx loop to initialize";
+    
+    _thread.reset(new boost::thread([=]{ loop(); }));
     
     // lock the thread until Rsx has initialized the buffer
     boost::unique_lock<boost::mutex> lock(_initMutex);
@@ -992,4 +956,213 @@ void Rsx::TextureControl0(unsigned index,
 
 void Rsx::SetReference(uint32_t ref) {
     _ref = ref;
+}
+
+// Surface
+
+void Rsx::SurfaceCompression(uint32_t x) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceCompression(%d)", x);
+}
+
+void Rsx::setSurfaceColorLocation(unsigned index, uint32_t location) {
+    assert(index < 4);
+    location -= CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER;
+    if (location == CELL_GCM_LOCATION_LOCAL) {
+        _context->surface.colorLocation[index] = MemoryLocation::Local;   
+    } else if (location == CELL_GCM_LOCATION_MAIN) {
+        _context->surface.colorLocation[index] = MemoryLocation::Main;
+    } else {
+        assert(false);
+    }
+}
+
+void Rsx::SurfaceFormat(uint8_t colorFormat,
+                        uint8_t depthFormat,
+                        uint8_t antialias,
+                        uint8_t type,
+                        uint8_t width,
+                        uint8_t height,
+                        uint32_t pitchA,
+                        uint32_t offsetA,
+                        uint32_t offsetZ,
+                        uint32_t offsetB,
+                        uint32_t pitchB) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceFormat(%x, ...)", colorFormat);
+    assert(colorFormat == CELL_GCM_SURFACE_A8R8G8B8);
+    if (depthFormat == CELL_GCM_SURFACE_Z16) {
+        _context->surface.depthFormat = SurfaceDepthFormat::z16;
+    } else if (depthFormat == CELL_GCM_SURFACE_Z24S8) {
+        _context->surface.depthFormat = SurfaceDepthFormat::z24s8;
+    } else {
+        assert(false);
+    }
+    assert(antialias == CELL_GCM_SURFACE_CENTER_1);
+    assert(type == CELL_GCM_SURFACE_PITCH);
+    _context->surface.width = 1 << (width + 1);
+    _context->surface.height = 1 << (height + 1);
+    assert(_context->surface.width == 2048);
+    assert(_context->surface.height == 1024);
+    _context->surface.colorPitch[0] = pitchA;
+    _context->surface.colorPitch[1] = pitchB;
+    _context->surface.colorOffset[0] = offsetA;
+    _context->surface.colorOffset[1] = offsetB;
+    _context->surface.depthOffset = offsetZ;
+}
+
+void Rsx::SurfacePitchZ(uint32_t pitch) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfacePitchZ(%d)", pitch);
+    _context->surface.depthPitch = pitch;
+}
+
+void Rsx::SurfacePitchC(uint32_t pitchC, uint32_t pitchD, uint32_t offsetC, uint32_t offsetD) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfacePitchC(%d, %d, %d, %d)",
+                                          pitchC, pitchD, offsetC, offsetD);
+    _context->surface.colorPitch[2] = pitchC;
+    _context->surface.colorPitch[3] = pitchD;
+    _context->surface.colorOffset[2] = offsetC;
+    _context->surface.colorOffset[3] = offsetD;
+}
+
+void Rsx::SurfaceColorTarget(uint32_t target) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceColorTarget(%x)", target);
+    if (target == CELL_GCM_SURFACE_TARGET_NONE) {
+        _context->surface.colorTarget = { 0, 0, 0, 0 };
+    } else {
+        _context->surface.colorTarget = {
+            target != CELL_GCM_SURFACE_TARGET_1,
+            target != CELL_GCM_SURFACE_TARGET_0,
+            target == CELL_GCM_SURFACE_TARGET_MRT2 || target == CELL_GCM_SURFACE_TARGET_MRT3,
+            target == CELL_GCM_SURFACE_TARGET_MRT3
+        };
+    }
+}
+
+void Rsx::WindowOffset(uint16_t x, uint16_t y) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("WindowOffset(%d, %d)", x, y);
+    _context->surface.windowOriginX = x;
+    _context->surface.windowOriginY = y;
+}
+
+void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceClipHorizontal(%d, %d, %d, %d)", x, w, y, h);
+    _context->viewPortX = x;
+    _context->viewPortY = y;
+    _context->viewPortWidth = w;
+    _context->viewPortHeight = h;
+    _context->lastFrame.resize(w * h * 4);
+}
+
+// assume cellGcmSetSurface is always used and not its subcommands
+// then this command is always set last
+void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderWindow(%d, %x, %x)", height, origin, pixelCenters);
+    assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
+    assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
+    _context->framebuffer->setSurface(_context->surface);
+    updateFramebuffer();
+}
+
+void Rsx::Control0(uint32_t format) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Control0(%x)", format);
+    if (format & 0x00100000) {
+        auto depthFormat = (format & ~0x00100000) >> 12;
+        if (depthFormat == CELL_GCM_DEPTH_FORMAT_FIXED) {
+            _context->surface.depthType = SurfaceDepthType::Fixed;
+        } else if (depthFormat == CELL_GCM_DEPTH_FORMAT_FLOAT) {
+            _context->surface.depthType = SurfaceDepthType::Float;
+        } else {
+            assert(false);
+        }
+    } else {
+        BOOST_LOG_TRIVIAL(error) << "unknown control0";
+    }
+}
+
+void Rsx::ContextDmaColorA(uint32_t context) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorA(%x)", context);
+    setSurfaceColorLocation(0, context);
+}
+
+void Rsx::ContextDmaColorB(uint32_t context) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorB(%x)", context);
+    setSurfaceColorLocation(1, context);
+}
+
+void Rsx::ContextDmaColorC(uint32_t contextC, uint32_t contextD) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorC(%x, %x)", contextC, contextD);
+    setSurfaceColorLocation(2, contextC);
+    setSurfaceColorLocation(3, contextD);
+}
+
+void Rsx::ContextDmaColorD(uint32_t context) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorD(%x)", context);
+    setSurfaceColorLocation(3, context);
+}
+
+void Rsx::ContextDmaColorC(uint32_t contextC) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorC(%x)", contextC);
+    setSurfaceColorLocation(2, contextC);
+}
+
+void Rsx::ContextDmaZeta(uint32_t context) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaZeta(%x)", context);
+    auto local = context - CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER == CELL_GCM_LOCATION_LOCAL;
+    _context->surface.depthLocation = local ? MemoryLocation::Local : MemoryLocation::Main;
+}
+
+void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t width, uint32_t height) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("setDisplayBuffer(%x, ...)", id);
+    auto& buffer = _context->displayBuffers[id];
+    buffer.offset = offset;
+    buffer.pitch = pitch;
+    buffer.width = width;
+    buffer.height = height;
+}
+
+void Rsx::initGcm() {
+    BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
+    
+    _context->window.Init();
+    glcall(glCreateBuffers(1, &_context->buffer));
+    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT
+                  | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
+    glcall(glNamedBufferStorage(_context->buffer, GcmLocalMemorySize, NULL, mapFlags));
+    _context->bufferMappedMemory = (uint8_t*)glMapNamedBufferRange(
+        _context->buffer, 0, GcmLocalMemorySize, mapFlags & ~GL_DYNAMIC_STORAGE_BIT);
+    _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->bufferMappedMemory);
+    // remap io to point to the buffer as well
+    _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
+    
+    glcall(glCreateBuffers(1, &_context->vertexConstBuffer));
+    size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
+    glcall(glNamedBufferStorage(_context->vertexConstBuffer, constBufferSize, NULL, GL_DYNAMIC_STORAGE_BIT));
+    
+    glcall(glCreateBuffers(1, &_context->vertexSamplersBuffer));
+    auto uniformSize = sizeof(VertexShaderSamplerUniform) * 4;
+    glcall(glNamedBufferStorage(_context->vertexSamplersBuffer, uniformSize, NULL, GL_DYNAMIC_STORAGE_BIT));
+    
+    for (auto& s : _context->vertexTextureSamplers) {
+        s.enable = false;
+    }
+    for (auto& s : _context->fragmentTextureSamplers) {
+        s.enable = false;
+    }
+    
+    _context->framebuffer.reset(new GLFramebuffer());
+    _context->textureRenderer.reset(new TextureRenderer());
+    
+    boost::lock_guard<boost::mutex> lock(_initMutex);
+    BOOST_LOG_TRIVIAL(trace) << "rsx initialized";
+    _initialized = true;
+    _initCv.notify_all();
+}
+
+void Rsx::updateFramebuffer() {
+    glcall(glViewport(_context->viewPortX,
+                      _context->viewPortY,
+                      _context->viewPortWidth,
+                      _context->viewPortHeight));
+    auto& c = _context->colorClearValue;
+    glcall(glClearColor(c.r, c.g, c.b, c.a));
+    glcall(glClear(_context->glClearSurfaceMask));
 }

@@ -445,8 +445,8 @@ int render = 0;
 //-----------------------------------------------------------------------------
 void SampleApp::onRender()
 {
-	/*if (render++)
-		exit(0);*/
+	if (render++)
+		exit(0);
 	// base implementation clears screen and sets up camera
 	FWGCMCamControlApplication::onRender();
 

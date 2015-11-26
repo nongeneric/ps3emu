@@ -11,6 +11,18 @@ inline uint64_t getUValue(uint64_t u) { return u; }
 template <typename BF, int = BF::P>
 inline uint64_t getUValue(BF bf) { return bf.u(); }
 
+template <int Width>
+inline uint64_t mask(int x, int y) {
+    static_assert(Width <= 64, "");
+    assert(x < Width && y < Width);
+    assert(x >= 0 && y >= 0);
+    #pragma GCC diagnostic ignored "-Wstrict-overflow"
+    if (x > y)
+    #pragma GCC diagnostic pop
+        return mask<Width>(0, y) | mask<Width>(x, Width - 1);
+    return ((~0ull >> x) & (~0ull << (63 - y))) >> (64 - Width);
+}
+
 enum class BitFieldType {
     Signed, Unsigned, GPR, CR, FPR, Vector, None
 };
@@ -56,19 +68,12 @@ public:
     inline int64_t operator<<(unsigned shift) const {
         return static_cast<uint64_t>(s()) << shift;
     }
+    
+    inline void set(uint32_t u) {
+        uint32_t field = u << (32 - W - P);
+        _v = (_v & ~mask<32>(P, W)) | field;
+    }
 };
-
-template <int Width>
-inline uint64_t mask(int x, int y) {
-    static_assert(Width <= 64, "");
-    assert(x < Width && y < Width);
-    assert(x >= 0 && y >= 0);
-#pragma GCC diagnostic ignored "-Wstrict-overflow"
-    if (x > y)
-#pragma GCC diagnostic pop
-        return mask<Width>(0, y) | mask<Width>(x, Width - 1);
-    return ((~0ull >> x) & (~0ull << (63 - y))) >> (64 - Width);
-}
 
 template <typename N>
 inline uint8_t bit_test(uint64_t number, int width, N nvalue) {

@@ -163,7 +163,7 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x000001b4:
             //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_C";
             if (count == 1) {
-                ContextDmaColorC(readarg(1), readarg(1));
+                ContextDmaColorC(readarg(1));
             } else {
                 ContextDmaColorC(readarg(1), readarg(2));
             }
@@ -1351,11 +1351,12 @@ int64_t Rsx::interpret(uint32_t get) {
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("illegal method offset %x", offset);
         }
     }
-    if (name) {
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("[0x%08x: %02d%s] %s", 
-            get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
-    }
+    if (!name)
+        name = "";
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("[0x%08x: %02d%s] %s", 
+        get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
     len = (header.count.u() + 1) * 4;
+    assert(len != 0);
     return len;
 }
 
@@ -1390,7 +1391,7 @@ void Rsx::loop() {
         BOOST_LOG_TRIVIAL(trace) << "rsx loop update received";
         if (_shutdown)
             return;
-        while (_get < _put || _ret) {
+        while (_get < _put || _ret || _shutdown) {
             _get += interpret(_get);
         }
     }

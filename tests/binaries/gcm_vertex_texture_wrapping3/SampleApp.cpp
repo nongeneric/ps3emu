@@ -71,18 +71,18 @@ static uint32_t GeneratePlane(VertexData3D *point, uint32_t *indices, const floa
 			i += 6;
 	}
 
-	/*float xs[] = {
+	float xs[] = {
 		0.2, 0.5, 0.8, 1.2, 1.5, 1.8, 2.2, 2.5, 2.8, 0
 		-2.8, -2.5, -2.2, -1.8, -1.5, -1.2, -0.8, -0.5, -0.2
-	};*/
-	float t = 1.0f/3.0f + 0.01f;
+	};
+	/*float t = 1.0f/3.0f + 0.01f;
 	float b = 1.0f/3.0f - 0.01f;
 	float xs[] = {
 		0, t, 2*t, 1, 1 + t, 1 + 2*t, 2, 2 + t, 2 + 2*t, 0
 		-2 - 2*b, -2 - b, -2, -1 - 2*b, -1 - b, -1, -2 * b, -b, 0
-	};
+	};*/
 	for (int n = 0; n < sizeof(xs) / 4; ++n) {
-		point[n].u = 1;//xs[n];
+		point[n].u = xs[n];
 	}
 
 	return i;
@@ -403,8 +403,8 @@ int render = 0;
 //-----------------------------------------------------------------------------
 void SampleApp::onRender()
 {
-	/*if (render++)
-		exit(0);*/
+	if (render++)
+		exit(0);
 	// base implementation clears screen and sets up camera
 	FWGCMCamControlApplication::onRender();
 

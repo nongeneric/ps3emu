@@ -39,12 +39,13 @@ class Rsx {
     uint32_t _activeSemaphoreHandle = 0;
     int64_t interpret(uint32_t get);
     void loop();
-    void setSurfaceColorLocation(uint32_t context);
+    void setSurfaceColorLocation(unsigned index, uint32_t location);
     void initGcm();
     void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
     bool linkShaderProgram();
     void updateShaders();
     void updateTextures();
+    void updateFramebuffer();
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
@@ -92,6 +93,7 @@ class Rsx {
     void ContextDmaColorA(uint32_t context);
     void ContextDmaColorB(uint32_t context);
     void ContextDmaColorC(uint32_t contextC, uint32_t contextD);
+    void ContextDmaColorC(uint32_t contextC);
     void ContextDmaColorD(uint32_t context);
     void ContextDmaZeta(uint32_t context);
     void SurfaceFormat(uint8_t colorFormat,
@@ -106,7 +108,7 @@ class Rsx {
                        uint32_t offsetB,
                        uint32_t pitchB);
     void SurfacePitchZ(uint32_t pitch);
-    void SurfaceColorTarget(uint32_t mask);
+    void SurfaceColorTarget(uint32_t target);
     void ColorMask(uint32_t mask);
     void DepthFunc(uint32_t zf);
     void CullFaceEnable(bool enable);
@@ -189,5 +191,10 @@ public:
     bool isFlipInProgress() const;
     void resetFlipStatus();
     void setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress);
+    void setDisplayBuffer(uint8_t id,
+                          uint32_t offset,
+                          uint32_t pitch,
+                          uint32_t width,
+                          uint32_t height);
     void init();
 };

@@ -25,7 +25,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
     line("#version 450 core");
-    line("out vec4 color;");
+    line("layout (location = 0) out vec4 color[4];");
     line(ssnprintf("%sin vec4 f_COL0;", isFlatColorShading ? "flat " : ""));
     line("in vec4 f_COL1;");
     line("in vec4 f_FOGC;");
@@ -55,8 +55,10 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         auto str = PrintStatement(st.get());
         line(str);
     }
-    
-    line("    color = r[0];\n");
+    // MRT
+    for (int i = 0; i <= std::min(lastReg, 4); ++i) {
+        line(ssnprintf("    color[%d] = r[%d];\n", i, i));
+    }
     line("}");
     return res;
 }

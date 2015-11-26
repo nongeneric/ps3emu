@@ -1,7 +1,9 @@
 #pragma once
 
 #include <glad/glad.h>
+#include <glm/glm.hpp>
 #include <stdint.h>
+#include <functional>
 
 struct RsxTextureInfo {
     uint32_t pitch;
@@ -39,4 +41,43 @@ public:
     ~GLTexture();
     RsxTextureInfo const& info() const;
     void bind(GLuint samplerIndex);
+};
+
+class TextureReader {
+    std::function<glm::vec4(uint8_t*)> _read;
+    std::function<glm::vec4(uint8_t*)> make_read(uint32_t texelFormat,
+                                                 RsxTextureInfo const& info);
+public:
+    TextureReader(uint32_t format, RsxTextureInfo const& info);
+    void read(uint8_t* ptr, glm::vec4& tex);
+};
+
+// TODO: swizzle textures
+// remap order for 2x16 and 32 ...
+class TextureIterator : std::iterator<std::forward_iterator_tag, glm::vec4> {
+    uint8_t* _ptr;
+    unsigned _pos = 0;
+    unsigned _pitch;
+    unsigned _width;
+    unsigned _size;
+    TextureIterator(TextureIterator const&) = delete;
+public:
+    TextureIterator(uint8_t* buf, unsigned pitch, unsigned width, unsigned size);
+    TextureIterator& operator++();
+    bool operator==(TextureIterator const& other);
+    uint8_t* operator*();
+};
+
+class GLSimpleTexture {
+    GLuint _handle;
+    unsigned _width;
+    unsigned _height;
+    GLuint _format;
+public:
+    GLSimpleTexture(unsigned width, unsigned height, GLuint format);
+    ~GLSimpleTexture();
+    GLuint handle();
+    unsigned width();
+    unsigned height();
+    GLuint format();
 };

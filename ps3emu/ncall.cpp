@@ -192,7 +192,7 @@ STUB_5(_cellGcmInitBody);
 STUB_1(cellGcmSetFlipMode);
 STUB_1(cellGcmGetConfiguration);
 STUB_2(cellGcmAddressToOffset);
-STUB_5(cellGcmSetDisplayBuffer);
+STUB_6(cellGcmSetDisplayBuffer);
 STUB_0(cellGcmGetControlRegister);
 STUB_1(cellGcmGetLabelAddress);
 STUB_1(sys_timer_usleep);

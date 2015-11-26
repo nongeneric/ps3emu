@@ -16,6 +16,20 @@ TEST_CASE("common bitfield operations") {
     REQUIRE(_3bits.u() == 7);
 }
 
+TEST_CASE("bitfield write") {
+    union {
+        uint32_t val;
+        BitField<0, 8> bf1;
+        BitField<8, 16> bf2;
+        BitField<16, 32> bf3;
+    } f = { 0 };
+    f.bf1.set(0x4f);
+    f.bf2.set(0x12);
+    f.bf3.set(0xabcd);
+    REQUIRE( f.val == 0x4f12abcd );
+    REQUIRE( f.bf2.u() == 0x12 );
+}
+
 TEST_CASE("bl instruction") {
     uint8_t instr[] = { 0x48, 0x00, 0x01, 0x09 };
     std::string res;
