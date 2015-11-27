@@ -42,10 +42,10 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("in vec4 f_SSA;");
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
         line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;", i + 4, samplerSizes[i], i));
+        line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
+        line(ssnprintf("    return texture(s%d, uvp.xy);", i));
+        line("}");
     }
-    line("vec4 tex0(vec4 uvp) {");
-    line("    return texture(s0, uvp.xy);");
-    line("}");
     line("void main(void) {");
     line("    vec4 f_WPOS = gl_FragCoord;");
     line("    vec4 c[2];");
@@ -56,8 +56,9 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         line(str);
     }
     // MRT
-    for (int i = 0; i <= std::min(lastReg, 4); ++i) {
-        line(ssnprintf("    color[%d] = r[%d];\n", i, i));
+    int regs[] = { 0, 2, 3, 4 };
+    for (int i = 0; i < 4 && regs[i] <= lastReg; ++i) {
+        line(ssnprintf("    color[%d] = r[%d];", i, regs[i]));
     }
     line("}");
     return res;

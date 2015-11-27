@@ -149,6 +149,8 @@ namespace ShaderRewriter {
             const char* name = nullptr;
             switch (invocation->name()) {
                 case FunctionName::vec4: name = "vec4"; break;
+                case FunctionName::vec3: name = "vec3"; break;
+                case FunctionName::vec2: name = "vec2"; break;
                 case FunctionName::fract: name = "fract"; break;
                 case FunctionName::floor: name = "floor"; break;
                 case FunctionName::ceil: name = "ceil"; break;
@@ -382,6 +384,12 @@ namespace ShaderRewriter {
                 auto mask = new ComponentMask(expr, { 1, 0, 0, 0 });
                 return mask;
             }
+            if ((expected == ExprType::vec4 && current == ExprType::bvec4) ||
+                (expected == ExprType::vec3 && current == ExprType::bvec3) ||
+                (expected == ExprType::vec2 && current == ExprType::bvec2)) {
+                auto invoke = new Invocation(FunctionName::vec2, { expr });
+                return invoke;
+            }
             if (current == ExprType::notype)
                 return expr;
             assert(false);
@@ -447,7 +455,7 @@ namespace ShaderRewriter {
         Expression* expr = nullptr;
         bool ignoreSwizzle = false;
         if (i.opcode.tex && n == i.opcode.op_count - 1) {
-            expr = new IntegerLiteral(i.arguments[n].reg_num);
+            expr = new IntegerLiteral(i.tex_num);
         } else if (arg.type == op_type_t::Const) {
             expr = new Invocation(
                 FunctionName::vec4,

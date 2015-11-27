@@ -82,6 +82,7 @@ struct fragment_instr_t {
         BitField<0, 1> RegType;
         BitField<1, 7> RegNum;
         BitField<7, 8> LastInstr;
+        BitField<8, 11> InputAttr8_10;
         BitField<11, 12> Op0wMask;
         BitField<12, 13> Op0zMask;
         BitField<13, 14> Op0yMask;
@@ -89,12 +90,11 @@ struct fragment_instr_t {
         BitField<15, 16> C0;
         BitField<16, 18> Clamp;
         BitField<18, 19> Bx2;
+        BitField<19, 23> TexNum;
+        BitField<23, 24> InputAttr23;
         BitField<24, 25> Sat;
         BitField<25, 26> RegC;
         BitField<26, 32> Opcode16;
-        
-        BitField<8, 11> InputAttr8_10;
-        BitField<23, 24> InputAttr23;
     } b0;
     union {
         BitField<0, 6> Op1RegNum;
@@ -451,7 +451,7 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
         if (arg.is_abs)
             res += "|";
         if (i.opcode.tex && n == i.opcode.op_count - 1) {
-            res += ssnprintf("TEX%d", i.arguments[n].reg_num);
+            res += ssnprintf("TEX%d", i.tex_num);
         } else if (arg.type == op_type_t::Attr) {
             if (i.persp_corr == persp_corr_t::F) {
                 res += "f[";
@@ -499,6 +499,7 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
     res.opcode = opcode;
     res.clamp = i->Clamp();
     res.control = i->Control();
+    res.tex_num = i->b0.TexNum.u();
     if (!opcode.control) {
         res.scale = i->Scale();
         res.is_bx2 = i->b0.Bx2.u();
@@ -547,7 +548,7 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
             memcpy(arg.imm_val, cbuf, sizeof(cbuf));
         }
     }
-    return size;
+    return std::min(size, 32);
 }
 
 std::string print_swizzle(swizzle_t swizzle, bool allComponents) {

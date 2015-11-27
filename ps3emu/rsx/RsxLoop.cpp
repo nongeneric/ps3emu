@@ -1231,7 +1231,7 @@ int64_t Rsx::interpret(uint32_t get) {
                               f.dimension.u(),
                               f.border.u(),
                               f.cubemap.u(),
-                              f.location.u());
+                              f.location.u() - 1);
                 break;
             }
             if (isScale(offset,
@@ -1266,7 +1266,7 @@ int64_t Rsx::interpret(uint32_t get) {
                                     f.mipmap.u(),
                                     f.format.u(),
                                     f.dimension.u(),
-                                    f.location.u());
+                                    f.location.u() - 1);
                 break;
             }
             if (isScale(offset,

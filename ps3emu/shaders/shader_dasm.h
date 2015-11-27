@@ -128,6 +128,7 @@ struct FragmentInstr {
     input_attr_t input_attr;
     bool is_last;
     fragment_argument_t arguments[3];
+    int tex_num;
 };
 
 struct vertex_arg_address_ref {

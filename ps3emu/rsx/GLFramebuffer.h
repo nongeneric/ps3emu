@@ -6,10 +6,6 @@
 #include <memory>
 #include <map>
 
-enum class MemoryLocation {
-    Main, Local
-};
-
 enum class SurfaceDepthType {
     Fixed, Float
 };
@@ -33,8 +29,6 @@ struct SurfaceInfo {
     SurfaceDepthFormat depthFormat;
     std::array<bool, 4> colorTarget;
 };
-
-ps3_uintptr_t addressToMainMemory(MemoryLocation location, ps3_uintptr_t address);
 
 class GLFramebuffer {
     std::map<ps3_uintptr_t, std::unique_ptr<GLSimpleTexture>> _cache;

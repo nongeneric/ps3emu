@@ -741,7 +741,8 @@ void Rsx::VertexTextureOffset(unsigned index,
     t.mipmap = mipmap;
     t.format = format;
     t.dimension = dimension;
-    t.location = location; // TODO: handle location
+    assert(location == CELL_GCM_LOCATION_LOCAL || location == CELL_GCM_LOCATION_MAIN);
+    t.location = location == CELL_GCM_LOCATION_MAIN ? MemoryLocation::Main : MemoryLocation::Local;
 }
 
 void Rsx::VertexTextureControl3(unsigned index, uint32_t pitch) {
@@ -806,9 +807,15 @@ void Rsx::updateTextures() {
     }
     for (auto& sampler : _context->fragmentTextureSamplers) {
         if (sampler.enable) {
-            auto texture = new GLTexture(_ppu, sampler.texture); // TODO: search cache
-            texture->bind(index);
-            textureCache.emplace_back(texture);
+            auto va = addressToMainMemory(sampler.texture.location, sampler.texture.offset);
+            auto surfaceTex = _context->framebuffer->findTexture(va);
+            if (surfaceTex) {
+                glcall(glBindTextureUnit(index, surfaceTex->handle()));
+            } else {
+                auto texture = new GLTexture(_ppu, sampler.texture); // TODO: search cache
+                texture->bind(index);
+                textureCache.emplace_back(texture);
+            }
             
             auto handle = sampler.glSampler.handle();
             if (!handle) {
@@ -915,7 +922,8 @@ void Rsx::TextureOffset(unsigned index,
     t.dimension = dimension;
     t.fragmentBorder = border;
     t.fragmentCubemap = cubemap;
-    t.location = location;
+    assert(location == CELL_GCM_LOCATION_LOCAL || location == CELL_GCM_LOCATION_MAIN);
+    t.location = location == CELL_GCM_LOCATION_MAIN ? MemoryLocation::Main : MemoryLocation::Local;
 }
 
 void Rsx::TextureImageRect(unsigned int index, uint16_t width, uint16_t height) {

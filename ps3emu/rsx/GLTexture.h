@@ -2,8 +2,13 @@
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include "../constants.h"
 #include <stdint.h>
 #include <functional>
+
+enum class MemoryLocation {
+    Main, Local
+};
 
 struct RsxTextureInfo {
     uint32_t pitch;
@@ -13,7 +18,7 @@ struct RsxTextureInfo {
     uint8_t mipmap;
     uint8_t format;
     uint8_t dimension;
-    uint8_t location;
+    MemoryLocation location;
     bool fragmentBorder;
     bool fragmentCubemap;
     uint16_t fragmentDepth;
@@ -81,3 +86,5 @@ public:
     unsigned height();
     GLuint format();
 };
+
+ps3_uintptr_t addressToMainMemory(MemoryLocation location, ps3_uintptr_t address);

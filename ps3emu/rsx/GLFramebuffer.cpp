@@ -88,10 +88,7 @@ void GLFramebuffer::updateTexture() {
 
 GLSimpleTexture* GLFramebuffer::findTexture(ps3_uintptr_t va) {
     auto it = _cache.find(va);
-    assert(it != end(_cache));
+    if (it == end(_cache))
+        return nullptr;
     return it->second.get();
-}
-
-ps3_uintptr_t addressToMainMemory(MemoryLocation location, ps3_uintptr_t address) {
-    return address + (location == MemoryLocation::Local ? GcmLocalMemoryBase : 0);
 }
