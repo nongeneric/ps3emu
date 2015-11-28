@@ -86,8 +86,13 @@ void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
     
     VirtualAddress split { va };
     auto& page = _pages[split.page.u()];
-    if (!page.ptr)
-        throw std::runtime_error("accessing non existing page");
+    if (!page.ptr) {
+        if (allocate) {
+            page.alloc();
+        } else {
+            throw std::runtime_error("accessing non existing page");
+        }
+    }
     memcpy(buf, page.ptr + split.offset.u(), len);
 }
 

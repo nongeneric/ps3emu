@@ -1,0 +1,30 @@
+# profile sce_fp_rsx
+# parameterCount 7
+# instructionCount 20
+# attributeInputMask Tex0
+# registerCount 3
+
+index: type: name: semantic: res: # of const, const offset
+#0: float4: v2f.color: in.COLOR0: COLOR0
+#1: float4: v2f.tex: in.TEX0: TEXCOORD0
+#2: sampler2D: texMRT0: : TEXUNIT0
+#3: sampler2D: texMRT1: : TEXUNIT1
+#4: sampler2D: texMRT2: : TEXUNIT2
+#5: sampler2D: texMRT3: : TEXUNIT3
+#6: float4: main.COL: out.COLOR: COLOR0
+
+MOVR R1.xy, f[TEX0];
+SLTH H3.xy, R1, {0x3f000000(0.5), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.x;
+MULR R2.zw, R1.xxxy, {0x00000000(0), 0x40000000(2), 0x00000000(0), 0x00000000(0)}.y;
+MULXC RC.x, H3, H3.y;
+SGTH H4.xy, R1, {0x3f000000(0.5), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.x;
+MULXC RC.zw, H4.xxxy, H3.xxyx;
+TEXR R0(NE.x), R2.zwzz, TEX0;
+MADR R2.zw, R1.xxxy, {0x40000000(2), 0xbf800000(-1), 0x80000000(-0), 0x00000000(0)}.x, {0x40000000(2), 0xbf800000(-1), 0x80000000(-0), 0x00000000(0)}.yzyz;
+MULXC RC.x, H4, H4.y;
+MADR R1.zw, R1.xxxy, {0x40000000(2), 0x80000000(-0), 0xbf800000(-1), 0x00000000(0)}.x, {0x40000000(2), 0x80000000(-0), 0xbf800000(-1), 0x00000000(0)}.yzyz;
+TEXR R0(NE.z), R2.zwzz, TEX1;
+TEXR R0(NE.w), R1.zwzz, TEX2;
+MADR R1.xy, R1, {0x40000000(2), 0xbf800000(-1), 0x00000000(0), 0x00000000(0)}.x, {0x40000000(2), 0xbf800000(-1), 0x00000000(0), 0x00000000(0)}.y;
+TEXR R0(NE.x), R1, TEX3; # last instruction
+END

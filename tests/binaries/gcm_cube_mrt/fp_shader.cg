@@ -1,0 +1,47 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2007 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+struct v2fConnector
+{
+    float4 projCoord : POSITION;
+    float4 color     : COLOR0;
+    float4 tex       : TEX0;
+};
+
+struct f2fConnector
+{
+    float4 COL : COLOR;
+};
+
+f2fConnector main
+(
+    v2fConnector v2f,
+    uniform texobj2D texMRT0,
+    uniform texobj2D texMRT1,
+    uniform texobj2D texMRT2,
+    uniform texobj2D texMRT3
+)
+{
+    f2fConnector f2f = {float4(0.0f)};
+
+    // prepare coords for each quadrant of quad:
+    float2 coords0 = v2f.tex.xy * 2.0 - float2(0.0f, 0.0f);
+    float2 coords1 = v2f.tex.xy * 2.0 - float2(1.0f, 0.0f);
+    float2 coords2 = v2f.tex.xy * 2.0 - float2(0.0f, 1.0f);
+    float2 coords3 = v2f.tex.xy * 2.0 - float2(1.0f, 1.0f);
+
+    // map a different MRT buffer to each quadrant:
+    if (v2f.tex.x < 0.5f && v2f.tex.y < 0.5f)
+      f2f.COL   = f4tex2D(texMRT0, coords0);
+    if (v2f.tex.x > 0.5f && v2f.tex.y < 0.5f)
+      f2f.COL   = f4tex2D(texMRT1, coords1);
+    if (v2f.tex.x < 0.5f && v2f.tex.y > 0.5f)
+      f2f.COL   = f4tex2D(texMRT2, coords2);
+    if (v2f.tex.x > 0.5f && v2f.tex.y > 0.5f)
+      f2f.COL   = f4tex2D(texMRT3, coords3);
+
+    return f2f;
+}
+

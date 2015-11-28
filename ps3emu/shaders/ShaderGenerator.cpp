@@ -40,9 +40,14 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("in vec4 f_TEX8;");
     line("in vec4 f_TEX9;");
     line("in vec4 f_SSA;");
+    line(ssnprintf("layout (std140, binding = %d) uniform FragmentSamplersInfo {",
+                   FragmentShaderSamplesInfoBinding));
+    line("    int flip[16];");
+    line("} fragmentSamplersInfo;");
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
         line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;", i + 4, samplerSizes[i], i));
         line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
+        line(ssnprintf("    uvp = fragmentSamplersInfo.flip[%d] == 0 ? uvp : vec4(uvp.x, 1 - uvp.y, uvp.zw);", i));
         line(ssnprintf("    return texture(s%d, uvp.xy);", i));
         line("}");
     }
@@ -77,7 +82,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                    VertexShaderConstantBinding));
     line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
     line("} constants;");
-    line(ssnprintf("layout(std140, binding = %d) uniform SamplersInfo {",
+    line(ssnprintf("layout (std140, binding = %d) uniform SamplersInfo {",
                    VertexShaderSamplesInfoBinding));
     line("    ivec3 wrapMode;");
     line("    vec4 borderColor;");

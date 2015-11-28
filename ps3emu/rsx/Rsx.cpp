@@ -144,13 +144,8 @@ public:
     uint32_t gcmIoSize;
     ps3_uintptr_t gcmIoAddress;
     Window window;
-    GLuint buffer;
-    uint8_t* bufferMappedMemory;
     SurfaceInfo surface;
-    unsigned viewPortX;
-    unsigned viewPortY;
-    unsigned viewPortWidth;
-    unsigned viewPortHeight;
+    ViewPortInfo viewPort;
     float clipMin;
     float clipMax;
     float viewPortScale[4];
@@ -163,12 +158,13 @@ public:
     glm::vec4 colorClearValue;
     GLuint glClearSurfaceMask;
     bool isFlipInProgress = false;
-    VertexDataArrayFormatInfo vertexDataArrays[16];
+    std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;
     GLShader vertexShader;
     GLShader fragmentShader;
     GLuint vertexConstBuffer;
     GLuint vertexSamplersBuffer;
+    GLuint fragmentSamplersBuffer;
     GLProgram shaderProgram = GLProgram(0);
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
@@ -184,6 +180,7 @@ public:
     DisplayBufferInfo displayBuffers[8];
     std::unique_ptr<GLFramebuffer> framebuffer;
     std::unique_ptr<TextureRenderer> textureRenderer;
+    std::unique_ptr<uint8_t[]> localMemory;
 };
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
@@ -541,8 +538,6 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
     GLint maxBindings;
     assert((GLint)array.binding < (glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBindings), maxBindings));
     assert(location == CELL_GCM_LOCATION_LOCAL);
-    glcall(glVertexAttribBinding(index, array.binding));
-    glcall(glBindVertexBuffer(array.binding, _context->buffer, offset, array.stride));
 }
 
 void Rsx::BeginEnd(uint32_t mode) {
@@ -563,9 +558,10 @@ void Rsx::BeginEnd(uint32_t mode) {
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
+    updateVertexDataArrays(count);
     updateTextures();
     updateShaders();
-    glcall(glDrawArrays(_context->glVertexArrayMode, first, count + 1));
+    glcall(glDrawArrays(_context->glVertexArrayMode, first, count));
 }
 
 bool Rsx::isFlipInProgress() const {
@@ -583,6 +579,10 @@ struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
     std::array<float, 4> borderColor;
 };
 
+struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
+    uint32_t flip;
+};
+
 void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
     _context->gcmIoSize = ioSize;
     _context->gcmIoAddress = ioAddress;
@@ -598,10 +598,10 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->window.SwapBuffers();
     
     auto& vec = _context->lastFrame;
-    glReadnPixels(_context->viewPortX,
-                  _context->viewPortY,
-                  _context->viewPortWidth,
-                  _context->viewPortHeight,
+    glReadnPixels(_context->viewPort.x,
+                  _context->viewPort.y,
+                  _context->viewPort.width,
+                  _context->viewPort.height,
                   GL_RGBA,
                   GL_UNSIGNED_BYTE,
                   vec.size(),
@@ -635,6 +635,16 @@ bool Rsx::linkShaderProgram() {
     glcall(glLinkProgram(program.handle()));
     glcall(glUseProgram(program.handle()));
     _context->shaderProgram = std::move(program);
+    
+    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
+                            VertexShaderConstantBinding,
+                            _context->vertexConstBuffer));
+    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
+                            VertexShaderSamplesInfoBinding,
+                            _context->vertexSamplersBuffer));
+    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
+                            FragmentShaderSamplesInfoBinding,
+                            _context->fragmentSamplersBuffer));
     return true;
 }
 
@@ -660,6 +670,7 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawIndexArray(%x, %x)", first, count);
+    updateVertexDataArrays(count);
     updateTextures();
     updateShaders();
     
@@ -718,14 +729,7 @@ void Rsx::updateShaders() {
         _context->vertexShader = std::move(vertexShader);
     }
     
-    if (linkShaderProgram()) {
-        glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                                VertexShaderConstantBinding,
-                                _context->vertexConstBuffer));
-        glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                                VertexShaderSamplesInfoBinding,
-                                _context->vertexSamplersBuffer));
-    }
+    linkShaderProgram();
 }
 
 void Rsx::VertexTextureOffset(unsigned index, 
@@ -797,14 +801,15 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
-            VertexShaderSamplerUniform info[] = { 
+            VertexShaderSamplerUniform info = { 
                 sampler.wraps, sampler.wrapt, 0, sampler.borderColor
             };
             auto infoSize = sizeof(info);
-            glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, index * infoSize, infoSize, info));
+            glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, index * infoSize, infoSize, &info));
         }
         index++;
     }
+    int fragmentIndex = 0;
     for (auto& sampler : _context->fragmentTextureSamplers) {
         if (sampler.enable) {
             auto va = addressToMainMemory(sampler.texture.location, sampler.texture.offset);
@@ -831,12 +836,13 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
-            //VertexShaderSamplerUniform info[] = { 
-            //    sampler.wraps, sampler.wrapt, sampler.fragmentWrapr, sampler.borderColor
-            //};
-            //auto infoSize = sizeof(info);
-            //glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, index * infoSize, infoSize, info));
+            FragmentShaderSamplerUniform info = { 
+                surfaceTex != nullptr
+            };
+            auto infoSize = sizeof(info);
+            glcall(glNamedBufferSubData(_context->fragmentSamplersBuffer, fragmentIndex * infoSize, infoSize, &info));
         }
+        fragmentIndex++;
         index++;
     }
 }
@@ -1053,10 +1059,10 @@ void Rsx::WindowOffset(uint16_t x, uint16_t y) {
 
 void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceClipHorizontal(%d, %d, %d, %d)", x, w, y, h);
-    _context->viewPortX = x;
-    _context->viewPortY = y;
-    _context->viewPortWidth = w;
-    _context->viewPortHeight = h;
+    _context->viewPort.x = x;
+    _context->viewPort.y = y;
+    _context->viewPort.width = w;
+    _context->viewPort.height = h;
     _context->lastFrame.resize(w * h * 4);
 }
 
@@ -1066,7 +1072,7 @@ void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderWindow(%d, %x, %x)", height, origin, pixelCenters);
     assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
     assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
-    _context->framebuffer->setSurface(_context->surface);
+    _context->framebuffer->setSurface(_context->surface, _context->viewPort);
     updateFramebuffer();
 }
 
@@ -1131,23 +1137,27 @@ void Rsx::initGcm() {
     BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
     
     _context->window.Init();
-    glcall(glCreateBuffers(1, &_context->buffer));
-    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT
-                  | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
-    glcall(glNamedBufferStorage(_context->buffer, GcmLocalMemorySize, NULL, mapFlags));
-    _context->bufferMappedMemory = (uint8_t*)glMapNamedBufferRange(
-        _context->buffer, 0, GcmLocalMemorySize, mapFlags & ~GL_DYNAMIC_STORAGE_BIT);
-    _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->bufferMappedMemory);
+    
+    _context->localMemory.reset(new uint8_t[GcmLocalMemorySize]);
+    _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->localMemory.get());
+    
     // remap io to point to the buffer as well
     _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
     
     glcall(glCreateBuffers(1, &_context->vertexConstBuffer));
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
-    glcall(glNamedBufferStorage(_context->vertexConstBuffer, constBufferSize, NULL, GL_DYNAMIC_STORAGE_BIT));
+    glcall(glNamedBufferStorage(_context->vertexConstBuffer, constBufferSize, NULL, 
+                                GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT));
     
     glcall(glCreateBuffers(1, &_context->vertexSamplersBuffer));
     auto uniformSize = sizeof(VertexShaderSamplerUniform) * 4;
-    glcall(glNamedBufferStorage(_context->vertexSamplersBuffer, uniformSize, NULL, GL_DYNAMIC_STORAGE_BIT));
+    glcall(glNamedBufferStorage(_context->vertexSamplersBuffer, uniformSize, NULL, 
+                                GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT));
+    
+    glcall(glCreateBuffers(1, &_context->fragmentSamplersBuffer));
+    uniformSize = sizeof(FragmentShaderSamplerUniform) * 16;
+    glcall(glNamedBufferStorage(_context->fragmentSamplersBuffer, uniformSize, NULL, 
+                                GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT));
     
     for (auto& s : _context->vertexTextureSamplers) {
         s.enable = false;
@@ -1166,11 +1176,36 @@ void Rsx::initGcm() {
 }
 
 void Rsx::updateFramebuffer() {
-    glcall(glViewport(_context->viewPortX,
-                      _context->viewPortY,
-                      _context->viewPortWidth,
-                      _context->viewPortHeight));
+    glcall(glViewport(_context->viewPort.x,
+                      _context->viewPort.y,
+                      _context->viewPort.width,
+                      _context->viewPort.height));
     auto& c = _context->colorClearValue;
     glcall(glClearColor(c.r, c.g, c.b, c.a));
     glcall(glClear(_context->glClearSurfaceMask));
+}
+
+void Rsx::updateVertexDataArrays(unsigned count) {
+    // TODO: proper buffer management
+    
+    for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
+        auto& format = _context->vertexDataArrays[i];
+        auto& input = _context->vertexInputs[i];
+        if (!input.enabled)
+            continue;
+        
+        auto bufferSize = count * format.stride;
+        
+        GLuint buffer;
+        glcall(glCreateBuffers(1, &buffer));
+        glcall(glNamedBufferStorage(buffer, bufferSize, nullptr, GL_MAP_WRITE_BIT));
+        
+        auto mapped = glMapNamedBufferRange(buffer, 0, bufferSize, GL_MAP_WRITE_BIT);
+        auto va = addressToMainMemory(MemoryLocation::Local, format.offset);
+        _ppu->readMemory(va, mapped, bufferSize);
+        glcall(glUnmapNamedBuffer(buffer));
+        
+        glcall(glVertexAttribBinding(i, format.binding));
+        glcall(glBindVertexBuffer(format.binding, buffer, 0, format.stride));
+    }
 }

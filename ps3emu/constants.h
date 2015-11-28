@@ -24,3 +24,4 @@ constexpr uint32_t DefaultMainMemoryPageCount = MaxMainMemoryAddress / DefaultMa
 constexpr unsigned VertexShaderConstantCount = 468;
 constexpr unsigned VertexShaderConstantBinding = 16;
 constexpr unsigned VertexShaderSamplesInfoBinding = 17;
+constexpr unsigned FragmentShaderSamplesInfoBinding = 18;

@@ -43,6 +43,7 @@ class Rsx {
     void initGcm();
     void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
     bool linkShaderProgram();
+    void updateVertexDataArrays(unsigned count);
     void updateShaders();
     void updateTextures();
     void updateFramebuffer();

@@ -551,7 +551,7 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001814: {
             //name = "CELL_GCM_NV4097_DRAW_ARRAYS";
             auto arg = readarg(1);
-            DrawArrays(arg & 0xfffff, arg >> 24);
+            DrawArrays(arg & 0xfffff, (arg >> 24) + 1);
             break;
         }
         case 0x00001818:
