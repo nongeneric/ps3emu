@@ -231,6 +231,8 @@ STUB_2(sys_mutex_lock);
 STUB_1(sys_mutex_trylock);
 STUB_1(sys_mutex_unlock);
 STUB_4(_sys_heap_create_heap);
+STUB_1(cellSysmoduleLoadModule);
+STUB_1(cellSysmoduleUnloadModule);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -281,6 +283,8 @@ NCallEntry ncallTable[] {
     ENTRY(cellMouseGetInfo),
     ENTRY(cellGcmSetDebugOutputLevel),
     ENTRY(_sys_heap_create_heap),
+    ENTRY(cellSysmoduleLoadModule),
+    ENTRY(cellSysmoduleUnloadModule),
 };
 
 void PPU::ncall(uint32_t index) {

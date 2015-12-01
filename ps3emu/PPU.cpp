@@ -10,17 +10,34 @@ bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
     return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
 }
 
-template <class F>
-bool mergeAcrossPages(PPU* ppu, F f, ps3_uintptr_t va, 
-                      void* buf, uint len, bool allocate) {
-    auto pageOffset = va % DefaultMainMemoryPageSize;
-    if (pageOffset + len > DefaultMainMemoryPageSize) {
-        auto firstHalfLen = DefaultMainMemoryPageSize - pageOffset;
-        (ppu->*f)(va, buf, firstHalfLen, allocate);
-        (ppu->*f)(va + DefaultMainMemoryPageSize, (char*)buf + firstHalfLen, len - firstHalfLen, allocate);
-        return true;
+template <bool Read>
+void copy(ps3_uintptr_t va, const void* buf, uint len, bool allocate, MemoryPage* pages) {
+    assert(va != 0 || len == 0);
+    char* chars = (char*)buf;
+    for (auto curVa = va; curVa != va + len;) {
+        VirtualAddress split { curVa };
+        unsigned pageIndex = split.page.u();
+        ps3_uintptr_t pageEnd = (pageIndex + 1) * DefaultMainMemoryPageSize;
+        auto end = std::min(pageEnd, va + len);
+        auto& page = pages[pageIndex];
+        if (!page.ptr) {
+            if (allocate) {
+                page.alloc();
+            } else {
+                throw std::runtime_error("accessing non existing page");
+            }
+        }
+        auto offset = split.offset.u();
+        auto source = chars + (curVa - va);
+        auto dest = page.ptr + offset;
+        auto size = end - curVa;
+        if (Read) {
+            memcpy(source, dest, size);
+        } else {
+            memcpy(dest, source, size);
+        }
+        curVa = end;
     }
-    return false;
 }
 
 void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
@@ -43,16 +60,7 @@ void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate
         return;
     }
     
-    assert(va != 0 || len == 0);
-    if (mergeAcrossPages(this, &PPU::writeMemory, va, const_cast<void*>(buf), len, allocate))
-        return;
-    
-    VirtualAddress split { va };
-    auto& page = _pages[split.page.u()];
-    if (!page.ptr && !allocate)
-        throw std::runtime_error("accessing non existing page");
-    page.alloc();
-    memcpy(page.ptr + split.offset.u(), buf, len);
+    copy<false>(va, buf, len, allocate, _pages.get());
 }
 
 void PPU::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
@@ -80,20 +88,8 @@ void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
         }
         throw std::runtime_error("reading rsx registers not implemented");
     }
-    
-    if (mergeAcrossPages(this, &PPU::readMemory, va, buf, len, allocate))
-        return;
-    
-    VirtualAddress split { va };
-    auto& page = _pages[split.page.u()];
-    if (!page.ptr) {
-        if (allocate) {
-            page.alloc();
-        } else {
-            throw std::runtime_error("accessing non existing page");
-        }
-    }
-    memcpy(buf, page.ptr + split.offset.u(), len);
+
+    copy<true>(va, buf, len, allocate, _pages.get());
 }
 
 bool PPU::isAllocated(ps3_uintptr_t va) {

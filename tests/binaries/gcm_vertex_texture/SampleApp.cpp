@@ -446,14 +446,11 @@ void print_vector(Vector4 vector) {
 	fflush(stdout);
 }
 
-//-----------------------------------------------------------------------------
-// Description: Render callback
-// Parameters: 
-// Returns:
-// Notes: 
-//-----------------------------------------------------------------------------
+bool render = 0;
 void SampleApp::onRender()
 {
+	if (render++)
+		exit(0);
 	// base implementation clears screen and sets up camera
 	FWGCMCamControlApplication::onRender();
 

@@ -15,45 +15,54 @@
 void init_sys_lib() { }
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
-    
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
 }
 
 int sys_lwmutex_create(sys_lwmutex_t* mutex_id, sys_lwmutex_attribute_t* attr) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_lwmutex_destroy(sys_lwmutex_t* lwmutex_id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_lwmutex_lock(sys_lwmutex_t* lwmutex_id, usecond_t timeout) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_lwmutex_unlock(sys_lwmutex_t* lwmutex_id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
-    mem_info->available_user_memory = 256 * (1 << 20);
-    mem_info->total_user_memory = 512 * (1 << 20);
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    mem_info->total_user_memory = 221249536;
+    mem_info->available_user_memory = mem_info->total_user_memory / 2; // TODO: handle alloc/dealloc
     return CELL_OK;
 }
 
 system_time_t sys_time_get_system_time(PPU* ppu) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     auto sec = (float)ppu->getTimeBase() / (float)ppu->getFrequency();
     return sec * 1000000;
 }
 
 int _sys_process_atexitspawn() {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int _sys_process_at_Exitspawn() {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     *thread_id = 7;
     return CELL_OK;
 }
@@ -96,6 +105,7 @@ int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
 #define  SYS_TTYP_USER13       (SYS_TTYP15)
 
 int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     if (len == 0)
         return CELL_OK;
     auto asChar = (const char*)buf;
@@ -115,19 +125,28 @@ int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned i
 }
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_prx_exitspawn_with_level(uint64_t level) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
-int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t* alloc_addr, PPU* ppu) {
+constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
+constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
+
+int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPU* ppu) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
+    assert(size < 256 * 1024 * 1024);
     *alloc_addr = ppu->malloc(size);
     return CELL_OK;
 }
 
 int sys_timer_usleep(usecond_t sleep_time) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     boost::this_thread::sleep_for( boost::chrono::microseconds(sleep_time) );
     return CELL_OK;
 }
@@ -141,6 +160,7 @@ CellFsErrno sys_fs_open_impl(const char* path,
                              const void* arg,
                              uint64_t size)
 {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return 1;
 }
 
@@ -167,6 +187,7 @@ int sys_event_queue_create(sys_event_queue_t* equeue_id,
                            sys_ipc_key_t event_queue_key,
                            uint32_t size)
 {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
     assert(attr->attr_protocol == SYS_SYNC_PRIORITY ||
            attr->attr_protocol == SYS_SYNC_FIFO);
@@ -185,6 +206,7 @@ int sys_event_queue_create(sys_event_queue_t* equeue_id,
 }
 
 int sys_event_port_create(sys_event_port_t* eport_id, int port_type, uint64_t name) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     boost::lock_guard<boost::mutex> lock(eventQueueVectorMutex);
     auto it = std::max_element(begin(ports), end(ports), [](auto& a, auto& b) {
         return a.first < b.first;
@@ -198,6 +220,7 @@ int sys_event_port_create(sys_event_port_t* eport_id, int port_type, uint64_t na
 int sys_event_port_connect_local(sys_event_port_t event_port_id, 
                                  sys_event_queue_t event_queue_id)
 {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     boost::lock_guard<boost::mutex> lock(eventQueueVectorMutex);
     assert(ports.find(event_port_id) != end(ports));
     assert(queues.find(event_queue_id) != end(queues));
@@ -207,10 +230,12 @@ int sys_event_port_connect_local(sys_event_port_t event_port_id,
 }
 
 uint64_t sys_time_get_timebase_frequency(PPU* ppu) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return ppu->getFrequency();
 }
 
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     info->pst_addr = StackBase;
     info->pst_size = StackSize;
     return CELL_OK;
@@ -245,17 +270,20 @@ public:
 IDMap<sys_mutex_t, std::unique_ptr<boost::timed_mutex>> mutexes;
 
 int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     auto mutex = std::make_unique<boost::timed_mutex>();
     *mutex_id = mutexes.create(std::move(mutex));
     return CELL_OK;
 }
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     mutexes.destroy(mutex_id);
     return CELL_OK;
 }
 
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     if (timeout == 0)
         mutexes.get(mutex_id)->lock();
     else
@@ -264,16 +292,32 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
 }
 
 int sys_mutex_trylock(sys_mutex_t mutex_id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     bool locked = mutexes.get(mutex_id)->try_lock();
     return locked ? CELL_OK : EBUSY;
 }
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     mutexes.get(mutex_id)->unlock();
     return CELL_OK;
 }
 
 uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     *id = 0x123;
+    return CELL_OK;
+}
+
+constexpr uint16_t CELL_SYSMODULE_FS = 0x000e;
+
+uint32_t cellSysmoduleLoadModule(uint16_t id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    assert(id == CELL_SYSMODULE_FS);
+    return CELL_OK;
+}
+
+uint32_t cellSysmoduleUnloadModule(uint16_t id) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }

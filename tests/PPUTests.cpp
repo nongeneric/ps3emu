@@ -1011,7 +1011,7 @@ TEST_CASE("memcpy") {
     ppu.setLR(0);
     const char* str = "hello there";
     ppu.writeMemory(src, str, strlen(str) + 1, true);
-    ppu.setMemory(dest, 100, 0, true);
+    ppu.setMemory(dest, 0, 100, true);
     ppu.setGPR(3, dest);
     ppu.setGPR(4, src);
     ppu.setGPR(5, strlen(str) + 1);

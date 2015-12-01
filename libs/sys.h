@@ -53,8 +53,8 @@ extern int sys_lwmutex_unlock(sys_lwmutex_t * lwmutex_id);
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2);
 
 typedef struct sys_memory_info {
-    big_uint64_t total_user_memory;
-    big_uint64_t available_user_memory;
+    big_uint32_t total_user_memory;
+    big_uint32_t available_user_memory;
 } sys_memory_info_t;
 
 int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
@@ -82,7 +82,7 @@ typedef big_uint32_t sys_addr_t;
 #define SYS_MEMORY_GRANULARITY_64K       0x0000000000000200ULL
 #define SYS_MEMORY_GRANULARITY_MASK      0x0000000000000f00ULL
 
-int sys_memory_allocate(size_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);
+int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);
 int sys_timer_usleep(usecond_t sleep_time);
 
 typedef uint32_t CellFsErrno;
@@ -153,3 +153,5 @@ int sys_mutex_trylock(sys_mutex_t mutex_id);
 int sys_mutex_unlock(sys_mutex_t mutex_id);
 
 uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);
+uint32_t cellSysmoduleLoadModule(uint16_t id);
+uint32_t cellSysmoduleUnloadModule(uint16_t id);

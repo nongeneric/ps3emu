@@ -836,6 +836,7 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
+            // TODO: handle viewport CELL_GCM_WINDOW_ORIGIN_TOP
             FragmentShaderSamplerUniform info = { 
                 surfaceTex != nullptr
             };
