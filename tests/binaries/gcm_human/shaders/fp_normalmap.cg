@@ -1,0 +1,42 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+void main
+(
+	float4 position   : TEXCOORD0,
+	float2 texcoord   : TEXCOORD1,
+
+	uniform float3		   lightPos,	// light pos in local space
+	uniform float3		   lightCol,	// light color
+	uniform float3		   ambient,		// ambient color
+	uniform float3		   eyePosLocal,	// eye pos in local space
+
+	uniform sampler2D      normalMap, 
+
+	out float4 oColor : COLOR
+)
+{
+	float shininess =  17.8954f;   //arbitrary shininess value
+
+	// Normal
+	float3 normal = (tex2D(normalMap, texcoord).xyz * 2.f) - 1.f;
+	normal = normalize(normal);
+
+	//basic diffuse lighting calcution
+	float3 lightDirection = normalize (lightPos - position.xyz);
+	float  diffuseLight = max(dot (normal, lightDirection), 0.f);
+
+	// Compute the specular lighting term
+	float3 eyeDirection = normalize (eyePosLocal - position.xyz);
+	float3 halfAngle = normalize (lightDirection + eyeDirection);
+	float  specularLight = pow (max(dot (halfAngle, normal), 0.f), shininess);
+	if (diffuseLight <= 0.f)
+		specularLight = 0.f;
+
+	// Compute the final fragment color
+	float3 color   = ((lightCol*diffuseLight)+ambient) + specularLight;
+
+	oColor = float4( color, 1.f );
+}

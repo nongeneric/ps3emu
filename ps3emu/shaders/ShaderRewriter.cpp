@@ -31,9 +31,13 @@ namespace ShaderRewriter {
         { FunctionName::dot4, { ExprType::fp32, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::abs, { ExprType::notype, ExprType::notype } },
         { FunctionName::cos, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::min, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::max, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::min, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::max, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::exp2, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::sin, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::lg2, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::pow, { ExprType::notype, ExprType::notype } },
+        { FunctionName::inversesqrt, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse3f, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::txl0, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
@@ -70,6 +74,7 @@ namespace ShaderRewriter {
         std::string printOperatorName(FunctionName name) {
             switch (name) {
                 case FunctionName::mul: return "*";
+                case FunctionName::div: return "/";
                 case FunctionName::add: return "+";
                 case FunctionName::neg: return "-";
                 case FunctionName::gt: return ">";
@@ -154,14 +159,18 @@ namespace ShaderRewriter {
                 case FunctionName::fract: name = "fract"; break;
                 case FunctionName::floor: name = "floor"; break;
                 case FunctionName::ceil: name = "ceil"; break;
-                case FunctionName::dot2: name = "dot"; break;
+                case FunctionName::dot2:
+                case FunctionName::dot3:
                 case FunctionName::dot4: name = "dot"; break;
+                case FunctionName::max: name = "max"; break;
+                case FunctionName::min: name = "min"; break;
                 case FunctionName::lessThan: name = "lessThan"; break;
                 case FunctionName::greaterThan: name = "greaterThan"; break;
                 case FunctionName::lessThanEqual: name = "lessThanEqual"; break;
                 case FunctionName::abs: name = "abs"; break;
                 case FunctionName::cast_float: name = "float"; break;
                 case FunctionName::cos: name = "cos"; break;
+                case FunctionName::inversesqrt: name = "inversesqrt"; break;
                 case FunctionName::sin: name = "sin"; break;
                 case FunctionName::reverse4f: name = "reverse4f"; break;
                 case FunctionName::reverse3f: name = "reverse3f"; break;
@@ -169,6 +178,9 @@ namespace ShaderRewriter {
                 case FunctionName::txl1: name = "txl1"; break;
                 case FunctionName::txl2: name = "txl2"; break;
                 case FunctionName::txl3: name = "txl3"; break;
+                case FunctionName::lg2: name = "log2"; break;
+                case FunctionName::pow: name = "pow"; break;
+                case FunctionName::exp2: name = "exp2"; break;
                 default: assert(false);
             }
             _ret = ssnprintf("%s(%s)", name, str.c_str());
@@ -284,6 +296,10 @@ namespace ShaderRewriter {
         
         virtual void visit(ComponentMask* mask) override {
             auto exprType = accept(mask->expr());
+            if (exprType == ExprType::notype) {
+                _ret = ExprType::notype;
+                return;
+            }
             auto t = std::find_if(std::begin(types), std::end(types), [=](auto i) {
                 return i.type == exprType;
             });
@@ -390,6 +406,10 @@ namespace ShaderRewriter {
                 auto invoke = new Invocation(FunctionName::vec2, { expr });
                 return invoke;
             }
+            if (expected == ExprType::vec3 && current == ExprType::vec4) {
+                auto mask = new ComponentMask(expr, { 1, 1, 1, 0 });
+                return mask;
+            }
             if (current == ExprType::notype)
                 return expr;
             assert(false);
@@ -467,7 +487,7 @@ namespace ShaderRewriter {
                 }
             );
         } else if (arg.type == op_type_t::Attr) {
-            assert(i.persp_corr == persp_corr_t::F);
+            // the g[] correction has no effect
             auto name = ssnprintf("f_%s", print_attr(i.input_attr));
             expr = new Variable(name, nullptr);
         } else if (arg.type == op_type_t::Temp) {
@@ -498,10 +518,10 @@ namespace ShaderRewriter {
         if (cond.relation == cond_t::TR)
             return;
         auto func = relationToFunction(cond.relation);
-        auto sw = cond.swizzle;
-        assert(sw.comp[0] == sw.comp[1] && 
-        sw.comp[1] == sw.comp[2] &&
-        sw.comp[2] == sw.comp[3]);
+//         auto sw = cond.swizzle;
+//         assert(sw.comp[0] == sw.comp[1] && 
+//                sw.comp[1] == sw.comp[2] &&
+//                sw.comp[2] == sw.comp[3]);
         auto regnum = cond.is_C1 ? 1 : 0;
         auto reg = new Variable("c", new IntegerLiteral(regnum));
         auto swexpr = new Swizzle(reg, cond.swizzle);
@@ -561,6 +581,16 @@ namespace ShaderRewriter {
                 rhs = new Invocation(FunctionName::dot4, { args[0], args[1] });
                 break;
             }
+            case fragment_op_t::DIV: {
+                rhs = new BinaryOperator(FunctionName::div, args[0], args[1]);
+                break;
+            }
+            case fragment_op_t::DIVSQ: {
+                auto mask = new ComponentMask(args[1], { 1, 0, 0, 0 });
+                auto inv = new Invocation(FunctionName::inversesqrt, { mask });
+                rhs = new BinaryOperator(FunctionName::mul, args[0], inv);
+                break;
+            }
             case fragment_op_t::EX2: {
                 rhs = new Invocation(FunctionName::exp2, { args[0] });
                 break;
@@ -584,11 +614,11 @@ namespace ShaderRewriter {
                 break;
             }
             case fragment_op_t::MAX: {
-                rhs = new Invocation(FunctionName::max, { args[0] });
+                rhs = new Invocation(FunctionName::max, { args[0], args[1] });
                 break;
             }
             case fragment_op_t::MIN: {
-                rhs = new Invocation(FunctionName::min, { args[0] });
+                rhs = new Invocation(FunctionName::min, { args[0], args[1] });
                 break;
             }
             case fragment_op_t::MOV: {
@@ -875,11 +905,11 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::MIN: {
-                rhs = new Invocation(FunctionName::min, { args[1] });
+                rhs = new Invocation(FunctionName::min, { args[1], args[2] });
                 break;
             }
             case vertex_op_t::MAX: {
-                rhs = new Invocation(FunctionName::max, { args[1] });
+                rhs = new Invocation(FunctionName::max, { args[1], args[2] });
                 break;
             }
             case vertex_op_t::MOV: {
@@ -902,7 +932,8 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::RCP: {
-                rhs = new Invocation(FunctionName::pow, { args[1], new FloatLiteral(-1) });
+                auto mask = new ComponentMask(args[1], { 1, 0, 0, 0 });
+                rhs = new Invocation(FunctionName::pow, { mask, new FloatLiteral(-1) });
                 break;
             }
             case vertex_op_t::RSQ: {

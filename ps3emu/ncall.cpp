@@ -4,6 +4,7 @@
 #include "../libs/Controller.h"
 #include "../libs/Sysutil.h"
 #include "../libs/graphics/gcm.h"
+#include "../libs/fs.h"
 #include <boost/type_traits.hpp>
 #include <memory>
 #include <algorithm>
@@ -172,6 +173,24 @@ uint32_t sys_fs_open_proxy(uint32_t path,
     return sys_fs_open_impl(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
 }
 
+CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, PPU* ppu) {
+    std::string pathStr;
+    readString(ppu, path, pathStr);
+    return cellFsStat(pathStr.c_str(), sb, ppu);
+}
+
+CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path, 
+                             int flags, 
+                             big_int32_t* fd,
+                             uint64_t arg, 
+                             uint64_t size, 
+                             PPU* ppu)
+{
+    std::string pathStr;
+    readString(ppu, path, pathStr);
+    return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, ppu);
+}
+
 STUB_2(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
 STUB_2(sys_lwmutex_lock);
@@ -233,6 +252,12 @@ STUB_1(sys_mutex_unlock);
 STUB_4(_sys_heap_create_heap);
 STUB_1(cellSysmoduleLoadModule);
 STUB_1(cellSysmoduleUnloadModule);
+STUB_1(cellSysmoduleIsLoaded);
+STUB_3(cellFsStat_proxy);
+STUB_6(cellFsOpen_proxy);
+STUB_4(cellFsLseek);
+STUB_1(cellFsClose);
+STUB_5(cellFsRead);
 
 #define ENTRY(name) { #name, nstub_##name }
 
@@ -285,6 +310,12 @@ NCallEntry ncallTable[] {
     ENTRY(_sys_heap_create_heap),
     ENTRY(cellSysmoduleLoadModule),
     ENTRY(cellSysmoduleUnloadModule),
+    ENTRY(cellSysmoduleIsLoaded),
+    { "cellFsStat", nstub_cellFsStat_proxy },
+    { "cellFsOpen", nstub_cellFsOpen_proxy },
+    ENTRY(cellFsLseek),
+    ENTRY(cellFsClose),
+    ENTRY(cellFsRead),
 };
 
 void PPU::ncall(uint32_t index) {

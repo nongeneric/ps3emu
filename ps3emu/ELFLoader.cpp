@@ -21,6 +21,7 @@ ELFLoader::~ELFLoader()
 }
 
 void ELFLoader::load(std::string filePath) {
+    _loadedFilePath = filePath;
     FILE* f = fopen(filePath.c_str(), "rb");
     assert(f);
     fseek(f, 0, SEEK_END);
@@ -253,5 +254,9 @@ uint32_t ELFLoader::getSymbolValue(std::string name) {
             value = sym->st_value;
     });
     return value;
+}
+
+std::string ELFLoader::loadedFilePath() {
+    return _loadedFilePath;
 }
 

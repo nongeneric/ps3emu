@@ -38,12 +38,13 @@ class Rsx {
     std::map<uint32_t, uint32_t> _semaphores;
     uint32_t _activeSemaphoreHandle = 0;
     int64_t interpret(uint32_t get);
+    void waitForIdle();
     void loop();
     void setSurfaceColorLocation(unsigned index, uint32_t location);
     void initGcm();
     void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
     bool linkShaderProgram();
-    void updateVertexDataArrays(unsigned count);
+    void updateVertexDataArrays(unsigned first, unsigned count);
     void updateShaders();
     void updateTextures();
     void updateFramebuffer();
@@ -180,6 +181,17 @@ class Rsx {
                        uint8_t gs,
                        uint8_t bs);
     void SetReference(uint32_t ref);
+    void SemaphoreOffset(uint32_t offset);
+    void BackEndWriteSemaphoreRelease(uint32_t value);
+    void OffsetDestin(uint32_t offset);
+    void ColorFormat(uint32_t format, uint16_t dstPitch, uint16_t srcPitch);
+    void Point(uint16_t pointX, 
+               uint16_t pointY, 
+               uint16_t outSizeX, 
+               uint16_t outSizeY, 
+               uint16_t inSizeX, 
+               uint16_t inSizeY);
+    void Color(std::vector<uint32_t> const& vec);
 public:
     Rsx(PPU* ppu);
     ~Rsx();

@@ -98,3 +98,12 @@ TEST_CASE("gcm_mrt") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_cube_mrt/ps3frame.png");
 }
+
+TEST_CASE("gcm_human") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_human/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_human/ps3frame.png");
+}

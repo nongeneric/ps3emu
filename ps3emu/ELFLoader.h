@@ -70,6 +70,7 @@ static_assert(sizeof(Elf64_be_Sym) == sizeof(Elf64_Sym), "big endian struct mism
 
 class ELFLoader {
     std::vector<uint8_t> _file;
+    std::string _loadedFilePath;
     Elf64_be_Ehdr* _header;
     Elf64_be_Phdr* _pheaders;
     Elf64_be_Shdr* _sections;
@@ -85,6 +86,7 @@ public:
     Elf64_be_Sym* getGlobalSymbolByValue(uint32_t value, uint32_t section);
     uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
+    std::string loadedFilePath();
     void map(PPU* ppu, std::vector<std::string> args);
     void link(PPU* ppu);
 };

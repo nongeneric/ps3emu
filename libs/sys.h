@@ -1,9 +1,6 @@
 #pragma once
 
 #include "sys_defs.h"
-#include <boost/endian/arithmetic.hpp>
-
-using namespace boost::endian;
 
 typedef big_uint32_t _sys_sleep_queue_t;
 typedef big_uint32_t sys_protocol_t;
@@ -59,9 +56,7 @@ typedef struct sys_memory_info {
 
 int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
 
-typedef big_int64_t system_time_t;
-
-extern system_time_t sys_time_get_system_time(PPU* ppu);
+extern cell_system_time_t sys_time_get_system_time(PPU* ppu);
 extern int _sys_process_atexitspawn();
 extern int _sys_process_at_Exitspawn();
 
@@ -84,14 +79,6 @@ typedef big_uint32_t sys_addr_t;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);
 int sys_timer_usleep(usecond_t sleep_time);
-
-typedef uint32_t CellFsErrno;
-CellFsErrno sys_fs_open_impl(const char *path,
-                             uint32_t flags,
-                             big_uint32_t *fd,
-                             uint64_t mode,
-                             const void *arg,
-                             uint64_t size);
 
 typedef struct sys_event_queue_attr {
     sys_protocol_t attr_protocol;
@@ -155,3 +142,4 @@ int sys_mutex_unlock(sys_mutex_t mutex_id);
 uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);
 uint32_t cellSysmoduleLoadModule(uint16_t id);
 uint32_t cellSysmoduleUnloadModule(uint16_t id);
+uint32_t cellSysmoduleIsLoaded(uint16_t id);

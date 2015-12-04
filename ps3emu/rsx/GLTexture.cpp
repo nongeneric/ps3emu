@@ -19,7 +19,7 @@ void read_A8R8G8B8(const uint8_t* raw, u8vec4& texel) {
 }
 
 void read_D8R8G8B8(const uint8_t* raw, u8vec4& texel) {
-    texel = { raw[0], raw[1], raw[2], 0xff };
+    texel = { raw[1], raw[2], raw[3], 0xff };
 }
 
 void read_A1R5G5B5(const uint8_t* raw, u8vec4& texel) {

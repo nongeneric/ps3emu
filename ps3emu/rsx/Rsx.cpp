@@ -137,6 +137,18 @@ struct DisplayBufferInfo {
     uint32_t height;
 };
 
+struct TransferInfo {
+    uint32_t offsetDestin;
+    uint16_t destPitch;
+    uint16_t sourcePitch;
+    uint16_t pointX; 
+    uint16_t pointY; 
+    uint16_t outSizeX;
+    uint16_t outSizeY; 
+    uint16_t inSizeX;
+    uint16_t inSizeY;
+};
+
 class GLFramebuffer;
 class TextureRenderer;
 class RsxContext {
@@ -168,6 +180,7 @@ public:
     GLProgram shaderProgram = GLProgram(0);
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
+    uint32_t fragmentOffset = 0;
     std::vector<uint8_t> fragmentBytecode;
     std::vector<uint8_t> lastFrame;
     std::array<VertexShaderInputFormat, 16> vertexInputs;
@@ -181,6 +194,8 @@ public:
     std::unique_ptr<GLFramebuffer> framebuffer;
     std::unique_ptr<TextureRenderer> textureRenderer;
     std::unique_ptr<uint8_t[]> localMemory;
+    uint32_t semaphoreOffset = 0;
+    TransferInfo transfer;
 };
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
@@ -296,34 +311,42 @@ void Rsx::SemaphoreRelease(uint32_t value) {
 
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClearRectHorizontal(%d, %d, %d, %d)", x, w, y, h);
+    //TODO: implement
 }
 
 void Rsx::ClipIdTestEnable(uint32_t x) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClipIdTestEnable(%d)", x);
+    //TODO: implement
 }
 
 void Rsx::FlatShadeOp(uint32_t x) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("FlatShadeOp(%d)", x);
+    //TODO: implement
 }
 
 void Rsx::VertexAttribOutputMask(uint32_t mask) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexAttribOutputMask(%x)", mask);
+    //TODO: implement
 }
 
 void Rsx::FrequencyDividerOperation(uint16_t op) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("FrequencyDividerOperation(%x)", op);
+    //TODO: implement
 }
 
 void Rsx::TexCoordControl(unsigned int index, uint32_t control) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TexCoordControl(%d, %x)", index, control);
+    //TODO: implement
 }
 
 void Rsx::ReduceDstColor(bool enable) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ReduceDstColor(%d)", enable);
+    //TODO: implement
 }
 
 void Rsx::FogMode(uint32_t mode) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("FogMode(%x)", mode);
+    //TODO: implement
 }
 
 void Rsx::AnisoSpread(unsigned int index,
@@ -334,22 +357,27 @@ void Rsx::AnisoSpread(unsigned int index,
                       uint8_t hSpacingSelect,
                       uint8_t vSpacingSelect) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("AnisoSpread(%d, ...)", index);
+    //TODO: implement
 }
 
 void Rsx::VertexDataBaseOffset(uint32_t baseOffset, uint32_t baseIndex) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataBaseOffset(%x, %x)", baseOffset, baseIndex);
+    //TODO: implement
 }
 
 void Rsx::AlphaFunc(uint32_t af, uint32_t ref) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("AlphaFunc(%x, %x)", af, ref);
+    //TODO: implement
 }
 
 void Rsx::AlphaTestEnable(bool enable) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("AlphaTestEnable(%d)", enable);
+    //TODO: implement
 }
 
 void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderControl(%x, %d)", control, registerCount);
+    //TODO: implement
 }
 
 void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
@@ -381,9 +409,7 @@ void Rsx::ShaderProgram(uint32_t locationOffset) {
     // (with the "#last command" bit)
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _ppu->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
-    _context->fragmentBytecode.resize(1000); // TODO: compute size exactly
-    auto& vec = _context->fragmentBytecode;
-    _ppu->readMemory(GcmLocalMemoryBase + locationOffset - 1, &vec[0], vec.size());
+    _context->fragmentOffset = GcmLocalMemoryBase + locationOffset - 1;
     _context->fragmentShaderDirty = true;
 }
 
@@ -558,10 +584,10 @@ void Rsx::BeginEnd(uint32_t mode) {
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
-    updateVertexDataArrays(count);
+    updateVertexDataArrays(first, count);
     updateTextures();
     updateShaders();
-    glcall(glDrawArrays(_context->glVertexArrayMode, first, count));
+    glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
 }
 
 bool Rsx::isFlipInProgress() const {
@@ -670,7 +696,7 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawIndexArray(%x, %x)", first, count);
-    updateVertexDataArrays(count);
+    updateVertexDataArrays(first, count);
     updateTextures();
     updateShaders();
     
@@ -694,6 +720,11 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
 void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
+        
+        _context->fragmentBytecode.resize(1000); // TODO: compute size exactly
+        auto& vec = _context->fragmentBytecode;
+        _ppu->readMemory(_context->fragmentOffset, &vec[0], vec.size());
+        
         // TODO: handle sizes
         std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
         auto text = GenerateFragmentShader(_context->fragmentBytecode, sizes, _context->isFlatShadeMode);
@@ -1073,6 +1104,7 @@ void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderWindow(%d, %x, %x)", height, origin, pixelCenters);
     assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
     assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
+    waitForIdle();
     _context->framebuffer->setSurface(_context->surface, _context->viewPort);
     updateFramebuffer();
 }
@@ -1186,7 +1218,7 @@ void Rsx::updateFramebuffer() {
     glcall(glClear(_context->glClearSurfaceMask));
 }
 
-void Rsx::updateVertexDataArrays(unsigned count) {
+void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
     // TODO: proper buffer management
     
     for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
@@ -1203,10 +1235,65 @@ void Rsx::updateVertexDataArrays(unsigned count) {
         
         auto mapped = glMapNamedBufferRange(buffer, 0, bufferSize, GL_MAP_WRITE_BIT);
         auto va = addressToMainMemory(MemoryLocation::Local, format.offset);
-        _ppu->readMemory(va, mapped, bufferSize);
+        _ppu->readMemory(va + first * format.stride, mapped, bufferSize);
         glcall(glUnmapNamedBuffer(buffer));
         
         glcall(glVertexAttribBinding(i, format.binding));
         glcall(glBindVertexBuffer(format.binding, buffer, 0, format.stride));
+    }
+}
+
+void Rsx::waitForIdle() {
+    glcall(glFinish());
+}
+
+void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
+    waitForIdle();
+    _ppu->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
+    __sync_synchronize();
+}
+
+void Rsx::SemaphoreOffset(uint32_t offset) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SemaphoreOffset(%x)", offset);
+    _context->semaphoreOffset = offset;
+}
+
+void Rsx::OffsetDestin(uint32_t offset) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("OffsetDestin(%x)", offset);
+    _context->transfer.offsetDestin = offset;
+}
+
+void Rsx::ColorFormat(uint32_t format, uint16_t dstPitch, uint16_t srcPitch) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorFormat(%x, %x, %x)", format, dstPitch, srcPitch);
+    _context->transfer.destPitch = dstPitch;
+    _context->transfer.sourcePitch = srcPitch;
+}
+
+void Rsx::Point(uint16_t pointX, 
+                uint16_t pointY, 
+                uint16_t outSizeX, 
+                uint16_t outSizeY, 
+                uint16_t inSizeX, 
+                uint16_t inSizeY)
+{
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Point(%d, %d, %d, %d, %d, %d)",
+        pointX, pointY, outSizeX, outSizeX, inSizeX, inSizeY
+    );
+    _context->transfer.pointX = pointX;
+    _context->transfer.pointY = pointY;
+    _context->transfer.outSizeX = outSizeX;
+    _context->transfer.outSizeY = outSizeY;
+    _context->transfer.inSizeX = inSizeX;
+    _context->transfer.inSizeY = inSizeY;
+}
+
+void Rsx::Color(std::vector<uint32_t> const& vec) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Color(size=%d)", vec.size());
+    // TODO: calc image
+    auto pos = _context->transfer.pointX * 4;
+    for (auto v : vec) {
+        _ppu->store<4>(_context->transfer.offsetDestin + GcmLocalMemoryBase + pos, v);
+        pos += 4;
     }
 }

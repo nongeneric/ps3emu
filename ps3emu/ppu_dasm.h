@@ -2702,6 +2702,53 @@ EMU(VPERM, SIMDForm) {
     ppu->setV(i->vD, dbe);
 }
 
+inline unsigned __int128 make128(uint64_t low, uint64_t high) {
+    unsigned __int128 i = low;
+    i <<= 64;
+    return i | high;
+}
+
+PRINT(LVSR, SIMDForm) { // TODO: test
+    *result = format_nnn("lvsr", i->vD, i->rA, i->rB);
+}
+
+EMU(LVSR, SIMDForm) {
+    auto b = getB(i->rA, ppu);
+    auto ea = b + ppu->getGPR(i->rB);
+    auto sh = ea & 15;
+    unsigned __int128 vd;
+    switch (sh) {
+        case 0: vd = make128(0x1011121314151617ull, 0x18191A1B1C1D1E1Full); break;
+        case 1: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break;
+        case 2: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break;
+        case 3: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break;
+        case 4: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break;
+        case 5: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break;
+        case 6: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break;
+        case 7: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break;
+        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break;
+        case 9: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break;
+        case 10: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break;
+        case 11: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break;
+        case 12: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break;
+        case 13: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break;
+        case 14: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break;
+        case 15: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break;
+    }
+    ppu->setV(i->vD, vd);
+}
+
+PRINT(VANDC, SIMDForm) { // TODO: test
+    *result = format_nnn("vandc", i->vD, i->vA, i->vB);
+}
+
+EMU(VANDC, SIMDForm) {
+    auto a = ppu->getV(i->vA);
+    auto b = ppu->getV(i->vB);
+    auto d = a & ~b;
+    ppu->setV(i->vD, d);
+}
+
 enum class DasmMode {
     Print, Emulate, Name
 };
@@ -2759,6 +2806,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                                 case 140: invoke(VMRGHW);
                                 case 396: invoke(VMRGLW);
                                 case 330: invoke(VRSQRTEFP);
+                                case 1092: invoke(VANDC);
                                 default: throw std::runtime_error("unknown extented opcode");
                             }
                     }
@@ -2908,6 +2956,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 9: invoke(MULHDU);
                 case 71: invoke(LVEWX);
                 case 11: invoke(MULHWU);
+                case 38: invoke(LVSR);
                 default: throw std::runtime_error("unknown extented opcode");
             }
             break;

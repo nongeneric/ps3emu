@@ -19,22 +19,18 @@ void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
 }
 
 int sys_lwmutex_create(sys_lwmutex_t* mutex_id, sys_lwmutex_attribute_t* attr) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_lwmutex_destroy(sys_lwmutex_t* lwmutex_id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_lwmutex_lock(sys_lwmutex_t* lwmutex_id, usecond_t timeout) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_lwmutex_unlock(sys_lwmutex_t* lwmutex_id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -45,7 +41,7 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     return CELL_OK;
 }
 
-system_time_t sys_time_get_system_time(PPU* ppu) {
+cell_system_time_t sys_time_get_system_time(PPU* ppu) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     auto sec = (float)ppu->getTimeBase() / (float)ppu->getFrequency();
     return sec * 1000000;
@@ -62,7 +58,6 @@ int _sys_process_at_Exitspawn() {
 }
 
 int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     *thread_id = 7;
     return CELL_OK;
 }
@@ -146,22 +141,8 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
 }
 
 int sys_timer_usleep(usecond_t sleep_time) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     boost::this_thread::sleep_for( boost::chrono::microseconds(sleep_time) );
     return CELL_OK;
-}
-
-// TODO: filesystem impl / tests
-
-CellFsErrno sys_fs_open_impl(const char* path,
-                             uint32_t flags,
-                             big_uint32_t* fd,
-                             uint64_t mode,
-                             const void* arg,
-                             uint64_t size)
-{
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    return 1;
 }
 
 boost::mutex eventQueueVectorMutex;
@@ -319,5 +300,9 @@ uint32_t cellSysmoduleLoadModule(uint16_t id) {
 
 uint32_t cellSysmoduleUnloadModule(uint16_t id) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
+uint32_t cellSysmoduleIsLoaded(uint16_t id) {
     return CELL_OK;
 }

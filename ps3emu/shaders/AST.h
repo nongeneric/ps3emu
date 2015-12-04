@@ -8,7 +8,7 @@
 namespace ShaderRewriter {
     enum class FunctionName {
         vec4, vec3, vec2, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
-        mul, add, abs, neg, ternary, exp2, lg2, min, max, pow, inversesqrt,
+        mul, div, add, abs, neg, ternary, exp2, lg2, min, max, pow, inversesqrt,
         fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
         cast_float, clamp4i, sign,
         gt, ge, eq, ne, lt, le,

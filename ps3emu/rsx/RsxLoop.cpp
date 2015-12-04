@@ -30,6 +30,10 @@ bool isScale(uint32_t value, uint32_t base, uint32_t step, uint32_t maxIndex, ui
     return diff % step == 0 && index < maxIndex;
 }
 
+uint32_t swap16(uint32_t v) {
+    return (v >> 16) | (v << 16);
+}
+
 std::array<float, 4> parseColor(uint32_t raw) {
     union {
         uint32_t val;
@@ -51,7 +55,6 @@ int64_t Rsx::interpret(uint32_t get) {
     MethodHeader header { _ppu->load<4>(GcmLocalMemoryBase + get) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
-        assert(n <= count);\
         assert(n != 0);\
         return _ppu->load<4>(GcmLocalMemoryBase + get + 4 * n);\
     })(x)
@@ -551,7 +554,16 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001814: {
             //name = "CELL_GCM_NV4097_DRAW_ARRAYS";
             auto arg = readarg(1);
-            DrawArrays(arg & 0xfffff, (arg >> 24) + 1);
+            int indexCount = (arg >> 24) + 1;
+            int veryFirst = arg & 0xffffff;
+            for (auto i = 2u; i <= count; ++i) {
+                if (i == 2) veryFirst--;
+                arg = readarg(i);
+                int c = (arg >> 24);
+                //int f = arg & 0xffffff;
+                indexCount += c;
+            }
+            DrawArrays(veryFirst, indexCount);
             break;
         }
         case 0x00001818:
@@ -631,11 +643,17 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_INDEXED_CONSTANT_READ_LIMITS";
             break;
         case 0x00001d6c:
-            name = "CELL_GCM_NV4097_SET_SEMAPHORE_OFFSET";
+            //name = "CELL_GCM_NV4097_SET_SEMAPHORE_OFFSET";
+            SemaphoreOffset(readarg(1));
             break;
-        case 0x00001d70:
-            name = "CELL_GCM_NV4097_BACK_END_WRITE_SEMAPHORE_RELEASE";
+        case 0x00001d70: {
+            //name = "CELL_GCM_NV4097_BACK_END_WRITE_SEMAPHORE_RELEASE";
+            auto value = readarg(1);
+            auto p = (uint8_t*)&value;
+            std::swap(p[0], p[2]);
+            BackEndWriteSemaphoreRelease(value);
             break;
+        }
         case 0x00001d74:
             name = "CELL_GCM_NV4097_TEXTURE_READ_SEMAPHORE_RELEASE";
             break;
@@ -744,7 +762,8 @@ int64_t Rsx::interpret(uint32_t get) {
         }
         case 0x00001efc: {
             //name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD";
-            std::vector<uint32_t> vec(count - 1);
+            static std::vector<uint32_t> vec;
+            vec.resize(count - 1);
             for (auto i = 0u; i < vec.size(); ++i) {
                 vec[i] = readarg(i + 2);
             }
@@ -845,9 +864,12 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00006188:
             name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_DESTIN";
             break;
-        case 0x00006300:
-            name = "CELL_GCM_NV3062_SET_COLOR_FORMAT";
+        case 0x00006300: {
+            //name = "CELL_GCM_NV3062_SET_COLOR_FORMAT";
+            auto arg = readarg(2);
+            ColorFormat(readarg(1), arg >> 16, arg & 0xffff);
             break;
+        }
         case 0x00006304:
             name = "CELL_GCM_NV3062_SET_PITCH";
             break;
@@ -855,7 +877,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV3062_SET_OFFSET_SOURCE";
             break;
         case 0x0000630C:
-            name = "CELL_GCM_NV3062_SET_OFFSET_DESTIN";
+            //name = "CELL_GCM_NV3062_SET_OFFSET_DESTIN";
+            OffsetDestin(readarg(1));
             break;
         case 0x00008000:
             name = "CELL_GCM_NV309E_SET_OBJECT";
@@ -908,18 +931,34 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x0000A300:
             name = "CELL_GCM_NV308A_SET_COLOR_FORMAT";
             break;
-        case 0x0000A304:
-            name = "CELL_GCM_NV308A_POINT";
+        case 0x0000A304: {
+            //name = "CELL_GCM_NV308A_POINT";
+            auto arg1 = readarg(1);
+            auto arg2 = readarg(2);
+            auto arg3 = readarg(3);
+            Point(
+                arg1 & 0xffff, arg1 >> 16,
+                arg2 & 0xffff, arg2 >> 16,
+                arg3 & 0xffff, arg3 >> 16
+            );
             break;
+        }
         case 0x0000A308:
             name = "CELL_GCM_NV308A_SIZE_OUT";
             break;
         case 0x0000A30C:
             name = "CELL_GCM_NV308A_SIZE_IN";
             break;
-        case 0x0000A400:
-            name = "CELL_GCM_NV308A_COLOR";
+        case 0x0000A400: {
+            //name = "CELL_GCM_NV308A_COLOR";
+            static std::vector<uint32_t> vec;
+            vec.resize(count - 1);
+            for (auto i = 0u; i < vec.size(); ++i) {
+                vec[i] = readarg(i + 1);
+            }
+            Color(vec);
             break;
+        }
         case 0x0000C000:
             name = "CELL_GCM_NV3089_SET_OBJECT";
             break;
