@@ -2,11 +2,14 @@ cmake_minimum_required(VERSION 2.8.11)
 
 include_directories(${pdfshrink_SOURCE_DIR})
 
+add_definitions(-DBOOST_ALL_DYN_LINK)
 add_definitions(-DBOOST_LOG_DYN_LINK)
 set(Boost_USE_STATIC_LIBS       OFF)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package(Boost COMPONENTS filesystem regex thread system log chrono REQUIRED)
+find_package(Boost COMPONENTS 
+    filesystem regex thread system log_setup 
+    log chrono program_options REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
@@ -27,4 +30,5 @@ add_subdirectory(ps3emu)
 add_subdirectory(dbg-gui)
 add_subdirectory(libs)
 add_subdirectory(ps3run)
+add_subdirectory(unsce)
 add_subdirectory(tests)
