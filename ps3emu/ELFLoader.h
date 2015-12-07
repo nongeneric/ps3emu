@@ -78,8 +78,6 @@ class ELFLoader {
     ps3_uintptr_t storeArgs(PPU* ppu, std::vector<std::string> const& args);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
 public:
-    ELFLoader();
-    ~ELFLoader();
     uint64_t entryPoint();
     const char* getString(uint32_t idx);
     const char* getSectionName(uint32_t idx);

@@ -133,6 +133,12 @@ union XER_t {
 };
 static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 
+struct NCallEntry {
+    const char* name;
+    uint32_t fnid;
+    void (*stub)(PPU*);
+};
+
 class ELFLoader;
 class PPU {
     uint64_t _LR = 0;
@@ -175,7 +181,7 @@ public:
     void reset();
     void ncall(uint32_t index);
     void scall();
-    uint32_t findNCallEntryIndex(std::string name);
+    const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index);
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);
     void setRsx(Rsx* rsx);

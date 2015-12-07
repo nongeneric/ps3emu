@@ -5,6 +5,7 @@
 #include "../libs/Sysutil.h"
 #include "../libs/graphics/gcm.h"
 #include "../libs/fs.h"
+#include <openssl/sha.h>
 #include <boost/type_traits.hpp>
 #include <memory>
 #include <algorithm>
@@ -38,10 +39,19 @@ namespace boost {
 
 using namespace emu::Gcm;
 
-struct NCallEntry {
-    const char* name;
-    void (*stub)(PPU*);
-};
+uint32_t calcFnid(const char* name) {
+    SHA_CTX ctx;
+    SHA1_Init(&ctx);
+    static uint8_t suffix[] = {
+        0x67, 0x59, 0x65, 0x99, 0x04, 0x25, 0x04, 0x90, 
+        0x56, 0x64, 0x27, 0x49, 0x94, 0x89, 0x74, 0x1A
+    };
+    SHA1_Update(&ctx, (const uint8_t*)name, strlen(name));
+    SHA1_Update(&ctx, suffix, sizeof(suffix));
+    uint8_t md[20];
+    SHA1_Final(md, &ctx);
+    return *(uint32_t*)md;
+}
 
 template <int ArgN, class T, class Enable = void>
 struct get_arg {
@@ -259,10 +269,9 @@ STUB_4(cellFsLseek);
 STUB_1(cellFsClose);
 STUB_5(cellFsRead);
 
-#define ENTRY(name) { #name, nstub_##name }
+#define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
 NCallEntry ncallTable[] {
-    { "", nullptr },
     ENTRY(sys_initialize_tls),
     ENTRY(sys_lwmutex_create),
     ENTRY(sys_lwmutex_destroy),
@@ -311,8 +320,8 @@ NCallEntry ncallTable[] {
     ENTRY(cellSysmoduleLoadModule),
     ENTRY(cellSysmoduleUnloadModule),
     ENTRY(cellSysmoduleIsLoaded),
-    { "cellFsStat", nstub_cellFsStat_proxy },
-    { "cellFsOpen", nstub_cellFsOpen_proxy },
+    { "cellFsStat", calcFnid("cellFsStat"), nstub_cellFsStat_proxy },
+    { "cellFsOpen", calcFnid("cellFsOpen"), nstub_cellFsOpen_proxy },
     ENTRY(cellFsLseek),
     ENTRY(cellFsClose),
     ENTRY(cellFsRead),
@@ -348,12 +357,13 @@ void PPU::scall() {
     }
 }
 
-uint32_t PPU::findNCallEntryIndex(std::string name) {
+const NCallEntry* PPU::findNCallEntry(uint32_t fnid, uint32_t& index) {
     auto count = sizeof(ncallTable) / sizeof(NCallEntry);
     for (uint32_t i = 0; i < count; ++i) {
-        if (ncallTable[i].name == name) {
-            return i;
+        if (ncallTable[i].fnid == fnid) {
+            index = i;
+            return &ncallTable[i];
         }
     }
-    return 0;
+    return nullptr;
 }

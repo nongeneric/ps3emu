@@ -416,6 +416,7 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
 
 #define METADATA_SECTION_TYPE_SHDR 1
 #define METADATA_SECTION_TYPE_PHDR 2
+#define METADATA_SECTION_TYPE_UNK3 3
 
 bool decrypt_sections(sce_header_t* sce_header,
                       metadata_header_t* metadata_header,
@@ -474,23 +475,9 @@ bool write_elf(std::string elf_path,
         return false;
     }
     
-    auto elf_eheader = reinterpret_cast<Elf64_be_Ehdr*>(&file_buf[0] + self_header->elf_offset);
-    auto self_pheader = reinterpret_cast<Elf64_be_Phdr*>(
-        &file_buf[0] + self_header->program_header_offset);
-    auto self_section_headers = reinterpret_cast<Elf64_be_Shdr*>(
-        &file_buf[0] + self_header->section_header_offset);
-    
-    elf_file.write((char*)elf_eheader, sizeof(Elf64_be_Ehdr));
-    elf_file.write((char*)self_pheader, sizeof(Elf64_be_Phdr) * elf_eheader->e_phnum);
-    
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto msh = metadata_section_headers + i;
-        auto selfph = self_pheader + msh->index;
-        
-        if (msh->type != METADATA_SECTION_TYPE_PHDR)
-            continue;
-        
-        auto dest = selfph->p_offset;
+        auto dest = msh->data_offset - sce_header->header_size;
         auto src = msh->data_offset;
         
         BOOST_LOG_TRIVIAL(trace) << "writing self section to elf\n"
@@ -499,13 +486,7 @@ bool write_elf(std::string elf_path,
             << ssnprintf("  size         %08X\n", msh->data_size);
             
         elf_file.seekp((uint32_t)dest);
-        elf_file.write(&file_buf[0] + src, selfph->p_filesz);
-    }
-    
-    if (self_header->section_header_offset != 0) {
-        elf_file.seekp((uint32_t)elf_eheader->e_shoff);
-        elf_file.write(&file_buf[0] + self_header->section_header_offset, 
-                       sizeof(Elf64_be_Shdr) * elf_eheader->e_shnum);
+        elf_file.write(&file_buf[0] + src, msh->data_size);
     }
     
     return true;
@@ -552,8 +533,6 @@ int main(int argc, char* argv[]) {
     auto sce_header = reinterpret_cast<sce_header_t*>(&file_buf[0]);
     auto self_header = reinterpret_cast<self_header_t*>(sce_header + 1);
     auto app_info = reinterpret_cast<app_info_t*>(&file_buf[0] + self_header->appinfo_offset);
-    auto self_section_infos = reinterpret_cast<self_section_info_t*>(
-        &file_buf[0] + self_header->section_info_offset);
     auto metadata_info = reinterpret_cast<metadata_info_t*>(
         &file_buf[0] + sizeof(sce_header_t) + sce_header->metadata_offset);
     auto metadata_header = reinterpret_cast<metadata_header_t*>(metadata_info + 1);

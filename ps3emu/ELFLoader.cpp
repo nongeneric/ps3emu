@@ -7,18 +7,44 @@
 
 using namespace boost::endian;
 
-const auto vaTLS = StackBase + StackSize;
-const auto tlsSize = 64 * (1u << 10);
+static const auto vaTLS = StackBase + StackSize;
+static const auto tlsSize = 64 * (1u << 10);
+static const uint32_t PT_TYPE_PARAMS = PT_LOOS + 1;
+static const uint32_t PT_TYPE_PRXINFO = PT_LOOS + 2;
 
-ELFLoader::ELFLoader()
-{
+#pragma pack(1)
 
-}
+struct prx_info {
+    big_uint32_t lib_header;
+    big_uint16_t lib_id;
+    big_uint16_t count;
+    big_uint32_t unk0;
+    big_uint32_t unk1;
+    big_uint32_t prx_name;
+    big_uint32_t prx_fnids;
+    big_uint32_t prx_stubs;
+    big_uint32_t unk2;
+    big_uint32_t unk3;
+    big_uint32_t unk4;
+    big_uint32_t unk5;
+};
 
-ELFLoader::~ELFLoader()
-{
+static_assert(sizeof(prx_info) == 44, "");
 
-}
+struct sys_process_prx_info {
+    big_uint32_t header_size;
+    big_uint32_t unk0;
+    big_uint32_t unk1;
+    big_uint32_t unk2;
+    big_uint32_t unk3;
+    big_uint32_t unk4;
+    big_uint32_t prx_infos;
+    big_uint32_t padding[9];
+};
+
+static_assert(sizeof(sys_process_prx_info) == 64, "");
+
+#pragma pack()
 
 void ELFLoader::load(std::string filePath) {
     _loadedFilePath = filePath;
@@ -49,8 +75,16 @@ void ELFLoader::load(std::string filePath) {
     if (_header->e_ident[EI_CLASS] != ELFCLASS64)
         throw std::runtime_error("Only ELF64 supported");
     
+    auto ELFOSABI_CELLOSLV2 = 0x66;
+    
+    if (_header->e_ident[EI_OSABI] != ELFOSABI_CELLOSLV2)
+        throw std::runtime_error("Not CELLOSLV2 ABI");
+    
     if (_header->e_ident[EI_DATA] != ELFDATA2MSB)
         throw std::runtime_error("Only big endian supported");
+    
+    if (_header->e_machine != EM_PPC64)
+        throw std::runtime_error("Unkown machine value");
     
     _sections = reinterpret_cast<Elf64_be_Shdr*>(&_file[0] + _header->e_shoff);
     
@@ -91,7 +125,7 @@ struct fdescr {
     big_uint32_t va;
     big_uint32_t tocBase;
 };
-static_assert(sizeof(fdescr) == 8, "bad function descriptor size");
+static_assert(sizeof(fdescr) == 8, "");
 
 void ELFLoader::map(PPU* ppu, std::vector<std::string> args) {
     ppu->setELFLoader(this);
@@ -148,46 +182,97 @@ Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
     return nullptr;
 }
 
-struct LGFEntry {
-    big_uint32_t prxStub;
-    big_uint32_t va;
-    big_uint32_t fnid;
-    big_uint32_t stub;
-    big_uint32_t sym;
-};
+template <typename Elem>
+std::vector<Elem> readSection(Elf64_be_Shdr* sections,
+                              Elf64_be_Ehdr* header,
+                              uint32_t va,
+                              PPU* ppu) {
+    auto section = std::find_if(sections, sections + header->e_shnum, [&](auto& sh) {
+        return sh.sh_addr == va;
+    });
+    
+    if (section == sections + header->e_shnum)
+        throw std::runtime_error("section not present");
+    
+    if (section->sh_size % sizeof(Elem) != 0)
+        throw std::runtime_error("section size inconsistency");
+    
+    std::vector<Elem> vec(section->sh_size / sizeof(Elem));
+    ppu->readMemory(section->sh_addr, &vec[0], section->sh_size);
+    return vec;
+}
 
 void ELFLoader::link(PPU* ppu) {
-    auto lgfSectionName = ".debug_libgenfunc";
-    auto lgfSection = findSectionByName(lgfSectionName);
-    if (!lgfSection) {
-        BOOST_LOG_TRIVIAL(trace) << "no libgenfunc section found, nothing to do";
-        return;
-    }
-    auto entries = reinterpret_cast<LGFEntry*>(&_file[0] + lgfSection->sh_offset);
-    auto count = lgfSection->sh_size / sizeof(LGFEntry);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%d LGF entries found in %s",
-        count, getSectionName(lgfSection->sh_name));
-    uint64_t vaFDescrs = 0x7f000000;
-    ppu->setMemory(vaFDescrs, 0, count * 2, true);
+    auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
+        return ph.p_type == PT_TYPE_PRXINFO;
+    });
+    
+    if (phprx == _pheaders + _header->e_phnum)
+        throw std::runtime_error("PRXINFO segment not present");
+    
+    auto procPrxInfoVec = readSection<sys_process_prx_info>(
+        _sections, _header, phprx->p_vaddr, ppu);
+    
+    auto prxInfos = readSection<prx_info>(
+        _sections, _header, procPrxInfoVec[0].prx_infos, ppu);
+    
+    auto firstPrxName = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
+        return l.prx_name < r.prx_name;
+    });
+    auto firstPrxFnid = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
+        return l.prx_fnids < r.prx_fnids;
+    });
+    auto firstPrxStub = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
+        return l.prx_stubs < r.prx_stubs;
+    });
+    
+    auto prxNames = readSection<char>(
+        _sections, _header, firstPrxName->prx_name - 4, ppu);
+    
+    auto prxFnids = readSection<big_uint32_t>(
+        _sections, _header, firstPrxFnid->prx_fnids, ppu);
+    
+    auto prxStubs = readSection<big_uint32_t>(
+        _sections, _header, firstPrxStub->prx_stubs, ppu);
+    
+    if (prxFnids.size() != prxStubs.size())
+        throw std::runtime_error("prx infos/stubs/fnids inconsistency");
+    
+    uint64_t vaDescr = 0x7f000000;
+    ppu->setMemory(vaDescr, 0, prxFnids.size() * 8, true);
     uint32_t curUnknownNcall = 2000;
-    for (auto i = 0u; i < count; ++i) {
-        uint32_t lgfIdx = std::distance(_sections, lgfSection);
-        auto symbol = getGlobalSymbolByValue(entries[i].sym, lgfIdx);
-        if (symbol) {
-            auto sname = getString(symbol->st_name);
-            auto vaFDescr = vaFDescrs + i * 8;
-            auto index = ppu->findNCallEntryIndex(sname);
-            if (index == 0) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("resolving %d rsx modules", prxInfos.size());
+    for (auto& info : prxInfos) {
+        auto nameOffset = info.prx_name - firstPrxName->prx_name;
+        std::string name(&prxNames[nameOffset + 4]);
+        BOOST_LOG_TRIVIAL(trace) << "  " << name;
+        
+        auto firstFnid = (info.prx_fnids - firstPrxFnid->prx_fnids) / sizeof(uint32_t);
+        auto firstStub = (info.prx_stubs - firstPrxStub->prx_stubs) / sizeof(uint32_t);
+        for (auto i = 0u; i < info.count; ++i) {
+            auto fnid = prxFnids.at(firstFnid + i);
+            auto& stub = prxStubs.at(firstStub + i);
+            
+            uint32_t index = 0;
+            auto ncallEntry = ppu->findNCallEntry(fnid, index);
+            std::string name;
+            if (!ncallEntry) {
                 index = curUnknownNcall--;
+                name = ssnprintf("(!) fnid_%08X", fnid);
+            } else {
+                name = ncallEntry->name;
             }
             uint32_t ncall = (1 << 26) | index;
-            ppu->store<4>(vaFDescr, vaFDescr + 4);
-            ppu->store<4>(vaFDescr + 4, ncall); // use tocbase to place ncall instruction
-            ppu->store<4>(entries[i].va, vaFDescr);
-            BOOST_LOG_TRIVIAL(trace) << ssnprintf("resolved %x to point to %s (ncall %d)",
-                entries[i].va, sname, index);
+            ppu->store<4>(vaDescr, vaDescr + 4);
+            ppu->store<4>(vaDescr + 4, ncall);
+            BOOST_LOG_TRIVIAL(trace) << ssnprintf("    %x -> %s (ncall %x)",
+                stub, name, index);
+            stub = vaDescr;
+            vaDescr += 8;
         }
     }
+    
+    ppu->writeMemory(firstPrxStub->prx_stubs, &prxStubs[0], prxStubs.size() * sizeof(big_uint32_t));
 }
 
 uint64_t ELFLoader::entryPoint() {
@@ -238,7 +323,6 @@ void ELFLoader::foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action) {
             return;
         }
     }
-    throw std::runtime_error("no symbol table section present");
 }
 
 uint32_t ELFLoader::getSymbolValue(std::string name) {
