@@ -238,7 +238,7 @@ void ELFLoader::link(PPU* ppu) {
     if (prxFnids.size() != prxStubs.size())
         throw std::runtime_error("prx infos/stubs/fnids inconsistency");
     
-    uint64_t vaDescr = 0x7f000000;
+    auto vaDescr = FunctionDescriptorsVa;
     ppu->setMemory(vaDescr, 0, prxFnids.size() * 8, true);
     uint32_t curUnknownNcall = 2000;
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("resolving %d rsx modules", prxInfos.size());
@@ -262,9 +262,8 @@ void ELFLoader::link(PPU* ppu) {
             } else {
                 name = ncallEntry->name;
             }
-            uint32_t ncall = (1 << 26) | index;
             ppu->store<4>(vaDescr, vaDescr + 4);
-            ppu->store<4>(vaDescr + 4, ncall);
+            encodeNCall(ppu, vaDescr + 4, index);
             BOOST_LOG_TRIVIAL(trace) << ssnprintf("    %x -> %s (ncall %x)",
                 stub, name, index);
             stub = vaDescr;

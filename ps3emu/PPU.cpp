@@ -10,8 +10,15 @@ bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
     return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
 }
 
+static constexpr auto PagePtrMask = ~uintptr_t() - 1;
+
 template <bool Read>
-void copy(ps3_uintptr_t va, const void* buf, uint len, bool allocate, MemoryPage* pages) {
+void copy(ps3_uintptr_t va, 
+          const void* buf, 
+          uint len, 
+          bool allocate, 
+          MemoryPage* pages,
+          std::function<void(uint32_t, uint32_t)>& memoryWriteHandler) {
     assert(va != 0 || len == 0);
     char* chars = (char*)buf;
     for (auto curVa = va; curVa != va + len;) {
@@ -20,6 +27,13 @@ void copy(ps3_uintptr_t va, const void* buf, uint len, bool allocate, MemoryPage
         ps3_uintptr_t pageEnd = (pageIndex + 1) * DefaultMainMemoryPageSize;
         auto end = std::min(pageEnd, va + len);
         auto& page = pages[pageIndex];
+        if (!Read) {
+            auto ptr = page.ptr.fetch_and(PagePtrMask);
+            if (ptr & 1) {
+                memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize, 
+                                   DefaultMainMemoryPageSize);
+            }
+        }
         if (!page.ptr) {
             if (allocate) {
                 page.alloc();
@@ -29,7 +43,7 @@ void copy(ps3_uintptr_t va, const void* buf, uint len, bool allocate, MemoryPage
         }
         auto offset = split.offset.u();
         auto source = chars + (curVa - va);
-        auto dest = page.ptr + offset;
+        auto dest = (uint8_t*)((page.ptr & PagePtrMask) + offset);
         auto size = end - curVa;
         if (Read) {
             memcpy(source, dest, size);
@@ -60,7 +74,7 @@ void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate
         return;
     }
     
-    copy<false>(va, buf, len, allocate, _pages.get());
+    copy<false>(va, buf, len, allocate, _pages.get(), _memoryWriteHandler);
 }
 
 void PPU::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
@@ -89,7 +103,7 @@ void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
         throw std::runtime_error("reading rsx registers not implemented");
     }
 
-    copy<true>(va, buf, len, allocate, _pages.get());
+    copy<true>(va, buf, len, allocate, _pages.get(), _memoryWriteHandler);
 }
 
 bool PPU::isAllocated(ps3_uintptr_t va) {
@@ -147,18 +161,21 @@ PPU::PPU() {
     reset();
 }
 
+struct alignas(2) page_byte { uint8_t v; };
+
 void MemoryPage::alloc() {
     if (ptr)
         return;
-    ptr = new uint8_t[DefaultMainMemoryPageSize];
-    memset(ptr, 0, DefaultMainMemoryPageSize);
+    ptr = (uintptr_t)new page_byte[DefaultMainMemoryPageSize];
+    assert((ptr & 1) == 0);
+    memset((void*)ptr.load(), 0, DefaultMainMemoryPageSize);
 }
 
 void MemoryPage::dealloc() {
     if (ptr) {
-        delete [] ptr;
+        delete [] (page_byte*)ptr.load();
     }
-    ptr = nullptr;
+    ptr = 0;
 }
 
 void PPU::shutdown() {
@@ -181,7 +198,7 @@ void PPU::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
         destPage.alloc();
         auto& srcPage = _pages[srcPageIndex + i];
         srcPage.dealloc();
-        srcPage.ptr = destPage.ptr;
+        srcPage.ptr.store(destPage.ptr.load());
     }
 }
 
@@ -197,18 +214,18 @@ void PPU::allocPage(void** ptr, ps3_uintptr_t* va) {
     *va = malloc(DefaultMainMemoryPageSize);
     VirtualAddress split { *va };
     assert(split.offset.u() == 0);
-    *ptr = _pages[split.page.u()].ptr;
+    *ptr = (void*)(_pages[split.page.u()].ptr.load() & PagePtrMask);
 }
 
 uint8_t* PPU::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
     VirtualAddress split { va };
-    auto page = _pages[split.page.u()];
+    auto& page = _pages[split.page.u()];
     if (!page.ptr)
         throw std::runtime_error("getting memory pointer for not allocated memory");
     auto offset = split.offset.u();
     if (offset + len > DefaultMainMemoryPageSize)
         throw std::runtime_error("getting memory pointer acress page boundaries");
-    return page.ptr + offset;
+    return (uint8_t*)((page.ptr & PagePtrMask) + offset);
 }
 
 void PPU::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
@@ -221,9 +238,9 @@ void PPU::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
         auto& page = _pages[firstPage + i];
         auto memoryPtr = (uint8_t*)memory + i * DefaultMainMemoryPageSize;
         if (page.ptr) {
-            memcpy(memoryPtr, page.ptr, DefaultMainMemoryPageSize);
+            memcpy(memoryPtr, (void*)(page.ptr & PagePtrMask), DefaultMainMemoryPageSize);
         }
-        page.ptr = memoryPtr;
+        page.ptr = (uintptr_t)memoryPtr;
         _providedMemoryPages[firstPage + i] = true;
     }
 }
@@ -238,3 +255,23 @@ uint64_t PPU::getTimeBase() {
     auto us = boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
     return 1000000 * us.count() * getFrequency();
 }
+
+void PPU::memoryBreak(uint32_t va, uint32_t size) {
+    VirtualAddress split { va };
+    auto* page = &_pages[split.page.u()];
+    for (auto i = 0u; i <= size / DefaultMainMemoryPageSize; ++i) {
+        auto ptr = page->ptr.fetch_or(1);
+        if (!ptr)
+            throw std::runtime_error("memory break on nonexisting page");
+    }
+}
+
+void PPU::memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler) {
+    _memoryWriteHandler = handler;
+}
+
+void encodeNCall(PPU* ppu, ps3_uintptr_t va, uint32_t index) {
+    uint32_t ncall = (1 << 26) | index;
+    ppu->store<4>(va, ncall);
+}
+

@@ -1,10 +1,11 @@
 #include "gcm.h"
 #include "graphics.h"
+#include "../sys.h"
 #include "../../ps3emu/constants.h"
 #include "../../ps3emu/PPU.h"
-#include <boost/log/trivial.hpp>
 #include "../../ps3emu/ELFLoader.h"
 #include <algorithm>
+#include <boost/log/trivial.hpp>
 
 using namespace boost::endian;
 
@@ -22,7 +23,8 @@ struct {
     Rsx* rsx;
     std::vector<IOMapping> ioMaps;
     TargetCellGcmContextData* context = nullptr;
-    ps3_uintptr_t defaultCommandBuffer = 0;
+    ps3_uintptr_t gCellGcmCurrentContext = 0;
+    uint32_t defaultCommandBufferSize = 0;
 } emuGcmState;
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode) {
@@ -55,23 +57,22 @@ int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t* of
 
 void setCurrentCommandBuffer(PPU* ppu, ps3_uintptr_t va) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    auto contextVa = ppu->getELFLoader()->getSymbolValue("gCellGcmCurrentContext");
-    ppu->store<4>(contextVa, va);
+    ppu->store<4>(emuGcmState.gCellGcmCurrentContext, va);
 }
 
-uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu) {
+uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     
     ppu->getRsx()->setGcmContext(ioSize, ioAddress);
     ppu->getRsx()->init();
     ppu->setMemory(GcmLabelBaseOffset, 0, 1, true);
+    ppu->setMemory(DefaultGcmDefaultContextData, 0, 16, true);
     
-    ps3_uintptr_t pageVa;
-    void* pagePtr;
-    ppu->allocPage(&pagePtr, &pageVa);
-    emuGcmState.context = (TargetCellGcmContextData*)pagePtr;
-    emuGcmState.defaultCommandBuffer = pageVa;
-    setCurrentCommandBuffer(ppu, pageVa);
+    emuGcmState.context = (TargetCellGcmContextData*)
+        ppu->getMemoryPointer(DefaultGcmDefaultContextData, sizeof(TargetCellGcmContextData));
+    emuGcmState.defaultCommandBufferSize = cmdSize;
+    emuGcmState.gCellGcmCurrentContext = defaultGcmContextSymbolVa;
+    setCurrentCommandBuffer(ppu, DefaultGcmDefaultContextData);
     emuGcmState.ppu = ppu;
     emuGcmState.rsx = ppu->getRsx();
     emuGcmState.ioMaps.push_back({ ioAddress, ioSize, 0 });
@@ -80,7 +81,15 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint3
     emuGcmState.context->begin = ioAddress + gcmResetCommandsSize;
     emuGcmState.context->end = emuGcmState.context->begin + 0x1bff * 4;
     emuGcmState.context->current = ioAddress + gcmResetCommandsSize + gcmInitCommandsSize;
-    emuGcmState.context->callback = 0;
+    emuGcmState.context->callback = DefaultGcmBufferOverflowCallback;
+    uint32_t callbackNCallIndex;
+    auto entry = ppu->findNCallEntry(calcFnid("defaultContextCallback"), callbackNCallIndex);
+    assert(entry);
+    
+    // gCellGcmCurrentContext -> context -> callback-fun-descr -> callback-code
+    ppu->store<4>(DefaultGcmBufferOverflowCallback, DefaultGcmBufferOverflowCallback + 4);
+    encodeNCall(ppu, DefaultGcmBufferOverflowCallback + 4, callbackNCallIndex);
+    
     emuGcmState.rsx->setGet(emuGcmState.context->begin - ioAddress);
     emuGcmState.rsx->setPut(emuGcmState.context->current - ioAddress);
     auto rsxPrimaryDmaLabel = 3;
@@ -216,8 +225,36 @@ emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler) {
 
 emu_void_t cellGcmSetDefaultCommandBuffer(PPU* ppu) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    setCurrentCommandBuffer(ppu, emuGcmState.defaultCommandBuffer);
+    setCurrentCommandBuffer(ppu, DefaultGcmDefaultContextData);
     return emu_void;
+}
+
+uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) {
+    uint32_t k32 = 32 * 1024;
+    assert(emuGcmState.defaultCommandBufferSize % k32 == 0);
+    auto ioBase = emuGcmState.ioMaps.at(0).address;
+    uint32_t nextBuffer = ioBase + gcmResetCommandsSize;
+    uint32_t nextSize;
+    if (nextBuffer - ioBase > emuGcmState.defaultCommandBufferSize) {
+        nextSize = k32 - gcmResetCommandsSize;
+    } else {
+        nextBuffer = data->end + 4;
+        nextSize = k32;
+    }
+    
+    emuGcmState.rsx->setPut(data->current - ioBase);
+    while ((emuGcmState.rsx->getGet() > nextBuffer - ioBase &&
+           emuGcmState.rsx->getGet() < nextBuffer - ioBase + nextSize) ||
+           emuGcmState.rsx->isCallActive()) {
+        sys_timer_usleep(20);
+    }
+    
+    emuGcmState.rsx->encodeJump(data->current, nextBuffer - ioBase);
+    
+    data->begin = nextBuffer;
+    data->current = nextBuffer;
+    data->end = nextBuffer + nextSize - 4;
+    return CELL_OK;
 }
 
 }}

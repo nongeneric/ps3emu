@@ -24,7 +24,8 @@ struct TargetCellGcmContextData {
 namespace emu {
 namespace Gcm {
 
-uint32_t _cellGcmInitBody(ps3_uintptr_t callGcmCallback, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu);
+uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu);
+uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count);
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode);
 emu_void_t cellGcmGetConfiguration(CellGcmConfig *config);

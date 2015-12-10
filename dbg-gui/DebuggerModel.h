@@ -37,6 +37,7 @@ public:
     void stepIn(bool updateUI = true);
     void stepOver();
     void run();
+    void runto(ps3_uintptr_t va);
     void runToLR();
     void restart();
 signals:

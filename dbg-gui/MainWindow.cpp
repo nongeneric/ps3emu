@@ -55,12 +55,6 @@ void MainWindow::setupDocks() {
     dasmGrid->setArrowsColumn(2);
     dasmGrid->setScrollable(true);
     setCentralWidget(dasmGrid);
-    
-    #if DEBUG
-    auto args = QStringList() << "a.elf" << "-3.4" << "-1" << "9";
-    _model.loadFile("../tests/binaries/gcm_vertex_texture_wrapping/a.elf", args);
-    return;
-    #endif
 }
 
 void MainWindow::setupMenu() {
@@ -94,6 +88,11 @@ void MainWindow::setupMenu() {
     run->setShortcut(QKeySequence(Qt::Key_F5));
     connect(run, &QAction::triggered, this, [=]() { _model.run(); });
     trace->addAction(run);
+    
+    auto runto = new QAction("Run to 0", this);
+    runto->setShortcut(QKeySequence(Qt::Key_F6));
+    connect(runto, &QAction::triggered, this, [=]() { _model.runto(0); });
+    trace->addAction(runto);
     
     auto restart = new QAction("Restart", this);
     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
@@ -132,4 +131,8 @@ void MainWindow::setupStatusBar() {
         label->setText(text);
         _log->append(text);
     });
+}
+
+void MainWindow::loadElf(QString path, QStringList args) {
+    _model.loadFile(path, args); 
 }

@@ -90,7 +90,7 @@ TEST_CASE("gcm_cube") {
     compareLastFrame("./binaries/gcm_cube/ps3frame.png");
 }
 
-TEST_CASE("gcm_mrt") {
+TEST_CASE("gcm_cube_mrt") {
     QProcess proc;
     auto args = QStringList() << "./binaries/gcm_cube_mrt/a.elf";
     proc.start(runnerPath, args);

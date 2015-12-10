@@ -6,6 +6,7 @@
 #include <boost/endian/arithmetic.hpp>
 #include <memory>
 #include <map>
+#include <atomic>
 
 namespace emu {
 
@@ -22,10 +23,10 @@ constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 class RsxContext;
 class PPU;
 class Rsx {
-    uint32_t _get = 0xffffffff;
+    uint32_t _get = 0;
     uint32_t _put = 0;
     uint32_t _ref = 0xffffffff;
-    uint32_t _ret = 0;
+    std::atomic<uint32_t> _ret;
     bool _shutdown = false;
     bool _initialized = false;
     PPU* _ppu;
@@ -38,6 +39,7 @@ class Rsx {
     std::map<uint32_t, uint32_t> _semaphores;
     uint32_t _activeSemaphoreHandle = 0;
     int64_t interpret(uint32_t get);
+    void memoryBreakHandler(uint32_t va, uint32_t size);
     void waitForIdle();
     void loop();
     void setSurfaceColorLocation(unsigned index, uint32_t location);
@@ -198,8 +200,10 @@ public:
     void shutdown();
     void setPut(uint32_t put);
     void setGet(uint32_t get);
+    uint32_t getGet();
     uint32_t getRef();
     void setRef(uint32_t ref);
+    bool isCallActive();
     void setLabel(int index, uint32_t value);
     bool isFlipInProgress() const;
     void resetFlipStatus();
@@ -210,4 +214,5 @@ public:
                           uint32_t width,
                           uint32_t height);
     void init();
+    void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
 };

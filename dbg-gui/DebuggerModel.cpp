@@ -298,8 +298,9 @@ void DebuggerModel::stepIn(bool updateUI) {
         if (updateUI) {
             this->updateUI();
         }
-    } catch (ProcessFinishedException&) {
+    } catch (ProcessFinishedException& exc) {
         emit message("process terminated");
+        throw exc;
     } catch (std::exception& exc) {
         auto msg = QString("error: %1 (NIP: %2)")
             .arg(exc.what()).arg(_ppu->getNIP(), 16, 16);
@@ -351,9 +352,7 @@ void DebuggerModel::exec(QString command) {
                 _dasmModel->navigate(va);
                 return;
             } else if (name == "runto") {
-                while (_ppu->getNIP() != va)
-                    stepIn(false);
-                updateUI();
+                runto(va);
                 return;
             } else if (name == "mem") {
                 printMemory(va);
@@ -429,4 +428,10 @@ void DebuggerModel::updateUI() {
     _gprModel->update();
     _dasmModel->update();
     _dasmModel->navigate(_ppu->getNIP());
+}
+
+void DebuggerModel::runto(ps3_uintptr_t va) {
+     while (_ppu->getNIP() != va)
+        stepIn(false);
+     updateUI();
 }

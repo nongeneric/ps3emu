@@ -20,4 +20,5 @@ public slots:
 public:
     MainWindow(QWidget *parent = 0);
     ~MainWindow();
+    void loadElf(QString path, QStringList args);
 };

@@ -269,3 +269,15 @@ TEST_CASE("hello_simd") {
         "vector: -0.963558,-0.963558,-0.963558,-0.963558\n"
     );
 }
+
+TEST_CASE("basic_large_cmdbuf") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/basic_large_cmdbuf/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output ==  
+        "end - begin = 6ffc\n"
+        "success\n"
+    );
+}

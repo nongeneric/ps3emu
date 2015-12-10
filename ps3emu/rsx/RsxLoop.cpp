@@ -74,7 +74,7 @@ int64_t Rsx::interpret(uint32_t get) {
         return offset - get;
     }
     if (header.val == 0x20000) {
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx ret to %x", _ret);
+        BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx ret to %x", _ret.load());
         auto offset = _ret - get;
         _ret = 0;
         return offset;
@@ -1423,14 +1423,18 @@ void Rsx::setRef(uint32_t ref) {
 
 void Rsx::loop() {
     initGcm();
+    _ret = 0;
     BOOST_LOG_TRIVIAL(trace) << "rsx loop started, waiting for updates";
     boost::unique_lock<boost::mutex> lock(_mutex);
     for (;;) {
         _cv.wait(lock);
         BOOST_LOG_TRIVIAL(trace) << "rsx loop update received";
-        if (_shutdown)
+        if (_shutdown && _get == _put) { // idle
+            waitForIdle();
             return;
-        while (_get < _put || _ret || _shutdown) {
+        }
+        while (_get != _put || _ret) {
+            BOOST_LOG_TRIVIAL(trace) << ssnprintf("get = %x put = %x", _get, _put);
             _get += interpret(_get);
         }
     }
@@ -1439,12 +1443,22 @@ void Rsx::loop() {
 void Rsx::shutdown() {
     if (!_initialized)
         return;
-    assert(!_shutdown);
-    BOOST_LOG_TRIVIAL(trace) << "waiting for rsx to shutdown";
-    {
-        boost::unique_lock<boost::mutex> lock(_mutex);
-        _shutdown = true;
+    
+    if (!_shutdown) {
+        BOOST_LOG_TRIVIAL(trace) << "waiting for rsx to shutdown";
+        {
+            boost::unique_lock<boost::mutex> lock(_mutex);
+            _shutdown = true;
+        }
+        _cv.notify_all();
     }
-    _cv.notify_all();
     _thread->join();
+}
+
+void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
+    assert((destOffset & 3) == 0);
+    MethodHeader header { 0 };
+    header.prefix.set(1);
+    header.jumpoffset.set(destOffset);
+    _ppu->store<4>(va, header.val);
 }

@@ -1,5 +1,7 @@
 #include "Rsx.h"
 
+#include "GLBuffer.h"
+#include "Cache.h"
 #include "GLFramebuffer.h"
 #include "GLTexture.h"
 #include "../PPU.h"
@@ -40,33 +42,6 @@ void check_shader(GLuint shader) {
 
 enum class GLShaderType {
     vertex, fragment
-};
-
-template <typename H, void (*Deleter)(H)>
-class HandleWrapper {
-    H _handle = H();
-public:
-    HandleWrapper(H handle) : _handle(handle) { }
-    
-    HandleWrapper(HandleWrapper&& other) {
-        _handle = other._handle;
-        other._handle = H();
-    }
-    
-    HandleWrapper& operator=(HandleWrapper&& other) {
-        std::swap(_handle, other._handle);
-        return *this;
-    }
-    
-    virtual ~HandleWrapper() {
-        if (_handle != H()) {
-            Deleter(_handle);
-        }
-    }
-    
-    GLuint handle() {
-        return _handle;
-    }
 };
 
 void deleteShader(GLuint handle) {
@@ -149,6 +124,15 @@ struct TransferInfo {
     uint16_t inSizeY;
 };
 
+struct BufferCacheKey {
+    uint32_t va;
+    uint32_t size;
+    inline bool operator<(BufferCacheKey const& other) const {
+        return std::tie(va, size)
+             < std::tie(other.va, other.size);
+    }
+};
+
 class GLFramebuffer;
 class TextureRenderer;
 class RsxContext {
@@ -196,6 +180,7 @@ public:
     std::unique_ptr<uint8_t[]> localMemory;
     uint32_t semaphoreOffset = 0;
     TransferInfo transfer;
+    Cache<BufferCacheKey, GLBuffer, 256 * (2 >> 20)> bufferCache;
 };
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
@@ -207,8 +192,7 @@ Rsx::~Rsx() {
 class TextureRenderer {
     GLProgram _program;
     GLSampler _sampler;
-    // TODO: buffer management
-    GLuint _buffer;
+    GLBuffer _buffer;
 public:
     TextureRenderer() {
         GLShader fragmentShader(GLShaderType::fragment);
@@ -249,15 +233,14 @@ public:
             { -1.f, 1.f }, { 1.f, 1.f }, { 1.f, -1.f }
         };
         
-        glcall(glCreateBuffers(1, &_buffer));
-        glcall(glNamedBufferStorage(_buffer, sizeof(vertices), vertices, 0));
+        _buffer = GLBuffer(GLBufferType::Static, sizeof(vertices), vertices);
     }
     
     void render(GLSimpleTexture* tex) {
         glcall(glEnableVertexAttribArray(0));
         glcall(glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0));
         glcall(glVertexAttribBinding(0, 0));
-        glcall(glBindVertexBuffer(0, _buffer, 0, sizeof(glm::vec2)));
+        glcall(glBindVertexBuffer(0, _buffer.handle(), 0, sizeof(glm::vec2)));
         
         auto samplerIndex = 20;
         glcall(glBindTextureUnit(samplerIndex, tex->handle()));
@@ -585,6 +568,7 @@ void Rsx::BeginEnd(uint32_t mode) {
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
     updateVertexDataArrays(first, count);
+    _context->bufferCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
     updateTextures();
     updateShaders();
     glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
@@ -697,6 +681,7 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawIndexArray(%x, %x)", first, count);
     updateVertexDataArrays(first, count);
+    _context->bufferCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
     updateTextures();
     updateShaders();
     
@@ -1169,8 +1154,8 @@ void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t
 void Rsx::initGcm() {
     BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
     
+    _ppu->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
     _context->window.Init();
-    
     _context->localMemory.reset(new uint8_t[GcmLocalMemorySize]);
     _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->localMemory.get());
     
@@ -1219,27 +1204,30 @@ void Rsx::updateFramebuffer() {
 }
 
 void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
-    // TODO: proper buffer management
-    
     for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
         auto& format = _context->vertexDataArrays[i];
         auto& input = _context->vertexInputs[i];
         if (!input.enabled)
             continue;
-        
+   
+        auto va = addressToMainMemory(MemoryLocation::Local, format.offset);
+        auto bufferVa = va + first * format.stride;
         auto bufferSize = count * format.stride;
         
-        GLuint buffer;
-        glcall(glCreateBuffers(1, &buffer));
-        glcall(glNamedBufferStorage(buffer, bufferSize, nullptr, GL_MAP_WRITE_BIT));
-        
-        auto mapped = glMapNamedBufferRange(buffer, 0, bufferSize, GL_MAP_WRITE_BIT);
-        auto va = addressToMainMemory(MemoryLocation::Local, format.offset);
-        _ppu->readMemory(va + first * format.stride, mapped, bufferSize);
-        glcall(glUnmapNamedBuffer(buffer));
+        BufferCacheKey key { bufferVa, bufferSize };
+        GLBuffer* buffer = _context->bufferCache.retrieve(key);
+        if (!buffer) {
+            CacheItemUpdater<GLBuffer> updater{ bufferVa, bufferSize, [=](auto b) {
+                auto mapped = b->map();
+                _ppu->readMemory(bufferVa, mapped, bufferSize);
+                b->unmap();
+            }};
+            buffer = new GLBuffer(GLBufferType::MapWrite, bufferSize);
+            _context->bufferCache.insert(key, buffer, updater);
+        }
         
         glcall(glVertexAttribBinding(i, format.binding));
-        glcall(glBindVertexBuffer(format.binding, buffer, 0, format.stride));
+        glcall(glBindVertexBuffer(format.binding, buffer->handle(), 0, format.stride));
     }
 }
 
@@ -1296,4 +1284,16 @@ void Rsx::Color(std::vector<uint32_t> const& vec) {
         _ppu->store<4>(_context->transfer.offsetDestin + GcmLocalMemoryBase + pos, v);
         pos += 4;
     }
+}
+
+void Rsx::memoryBreakHandler(uint32_t va, uint32_t size) {
+    _context->bufferCache.invalidate(va, size);
+}
+
+bool Rsx::isCallActive() {
+    return _ret != 0;
+}
+
+uint32_t Rsx::getGet() {
+    return _get;
 }

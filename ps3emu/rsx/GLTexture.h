@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include "GLBuffer.h"
 #include "../constants.h"
 #include <stdint.h>
 #include <functional>
@@ -31,9 +32,6 @@ struct RsxTextureInfo {
     uint8_t fragmentGs;
     uint8_t fragmentBs;
 };
-
-#define glcall(a) { a; glcheck(__LINE__, #a); }
-void glcheck(int line, const char* call);
 
 class PPU;
 class GLTexture {

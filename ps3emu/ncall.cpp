@@ -93,6 +93,7 @@ void nstub_sys_initialize_tls(PPU* ppu) {
 }
 
 void nstub_sys_process_exit(PPU* ppu) {
+    ppu->getRsx()->shutdown();
     throw ProcessFinishedException();
 }
 
@@ -201,6 +202,7 @@ CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path,
     return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, ppu);
 }
 
+STUB_2(defaultContextCallback);
 STUB_2(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
 STUB_2(sys_lwmutex_lock);
@@ -272,6 +274,7 @@ STUB_5(cellFsRead);
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
 NCallEntry ncallTable[] {
+    ENTRY(defaultContextCallback),
     ENTRY(sys_initialize_tls),
     ENTRY(sys_lwmutex_create),
     ENTRY(sys_lwmutex_destroy),

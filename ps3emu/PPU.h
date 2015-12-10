@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bitset>
 #include <boost/endian/arithmetic.hpp>
 #include <boost/chrono.hpp>
@@ -22,9 +23,10 @@ union VirtualAddress {
 };
 
 struct MemoryPage {
-    uint8_t* ptr = nullptr;
+    std::atomic<uintptr_t> ptr;
     void alloc();
     void dealloc();
+    inline MemoryPage() { ptr = 0; }
 };
 
 template <int Bytes>
@@ -150,6 +152,7 @@ class PPU {
     FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
+    std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;
     
     std::unique_ptr<MemoryPage[]> _pages;
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
@@ -194,6 +197,9 @@ public:
     
     uint64_t getFrequency();
     uint64_t getTimeBase();
+    
+    void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
+    void memoryBreak(uint32_t va, uint32_t size);
     
     template <int Bytes>
     typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
@@ -401,3 +407,6 @@ public:
         return _rsx;
     }
 };
+
+uint32_t calcFnid(const char* name);
+void encodeNCall(PPU* ppu, ps3_uintptr_t va, uint32_t index);

@@ -431,3 +431,4 @@ uint8_t gcmInitCommands[] = {
 
 int gcmResetCommandsSize = sizeof(gcmResetCommands);
 int gcmInitCommandsSize = sizeof(gcmInitCommands);
+static_assert(sizeof(gcmResetCommands) == 0x1000, "");
