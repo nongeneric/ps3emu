@@ -6,6 +6,8 @@
 #include <boost/log/utility/setup/file.hpp>
 #include <boost/log/trivial.hpp>
 
+using namespace boost::log;
+
 void emulate(const char* path, std::vector<std::string> args) {
     PPU ppu;
     ELFLoader elf;
@@ -37,7 +39,15 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    boost::log::add_file_log("/tmp/ps3run.log");
+    add_file_log(
+        keywords::file_name = "/tmp/ps3run.log",
+        keywords::auto_flush = true
+    );
+    
+//     core::get()->set_filter
+//     (
+//         trivial::severity >= trivial::info
+//     );
     
     auto path = argv[1];
     try {

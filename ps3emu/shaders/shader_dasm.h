@@ -86,7 +86,10 @@ struct fragment_argument_t {
     swizzle_t swizzle;
     int reg_num;
     reg_type_t reg_type;
-    uint32_t imm_val[4];
+    union {
+        uint32_t u[4];
+        float f[4];
+    } imm_val;
 };
 
 struct fragment_opcode_t {

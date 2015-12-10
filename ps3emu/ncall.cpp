@@ -48,9 +48,12 @@ uint32_t calcFnid(const char* name) {
     };
     SHA1_Update(&ctx, (const uint8_t*)name, strlen(name));
     SHA1_Update(&ctx, suffix, sizeof(suffix));
-    uint8_t md[20];
-    SHA1_Final(md, &ctx);
-    return *(uint32_t*)md;
+    union {
+        uint8_t b[20];
+        uint32_t u32[5];
+    } md;
+    SHA1_Final(md.b, &ctx);
+    return md.u32[0];
 }
 
 template <int ArgN, class T, class Enable = void>

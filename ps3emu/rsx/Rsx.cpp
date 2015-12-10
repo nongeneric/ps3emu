@@ -84,8 +84,6 @@ public:
     }
 };
 
-std::vector<std::unique_ptr<GLTexture>> textureCache;
-
 struct TextureSamplerInfo {
     bool enable;
     GLSampler glSampler = GLSampler(0);
@@ -130,6 +128,17 @@ struct BufferCacheKey {
     inline bool operator<(BufferCacheKey const& other) const {
         return std::tie(va, size)
              < std::tie(other.va, other.size);
+    }
+};
+
+struct TextureCacheKey {
+    uint32_t va;
+    uint32_t width;
+    uint32_t height;
+    uint8_t internalType;
+    inline bool operator<(TextureCacheKey const& other) const {
+        return std::tie(va, width, height, internalType)
+             < std::tie(other.va, other.width, other.height, other.internalType);
     }
 };
 
@@ -181,6 +190,7 @@ public:
     uint32_t semaphoreOffset = 0;
     TransferInfo transfer;
     Cache<BufferCacheKey, GLBuffer, 256 * (2 >> 20)> bufferCache;
+    Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
 };
 
 Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
@@ -568,9 +578,12 @@ void Rsx::BeginEnd(uint32_t mode) {
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
     updateVertexDataArrays(first, count);
-    _context->bufferCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
     updateTextures();
     updateShaders();
+    
+    _context->bufferCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
+    _context->textureCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
+    
     glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
 }
 
@@ -681,9 +694,11 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawIndexArray(%x, %x)", first, count);
     updateVertexDataArrays(first, count);
-    _context->bufferCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
     updateTextures();
     updateShaders();
+    
+    _context->bufferCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
+    _context->textureCache.watch([=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); });
     
     // TODO: proper buffer management
     std::unique_ptr<uint8_t[]> copy(new uint8_t[count * 4]); // TODO: check index format
@@ -799,10 +814,26 @@ void Rsx::updateTextures() {
     int index = 0;
     for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
-            auto texture = new GLTexture(_ppu, sampler.texture); // TODO: search cache
-            texture->bind(index);
-            textureCache.emplace_back(texture);
+            auto& info = sampler.texture;
+            TextureCacheKey key { 
+                addressToMainMemory(info.location, info.offset),
+                info.width,
+                info.height,
+                info.format
+            };
+            auto texture = _context->textureCache.retrieve(key);
+            if (!texture) {
+                CacheItemUpdater<GLTexture> updater { 
+                    key.va, info.height * info.pitch,
+                    [=](auto t) {
+                        t->update(_ppu);
+                    }
+                };
+                texture = new GLTexture(_ppu, sampler.texture);
+                _context->textureCache.insert(key, texture, updater);
+            }
             
+            texture->bind(index);
             auto handle = sampler.glSampler.handle();
             if (!handle) {
                 sampler.glSampler = GLSampler();
@@ -817,11 +848,14 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
-            VertexShaderSamplerUniform info = { 
+            VertexShaderSamplerUniform uniform = { 
                 sampler.wraps, sampler.wrapt, 0, sampler.borderColor
             };
-            auto infoSize = sizeof(info);
-            glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, index * infoSize, infoSize, &info));
+            auto uniformSize = sizeof(uniform);
+            glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, 
+                                        index * uniformSize, 
+                                        uniformSize, 
+                                        &uniform));
         }
         index++;
     }
@@ -833,9 +867,25 @@ void Rsx::updateTextures() {
             if (surfaceTex) {
                 glcall(glBindTextureUnit(index, surfaceTex->handle()));
             } else {
-                auto texture = new GLTexture(_ppu, sampler.texture); // TODO: search cache
+                auto& info = sampler.texture;
+                TextureCacheKey key { 
+                    addressToMainMemory(info.location, info.offset),
+                    info.width,
+                    info.height,
+                    info.format
+                };
+                auto texture = _context->textureCache.retrieve(key);
+                if (!texture) {
+                    CacheItemUpdater<GLTexture> updater { 
+                        key.va, info.height * info.pitch,
+                        [=](auto t) {
+                            t->update(_ppu);
+                        }
+                    };
+                    texture = new GLTexture(_ppu, sampler.texture);
+                    _context->textureCache.insert(key, texture, updater);
+                }
                 texture->bind(index);
-                textureCache.emplace_back(texture);
             }
             
             auto handle = sampler.glSampler.handle();
@@ -1288,6 +1338,7 @@ void Rsx::Color(std::vector<uint32_t> const& vec) {
 
 void Rsx::memoryBreakHandler(uint32_t va, uint32_t size) {
     _context->bufferCache.invalidate(va, size);
+    _context->textureCache.invalidate(va, size);
 }
 
 bool Rsx::isCallActive() {

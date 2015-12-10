@@ -93,6 +93,8 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(FloatLiteral* literal) override {
+            if (std::isnan(literal->value()))
+                throw std::runtime_error("FloatLiteral should never be nan");
             _ret = ssnprintf("%g", literal->value());
         }
         
@@ -480,10 +482,10 @@ namespace ShaderRewriter {
             expr = new Invocation(
                 FunctionName::vec4,
                 {
-                    new FloatLiteral(*(float*)&arg.imm_val[0]),
-                    new FloatLiteral(*(float*)&arg.imm_val[1]),
-                    new FloatLiteral(*(float*)&arg.imm_val[2]),
-                    new FloatLiteral(*(float*)&arg.imm_val[3])
+                    new FloatLiteral(arg.imm_val.f[0]),
+                    new FloatLiteral(arg.imm_val.f[1]),
+                    new FloatLiteral(arg.imm_val.f[2]),
+                    new FloatLiteral(arg.imm_val.f[3])
                 }
             );
         } else if (arg.type == op_type_t::Attr) {

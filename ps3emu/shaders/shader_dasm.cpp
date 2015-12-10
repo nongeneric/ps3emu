@@ -362,7 +362,7 @@ const char* print_attr(input_attr_t attr) {
 
 void fragment_dasm(FragmentInstr const& i, std::string& res) {
     res += i.opcode.mnemonic;
-    const char* clamp;
+    const char* clamp = "";
     switch (i.clamp) {
         case clamp_t::B:
             clamp = "B";
@@ -465,8 +465,8 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             }
             res += "]";
         } else if (arg.type == op_type_t::Const) {
-            auto cu = i.arguments[n].imm_val;
-            auto cf = (float*)cu;
+            auto cu = i.arguments[n].imm_val.u;
+            auto cf = i.arguments[n].imm_val.f;
             res += ssnprintf("{0x%08x(%g), 0x%08x(%g), 0x%08x(%g), 0x%08x(%g)}",
                 cu[0], cf[0], cu[1], cf[1], cu[2], cf[2], cu[3], cf[3]
             );
@@ -538,14 +538,13 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
         if (arg.type == op_type_t::Const) {
             size += 16;
             uint8_t cbuf[16];
-            // exch words and then reverse bytes to make le dwords
             for (auto i = 0u; i < sizeof(cbuf); i += 4) {
                 cbuf[i + 0] = instr[i + 16 + 1];
                 cbuf[i + 1] = instr[i + 16 + 0];
                 cbuf[i + 2] = instr[i + 16 + 3];
                 cbuf[i + 3] = instr[i + 16 + 2];
             }
-            memcpy(arg.imm_val, cbuf, sizeof(cbuf));
+            memcpy(arg.imm_val.u, cbuf, sizeof(cbuf));
         }
     }
     return std::min(size, 32);

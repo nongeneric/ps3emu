@@ -2617,13 +2617,16 @@ EMU(VCMPEQFP, SIMDForm) {
     ppu->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
-    float dbe[4];
+    union {
+        float f[4];
+        unsigned __int128 i128;
+    } dbe;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = abe[i] == bbe[i] ? ~0u : 0u;
+        dbe.f[i] = abe[i] == bbe[i] ? ~0u : 0u;
     }
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    ppu->setV(i->vD, (uint8_t*)dbe.f);
     if (i->Rc.u()) {
-        auto ui = *(unsigned __int128*)dbe;
+        auto ui = dbe.i128;
         auto t = ui + 1 == 0;
         auto f = ui == 0;
         auto c = t << 3 | f << 1;
@@ -2694,7 +2697,7 @@ EMU(VPERM, SIMDForm) {
     ppu->getV(i->vB, be + 16);
     uint8_t cbe[16];
     ppu->getV(i->vC, cbe);
-    uint8_t dbe[16];
+    uint8_t dbe[16] = { 0 };
     for (int i = 0; i < 15; ++i) {
         auto b = cbe[i] & 31;
         dbe[i] = be[b];

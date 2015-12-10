@@ -43,6 +43,7 @@ public:
     GLTexture(PPU* ppu, RsxTextureInfo const& info);
     ~GLTexture();
     RsxTextureInfo const& info() const;
+    void update(PPU* ppu);
     void bind(GLuint samplerIndex);
 };
 

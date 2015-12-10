@@ -291,28 +291,31 @@ public:
 };
 
 GLTexture::GLTexture(PPU* ppu, const RsxTextureInfo& info): _info(info) {
-    auto size = info.pitch * info.height;
+    glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
+    glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
+}
+
+void GLTexture::update(PPU* ppu) {
+    auto size = _info.pitch * _info.height;
     std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
-    auto va = addressToMainMemory(info.location, info.offset);
+    auto va = addressToMainMemory(_info.location, _info.offset);
     ppu->readMemory(va, buf.get(), size);
     
-    std::unique_ptr<vec4[]> conv(new vec4[info.width * info.height]);
+    std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
 
-    assert(info.format & CELL_GCM_TEXTURE_LN);
+    assert(_info.format & CELL_GCM_TEXTURE_LN);
     
-    auto texelFormat = info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
+    auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     
-    TextureReader reader(texelFormat, info);
-    TextureIterator it(&buf[0], info.pitch, info.width, getTexelSize(texelFormat));
-    for (auto i = 0; i < info.width * info.height; ++i) {
+    TextureReader reader(texelFormat, _info);
+    TextureIterator it(&buf[0], _info.pitch, _info.width, getTexelSize(texelFormat));
+    for (auto i = 0; i < _info.width * _info.height; ++i) {
         reader.read(*it, conv[i]);
         ++it;
     }
     
-    glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
-    glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
     glcall(glTextureSubImage2D(_handle,
-        0, 0, 0, info.width, info.height, GL_RGBA, GL_FLOAT, conv.get()
+        0, 0, 0, _info.width, _info.height, GL_RGBA, GL_FLOAT, conv.get()
     ));
 }
 
