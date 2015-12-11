@@ -31,10 +31,12 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("#version 450 core");
     line("layout (location = 0) out vec4 color[4];");
     line(ssnprintf("%sin vec4 f_COL0;", isFlatColorShading ? "flat " : ""));
-    line(ssnprintf("layout(std140, binding = %d) uniform FragmentConstants {",
-                   FragmentShaderConstantBinding));
-    line(ssnprintf("    vec4 c[%d];", std::max(1u, constIndex)));
-    line("} fconst;");
+    if (constIndex) {
+        line(ssnprintf("layout(std140, binding = %d) uniform FragmentConstants {",
+                    FragmentShaderConstantBinding));
+        line(ssnprintf("    vec4 c[%d];", constIndex));
+        line("} fconst;");
+    }
     line("in vec4 f_COL1;");
     line("in vec4 f_FOGC;");
     line("in vec4 f_TEX0;");

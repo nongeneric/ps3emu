@@ -43,6 +43,7 @@ class Rsx {
     ps3_uintptr_t _gcmIoAddress;
     int64_t interpret(uint32_t get);
     Window window;
+    void watchCaches();
     void memoryBreakHandler(uint32_t va, uint32_t size);
     void waitForIdle();
     void loop();

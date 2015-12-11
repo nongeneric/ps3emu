@@ -225,3 +225,4 @@ struct FragmentProgramInfo {
 };
 
 FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr);
+uint32_t get_fragment_bytecode_length(const uint8_t* ptr);

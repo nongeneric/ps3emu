@@ -1066,3 +1066,8 @@ FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr) {
     }
     throw std::runtime_error("can't find the last instructions");
 }
+
+uint32_t get_fragment_bytecode_length(const uint8_t* ptr) {
+    // TODO: optimize
+    return get_fragment_bytecode_info(ptr).length;
+}
