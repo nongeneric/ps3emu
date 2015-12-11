@@ -87,6 +87,11 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    ivec3 wrapMode;");
     line("    vec4 borderColor;");
     line("} samplersInfo[4];");
+    line("out gl_PerVertex {");
+    line("    vec4 gl_Position;");
+    //line("    float gl_PointSize;");
+    //line("    float gl_ClipDistance[];");
+    line("};");
     line("out vec4 f_COL0;");
     line("out vec4 f_COL1;");
     line("out vec4 f_FOGC;");

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../libs/graphics/graphics.h"
 #include "../constants.h"
 #include "../../libs/graphics/gcm.h"
 #include <boost/thread.hpp>
@@ -38,7 +39,10 @@ class Rsx {
     std::unique_ptr<RsxContext> _context;
     std::map<uint32_t, uint32_t> _semaphores;
     uint32_t _activeSemaphoreHandle = 0;
+    uint32_t _gcmIoSize;
+    ps3_uintptr_t _gcmIoAddress;
     int64_t interpret(uint32_t get);
+    Window window;
     void memoryBreakHandler(uint32_t va, uint32_t size);
     void waitForIdle();
     void loop();

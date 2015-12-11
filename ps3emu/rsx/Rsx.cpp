@@ -28,18 +28,6 @@ struct VertexDataArrayFormatInfo {
 
 typedef std::array<float, 4> glvec4_t;
 
-void check_shader(GLuint shader) {
-    GLint param;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &param);
-    if (param != GL_TRUE) {
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &param);
-        std::string s(param + 1, 0);
-        GLsizei len;
-        glGetShaderInfoLog(shader, param, &len, &s[0]);
-        throw std::runtime_error(ssnprintf("shader error: %s\n", s.c_str()));
-    }
-}
-
 enum class GLShaderType {
     vertex, fragment
 };
@@ -81,6 +69,63 @@ public:
         GLuint handle;
         glcall(glCreateSamplers(1, &handle));
         return handle;
+    }
+};
+
+void deleteProgramPipeline(GLuint handle) {
+    glDeleteProgramPipelines(1, &handle);
+}
+
+template <GLuint Type>
+class Shader {
+    GLProgram _program;
+    GLuint create(const char* text) {
+        return glCreateShaderProgramv(Type, 1, &text);
+    }
+public:
+    Shader() : _program(0) { }
+    Shader(const char* text) : _program(create(text)) { }
+    GLuint handle() {
+        return _program.handle();
+    }
+    std::string log() {
+        GLint len;
+        glcall(glGetProgramiv(_program.handle(), GL_INFO_LOG_LENGTH, &len));
+        std::string str;
+        str.resize(len);
+        glcall(glGetProgramInfoLog(_program.handle(), len, nullptr, &str[0]));
+        return str;   
+    }
+};
+
+class VertexShader : public Shader<GL_VERTEX_SHADER> {
+public:
+    VertexShader() { }
+    VertexShader(const char* text) : Shader(text) { }
+};
+
+class FragmentShader : public Shader<GL_FRAGMENT_SHADER> {
+public:
+    FragmentShader() { }
+    FragmentShader(const char* text) : Shader(text) { }
+};
+
+class GLProgramPipeline : public HandleWrapper<GLuint, deleteProgramPipeline> {
+    GLuint create() {
+        GLuint handle = 0;
+        glcall(glGenProgramPipelines(1, &handle));
+        return handle;
+    }
+public:
+    GLProgramPipeline() : HandleWrapper(create()) { }
+    void bind() {
+        glcall(glBindProgramPipeline(handle()));
+    }
+    void useShader(VertexShader& shader) {
+        glcall(glUseProgramStages(handle(), GL_VERTEX_SHADER_BIT, shader.handle()));
+    }
+    void useShader(FragmentShader& shader) {
+        glcall(glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader.handle()));
     }
 };
 
@@ -142,13 +187,20 @@ struct TextureCacheKey {
     }
 };
 
+struct VertexShaderCacheKey {
+    std::vector<uint8_t> bytecode;
+    inline bool operator<(VertexShaderCacheKey const& other) const {
+        auto size = bytecode.size();
+        auto othersize = other.bytecode.size();
+        return std::tie(size, bytecode)
+             < std::tie(othersize, other.bytecode);
+    }
+};
+
 class GLFramebuffer;
 class TextureRenderer;
 class RsxContext {
 public:
-    uint32_t gcmIoSize;
-    ps3_uintptr_t gcmIoAddress;
-    Window window;
     SurfaceInfo surface;
     ViewPortInfo viewPort;
     float clipMin;
@@ -165,12 +217,11 @@ public:
     bool isFlipInProgress = false;
     std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;
-    GLShader vertexShader;
-    GLShader fragmentShader;
+    VertexShader vertexShader;
+    FragmentShader fragmentShader;
     GLuint vertexConstBuffer;
     GLuint vertexSamplersBuffer;
     GLuint fragmentSamplersBuffer;
-    GLProgram shaderProgram = GLProgram(0);
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentOffset = 0;
@@ -189,25 +240,26 @@ public:
     std::unique_ptr<uint8_t[]> localMemory;
     uint32_t semaphoreOffset = 0;
     TransferInfo transfer;
+    GLProgramPipeline pipeline;
     Cache<BufferCacheKey, GLBuffer, 256 * (2 >> 20)> bufferCache;
     Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
+    Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
 };
 
-Rsx::Rsx(PPU* ppu) : _ppu(ppu), _context(new RsxContext()) { }
+Rsx::Rsx(PPU* ppu) : _ppu(ppu) { }
 
 Rsx::~Rsx() {
     shutdown();
 }
 
 class TextureRenderer {
-    GLProgram _program;
+    GLProgramPipeline _pipeline;
+    VertexShader _vertexShader;
+    FragmentShader _fragmentShader;
     GLSampler _sampler;
     GLBuffer _buffer;
 public:
     TextureRenderer() {
-        GLShader fragmentShader(GLShaderType::fragment);
-        GLShader vertexShader(GLShaderType::vertex);
-        
         auto fragmentCode =
             "#version 450 core\n"
             "out vec4 color;\n"
@@ -220,23 +272,17 @@ public:
         auto vertexCode =
             "#version 450 core\n"
             "layout (location = 0) in vec2 pos;\n"
+            "out gl_PerVertex {\n"
+            "    vec4 gl_Position;\n"
+            "};\n"
             "void main(void) {\n"
             "    gl_Position = vec4(pos, 0, 1);\n"
             "}\n";
         
-        auto fs = fragmentShader.handle();
-        auto vs = vertexShader.handle();
-        
-        glShaderSource(fs, 1, &fragmentCode, NULL);
-        glShaderSource(vs, 1, &vertexCode, NULL);
-        glCompileShader(fs);
-        glCompileShader(vs);
-        check_shader(fs);
-        check_shader(vs);
-        
-        glAttachShader(_program.handle(), fs);
-        glAttachShader(_program.handle(), vs);
-        glcall(glLinkProgram(_program.handle()));
+        _fragmentShader = FragmentShader(fragmentCode);
+        _vertexShader = VertexShader(vertexCode);
+        _pipeline.useShader(_fragmentShader);
+        _pipeline.useShader(_vertexShader);
         
         glm::vec2 vertices[] {
             { -1.f, 1.f }, { -1.f, -1.f }, { 1.f, -1.f },
@@ -257,7 +303,7 @@ public:
         glcall(glBindSampler(samplerIndex, _sampler.handle()));
         glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glcall(glUseProgram(_program.handle()));
+        _pipeline.bind();
         
         glcall(glDrawArrays(GL_TRIANGLES, 0, 6));
         
@@ -376,7 +422,7 @@ void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
 void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgramLoad(%x, %x)", load, start);
     assert(load == 0);
-    assert(start == 0); // TODO: handle one-parameter invocation without resetting start
+    assert(start == 0);
     _context->vertexLoadOffset = load;
 }
 
@@ -607,8 +653,8 @@ struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
 };
 
 void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
-    _context->gcmIoSize = ioSize;
-    _context->gcmIoAddress = ioAddress;
+    _gcmIoSize = ioSize;
+    _gcmIoAddress = ioAddress;
 }
 
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
@@ -617,8 +663,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->framebuffer->bindDefault();
     updateFramebuffer();
     _context->textureRenderer->render(tex);
-    
-    _context->window.SwapBuffers();
+    _context->pipeline.bind();
+    window.SwapBuffers();
     
     auto& vec = _context->lastFrame;
     glReadnPixels(_context->viewPort.x,
@@ -652,12 +698,8 @@ bool Rsx::linkShaderProgram() {
     if (!_context->fragmentShader.handle() || !_context->vertexShader.handle())
         return false;
     
-    GLProgram program;
-    glAttachShader(program.handle(), _context->vertexShader.handle());
-    glAttachShader(program.handle(), _context->fragmentShader.handle());
-    glcall(glLinkProgram(program.handle()));
-    glcall(glUseProgram(program.handle()));
-    _context->shaderProgram = std::move(program);
+    _context->pipeline.useShader(_context->vertexShader);
+    _context->pipeline.useShader(_context->fragmentShader);
     
     glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
                             VertexShaderConstantBinding,
@@ -731,11 +773,9 @@ void Rsx::updateShaders() {
                 
         BOOST_LOG_TRIVIAL(trace) << text;
         
-        _context->fragmentShader = GLShader(GLShaderType::fragment);
-        const char* textptr = text.c_str();
-        glShaderSource(_context->fragmentShader.handle(), 1, &textptr, NULL);
-        glCompileShader(_context->fragmentShader.handle());
-        check_shader(_context->fragmentShader.handle());
+        FragmentShader shader(text.c_str());
+        BOOST_LOG_TRIVIAL(trace) << "fragment shader log:\n" << shader.log();
+        _context->fragmentShader = std::move(shader);
     }
     
     if (_context->vertexShaderDirty) {
@@ -752,12 +792,9 @@ void Rsx::updateShaders() {
 
         BOOST_LOG_TRIVIAL(trace) << text;
         
-        GLShader vertexShader(GLShaderType::vertex);
-        const char* textptr = text.c_str();
-        glShaderSource(vertexShader.handle(), 1, &textptr, NULL);
-        glCompileShader(vertexShader.handle());
-        check_shader(vertexShader.handle());
-        _context->vertexShader = std::move(vertexShader);
+        VertexShader shader(text.c_str());
+        BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader.log();
+        _context->vertexShader = std::move(shader);
     }
     
     linkShaderProgram();
@@ -1204,13 +1241,16 @@ void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t
 void Rsx::initGcm() {
     BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
     
+    window.Init();
+    _context.reset(new RsxContext());
+    
     _ppu->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
-    _context->window.Init();
+    _context->pipeline.bind();
     _context->localMemory.reset(new uint8_t[GcmLocalMemorySize]);
     _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->localMemory.get());
     
     // remap io to point to the buffer as well
-    _ppu->map(_context->gcmIoAddress, GcmLocalMemoryBase, _context->gcmIoSize);
+    _ppu->map(_gcmIoAddress, GcmLocalMemoryBase, _gcmIoSize);
     
     glcall(glCreateBuffers(1, &_context->vertexConstBuffer));
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
