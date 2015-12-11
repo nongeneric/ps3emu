@@ -788,7 +788,7 @@ class FragmentShaderUpdateFunctor {
         *shader = FragmentShader(text.c_str());
         BOOST_LOG_TRIVIAL(trace) << "fragment shader log:\n" << shader->log();
         
-        std::swap(_bytecode, _newbytecode);
+        _bytecode = _newbytecode;
         _info = get_fragment_bytecode_info(&_bytecode[0]);
         updateConsts();
     }
@@ -797,7 +797,7 @@ class FragmentShaderUpdateFunctor {
         auto fconst = (std::array<float, 4>*)_constBuffer.map();
         for (auto i = 0u; i < _info.length; i += 16) {
             if (_info.constMap[i / 16]) {
-                *fconst = read_fragment_imm_val(&_bytecode[i]);
+                *fconst = read_fragment_imm_val(&_newbytecode[i]);
                 fconst++;
             }
         }
@@ -814,18 +814,17 @@ public:
                                 RsxContext* rsxContext,
                                 PPU* ppu)
         : _constBuffer(GLBufferType::MapWrite, size / 2),
-          _bytecode(bytecode),
+          _newbytecode(bytecode),
           _rsxContext(rsxContext),
           _ppu(ppu),
           va(va), size(size)
     {
         assert(size % 16 == 0);
-        _info = get_fragment_bytecode_info(&_bytecode[0]);
+        _info = get_fragment_bytecode_info(&_newbytecode[0]);
     }
     
     void update(FragmentShader* shader) {
-        if (_newbytecode.empty()) { // first update
-            _newbytecode = _bytecode;
+        if (_bytecode.empty()) { // first update
             updateBytecode(shader);
             return;
         }

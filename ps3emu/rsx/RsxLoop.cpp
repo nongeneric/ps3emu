@@ -75,6 +75,9 @@ int64_t Rsx::interpret(uint32_t get) {
     }
     if (header.val == 0x20000) {
         BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx ret to %x", _ret.load());
+        if (!_get) {
+            BOOST_LOG_TRIVIAL(error) << "rsx ret to 0, command buffer corruption is likely";
+        }
         auto offset = _ret - get;
         _ret = 0;
         return offset;

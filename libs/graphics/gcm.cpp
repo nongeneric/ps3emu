@@ -233,10 +233,11 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     uint32_t k32 = 32 * 1024;
     assert(emuGcmState.defaultCommandBufferSize % k32 == 0);
     auto ioBase = emuGcmState.ioMaps.at(0).address;
-    uint32_t nextBuffer = ioBase + gcmResetCommandsSize;
+    uint32_t nextBuffer = data->end + 4;
     uint32_t nextSize;
-    if (nextBuffer - ioBase > emuGcmState.defaultCommandBufferSize) {
+    if (nextBuffer - ioBase >= emuGcmState.defaultCommandBufferSize) {
         nextSize = k32 - gcmResetCommandsSize;
+        nextBuffer = ioBase + gcmResetCommandsSize;
     } else {
         nextBuffer = data->end + 4;
         nextSize = k32;
@@ -250,6 +251,12 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     }
     
     emuGcmState.rsx->encodeJump(data->current, nextBuffer - ioBase);
+    
+    BOOST_LOG_TRIVIAL(trace) << 
+        ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, jump = %x, dest = %x, defsize = %x)",
+            nextSize, nextBuffer - ioBase, data->current - ioBase, nextBuffer - ioBase, 
+            emuGcmState.defaultCommandBufferSize
+        );
     
     data->begin = nextBuffer;
     data->current = nextBuffer;
