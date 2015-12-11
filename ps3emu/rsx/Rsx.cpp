@@ -6,6 +6,7 @@
 #include "GLTexture.h"
 #include "../PPU.h"
 #include "../shaders/ShaderGenerator.h"
+#include "../shaders/shader_dasm.h"
 #include "../utils.h"
 #include <atomic>
 #include <vector>
@@ -217,9 +218,10 @@ public:
     bool isFlipInProgress = false;
     std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;
-    VertexShader vertexShader;
+    VertexShader* vertexShader = nullptr;
     FragmentShader fragmentShader;
-    GLuint vertexConstBuffer;
+    GLBuffer vertexConstBuffer;
+    GLBuffer fragmentConstBuffer;
     GLuint vertexSamplersBuffer;
     GLuint fragmentSamplersBuffer;
     bool vertexShaderDirty = false;
@@ -691,19 +693,22 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& va
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformConstantLoad(%x, %d)", loadAt, vals.size());
     assert(vals.size() % 4 == 0);
     auto size = vals.size() * sizeof(uint32_t);
-    glcall(glNamedBufferSubData(_context->vertexConstBuffer, loadAt * 16, size, vals.data()));
+    glcall(glNamedBufferSubData(_context->vertexConstBuffer.handle(), loadAt * 16, size, vals.data()));
 }
 
 bool Rsx::linkShaderProgram() {
-    if (!_context->fragmentShader.handle() || !_context->vertexShader.handle())
+    if (!_context->fragmentShader.handle() || !_context->vertexShader)
         return false;
     
-    _context->pipeline.useShader(_context->vertexShader);
+    _context->pipeline.useShader(*_context->vertexShader);
     _context->pipeline.useShader(_context->fragmentShader);
     
     glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
+                            FragmentShaderConstantBinding,
+                            _context->fragmentConstBuffer.handle()));
+    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
                             VertexShaderConstantBinding,
-                            _context->vertexConstBuffer));
+                            _context->vertexConstBuffer.handle()));
     glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
                             VertexShaderSamplesInfoBinding,
                             _context->vertexSamplersBuffer));
@@ -763,9 +768,19 @@ void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
         
-        _context->fragmentBytecode.resize(1000); // TODO: compute size exactly
         auto& vec = _context->fragmentBytecode;
+        vec.resize(512 * 16);
         _ppu->readMemory(_context->fragmentOffset, &vec[0], vec.size());
+        
+        auto info = get_fragment_bytecode_info(&vec[0]);        
+        auto fconst = (std::array<float, 4>*)_context->fragmentConstBuffer.map();
+        for (auto i = 0u; i < info.length; i += 16) {
+            if (info.constMap[i / 16]) {
+                *fconst = read_fragment_imm_val(&vec[i]);
+                fconst++;
+            }
+        }
+        _context->fragmentConstBuffer.unmap();
         
         // TODO: handle sizes
         std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
@@ -786,15 +801,23 @@ void Rsx::updateShaders() {
             _context->vertexTextureSamplers[2].texture.dimension,
             _context->vertexTextureSamplers[3].texture.dimension
         };
-        auto text = GenerateVertexShader(_context->vertexInstructions.data(),
+        
+        auto size = CalcVertexBytecodeSize(_context->vertexInstructions.data());
+        
+        VertexShaderCacheKey key { std::vector<uint8_t>(_context->vertexInstructions.data(),
+                                                        _context->vertexInstructions.data() + size) };
+        auto shader = _context->vertexShaderCache.retrieve(key);
+        if (!shader) {
+            auto text = GenerateVertexShader(_context->vertexInstructions.data(),
                                          _context->vertexInputs,
                                          samplerSizes, 0); // TODO: loadAt
-
-        BOOST_LOG_TRIVIAL(trace) << text;
-        
-        VertexShader shader(text.c_str());
-        BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader.log();
-        _context->vertexShader = std::move(shader);
+            BOOST_LOG_TRIVIAL(trace) << text;
+            shader = new VertexShader(text.c_str());
+            BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader->log();
+            CacheItemUpdater<VertexShader> updater { uint32_t(), (uint32_t)key.bytecode.size(), [](auto){} };
+            _context->vertexShaderCache.insert(key, shader, updater);
+        }
+        _context->vertexShader = shader;
     }
     
     linkShaderProgram();
@@ -1252,10 +1275,11 @@ void Rsx::initGcm() {
     // remap io to point to the buffer as well
     _ppu->map(_gcmIoAddress, GcmLocalMemoryBase, _gcmIoSize);
     
-    glcall(glCreateBuffers(1, &_context->vertexConstBuffer));
+    size_t fragmentConstBufferSize = FragmentShaderConstantCount * sizeof(float) * 4;
+    _context->fragmentConstBuffer = GLBuffer(GLBufferType::MapWrite, fragmentConstBufferSize);
+    
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
-    glcall(glNamedBufferStorage(_context->vertexConstBuffer, constBufferSize, NULL, 
-                                GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT));
+    _context->vertexConstBuffer = GLBuffer(GLBufferType::MapRead, constBufferSize);
     
     glcall(glCreateBuffers(1, &_context->vertexSamplersBuffer));
     auto uniformSize = sizeof(VertexShaderSamplerUniform) * 4;

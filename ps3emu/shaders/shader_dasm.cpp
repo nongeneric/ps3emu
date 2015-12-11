@@ -523,7 +523,7 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
         res.input_attr = i->InputAttr();
     }
     res.is_last = i->b0.LastInstr.u();
-    int size = 16;
+    bool has_const = false;
     for (int n = 0; n < opcode.op_count; ++n) {
         auto& arg = res.arguments[n];
         arg.type =  i->OpType(n);
@@ -536,18 +536,11 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
         arg.swizzle.comp[2] = i->OpMaskZ(n);
         arg.swizzle.comp[3] = i->OpMaskW(n);
         if (arg.type == op_type_t::Const) {
-            size += 16;
-            uint8_t cbuf[16];
-            for (auto i = 0u; i < sizeof(cbuf); i += 4) {
-                cbuf[i + 0] = instr[i + 16 + 1];
-                cbuf[i + 1] = instr[i + 16 + 0];
-                cbuf[i + 2] = instr[i + 16 + 3];
-                cbuf[i + 3] = instr[i + 16 + 2];
-            }
-            memcpy(arg.imm_val.u, cbuf, sizeof(cbuf));
+            has_const = true;
+            arg.imm_val.f = read_fragment_imm_val(instr + 16);
         }
     }
-    return std::min(size, 32);
+    return has_const ? 32 : 16;
 }
 
 std::string print_swizzle(swizzle_t swizzle, bool allComponents) {
@@ -1042,4 +1035,34 @@ std::string vertex_dasm(const VertexInstr& instr) {
         }
     }
     return res + ";";
+}
+
+std::array<float, 4> read_fragment_imm_val(const uint8_t* ptr) {
+    union {
+        std::array<float, 4> f;
+        std::array<uint8_t, 16> u8;
+    } u;
+    static_assert(sizeof(u) == 16, "");
+    for (auto i = 0u; i < sizeof(u); i += 4) {
+        u.u8[i + 0] = ptr[i + 1];
+        u.u8[i + 1] = ptr[i + 0];
+        u.u8[i + 2] = ptr[i + 3];
+        u.u8[i + 3] = ptr[i + 2];
+    }
+    return u.f;
+}
+
+FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr) {
+    auto pos = 0u;
+    std::bitset<512> map;
+    while (pos < 512 * 16) {
+        FragmentInstr fi;
+        auto len = fragment_dasm_instr(ptr + pos, fi);
+        map[pos / 16 + 1] = len == 32;
+        pos += len;
+        if (fi.is_last) {
+            return { map, pos };
+        }
+    }
+    throw std::runtime_error("can't find the last instructions");
 }

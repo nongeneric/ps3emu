@@ -17,6 +17,8 @@ struct VertexShaderInputFormat {
     // TODO: use dest_mask_t instead of int everywhere
 };
 
+uint32_t CalcVertexBytecodeSize(const uint8_t* bytecode);
+
 std::string GenerateVertexShader(const uint8_t* bytecode, 
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
                                  std::array<int, 4> const& samplerSizes,

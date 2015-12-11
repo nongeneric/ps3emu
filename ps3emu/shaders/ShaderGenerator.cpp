@@ -11,13 +11,17 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     std::vector<std::unique_ptr<Statement>> sts;
     auto pos = 0u;
     int lastReg = 0;
+    unsigned constIndex = 0;
     while (pos < bytecode.size()) {
         FragmentInstr fi;
-        pos += fragment_dasm_instr(&bytecode[0] + pos, fi);
-        for (auto& st : MakeStatement(fi)) {
+        auto len = fragment_dasm_instr(&bytecode[0] + pos, fi);
+        pos += len;
+        for (auto& st : MakeStatement(fi, constIndex)) {
             lastReg = std::max(lastReg, GetLastRegisterNum(st.get()));   
             sts.emplace_back(std::move(st));
         }
+        if (len == 32)
+            constIndex++;
         if (fi.is_last)
             break;
     }
@@ -27,6 +31,10 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("#version 450 core");
     line("layout (location = 0) out vec4 color[4];");
     line(ssnprintf("%sin vec4 f_COL0;", isFlatColorShading ? "flat " : ""));
+    line(ssnprintf("layout(std140, binding = %d) uniform FragmentConstants {",
+                   FragmentShaderConstantBinding));
+    line(ssnprintf("    vec4 c[%d];", std::max(1u, constIndex)));
+    line("} fconst;");
     line("in vec4 f_COL1;");
     line("in vec4 f_FOGC;");
     line("in vec4 f_TEX0;");
@@ -257,4 +265,19 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("}");
     
     return res;
+}
+
+uint32_t CalcVertexBytecodeSize(const uint8_t* bytecode) {
+    uint32_t size = 0;
+    std::array<VertexInstr, 2> instr;
+    while (size < 512 * 16) {
+        int count = vertex_dasm_instr(bytecode, instr);
+        size += 16;
+        bytecode += 16;
+        for (int n = 0; n < count; ++n) {
+            if (instr[n].is_last)
+                return size;
+        }
+    }
+    throw std::runtime_error("could not find the last instruction");
 }

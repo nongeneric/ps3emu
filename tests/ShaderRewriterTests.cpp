@@ -53,42 +53,42 @@ TEST_CASE() {
     auto pos = 0;
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    auto st = MakeStatement(fi);
+    auto st = MakeStatement(fi, 0);
     auto str = printStatements(st);
-    REQUIRE( str == "r[0].xy = (f_WPOS * (vec4(0.02, 0, 0, 0).xxxx)).xy;" );
+    REQUIRE( str == "r[0].xy = (f_WPOS * (fconst.c[0].xxxx)).xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[0].xy = fract(r[0]).xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
-    REQUIRE( str == "r[0].xy = (r[0] * (vec4(50, 0, 0, 0).xxxx)).xy;" );
+    REQUIRE( str == "r[0].xy = (r[0] * (fconst.c[0].xxxx)).xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "c[0].xy = r[0].xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[0].zw = floor((abs(r[0]).xxxy)).zw;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[1].w = r[0].w;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[0].x = (r[0].zzzz).x;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == 
         "if (((c[0].yyyy).x < 0)) {\n"
@@ -97,7 +97,7 @@ TEST_CASE() {
     );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == 
         "if (((c[0].xxxx).x < 0)) {\n"
@@ -106,46 +106,46 @@ TEST_CASE() {
     );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[0].y = (r[1].wwww).y;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
-    REQUIRE( str == "r[0].zw = ((r[0].xxxy) + (vec4(-25, 0, 0, 0).xxxx)).zw;" );
+    REQUIRE( str == "r[0].zw = ((r[0].xxxy) + (fconst.c[0].xxxx)).zw;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[0].xy = f_TEX0.xy;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "r[1].x = dot((r[0].zwzz).xy, (r[0].zwzz).xy).x;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
-    REQUIRE( str == "c[0].x = float(lessThan(r[1], (vec4(400, 0, 0, 0).xxxx)).x);" );
+    REQUIRE( str == "c[0].x = float(lessThan(r[1], (fconst.c[0].xxxx)).x);" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
-    REQUIRE( str == "r[0].zw = (vec4(0, 0, 1, 0).yzyz).zw;" );
+    REQUIRE( str == "r[0].zw = (fconst.c[0].yzyz).zw;" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == "" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    st = MakeStatement(fi);
+    st = MakeStatement(fi, 0);
     str = printStatements(st);
     REQUIRE( str == 
         "if (((c[0].xxxx).x != 0)) {\n"
-        "    r[0] = (vec4(0.9, 1, 0, 0).xxxy);\n"
+        "    r[0] = (fconst.c[0].xxxy);\n"
         "}"
     );
 }
@@ -320,7 +320,7 @@ TEST_CASE() {
     auto pos = 0;
     
     pos += fragment_dasm_instr(instr + pos, fi);
-    auto st = MakeStatement(fi);
+    auto st = MakeStatement(fi, 0);
     auto str = printStatements(st);
     REQUIRE( str == "r[0].x = tex0(f_TEX0).x;" );
 }

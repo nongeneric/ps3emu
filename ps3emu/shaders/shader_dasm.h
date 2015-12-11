@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <array>
 #include <vector>
+#include <bitset>
 #include <boost/variant.hpp>
 
 enum class clamp_t {
@@ -87,8 +88,8 @@ struct fragment_argument_t {
     int reg_num;
     reg_type_t reg_type;
     union {
-        uint32_t u[4];
-        float f[4];
+        std::array<uint32_t, 4> u;
+        std::array<float, 4> f;
     } imm_val;
 };
 
@@ -216,3 +217,11 @@ void fragment_dasm(FragmentInstr const& i, std::string& res);
 int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res);
 int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res);
 std::string vertex_dasm(VertexInstr const& instr);
+std::array<float, 4> read_fragment_imm_val(const uint8_t* ptr);
+
+struct FragmentProgramInfo {
+    std::bitset<512> constMap; // 1 means const
+    unsigned length;
+};
+
+FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr);

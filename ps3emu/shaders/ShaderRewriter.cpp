@@ -470,7 +470,7 @@ namespace ShaderRewriter {
         return visitor.result();
     }    
     
-    Expression* ConvertArgument(FragmentInstr const& i, int n) {
+    Expression* ConvertArgument(FragmentInstr const& i, int n, unsigned constIndex) {
         assert(n < i.opcode.op_count);
         auto& arg = i.arguments[n];
         assert(arg.is_abs + arg.is_neg <= 1);
@@ -479,15 +479,7 @@ namespace ShaderRewriter {
         if (i.opcode.tex && n == i.opcode.op_count - 1) {
             expr = new IntegerLiteral(i.tex_num);
         } else if (arg.type == op_type_t::Const) {
-            expr = new Invocation(
-                FunctionName::vec4,
-                {
-                    new FloatLiteral(arg.imm_val.f[0]),
-                    new FloatLiteral(arg.imm_val.f[1]),
-                    new FloatLiteral(arg.imm_val.f[2]),
-                    new FloatLiteral(arg.imm_val.f[3])
-                }
-            );
+            expr = new Variable("fconst.c", new IntegerLiteral(constIndex));
         } else if (arg.type == op_type_t::Attr) {
             // the g[] correction has no effect
             auto name = ssnprintf("f_%s", print_attr(i.input_attr));
@@ -552,11 +544,11 @@ namespace ShaderRewriter {
         }
     }
     
-    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i) {
+    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i, unsigned constIndex) {
         Expression* rhs = nullptr;
         Expression* args[4];
         for (int n = 0; n < i.opcode.op_count; ++n) {
-            args[n] = ConvertArgument(i, n);
+            args[n] = ConvertArgument(i, n, constIndex);
         }
         switch (i.opcode.instr) {
             case fragment_op_t::NOP:
