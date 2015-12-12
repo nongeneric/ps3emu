@@ -39,10 +39,7 @@ struct sys_process_prx_info {
     big_uint32_t unk3;
     big_uint32_t unk4;
     big_uint32_t prx_infos;
-    big_uint32_t padding[9];
 };
-
-static_assert(sizeof(sys_process_prx_info) == 64, "");
 
 #pragma pack()
 
@@ -210,11 +207,11 @@ void ELFLoader::link(PPU* ppu) {
     if (phprx == _pheaders + _header->e_phnum)
         throw std::runtime_error("PRXINFO segment not present");
     
-    auto procPrxInfoVec = readSection<sys_process_prx_info>(
-        _sections, _header, phprx->p_vaddr, ppu);
+    sys_process_prx_info prxInfo;
+    ppu->readMemory(phprx->p_vaddr, &prxInfo, sizeof(prxInfo));
     
     auto prxInfos = readSection<prx_info>(
-        _sections, _header, procPrxInfoVec[0].prx_infos, ppu);
+        _sections, _header, prxInfo.prx_infos, ppu);
     
     auto firstPrxName = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
         return l.prx_name < r.prx_name;

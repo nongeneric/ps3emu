@@ -1,6 +1,8 @@
 #include "../ps3emu/ELFLoader.h"
 #include "../ps3emu/utils.h"
 #include <openssl/aes.h>
+#include <openssl/hmac.h>
+#include <zlib.h>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/filesystem.hpp>
@@ -426,7 +428,7 @@ bool decrypt_sections(sce_header_t* sce_header,
     
     BOOST_LOG_TRIVIAL(error) << "sce keys";
     for (auto i = 0u; i < metadata_header->key_count; ++i) {
-        BOOST_LOG_TRIVIAL(error) << ssnprintf("  %03d  %s", i, print_hex(&keys[i][0], 16));
+        BOOST_LOG_TRIVIAL(error) << ssnprintf("  %02x  %s", i, print_hex(&keys[i][0], 16));
     }
     
     for (auto sh = metadata_section_headers;
@@ -437,10 +439,6 @@ bool decrypt_sections(sce_header_t* sce_header,
         if (sh->key_index >= metadata_header->key_count ||
             sh->iv_index >= metadata_header->key_count) {
             BOOST_LOG_TRIVIAL(error) << "a section marked encrypted references a non existent key";
-            continue;
-        }
-        if (sh->compressed == METADATA_SECTION_COMPRESSED) {
-            BOOST_LOG_TRIVIAL(error) << "compressed sections not supported";
             continue;
         }
         AES_KEY aes_key;
@@ -463,6 +461,29 @@ bool decrypt_sections(sce_header_t* sce_header,
     return true;
 }
 
+unsigned inflate(uint8_t* in, unsigned in_len, uint8_t* out, unsigned out_len) {
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    strm.avail_in = in_len;
+    strm.next_in = in;
+    
+    if (inflateInit(&strm) != Z_OK)
+        throw std::runtime_error("zlib init failed");
+    
+    strm.avail_out = out_len;
+    strm.next_out = out;
+    
+    auto err = inflate(&strm, Z_FINISH);
+    if (err != Z_STREAM_END)
+        throw std::runtime_error("inflate failed: ");
+    
+    inflateEnd(&strm);
+    
+    return strm.total_out;
+}
+
 bool write_elf(std::string elf_path,
                std::vector<char>& file_buf,
                sce_header_t* sce_header,
@@ -475,19 +496,47 @@ bool write_elf(std::string elf_path,
         return false;
     }
     
+    auto keys = reinterpret_cast<std::array<uint8_t, 16>*>(
+        metadata_section_headers + metadata_header->section_count);
+    auto phs = reinterpret_cast<Elf64_be_Phdr*>(&file_buf[0] + self_header->program_header_offset);
+    
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto msh = metadata_section_headers + i;
-        auto dest = msh->data_offset - sce_header->header_size;
+        auto ph = phs + msh->index;
+        auto dest = ph->p_offset;
         auto src = msh->data_offset;
+        
+        std::vector<uint8_t> vec(std::max(ph->p_filesz, msh->data_size));
+        char* src_ptr = &file_buf[0] + src;
+        auto src_size = msh->data_size;
+        
+        unsigned mdlen;
+        auto md = HMAC(EVP_sha1(), &keys[msh->sha1_index + 2], 0x40, 
+                       (uint8_t*)src_ptr, src_size, NULL, &mdlen);
+        if (memcmp(md, &keys[msh->sha1_index], mdlen)) {
+            throw std::runtime_error("section sha1 mismatch");
+        }
+        
+        if (msh->compressed == METADATA_SECTION_COMPRESSED) {
+            BOOST_LOG_TRIVIAL(trace) << "inflating";
+            src_size = inflate(reinterpret_cast<uint8_t*>(src_ptr), 
+                               msh->data_size, &vec[0], vec.size());
+            src_ptr = reinterpret_cast<char*>(&vec[0]);
+        }
         
         BOOST_LOG_TRIVIAL(trace) << "writing self section to elf\n"
             << ssnprintf("  self source  %08X\n", src)
             << ssnprintf("  elf dest     %08X\n", dest)
-            << ssnprintf("  size         %08X\n", msh->data_size);
+            << ssnprintf("  size         %08X\n", src_size);
             
         elf_file.seekp((uint32_t)dest);
-        elf_file.write(&file_buf[0] + src, msh->data_size);
+        elf_file.write(src_ptr, src_size);
     }
+    
+    auto elf_header = reinterpret_cast<Elf64_be_Ehdr*>(&file_buf[0] + self_header->elf_offset);
+    auto shs = &file_buf[0] + self_header->section_header_offset;
+    elf_file.seekp((uint32_t)elf_header->e_shoff);
+    elf_file.write(shs, sizeof(Elf64_be_Shdr) * elf_header->e_shnum);
     
     return true;
 }
