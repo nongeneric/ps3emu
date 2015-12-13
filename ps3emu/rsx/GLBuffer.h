@@ -44,6 +44,7 @@ class GLBuffer : public HandleWrapper<GLuint, deleteBuffer> {
     GLuint _mapFlags;
     bool _mapped = false;
     uint32_t _size;
+    GLBufferType _type;
     GLuint init(GLBufferType type, uint32_t size, void* data);
 public:
     GLBuffer();
@@ -53,5 +54,5 @@ public:
     }
     GLBuffer(GLBufferType type, uint32_t size, void* data = nullptr);
     void* map();
-    void unmap();
+    void unmap(bool sync = true);
 };

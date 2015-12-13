@@ -502,11 +502,13 @@ bool write_elf(std::string elf_path,
     
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto msh = metadata_section_headers + i;
+        if (msh->type != METADATA_SECTION_TYPE_PHDR)
+            continue;
+        
         auto ph = phs + msh->index;
         auto dest = ph->p_offset;
         auto src = msh->data_offset;
         
-        std::vector<uint8_t> vec(std::max(ph->p_filesz, msh->data_size));
         char* src_ptr = &file_buf[0] + src;
         auto src_size = msh->data_size;
         
@@ -517,6 +519,7 @@ bool write_elf(std::string elf_path,
             throw std::runtime_error("section sha1 mismatch");
         }
         
+        std::vector<uint8_t> vec(std::max(ph->p_filesz, msh->data_size));
         if (msh->compressed == METADATA_SECTION_COMPRESSED) {
             BOOST_LOG_TRIVIAL(trace) << "inflating";
             src_size = inflate(reinterpret_cast<uint8_t*>(src_ptr), 

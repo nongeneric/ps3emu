@@ -328,8 +328,8 @@ const RsxTextureInfo& GLTexture::info() const {
     return _info;
 }
 
-void GLTexture::bind(GLuint samplerIndex) {
-    glcall(glBindTextureUnit(samplerIndex, _handle));
+void GLTexture::bind(GLuint textureUnit) {
+    glcall(glBindTextureUnit(textureUnit, _handle));
 }
 
 void glcheck(int line, const char* call) {

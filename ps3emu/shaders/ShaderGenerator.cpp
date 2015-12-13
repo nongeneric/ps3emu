@@ -5,6 +5,28 @@
 
 using namespace ShaderRewriter;
 
+const char* flipIndex(int n) {
+    switch (n) {
+        case 0: return "[0].x";
+        case 1: return "[0].y";
+        case 2: return "[0].z";
+        case 3: return "[0].w";
+        case 4: return "[1].x";
+        case 5: return "[1].y";
+        case 6: return "[1].z";
+        case 7: return "[1].w";
+        case 8: return "[2].x";
+        case 9: return "[2].y";
+        case 10: return "[2].z";
+        case 11: return "[2].w";
+        case 12: return "[3].x";
+        case 13: return "[3].y";
+        case 14: return "[3].z";
+        case 15: return "[3].w";
+    }
+    throw std::runtime_error("");
+}
+
 std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    std::array<int, 16> const& samplerSizes,
                                    bool isFlatColorShading) {
@@ -52,12 +74,14 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("in vec4 f_SSA;");
     line(ssnprintf("layout (std140, binding = %d) uniform FragmentSamplersInfo {",
                    FragmentShaderSamplesInfoBinding));
-    line("    int flip[16];");
+    line("    ivec4 flip[4];");
     line("} fragmentSamplersInfo;");
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
-        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;", i + 4, samplerSizes[i], i));
+        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
+                       i + FragmentTextureUnit, samplerSizes[i], i));
         line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
-        line(ssnprintf("    uvp = fragmentSamplersInfo.flip[%d] == 0 ? uvp : vec4(uvp.x, 1 - uvp.y, uvp.zw);", i));
+        line(ssnprintf("    uvp = fragmentSamplersInfo.flip%s == 0 ? uvp : vec4(uvp.x, 1 - uvp.y, uvp.zw);",
+                       flipIndex(i)));
         line(ssnprintf("    return texture(s%d, uvp.xy);", i));
         line("}");
     }
@@ -94,9 +118,13 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("} constants;");
     line(ssnprintf("layout (std140, binding = %d) uniform SamplersInfo {",
                    VertexShaderSamplesInfoBinding));
-    line("    ivec3 wrapMode;");
-    line("    vec4 borderColor;");
-    line("} samplersInfo[4];");
+    line("    ivec4 wrapMode[4];");
+    line("    vec4 borderColor[4];");
+    line("} samplersInfo;");
+    for (auto i = 0u; i < samplerSizes.size(); ++i) {
+        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
+                       i + VertexTextureUnit, samplerSizes[i], i));
+    }
     line("out gl_PerVertex {");
     line("    vec4 gl_Position;");
     //line("    float gl_PointSize;");
@@ -116,9 +144,6 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("out vec4 f_TEX8;");
     line("out vec4 f_TEX9;");
     line("out vec4 f_SSA;");
-    for (auto i = 0u; i < samplerSizes.size(); ++i) {
-        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;", i, samplerSizes[i], i));
-    }
     line("float reverse(float f) {");
     line("    unsigned int bits = floatBitsToUint(f);");
     line("    unsigned int rev = ((bits & 0xff) << 24)");
@@ -196,7 +221,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     auto txl = [&](int size, int s) {
         line(ssnprintf("vec4 txl%d(vec4 uv) {", s, size));
         line(ssnprintf("    ivec%d size = textureSize(s%d, 0);", size, s));
-        line(ssnprintf("    ivec3 type = samplersInfo[%d].wrapMode;", s));
+        line(ssnprintf("    ivec4 type = samplersInfo.wrapMode[%d];", s));
         line(ssnprintf("    ivec4 iuv = ivec4("));
         for (int i = 0; i < size; ++i) {
             if (i != 0)
@@ -211,7 +236,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         auto sw = size == 1 ? "x" : size == 2 ? "xy" : "xyz";
         line(ssnprintf("    vec4 texel = reverse4f(texture(s%d, (iuv.%s + 0.5) / size, uv.w));", s, sw));
         line(ssnprintf("    if (iuv.x == -1 || iuv.y == -1 || iuv.z == -1)"));
-        line(ssnprintf("        texel = samplersInfo[%d].borderColor;", s));
+        line(ssnprintf("        texel = samplersInfo.borderColor[%d].abgr;", s));
         line(ssnprintf("    return texel;"));
         line(ssnprintf("};"));
     };

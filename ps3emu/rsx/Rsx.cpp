@@ -234,8 +234,8 @@ public:
     VertexShader* vertexShader = nullptr;
     FragmentShader* fragmentShader = nullptr;
     GLBuffer vertexConstBuffer;
-    GLuint vertexSamplersBuffer;
-    GLuint fragmentSamplersBuffer;
+    GLBuffer vertexSamplersBuffer;
+    GLBuffer fragmentSamplersBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentVa = 0;
@@ -639,8 +639,8 @@ void Rsx::BeginEnd(uint32_t mode) {
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
     updateVertexDataArrays(first, count);
-    updateTextures();
     updateShaders();
+    updateTextures();
     watchCaches();
     linkShaderProgram();
     glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
@@ -657,12 +657,12 @@ void Rsx::resetFlipStatus() {
 }
 
 struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
-    uint32_t wraps[3];
-    std::array<float, 4> borderColor;
+    std::array<uint32_t, 4> wraps[4];
+    std::array<float, 4> borderColor[4];
 };
 
 struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
-    uint32_t flip;
+    uint32_t flip[16];
 };
 
 void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
@@ -688,9 +688,16 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
                   GL_UNSIGNED_BYTE,
                   vec.size(),
                   &vec[0]);
+#if DEBUG
+    static int framenum = 0;
     
-    std::ofstream f("/tmp/ps3frame.rgba", std::ofstream::binary);
-    f.write((const char*)vec.data(), vec.size());
+    if (framenum < 3) {
+        std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgba", framenum), std::ofstream::binary);
+        f.write((const char*)vec.data(), vec.size());
+        framenum++;
+    }
+    
+#endif
     
     this->setLabel(1, 0);
     if (label != (uint32_t)-1) {
@@ -720,10 +727,10 @@ bool Rsx::linkShaderProgram() {
                             _context->vertexConstBuffer.handle()));
     glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
                             VertexShaderSamplesInfoBinding,
-                            _context->vertexSamplersBuffer));
+                            _context->vertexSamplersBuffer.handle()));
     glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
                             FragmentShaderSamplesInfoBinding,
-                            _context->fragmentSamplersBuffer));
+                            _context->fragmentSamplersBuffer.handle()));
     return true;
 }
 
@@ -863,7 +870,6 @@ void Rsx::updateShaders() {
         vec.resize(512 * 16);
         _ppu->readMemory(_context->fragmentVa, &vec[0], vec.size());
         
-        
         auto len = get_fragment_bytecode_length(&vec[0]);
         FragmentShaderCacheKey key { _context->fragmentVa, len };
         FragmentShaderUpdateFunctor* updater;
@@ -962,9 +968,11 @@ void Rsx::VertexTextureFilter(unsigned int index, float bias) {
 }
 
 void Rsx::updateTextures() {
-    int index = 0;
+    int i = 0;
+    auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.map();
     for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
+            auto textureUnit = i + VertexTextureUnit;
             auto& info = sampler.texture;
             TextureCacheKey key { 
                 addressToMainMemory(info.location, info.offset),
@@ -984,12 +992,12 @@ void Rsx::updateTextures() {
                 _context->textureCache.insert(key, texture, updater);
             }
             
-            texture->bind(index);
+            texture->bind(textureUnit);
             auto handle = sampler.glSampler.handle();
             if (!handle) {
                 sampler.glSampler = GLSampler();
                 handle = sampler.glSampler.handle();
-                glcall(glBindSampler(index, handle));
+                glcall(glBindSampler(textureUnit, handle));
             }
             glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD, sampler.minlod);
             glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD, sampler.maxlod);
@@ -999,24 +1007,22 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
-            VertexShaderSamplerUniform uniform = { 
-                sampler.wraps, sampler.wrapt, 0, sampler.borderColor
-            };
-            auto uniformSize = sizeof(uniform);
-            glcall(glNamedBufferSubData(_context->vertexSamplersBuffer, 
-                                        index * uniformSize, 
-                                        uniformSize, 
-                                        &uniform));
+            vertexSamplerUniform->wraps[i] = { sampler.wraps, sampler.wrapt, 0, 0 };
+            vertexSamplerUniform->borderColor[i] = sampler.borderColor;
         }
-        index++;
+        i++;
     }
-    int fragmentIndex = 0;
+    _context->vertexSamplersBuffer.unmap();
+    
+    i = 0;
+    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->fragmentSamplersBuffer.map();
     for (auto& sampler : _context->fragmentTextureSamplers) {
         if (sampler.enable) {
+            auto textureUnit = i + FragmentTextureUnit;
             auto va = addressToMainMemory(sampler.texture.location, sampler.texture.offset);
             auto surfaceTex = _context->framebuffer->findTexture(va);
             if (surfaceTex) {
-                glcall(glBindTextureUnit(index, surfaceTex->handle()));
+                glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
             } else {
                 auto& info = sampler.texture;
                 TextureCacheKey key { 
@@ -1036,14 +1042,14 @@ void Rsx::updateTextures() {
                     texture = new GLTexture(_ppu, sampler.texture);
                     _context->textureCache.insert(key, texture, std::move(updater));
                 }
-                texture->bind(index);
+                texture->bind(textureUnit);
             }
             
             auto handle = sampler.glSampler.handle();
             if (!handle) {
                 sampler.glSampler = GLSampler();
                 handle = sampler.glSampler.handle();
-                glcall(glBindSampler(index, handle));
+                glcall(glBindSampler(textureUnit, handle));
             }
             glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD, sampler.minlod);
             glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD, sampler.maxlod);
@@ -1054,15 +1060,11 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
             // TODO: handle viewport CELL_GCM_WINDOW_ORIGIN_TOP
-            FragmentShaderSamplerUniform info = { 
-                surfaceTex != nullptr
-            };
-            auto infoSize = sizeof(info);
-            glcall(glNamedBufferSubData(_context->fragmentSamplersBuffer, fragmentIndex * infoSize, infoSize, &info));
+            fragmentSamplerUniform->flip[i] = surfaceTex != nullptr;
         }
-        fragmentIndex++;
-        index++;
+        i++;
     }
+    _context->fragmentSamplersBuffer.unmap();
 }
 
 void Rsx::init() {
@@ -1352,10 +1354,37 @@ void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t
     buffer.height = height;
 }
 
+void glDebugCallbackFunction(GLenum source,
+            GLenum type,
+            GLuint id,
+            GLenum severity,
+            GLsizei length,
+            const GLchar *message,
+            const void *userParam) {
+    auto sourceStr = source == GL_DEBUG_SOURCE_API ? "Api"
+                   : source == GL_DEBUG_SOURCE_WINDOW_SYSTEM ? "WindowSystem"
+                   : source == GL_DEBUG_SOURCE_SHADER_COMPILER ? "ShaderCompiler"
+                   : source == GL_DEBUG_SOURCE_THIRD_PARTY ? "ThirdParty"
+                   : source == GL_DEBUG_SOURCE_APPLICATION ? "Application"
+                   : "Other";
+    auto text = ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
+    if (type == GL_DEBUG_TYPE_ERROR) {
+        BOOST_LOG_TRIVIAL(error) << text;
+    } else {
+        BOOST_LOG_TRIVIAL(trace) << text;
+    }
+    if (severity == GL_DEBUG_SEVERITY_HIGH)
+        exit(1);
+}
+
 void Rsx::initGcm() {
     BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
     
     window.Init();
+    
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(&glDebugCallbackFunction, nullptr);
+    
     _context.reset(new RsxContext());
     
     _ppu->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
@@ -1367,17 +1396,13 @@ void Rsx::initGcm() {
     _ppu->map(_gcmIoAddress, GcmLocalMemoryBase, _gcmIoSize);
     
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
-    _context->vertexConstBuffer = GLBuffer(GLBufferType::MapRead, constBufferSize);
+    _context->vertexConstBuffer = GLBuffer(GLBufferType::Dynamic, constBufferSize);
     
-    glcall(glCreateBuffers(1, &_context->vertexSamplersBuffer));
-    auto uniformSize = sizeof(VertexShaderSamplerUniform) * 4;
-    glcall(glNamedBufferStorage(_context->vertexSamplersBuffer, uniformSize, NULL, 
-                                GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT));
+    auto uniformSize = sizeof(VertexShaderSamplerUniform);
+    _context->vertexSamplersBuffer = GLBuffer(GLBufferType::MapWrite, uniformSize);
     
-    glcall(glCreateBuffers(1, &_context->fragmentSamplersBuffer));
-    uniformSize = sizeof(FragmentShaderSamplerUniform) * 16;
-    glcall(glNamedBufferStorage(_context->fragmentSamplersBuffer, uniformSize, NULL, 
-                                GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT));
+    uniformSize = sizeof(FragmentShaderSamplerUniform);
+    _context->fragmentSamplersBuffer = GLBuffer(GLBufferType::MapWrite, uniformSize);
     
     for (auto& s : _context->vertexTextureSamplers) {
         s.enable = false;

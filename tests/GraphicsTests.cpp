@@ -4,26 +4,40 @@
 
 static const char* runnerPath = "../ps3run/ps3run";
 
-void compareLastFrame(const char* expected) {
+int comparisonNum = 0;
+
+void compareLastFrame(const char* expected, int n = 0) {
+    comparisonNum++;
     QProcess proc;
     auto args = QStringList() << "-depth" << "8"
                               << "-size" << "1280x720"
                               << "-flip"
-                              << "/tmp/ps3frame.rgba"
-                              << "/tmp/ps3frame.png";
+                              << QString("/tmp/ps3frame%1.rgba").arg(n)
+                              << QString("/tmp/ps3frame%1.png").arg(n);
     proc.start("convert", args);
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() == 0 );
     
     args = QStringList() << "-metric" << "AE"
                          << "-fuzz" << "2%"
-                         << "/tmp/ps3frame.png"
+                         << QString("/tmp/ps3frame%1.png").arg(n)
                          << expected
-                         << "/tmp/ps3frame-diff.png";
+                         << QString("/tmp/ps3frame-diff%1.png").arg(n);
     proc.start("compare", args);
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() != 2 );
     auto output = QString(proc.readAllStandardError()).toStdString();
+    if (output != "0") {
+        args = QStringList() << QString("/tmp/ps3frame-diff%1.png").arg(n)
+                             << QString("/tmp/ps3frame-diff%1_bad%2.png").arg(n).arg(comparisonNum);
+        proc.start("mv", args);
+        proc.waitForFinished(-1);
+        args = QStringList() << QString("/tmp/ps3frame%1.png").arg(n)
+                             << QString("/tmp/ps3frame%1_bad%2.png").arg(n).arg(comparisonNum);
+        proc.start("mv", args);
+        proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    }
     REQUIRE( output == "0" );
 }
 
@@ -105,5 +119,7 @@ TEST_CASE("gcm_human") {
     proc.start(runnerPath, args);
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() == 0 );
-    compareLastFrame("./binaries/gcm_human/ps3frame.png");
+    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);
 }

@@ -5,7 +5,7 @@
 GLBuffer::GLBuffer() : HandleWrapper(0) { }
 
 GLBuffer::GLBuffer(GLBufferType type, uint32_t size, void* data) 
-    : HandleWrapper(init(type, size, data)), _size(size) { }
+    : HandleWrapper(init(type, size, data)), _size(size), _type(type) { }
 
 GLuint GLBuffer::init(GLBufferType type, uint32_t size, void* data) {
     if (!data && type == GLBufferType::Static)
@@ -13,7 +13,7 @@ GLuint GLBuffer::init(GLBufferType type, uint32_t size, void* data) {
     GLuint handle;
     auto flags = type == GLBufferType::Dynamic ? GL_DYNAMIC_STORAGE_BIT
                : type == GLBufferType::MapRead ? 
-                    GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT
+                    GL_MAP_READ_BIT
                : type == GLBufferType::MapWrite ?
                     GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT
                : 0;
@@ -32,11 +32,14 @@ void* GLBuffer::map() {
     return glMapNamedBufferRange(handle(), 0, _size, _mapFlags);
 }
 
-void GLBuffer::unmap() {
+void GLBuffer::unmap(bool sync) {
     if (!_mapFlags || !_mapped)
         throw std::runtime_error("buffer can't be unmapped");
     _mapped = false;
     glcall(glUnmapNamedBuffer(handle()));
+    if (sync && _type == GLBufferType::MapWrite) {
+        //glcall(glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT));
+    }
 }
 
 void deleteBuffer(GLuint handle) {
@@ -47,6 +50,7 @@ GLBuffer& GLBuffer::operator=(GLBuffer&& other) {
     _mapFlags = other._mapFlags;
     _mapped = other._mapped;
     _size = other._size;
+    _type = other._type;
     HandleWrapper::operator=(std::move(other));
     return *this;
 }
