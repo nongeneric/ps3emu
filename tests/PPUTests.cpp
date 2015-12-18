@@ -1,57 +1,57 @@
-#include "../ps3emu/PPU.h"
+#include "../ps3emu/MainMemory.h"
 #include "../ps3emu/ppu_dasm.h"
 #include <vector>
 #include <catch.hpp>
 
 TEST_CASE("read write memory") {
-    PPU ppu;
+    MainMemory mm;
     uint32_t original = 0xA1B2C3D4, read;
-    ppu.writeMemory(0x400, &original, 4, true);
-    ppu.readMemory(0x400, &read, 4);
+    mm.writeMemory(0x400, &original, 4, true);
+    mm.readMemory(0x400, &read, 4);
     REQUIRE(original == read);
     
-    ppu.store<4>(0x400, 0x1122334455667788);
-    REQUIRE(ppu.load<4>(0x400) == 0x55667788);
+    mm.store<4>(0x400, 0x1122334455667788);
+    REQUIRE(mm.load<4>(0x400) == 0x55667788);
 }
 
 TEST_CASE("read memory 128") {
-    PPU ppu;
-    ppu.setMemory(0x400, 0, 16, true);
+    MainMemory mm;
+    mm.setMemory(0x400, 0, 16, true);
     unsigned __int128 i128 = 0;
-    REQUIRE((ppu.load16(0x400) == i128));
+    REQUIRE((mm.load16(0x400) == i128));
 }
 
 TEST_CASE("map memory") {
-    PPU ppu;
+    MainMemory mm;
     auto mb = 1024 * 1024;
-    ppu.map(100 * mb, 200 * mb, 2 * mb);
-    ppu.store<4>(100 * mb, 13);
-    REQUIRE( ppu.load<4>(100 * mb) == 13 );
-    REQUIRE( ppu.load<4>(200 * mb) == 13 );
-    ppu.store<4>(100 * mb, 33);
-    REQUIRE( ppu.load<4>(100 * mb) == 33 );
-    REQUIRE( ppu.load<4>(200 * mb) == 33 );
-    ppu.setMemory(102 * mb, 0, 2, true);
-    ppu.setMemory(202 * mb, 0, 2, true);
-    ppu.store<4>(102 * mb - 2, 0xffffffff);
-    REQUIRE( ppu.load<4>(102 * mb - 2) == 0xffffffff );
-    REQUIRE( ppu.load<4>(202 * mb - 2) == 0xffff0000 );
+    mm.map(100 * mb, 200 * mb, 2 * mb);
+    mm.store<4>(100 * mb, 13);
+    REQUIRE( mm.load<4>(100 * mb) == 13 );
+    REQUIRE( mm.load<4>(200 * mb) == 13 );
+    mm.store<4>(100 * mb, 33);
+    REQUIRE( mm.load<4>(100 * mb) == 33 );
+    REQUIRE( mm.load<4>(200 * mb) == 33 );
+    mm.setMemory(102 * mb, 0, 2, true);
+    mm.setMemory(202 * mb, 0, 2, true);
+    mm.store<4>(102 * mb - 2, 0xffffffff);
+    REQUIRE( mm.load<4>(102 * mb - 2) == 0xffffffff );
+    REQUIRE( mm.load<4>(202 * mb - 2) == 0xffff0000 );
 }
 
 TEST_CASE("provide memory") {
-    PPU ppu;
-    ppu.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1, true);
-    ppu.store<4>(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
+    MainMemory mm;
+    mm.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1, true);
+    mm.store<4>(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
     std::vector<uint8_t> vec(DefaultMainMemoryPageSize * 4);
-    ppu.provideMemory(DefaultMainMemoryPageSize * 2, DefaultMainMemoryPageSize * 4, vec.data());
-    REQUIRE( ppu.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0x11223344 );
+    mm.provideMemory(DefaultMainMemoryPageSize * 2, DefaultMainMemoryPageSize * 4, vec.data());
+    REQUIRE( mm.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0x11223344 );
     REQUIRE( *(uint32_t*)&vec[DefaultMainMemoryPageSize * 3 + 0x300] == 0x44332211 );
     uint8_t* buf = &vec[DefaultMainMemoryPageSize * 3 + 0x300];
     buf[0] = 0xaa;
     buf[1] = 0xbb;
     buf[2] = 0xcc;
     buf[3] = 0xdd;
-    REQUIRE( ppu.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0xaabbccdd );
+    REQUIRE( mm.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0xaabbccdd );
 }
 
 TEST_CASE("fixed loads") {
@@ -92,9 +92,10 @@ TEST_CASE("fixed loads") {
 104f8:       e8 e1 ff e1     ldu     r7,-32(r1)              # ffffffe0
 104fc:       7d 01 10 6a     ldux    r8,r1,r2
 */
-    PPU ppu;
-    ppu.setMemory(0x300000, 0, 200, true);
-    ppu.setMemory(32, 0, 16, true);
+    MainMemory mm;
+    PPUThread th(&mm);
+    mm.setMemory(0x300000, 0, 200, true);
+    mm.setMemory(32, 0, 16, true);
     uint8_t instr[] = { 
           0x88, 0x60, 0x00, 0x20
         , 0x88, 0x81, 0xff, 0xe0
@@ -134,118 +135,118 @@ TEST_CASE("fixed loads") {
     };
     auto i = 0u;
     auto next = [&] {
-        ppu.setGPR(1, 0x300020);
-        ppu.setGPR(2, -32);
-        ppu_dasm<DasmMode::Emulate>(instr + i * 4, 0, &ppu);
+        th.setGPR(1, 0x300020);
+        th.setGPR(2, -32);
+        ppu_dasm<DasmMode::Emulate>(instr + i * 4, 0, &th);
         i++;
     };
     
-    ppu.store<8>(32,       0x55ff44ff332211ff);
-    ppu.store<8>(0x300000, 0xeeffddffccbbaaff);
-    ppu.store<8>(0x300020, 0xaaffbbffccddeeff);
+    mm.store<8>(32,       0x55ff44ff332211ff);
+    mm.store<8>(0x300000, 0xeeffddffccbbaaff);
+    mm.store<8>(0x300020, 0xaaffbbffccddeeff);
     
     next();
-    REQUIRE( ppu.getGPR(3) == 0x0000000000000055 );
+    REQUIRE( th.getGPR(3) == 0x0000000000000055 );
     next();
-    REQUIRE( ppu.getGPR(4) == 0x00000000000000ee );
+    REQUIRE( th.getGPR(4) == 0x00000000000000ee );
     next();
-    REQUIRE( ppu.getGPR(5) == 0x00000000000000aa );
+    REQUIRE( th.getGPR(5) == 0x00000000000000aa );
     next();
-    REQUIRE( ppu.getGPR(6) == 0x00000000000000ee );
+    REQUIRE( th.getGPR(6) == 0x00000000000000ee );
     next();
-    REQUIRE( ppu.getGPR(7) == 0x00000000000000ee );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(7) == 0x00000000000000ee );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.getGPR(8) == 0x00000000000000ee );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(8) == 0x00000000000000ee );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     
     next();
-    REQUIRE( ppu.getGPR(3) == 0x00000000000055ff );
+    REQUIRE( th.getGPR(3) == 0x00000000000055ff );
     next();
-    REQUIRE( ppu.getGPR(4) == 0x000000000000eeff );
+    REQUIRE( th.getGPR(4) == 0x000000000000eeff );
     next();
-    REQUIRE( ppu.getGPR(5) == 0x000000000000aaff );
+    REQUIRE( th.getGPR(5) == 0x000000000000aaff );
     next();
-    REQUIRE( ppu.getGPR(6) == 0x000000000000eeff );
+    REQUIRE( th.getGPR(6) == 0x000000000000eeff );
     next();
-    REQUIRE( ppu.getGPR(7) == 0x000000000000eeff );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(7) == 0x000000000000eeff );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.getGPR(8) == 0x000000000000eeff );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(8) == 0x000000000000eeff );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     
-    ppu.store<8>(32,       0xff11223344556677);
-    ppu.store<8>(0x300000, 0xffaabbccddee9988);
-    ppu.store<8>(0x300020, 0xff00aa11bb22cc33);
-    
-    next();
-    REQUIRE( ppu.getGPR(3) == 0xffffffffffffff11 );
-    next();
-    REQUIRE( ppu.getGPR(4) == 0xffffffffffffffaa );
-    next();
-    REQUIRE( ppu.getGPR(5) == 0xffffffffffffff00 );
-    next();
-    REQUIRE( ppu.getGPR(6) == 0xffffffffffffffaa );
-    next();
-    REQUIRE( ppu.getGPR(7) == 0xffffffffffffffaa );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
-    next();
-    REQUIRE( ppu.getGPR(8) == 0xffffffffffffffaa );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
-    
-    ppu.store<8>(32,       0x55ff44ff332211ff);
-    ppu.store<8>(0x300000, 0xeeffddffccbbaaff);
-    ppu.store<8>(0x300020, 0xaaffbbffccddeeff);
+    mm.store<8>(32,       0xff11223344556677);
+    mm.store<8>(0x300000, 0xffaabbccddee9988);
+    mm.store<8>(0x300020, 0xff00aa11bb22cc33);
     
     next();
-    REQUIRE( ppu.getGPR(3) == 0x0000000055ff44ff );
+    REQUIRE( th.getGPR(3) == 0xffffffffffffff11 );
     next();
-    REQUIRE( ppu.getGPR(4) == 0x00000000eeffddff );
+    REQUIRE( th.getGPR(4) == 0xffffffffffffffaa );
     next();
-    REQUIRE( ppu.getGPR(5) == 0x00000000aaffbbff );
+    REQUIRE( th.getGPR(5) == 0xffffffffffffff00 );
     next();
-    REQUIRE( ppu.getGPR(6) == 0x00000000eeffddff );
+    REQUIRE( th.getGPR(6) == 0xffffffffffffffaa );
     next();
-    REQUIRE( ppu.getGPR(7) == 0x00000000eeffddff );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(7) == 0xffffffffffffffaa );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.getGPR(8) == 0x00000000eeffddff );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(8) == 0xffffffffffffffaa );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     
-    ppu.store<8>(32,       0xff11223344556677);
-    ppu.store<8>(0x300000, 0xffaabbccddee9988);
-    ppu.store<8>(0x300020, 0xff00aa11bb22cc33);
-    
-    next();
-    REQUIRE( ppu.getGPR(3) == 0xffffffffff112233 );
-    next();
-    REQUIRE( ppu.getGPR(4) == 0xffffffffffaabbcc );
-    next();
-    REQUIRE( ppu.getGPR(5) == 0xffffffffff00aa11 );
-    next();
-    REQUIRE( ppu.getGPR(6) == 0xffffffffffaabbcc );
-    next();
-    REQUIRE( ppu.getGPR(7) == 0xffffffffffaabbcc );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
-    
-    ppu.store<8>(32,       0x55ff44ff332211ff);
-    ppu.store<8>(0x300000, 0xeeffddffccbbaaff);
-    ppu.store<8>(0x300020, 0xaaffbbffccddeeff);
+    mm.store<8>(32,       0x55ff44ff332211ff);
+    mm.store<8>(0x300000, 0xeeffddffccbbaaff);
+    mm.store<8>(0x300020, 0xaaffbbffccddeeff);
     
     next();
-    REQUIRE( ppu.getGPR(3) == 0x55ff44ff332211ff );
+    REQUIRE( th.getGPR(3) == 0x0000000055ff44ff );
     next();
-    REQUIRE( ppu.getGPR(4) == 0xeeffddffccbbaaff );
+    REQUIRE( th.getGPR(4) == 0x00000000eeffddff );
     next();
-    REQUIRE( ppu.getGPR(5) == 0xaaffbbffccddeeff );
+    REQUIRE( th.getGPR(5) == 0x00000000aaffbbff );
     next();
-    REQUIRE( ppu.getGPR(6) == 0xeeffddffccbbaaff );
+    REQUIRE( th.getGPR(6) == 0x00000000eeffddff );
     next();
-    REQUIRE( ppu.getGPR(7) == 0xeeffddffccbbaaff );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(7) == 0x00000000eeffddff );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.getGPR(8) == 0xeeffddffccbbaaff );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( th.getGPR(8) == 0x00000000eeffddff );
+    REQUIRE( th.getGPR(1) == 0x300000 );
+    
+    mm.store<8>(32,       0xff11223344556677);
+    mm.store<8>(0x300000, 0xffaabbccddee9988);
+    mm.store<8>(0x300020, 0xff00aa11bb22cc33);
+    
+    next();
+    REQUIRE( th.getGPR(3) == 0xffffffffff112233 );
+    next();
+    REQUIRE( th.getGPR(4) == 0xffffffffffaabbcc );
+    next();
+    REQUIRE( th.getGPR(5) == 0xffffffffff00aa11 );
+    next();
+    REQUIRE( th.getGPR(6) == 0xffffffffffaabbcc );
+    next();
+    REQUIRE( th.getGPR(7) == 0xffffffffffaabbcc );
+    REQUIRE( th.getGPR(1) == 0x300000 );
+    
+    mm.store<8>(32,       0x55ff44ff332211ff);
+    mm.store<8>(0x300000, 0xeeffddffccbbaaff);
+    mm.store<8>(0x300020, 0xaaffbbffccddeeff);
+    
+    next();
+    REQUIRE( th.getGPR(3) == 0x55ff44ff332211ff );
+    next();
+    REQUIRE( th.getGPR(4) == 0xeeffddffccbbaaff );
+    next();
+    REQUIRE( th.getGPR(5) == 0xaaffbbffccddeeff );
+    next();
+    REQUIRE( th.getGPR(6) == 0xeeffddffccbbaaff );
+    next();
+    REQUIRE( th.getGPR(7) == 0xeeffddffccbbaaff );
+    REQUIRE( th.getGPR(1) == 0x300000 );
+    next();
+    REQUIRE( th.getGPR(8) == 0xeeffddffccbbaaff );
+    REQUIRE( th.getGPR(1) == 0x300000 );
 }
 
 TEST_CASE("fixed stores") {
@@ -275,7 +276,8 @@ TEST_CASE("fixed stores") {
 10564:       f8 61 ff f1     stdu    r3,-16(r1)              # fffffff0
 10568:       7c 61 11 6a     stdux   r3,r1,r2
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x98, 0x60, 0x00, 0x10
         , 0x98, 0x61, 0xff, 0xf0
@@ -302,76 +304,76 @@ TEST_CASE("fixed stores") {
         , 0xf8, 0x61, 0xff, 0xf1
         , 0x7c, 0x61, 0x11, 0x6a
     };
-    ppu.setGPR(3, 0x1122334455667788);
+    th.setGPR(3, 0x1122334455667788);
     auto i = 0u;
     auto next = [&] {
-        ppu.setMemory(0x300010, 0, 100, true);
-        ppu.setMemory(16, 0, 100, true);
-        ppu.setGPR(1, 0x300010);
-        ppu.setGPR(2, 0x40);
-        ppu_dasm<DasmMode::Emulate>(instr + 4*i, 0, &ppu);
+        mm.setMemory(0x300010, 0, 100, true);
+        mm.setMemory(16, 0, 100, true);
+        th.setGPR(1, 0x300010);
+        th.setGPR(2, 0x40);
+        ppu_dasm<DasmMode::Emulate>(instr + 4*i, 0, &th);
         i++;
     };
     
     next();
-    REQUIRE( ppu.load<8>(16) ==       0x8800000000000000 );
+    REQUIRE( mm.load<8>(16) ==       0x8800000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x8800000000000000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x8800000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300010) == 0x8800000000000000 );
+    REQUIRE( mm.load<8>(0x300010) == 0x8800000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x8800000000000000 );
+    REQUIRE( mm.load<8>(0x300050) == 0x8800000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x8800000000000000 );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x8800000000000000 );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x8800000000000000 );
-    REQUIRE( ppu.getGPR(1) == 0x300050 );
+    REQUIRE( mm.load<8>(0x300050) == 0x8800000000000000 );
+    REQUIRE( th.getGPR(1) == 0x300050 );
     
     next();
-    REQUIRE( ppu.load<8>(16) ==       0x7788000000000000 );
+    REQUIRE( mm.load<8>(16) ==       0x7788000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x7788000000000000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x7788000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300010) == 0x7788000000000000 );
+    REQUIRE( mm.load<8>(0x300010) == 0x7788000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x7788000000000000 );
+    REQUIRE( mm.load<8>(0x300050) == 0x7788000000000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x7788000000000000 );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x7788000000000000 );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x7788000000000000 );
-    REQUIRE( ppu.getGPR(1) == 0x300050 );
+    REQUIRE( mm.load<8>(0x300050) == 0x7788000000000000 );
+    REQUIRE( th.getGPR(1) == 0x300050 );
     
     next();
-    REQUIRE( ppu.load<8>(16) ==       0x5566778800000000 );
+    REQUIRE( mm.load<8>(16) ==       0x5566778800000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x5566778800000000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x5566778800000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300010) == 0x5566778800000000 );
+    REQUIRE( mm.load<8>(0x300010) == 0x5566778800000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x5566778800000000 );
+    REQUIRE( mm.load<8>(0x300050) == 0x5566778800000000 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x5566778800000000 );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x5566778800000000 );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x5566778800000000 );
-    REQUIRE( ppu.getGPR(1) == 0x300050 );
+    REQUIRE( mm.load<8>(0x300050) == 0x5566778800000000 );
+    REQUIRE( th.getGPR(1) == 0x300050 );
     
     next();
-    REQUIRE( ppu.load<8>(16) ==       0x1122334455667788 );
+    REQUIRE( mm.load<8>(16) ==       0x1122334455667788 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x1122334455667788 );
+    REQUIRE( mm.load<8>(0x300000) == 0x1122334455667788 );
     next();
-    REQUIRE( ppu.load<8>(0x300010) == 0x1122334455667788 );
+    REQUIRE( mm.load<8>(0x300010) == 0x1122334455667788 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x1122334455667788 );
+    REQUIRE( mm.load<8>(0x300050) == 0x1122334455667788 );
     next();
-    REQUIRE( ppu.load<8>(0x300000) == 0x1122334455667788 );
-    REQUIRE( ppu.getGPR(1) == 0x300000 );
+    REQUIRE( mm.load<8>(0x300000) == 0x1122334455667788 );
+    REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( ppu.load<8>(0x300050) == 0x1122334455667788 );
-    REQUIRE( ppu.getGPR(1) == 0x300050 );
+    REQUIRE( mm.load<8>(0x300050) == 0x1122334455667788 );
+    REQUIRE( th.getGPR(1) == 0x300050 );
 }
 
 TEST_CASE("fixed load store with reversal") {
@@ -385,7 +387,8 @@ TEST_CASE("fixed load store with reversal") {
 10588:       7c e0 0d 2c     stwbrx  r7,0,r1
 1058c:       7c e1 15 2c     stwbrx  r7,r1,r2
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = {
           0x7c, 0x60, 0x0e, 0x2c
         , 0x7c, 0x81, 0x16, 0x2c
@@ -397,35 +400,35 @@ TEST_CASE("fixed load store with reversal") {
         , 0x7c, 0xe1, 0x15, 0x2c
     };
     
-    ppu.setMemory(0x300010, 0, 100, true);
-    ppu.setGPR(1, 0x300010);
-    ppu.setGPR(2, 0x40);
-    ppu.store<8>(0x300010, 0x1122334455667788);
-    ppu.store<8>(0x300050, 0xaabbccddeeff0099);
+    mm.setMemory(0x300010, 0, 100, true);
+    th.setGPR(1, 0x300010);
+    th.setGPR(2, 0x40);
+    mm.store<8>(0x300010, 0x1122334455667788);
+    mm.store<8>(0x300050, 0xaabbccddeeff0099);
     
-    ppu_dasm<DasmMode::Emulate>(instr + 0*4, 0, &ppu);
-    REQUIRE( ppu.getGPR(3) == 0x2211 );
-    ppu_dasm<DasmMode::Emulate>(instr + 1*4, 0, &ppu);
-    REQUIRE( ppu.getGPR(4) == 0xbbaa );
-    ppu_dasm<DasmMode::Emulate>(instr + 2*4, 0, &ppu);
-    REQUIRE( ppu.getGPR(5) == 0x44332211 );
-    ppu_dasm<DasmMode::Emulate>(instr + 3*4, 0, &ppu);
-    REQUIRE( ppu.getGPR(6) == 0xddccbbaa );
+    ppu_dasm<DasmMode::Emulate>(instr + 0*4, 0, &th);
+    REQUIRE( th.getGPR(3) == 0x2211 );
+    ppu_dasm<DasmMode::Emulate>(instr + 1*4, 0, &th);
+    REQUIRE( th.getGPR(4) == 0xbbaa );
+    ppu_dasm<DasmMode::Emulate>(instr + 2*4, 0, &th);
+    REQUIRE( th.getGPR(5) == 0x44332211 );
+    ppu_dasm<DasmMode::Emulate>(instr + 3*4, 0, &th);
+    REQUIRE( th.getGPR(6) == 0xddccbbaa );
     
-    ppu.setGPR(7, 0x1122334455667788);
+    th.setGPR(7, 0x1122334455667788);
     
-    ppu.setMemory(0x300010, 0, 100, true);
-    ppu_dasm<DasmMode::Emulate>(instr + 4*4, 0, &ppu);
-    REQUIRE( ppu.load<8>(0x300010) == 0x2211000000000000 );
-    ppu.setMemory(0x300010, 0, 100, true);
-    ppu_dasm<DasmMode::Emulate>(instr + 5*4, 0, &ppu);
-    REQUIRE( ppu.load<8>(0x300050) == 0x2211000000000000 );
-    ppu.setMemory(0x300010, 0, 100, true);
-    ppu_dasm<DasmMode::Emulate>(instr + 6*4, 0, &ppu);
-    REQUIRE( ppu.load<8>(0x300010) == 0x4433221100000000 );
-    ppu.setMemory(0x300010, 0, 100, true);
-    ppu_dasm<DasmMode::Emulate>(instr + 7*4, 0, &ppu);
-    REQUIRE( ppu.load<8>(0x300050) == 0x4433221100000000 );
+    mm.setMemory(0x300010, 0, 100, true);
+    ppu_dasm<DasmMode::Emulate>(instr + 4*4, 0, &th);
+    REQUIRE( mm.load<8>(0x300010) == 0x2211000000000000 );
+    mm.setMemory(0x300010, 0, 100, true);
+    ppu_dasm<DasmMode::Emulate>(instr + 5*4, 0, &th);
+    REQUIRE( mm.load<8>(0x300050) == 0x2211000000000000 );
+    mm.setMemory(0x300010, 0, 100, true);
+    ppu_dasm<DasmMode::Emulate>(instr + 6*4, 0, &th);
+    REQUIRE( mm.load<8>(0x300010) == 0x4433221100000000 );
+    mm.setMemory(0x300010, 0, 100, true);
+    ppu_dasm<DasmMode::Emulate>(instr + 7*4, 0, &th);
+    REQUIRE( mm.load<8>(0x300050) == 0x4433221100000000 );
 }
 
 TEST_CASE("fixed arithmetic") {
@@ -442,7 +445,8 @@ TEST_CASE("fixed arithmetic") {
 105b8:       7d 61 00 50     subf    r11,r1,r0
 105bc:       7d 81 04 50     subfo   r12,r1,r0
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = {
           0x38, 0x40, 0x00, 0x10
         , 0x38, 0x61, 0x00, 0x10
@@ -456,22 +460,22 @@ TEST_CASE("fixed arithmetic") {
         , 0x7d, 0x61, 0x00, 0x50
         , 0x7d, 0x81, 0x04, 0x50
     };
-    ppu.setGPR(0, 0x400);
-    ppu.setGPR(1, 0x100);
+    th.setGPR(0, 0x400);
+    th.setGPR(1, 0x100);
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
-    REQUIRE( ppu.getGPR(2) == 16 );
-    REQUIRE( ppu.getGPR(3) == 0x110 );
-    REQUIRE( ppu.getGPR(4) == -16ul );
-    REQUIRE( ppu.getGPR(5) == 0xf0 );
-    REQUIRE( ppu.getGPR(6) == 0x100000 );
-    REQUIRE( ppu.getGPR(7) == 0x100100 );
-    REQUIRE( ppu.getGPR(8) == 0xfffffffffff00000 );
-    REQUIRE( ppu.getGPR(9) == -1048320ul );
-    REQUIRE( ppu.getGPR(10) == 0x500 );
-    REQUIRE( ppu.getGPR(11) == 0x300 );
-    REQUIRE( ppu.getGPR(12) == 0x300 );
+    REQUIRE( th.getGPR(2) == 16 );
+    REQUIRE( th.getGPR(3) == 0x110 );
+    REQUIRE( th.getGPR(4) == -16ul );
+    REQUIRE( th.getGPR(5) == 0xf0 );
+    REQUIRE( th.getGPR(6) == 0x100000 );
+    REQUIRE( th.getGPR(7) == 0x100100 );
+    REQUIRE( th.getGPR(8) == 0xfffffffffff00000 );
+    REQUIRE( th.getGPR(9) == -1048320ul );
+    REQUIRE( th.getGPR(10) == 0x500 );
+    REQUIRE( th.getGPR(11) == 0x300 );
+    REQUIRE( th.getGPR(12) == 0x300 );
 }
 
 TEST_CASE("list1") {
@@ -481,7 +485,8 @@ TEST_CASE("list1") {
 10358:       38 62 00 0a     addi    r3,r2,10
 1035c:       7c 83 12 14     add     r4,r3,r2
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint64_t cia = 0x10350;
     uint8_t instr[] = {
         0x38, 0x40, 0x00, 0x0c,
@@ -490,11 +495,11 @@ TEST_CASE("list1") {
         0x7c, 0x83, 0x12, 0x14
     };
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, cia + i, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, cia + i, &th);
     }
-    REQUIRE(ppu.getGPR(2) == 12);
-    REQUIRE(ppu.getGPR(3) == 22);
-    REQUIRE(ppu.getGPR(4) == 34);
+    REQUIRE(th.getGPR(2) == 12);
+    REQUIRE(th.getGPR(3) == 22);
+    REQUIRE(th.getGPR(4) == 34);
 }
 
 TEST_CASE("list2") {
@@ -511,9 +516,10 @@ TEST_CASE("list2") {
 10370:       4e 80 00 20     blr
 10374:       60 00 00 00     nop
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto base = 0x10350;
-    ppu.setNIP(base);
+    th.setNIP(base);
     uint8_t instr[] = {
           0x38, 0x60, 0x00, 0x37
         , 0x38, 0x80, 0x00, 0x1d
@@ -527,30 +533,32 @@ TEST_CASE("list2") {
         , 0x60, 0x00, 0x00, 0x00
     };
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        auto nip = ppu.getNIP();
-        ppu.setNIP(nip + 4);
-        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &ppu);
+        auto nip = th.getNIP();
+        th.setNIP(nip + 4);
+        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &th);
     }
-    REQUIRE(ppu.getNIP() == 0x10378);
-    REQUIRE(ppu.getGPR(3) == (55 >> 2) + (29 << 5));
+    REQUIRE(th.getNIP() == 0x10378);
+    REQUIRE(th.getGPR(3) == (55 >> 2) + (29 << 5));
 }
 
 TEST_CASE("emu stw") {
-    PPU ppu;
-    ppu.setGPR(29, 0x1122334455667788);
-    ppu.setGPR(11, 0x400000);
-    ppu.setMemory(0x400000, 0, 8, true);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(29, 0x1122334455667788);
+    th.setGPR(11, 0x400000);
+    mm.setMemory(0x400000, 0, 8, true);
     uint8_t instr[] = { 0x93, 0xab, 0x00, 0x00 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE(ppu.load<4>(0x400000) == 0x55667788); 
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE(mm.load<4>(0x400000) == 0x55667788); 
 }
 
 TEST_CASE("emu mtctr") {
-    PPU ppu;
-    ppu.setGPR(0, 0x11223344);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(0, 0x11223344);
     uint8_t instr[] = { 0x7c, 0x09, 0x03, 0xa6 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE(ppu.getCTR() == 0x11223344); 
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE(th.getCTR() == 0x11223344); 
 }
 
 TEST_CASE("mask") {
@@ -571,22 +579,23 @@ TEST_CASE("bit_test") {
 }
 
 TEST_CASE("emu cmpld") {
-    PPU ppu;
-    ppu.setCR(0);
-    ppu.setGPR(30, 10);
-    ppu.setGPR(8, 10);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setCR(0);
+    th.setGPR(30, 10);
+    th.setGPR(8, 10);
     // cmpld cr7,r30,r8
     uint8_t instr[] = { 0x7f, 0xbe, 0x40, 0x40 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE((ppu.getCR() & 0xf) == 2);
-    ppu.setGPR(30, 20);
-    ppu.setGPR(8, 10);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE((ppu.getCR() & 0xf) == 4);
-    ppu.setGPR(30, 20);
-    ppu.setGPR(8, 30);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE((ppu.getCR() & 0xf) == 8);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE((th.getCR() & 0xf) == 2);
+    th.setGPR(30, 20);
+    th.setGPR(8, 10);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE((th.getCR() & 0xf) == 4);
+    th.setGPR(30, 20);
+    th.setGPR(8, 30);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE((th.getCR() & 0xf) == 8);
 }
 
 TEST_CASE("list3") {
@@ -605,12 +614,13 @@ TEST_CASE("list3") {
    1036c:       40 9c ff f0     bge     cr7,1035c <loop>
    10370:       60 00 00 00     nop
      */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto base = 0x10350;
     auto mem = 0x400000;
-    ppu.setNIP(base);
-    ppu.setMemory(mem, 0, 4, true);
-    ppu.setGPR(7, mem);
+    th.setNIP(base);
+    mm.setMemory(mem, 0, 4, true);
+    th.setGPR(7, mem);
     uint8_t instr[] = {
           0x38, 0x60, 0x00, 0x00
         , 0x38, 0x80, 0x00, 0x03
@@ -624,47 +634,50 @@ TEST_CASE("list3") {
     };
     int i = 0;
     for (;; i++) {
-        if (i == 50 || ppu.getNIP() == 0x10370)
+        if (i == 50 || th.getNIP() == 0x10370)
             break;
-        auto nip = ppu.getNIP();
-        ppu.setNIP(nip + 4);
-        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &ppu);
+        auto nip = th.getNIP();
+        th.setNIP(nip + 4);
+        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &th);
     }
     REQUIRE(i < 50);
-    REQUIRE(ppu.getNIP() == 0x10370);
-    REQUIRE(ppu.load<4>(mem) == 0x05050505);
+    REQUIRE(th.getNIP() == 0x10370);
+    REQUIRE(mm.load<4>(mem) == 0x05050505);
 }
 
 TEST_CASE("set crf") {
-    PPU ppu;
-    ppu.setCR(0);
-    ppu.setCRF_sign(7, 4);
-    REQUIRE(ppu.getCR() == 8);
-    ppu.setCR(0xf);
-    ppu.setCRF_sign(7, 4);
-    REQUIRE(ppu.getCR() == 9);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setCR(0);
+    th.setCRF_sign(7, 4);
+    REQUIRE(th.getCR() == 8);
+    th.setCR(0xf);
+    th.setCRF_sign(7, 4);
+    REQUIRE(th.getCR() == 9);
 }
 
 TEST_CASE("branch info bge") {
-    PPU ppu;
-    ppu.setGPR(10, ~0ull);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(10, ~0ull);
     // bge cr7,103b4
     uint8_t instr[] = { 0x40, 0x9c, 0xff, 0xe0 };
     REQUIRE(isAbsoluteBranch(instr));
     REQUIRE(getTargetAddress(instr, 0x103d4) == 0x103b4);
-    ppu.setCRF_sign(7, 2);
-    REQUIRE(isTaken(instr, 0x103d4, &ppu));
-    ppu.setCRF_sign(7, 4);
-    REQUIRE(!isTaken(instr, 0x103d4, &ppu));
+    th.setCRF_sign(7, 2);
+    REQUIRE(isTaken(instr, 0x103d4, &th));
+    th.setCRF_sign(7, 4);
+    REQUIRE(!isTaken(instr, 0x103d4, &th));
 }
 
 TEST_CASE("neg") {
-    PPU ppu;
-    ppu.setGPR(3, ~0ull);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(3, ~0ull);
     // neg r0,r3
     uint8_t instr[] = { 0x7c, 0x03, 0x00, 0xd0 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 1 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 1 );
 }
 
 TEST_CASE("strlen") {
@@ -728,170 +741,182 @@ TEST_CASE("strlen") {
         0x7c, 0x63, 0x20, 0x50, 0x4e, 0x80, 0x00, 0x20, 0x38, 0x84, 0xff, 0xff,
         0x7c, 0x63, 0x20, 0x50, 0x4e, 0x80, 0x00, 0x20
     };
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto base = 0x17ff4;
-    ppu.setNIP(base);
-    ppu.setLR(0);
+    th.setNIP(base);
+    th.setLR(0);
     const char* str = "hello there";
-    ppu.writeMemory(0x400000, str, strlen(str) + 1, true);
-    ppu.setGPR(3, 0x400000);
+    mm.writeMemory(0x400000, str, strlen(str) + 1, true);
+    th.setGPR(3, 0x400000);
     for (;;) {
-        if (ppu.getNIP() == 0)
+        if (th.getNIP() == 0)
             break;
-        auto nip = ppu.getNIP();
-        ppu.setNIP(nip + 4);
-        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &ppu);
+        auto nip = th.getNIP();
+        th.setNIP(nip + 4);
+        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &th);
     }
-    REQUIRE( ppu.getGPR(3) == strlen(str) );
+    REQUIRE( th.getGPR(3) == strlen(str) );
 }
 
 TEST_CASE("clrldi r0,r0,61") {
-    PPU ppu;
-    ppu.setGPR(0, ~0ull);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(0, ~0ull);
     uint8_t instr[] = { 0x78, 0x00, 0x07, 0x60 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 7 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 7 );
 }
 
 TEST_CASE("cntlzd r0,r11") {
     uint8_t instr[] = { 0x7d, 0x60, 0x00, 0x74 };
-    PPU ppu;
-    ppu.setGPR(0, 100);
-    ppu.setGPR(11, 0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 64 );
-    ppu.setGPR(11, 1);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 63 );
-    ppu.setGPR(11, 0xffffffff);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 32 );
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(0, 100);
+    th.setGPR(11, 0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 64 );
+    th.setGPR(11, 1);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 63 );
+    th.setGPR(11, 0xffffffff);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 32 );
 }
 
 TEST_CASE("nor r11,r9,r10") {
-    PPU ppu;
-    ppu.setGPR(11, 500);
-    ppu.setGPR(9, 0x7f7f7f7f7f7f7f7full);
-    ppu.setGPR(10, 0xf2eeece49feef4f3ull);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(11, 500);
+    th.setGPR(9, 0x7f7f7f7f7f7f7f7full);
+    th.setGPR(10, 0xf2eeece49feef4f3ull);
     uint8_t instr[] = { 0x7d, 0x2b, 0x50, 0xf8 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(11) == 0 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(11) == 0 );
 }
 
 TEST_CASE("subf r3,r3,r4") {
-    PPU ppu;
-    ppu.setGPR(3, 500);
-    ppu.setGPR(4, 700);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(3, 500);
+    th.setGPR(4, 700);
     uint8_t instr[] = { 0x7c, 0x63, 0x20, 0x50 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(3) == 200 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(3) == 200 );
 }
 
 TEST_CASE("lwz r11,0(r10)") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint32_t i = 0x66778899;
-    ppu.writeMemory(0x400000, &i, 4, true);
-    ppu.setGPR(10, 0x400000);
+    mm.writeMemory(0x400000, &i, 4, true);
+    th.setGPR(10, 0x400000);
     uint8_t instr[] = { 0x81, 0x6a, 0x00, 0x00 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(11) == 0x99887766 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(11) == 0x99887766 );
 }
 
 TEST_CASE("lis r9,22616") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x3d, 0x20, 0x58, 0x58 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(9) == 0x58580000 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(9) == 0x58580000 );
 }
 
 TEST_CASE("sradi r0,r1,3") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x7c, 0x20, 0x1e, 0x74 };
 
-    ppu.setGPR(1, 27);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 3 );
-    REQUIRE( ppu.getCA() == 0);
+    th.setGPR(1, 27);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 3 );
+    REQUIRE( th.getCA() == 0);
     
-    ppu.setGPR(1, 0xffffffffffffff1b);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 0xffffffffffffffe3 );
-    REQUIRE( ppu.getCA() == 1);
+    th.setGPR(1, 0xffffffffffffff1b);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 0xffffffffffffffe3 );
+    REQUIRE( th.getCA() == 1);
     
-    ppu.setGPR(1, 0xfffffffffffffff8);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 0xffffffffffffffff );
-    REQUIRE( ppu.getCA() == 0);
+    th.setGPR(1, 0xfffffffffffffff8);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 0xffffffffffffffff );
+    REQUIRE( th.getCA() == 0);
 }
 
 TEST_CASE("sradi r0,r1,0") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x7c, 0x20, 0x06, 0x74 };
     
-    ppu.setGPR(1, 0xffffffffffffffff);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 0xffffffffffffffff );
-    REQUIRE( ppu.getCA() == 0);
+    th.setGPR(1, 0xffffffffffffffff);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 0xffffffffffffffff );
+    REQUIRE( th.getCA() == 0);
     
-    ppu.setGPR(1, 10);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 10 );
-    REQUIRE( ppu.getCA() == 0);
+    th.setGPR(1, 10);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 10 );
+    REQUIRE( th.getCA() == 0);
 }
 
 TEST_CASE("addic r0,r1,2") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x30, 0x01, 0x00, 0x02 };
-    ppu.setGPR(1, 10);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 12 );
-    REQUIRE( ppu.getCA() == 0 );
+    th.setGPR(1, 10);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 12 );
+    REQUIRE( th.getCA() == 0 );
     
-    ppu.setGPR(1, ~0ull);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 1 );
-    REQUIRE( ppu.getCA() == 1 );
+    th.setGPR(1, ~0ull);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 1 );
+    REQUIRE( th.getCA() == 1 );
 }
 
 TEST_CASE("addic. r0,r1,2") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x34, 0x01, 0x00, 0x02 };
-    ppu.setGPR(1, 10);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 12 );
-    REQUIRE( ppu.getCA() == 0 );
-    REQUIRE( ppu.getCRF_sign(0) == 2 );
+    th.setGPR(1, 10);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 12 );
+    REQUIRE( th.getCA() == 0 );
+    REQUIRE( th.getCRF_sign(0) == 2 );
     
-    ppu.setGPR(1, ~0ull);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 1 );
-    REQUIRE( ppu.getCA() == 1 );
-    REQUIRE( ppu.getCRF_sign(0) == 2 );
+    th.setGPR(1, ~0ull);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 1 );
+    REQUIRE( th.getCA() == 1 );
+    REQUIRE( th.getCRF_sign(0) == 2 );
 }
 
 TEST_CASE("subfic r0,r1,2") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x20, 0x01, 0x00, 0x02 };
-    ppu.setGPR(1, 1);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 1 );
-    REQUIRE( ppu.getCA() == 0 );
+    th.setGPR(1, 1);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 1 );
+    REQUIRE( th.getCA() == 0 );
     
-    ppu.setGPR(1, 4);
-    ppu.setCA(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 0xfffffffffffffffe );
-    REQUIRE( ppu.getCA() == 0 );
+    th.setGPR(1, 4);
+    th.setCA(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 0xfffffffffffffffe );
+    REQUIRE( th.getCA() == 0 );
 }
 
 
@@ -1003,57 +1028,61 @@ TEST_CASE("memcpy") {
         0x00, 0x00, 0x2b, 0xa5, 0x00, 0x17, 0x91, 0x2b, 0x00, 0x08, 0x91, 0x0b, 0x00, 0x0c, 
         0x38, 0x84, 0x00, 0x18, 0x90, 0xcb, 0x00, 0x10, 0x91, 0x8b, 0x00, 0x14, 0x39, 0x6b, 
         0x00, 0x18, 0x4b, 0xff, 0xff, 0xb4 };
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto base = 0x17a30;
     uint64_t src = 0x400000;
     uint64_t dest = 0x600000;
-    ppu.setNIP(base);
-    ppu.setLR(0);
+    th.setNIP(base);
+    th.setLR(0);
     const char* str = "hello there";
-    ppu.writeMemory(src, str, strlen(str) + 1, true);
-    ppu.setMemory(dest, 0, 100, true);
-    ppu.setGPR(3, dest);
-    ppu.setGPR(4, src);
-    ppu.setGPR(5, strlen(str) + 1);
+    mm.writeMemory(src, str, strlen(str) + 1, true);
+    mm.setMemory(dest, 0, 100, true);
+    th.setGPR(3, dest);
+    th.setGPR(4, src);
+    th.setGPR(5, strlen(str) + 1);
     for (;;) {
-        if (ppu.getNIP() == 0)
+        if (th.getNIP() == 0)
             break;
-        auto nip = ppu.getNIP();
-        ppu.setNIP(nip + 4);
-        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &ppu);
+        auto nip = th.getNIP();
+        th.setNIP(nip + 4);
+        ppu_dasm<DasmMode::Emulate>(instr + nip - base, nip, &th);
     }
     char buf[100];
-    ppu.readMemory(dest, buf, sizeof buf);
+    mm.readMemory(dest, buf, sizeof buf);
     REQUIRE( std::string(buf) == "hello there" );
 }
 
 TEST_CASE("lwz r27,112(r1)") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto mem = 0x400000;
-    ppu.setMemory(mem, 0, 8, true);
-    ppu.store<8>(mem, 0x11223344aabbccdd);
-    ppu.setGPR(1, mem - 112);
+    mm.setMemory(mem, 0, 8, true);
+    mm.store<8>(mem, 0x11223344aabbccdd);
+    th.setGPR(1, mem - 112);
     uint8_t instr[] = { 0x83, 0x61, 0x00, 0x70 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(27) == 0x11223344 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(27) == 0x11223344 );
 }
 
 TEST_CASE("fadd f31,f31,f0") {
-    PPU ppu;
-    ppu.setFPRd(31, 1.);
-    ppu.setFPRd(0, 2.);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setFPRd(31, 1.);
+    th.setFPRd(0, 2.);
     uint8_t instr[] = { 0xff, 0xff, 0x00, 0x2a };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getFPRd(31) == 3. );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getFPRd(31) == 3. );
 }
 
 TEST_CASE("fcmpu cr7,f1,f30") {
-    PPU ppu;
-    ppu.setFPRd(1, 1.);
-    ppu.setFPRd(30, 2.);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setFPRd(1, 1.);
+    th.setFPRd(30, 2.);
     uint8_t instr[] = { 0xff, 0x81, 0xf0, 0x00 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getCRF(7) == 8 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getCRF(7) == 8 );
 }
 
 TEST_CASE("float loads") {
@@ -1067,30 +1096,31 @@ TEST_CASE("float loads") {
 10454:       cc e2 00 00     lfdu    f7,0(r2)
 10458:       7d 02 04 ee     lfdux   f8,r2,r0
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto mem = 0x400000;
-    ppu.setMemory(mem, 0, 16, true);
-    ppu.store<8>(mem,     0x3f92339c00000000); // float
-    ppu.store<8>(mem + 8, 0x3ff2467381d7dbf5); // double
+    mm.setMemory(mem, 0, 16, true);
+    mm.store<8>(mem,     0x3f92339c00000000); // float
+    mm.store<8>(mem + 8, 0x3ff2467381d7dbf5); // double
     uint8_t instr[] = { 
         0xc0, 0x21, 0x00, 0x00, 0x7c, 0x41, 0x04, 0x2e, 0xc4, 0x61, 0x00,
         0x00, 0x7c, 0x81, 0x04, 0x6e, 0xc8, 0xa2, 0x00, 0x00, 0x7c, 0xc2,
         0x04, 0xae, 0xcc, 0xe2, 0x00, 0x00, 0x7d, 0x02, 0x04, 0xee
     };
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu.setGPR(0, 0);
-        ppu.setGPR(1, mem);
-        ppu.setGPR(2, mem + 8);
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        th.setGPR(0, 0);
+        th.setGPR(1, mem);
+        th.setGPR(2, mem + 8);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
-    REQUIRE( ppu.getFPR(1) == 0x3ff2467380000000 ); // float -> double
-    REQUIRE( ppu.getFPR(2) == 0x3ff2467380000000 );
-    REQUIRE( ppu.getFPR(3) == 0x3ff2467380000000 );
-    REQUIRE( ppu.getFPR(4) == 0x3ff2467380000000 );
-    REQUIRE( ppu.getFPR(5) == 0x3ff2467381d7dbf5 ); // double -> double
-    REQUIRE( ppu.getFPR(6) == 0x3ff2467381d7dbf5 );
-    REQUIRE( ppu.getFPR(7) == 0x3ff2467381d7dbf5 );
-    REQUIRE( ppu.getFPR(8) == 0x3ff2467381d7dbf5 );
+    REQUIRE( th.getFPR(1) == 0x3ff2467380000000 ); // float -> double
+    REQUIRE( th.getFPR(2) == 0x3ff2467380000000 );
+    REQUIRE( th.getFPR(3) == 0x3ff2467380000000 );
+    REQUIRE( th.getFPR(4) == 0x3ff2467380000000 );
+    REQUIRE( th.getFPR(5) == 0x3ff2467381d7dbf5 ); // double -> double
+    REQUIRE( th.getFPR(6) == 0x3ff2467381d7dbf5 );
+    REQUIRE( th.getFPR(7) == 0x3ff2467381d7dbf5 );
+    REQUIRE( th.getFPR(8) == 0x3ff2467381d7dbf5 );
 }
 
 TEST_CASE("float loads with update") {
@@ -1100,9 +1130,10 @@ TEST_CASE("float loads with update") {
    1065c:       cc e2 ff c4     lfdu    f7,-60(r2)              # ffffffc4
    10660:       7d 02 04 ee     lfdux   f8,r2,r0
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto mem = 0x400000;
-    ppu.setMemory(mem, 0, 16, true);
+    mm.setMemory(mem, 0, 16, true);
     uint8_t instr[] = { 
           0xc4, 0x61, 0x00, 0x70
         , 0x7c, 0x81, 0x04, 0x6e
@@ -1110,20 +1141,20 @@ TEST_CASE("float loads with update") {
         , 0x7d, 0x02, 0x04, 0xee
     };
     
-    ppu.setGPR(1, mem - 112);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == mem );
-    ppu.setGPR(1, mem - 500);
-    ppu.setGPR(0, 500);
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == mem );
-    ppu.setGPR(2, mem + 60);
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == mem );
-    ppu.setGPR(2, mem + 200);
-    ppu.setGPR(0, -200);
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getGPR(2) == mem );
+    th.setGPR(1, mem - 112);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(1) == mem );
+    th.setGPR(1, mem - 500);
+    th.setGPR(0, 500);
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getGPR(1) == mem );
+    th.setGPR(2, mem + 60);
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getGPR(1) == mem );
+    th.setGPR(2, mem + 200);
+    th.setGPR(0, -200);
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getGPR(2) == mem );
 }
 
 TEST_CASE("float stores") {
@@ -1138,13 +1169,14 @@ TEST_CASE("float stores") {
 10430:  7c 28 05 ee     stfdux  f1,r8,r0
 10434:  7c 29 07 ae     stfiwx  f1,r9,r0
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     auto mem = 0x400000;
-    ppu.setMemory(mem, 0, 100, true);
-    ppu.setFPRd(1, 1.1);
-    ppu.setGPR(0, 0);
+    mm.setMemory(mem, 0, 100, true);
+    th.setFPRd(1, 1.1);
+    th.setGPR(0, 0);
     for (int i = 0; i < 9; ++i) {
-        ppu.setGPR(i + 1, mem + i * 8);   
+        th.setGPR(i + 1, mem + i * 8);   
     }
     uint8_t instr[] = { 
         0xd0, 0x21, 0x00 ,0x00, 0x7c, 0x22, 0x05, 0x2e, 0xd4, 0x23, 0x00, 0x00, 
@@ -1152,21 +1184,21 @@ TEST_CASE("float stores") {
         0xdc, 0x27, 0x00, 0x00, 0x7c, 0x28, 0x05, 0xee, 0x7c, 0x29, 0x07, 0xae
     };
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
-    REQUIRE( ppu.load<8>(mem + 0*8) == 0x3f8ccccd00000000 );
-    REQUIRE( ppu.load<8>(mem + 1*8) == 0x3f8ccccd00000000 );
-    REQUIRE( ppu.load<8>(mem + 2*8) == 0x3f8ccccd00000000 );
-    REQUIRE( ppu.getGPR(3) == mem + 2*8);
-    REQUIRE( ppu.load<8>(mem + 3*8) == 0x3f8ccccd00000000 );
-    REQUIRE( ppu.getGPR(4) == mem + 3*8);
-    REQUIRE( ppu.load<8>(mem + 4*8) == 0x3ff199999999999a );
-    REQUIRE( ppu.load<8>(mem + 5*8) == 0x3ff199999999999a );
-    REQUIRE( ppu.load<8>(mem + 6*8) == 0x3ff199999999999a );
-    REQUIRE( ppu.getGPR(7) == mem + 6*8);
-    REQUIRE( ppu.load<8>(mem + 7*8) == 0x3ff199999999999a );
-    REQUIRE( ppu.getGPR(8) == mem + 7*8);
-    REQUIRE( ppu.load<8>(mem + 8*8) == 0x9999999a00000000 );
+    REQUIRE( mm.load<8>(mem + 0*8) == 0x3f8ccccd00000000 );
+    REQUIRE( mm.load<8>(mem + 1*8) == 0x3f8ccccd00000000 );
+    REQUIRE( mm.load<8>(mem + 2*8) == 0x3f8ccccd00000000 );
+    REQUIRE( th.getGPR(3) == mem + 2*8);
+    REQUIRE( mm.load<8>(mem + 3*8) == 0x3f8ccccd00000000 );
+    REQUIRE( th.getGPR(4) == mem + 3*8);
+    REQUIRE( mm.load<8>(mem + 4*8) == 0x3ff199999999999a );
+    REQUIRE( mm.load<8>(mem + 5*8) == 0x3ff199999999999a );
+    REQUIRE( mm.load<8>(mem + 6*8) == 0x3ff199999999999a );
+    REQUIRE( th.getGPR(7) == mem + 6*8);
+    REQUIRE( mm.load<8>(mem + 7*8) == 0x3ff199999999999a );
+    REQUIRE( th.getGPR(8) == mem + 7*8);
+    REQUIRE( mm.load<8>(mem + 8*8) == 0x9999999a00000000 );
 }
 
 TEST_CASE("float moves") {
@@ -1176,42 +1208,44 @@ TEST_CASE("float moves") {
 10468:       fc 40 0a 10     fabs    f2,f1
 1046c:       fc 40 09 10     fnabs   f2,f1
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0xfc, 0x40, 0x08, 0x90
         , 0xfc, 0x40, 0x08, 0x50
         , 0xfc, 0x40, 0x0a, 0x10
         , 0xfc, 0x40, 0x09, 0x10
     };
-    ppu.setFPR(1, 0x3ff2467381d7dbf5);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getFPR(2) == 0x3ff2467381d7dbf5 );
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getFPR(2) == 0xbff2467381d7dbf5 );
-    ppu.setFPR(1, 0xbff2467381d7dbf5);
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getFPR(2) == 0x3ff2467381d7dbf5 );
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getFPR(2) == 0xbff2467381d7dbf5 );
+    th.setFPR(1, 0x3ff2467381d7dbf5);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getFPR(2) == 0x3ff2467381d7dbf5 );
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getFPR(2) == 0xbff2467381d7dbf5 );
+    th.setFPR(1, 0xbff2467381d7dbf5);
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getFPR(2) == 0x3ff2467381d7dbf5 );
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getFPR(2) == 0xbff2467381d7dbf5 );
 }
 
 TEST_CASE("mtocrf 8,r17") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x7e, 0x30, 0x81, 0x20 };
-    ppu.setGPR(17, 0x1111111123456789);
-    ppu.setCR(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getCRF(4) == 6 );
-    REQUIRE( ppu.getCR() == 0x00006000 );
-    ppu.setCR(0x24242888);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getCRF(4) == 6 );
-    REQUIRE( ppu.getCR() == 0x24246888 );
-    ppu.setGPR(17, 0x48008084);
-    ppu.setCR(0x28002082);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getCRF(4) == 8 );
-    REQUIRE( ppu.getCR() == 0x28008082 );
+    th.setGPR(17, 0x1111111123456789);
+    th.setCR(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getCRF(4) == 6 );
+    REQUIRE( th.getCR() == 0x00006000 );
+    th.setCR(0x24242888);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getCRF(4) == 6 );
+    REQUIRE( th.getCR() == 0x24246888 );
+    th.setGPR(17, 0x48008084);
+    th.setCR(0x28002082);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getCRF(4) == 8 );
+    REQUIRE( th.getCR() == 0x28008082 );
 }
 
 TEST_CASE("arithmetic shifts") {
@@ -1223,7 +1257,8 @@ TEST_CASE("arithmetic shifts") {
 105dc:       7c 41 0e 70     srawi   r1,r2,1
 105e0:       7c 41 0e 74     sradi   r1,r2,1
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x7c, 0xa0, 0xfe, 0x70
         , 0x7c, 0xa5, 0x07, 0xb4
@@ -1232,43 +1267,43 @@ TEST_CASE("arithmetic shifts") {
         , 0x7c, 0x41, 0x0e, 0x70
         , 0x7c, 0x41, 0x0e, 0x74
     };
-    ppu.setGPR(5, 0);
-    ppu.setGPR(0, 100);
-    ppu.setGPR(11, 150);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 0 );
+    th.setGPR(5, 0);
+    th.setGPR(0, 100);
+    th.setGPR(11, 150);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 0 );
     
-    ppu.setGPR(5, -1ul);
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getGPR(5) == -1ull );
+    th.setGPR(5, -1ul);
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getGPR(5) == -1ull );
     
-    ppu.setGPR(0, 0x65);
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getGPR(11) == 0 );
+    th.setGPR(0, 0x65);
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getGPR(11) == 0 );
     
-    ppu.setGPR(9, 0x497e6);
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getGPR(11) == 0 );
+    th.setGPR(9, 0x497e6);
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getGPR(11) == 0 );
     
-    ppu.setGPR(2, 0x80000000);
-    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0xffffffffc0000000 );
-    REQUIRE( ppu.getCA() == 0 );
+    th.setGPR(2, 0x80000000);
+    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &th);
+    REQUIRE( th.getGPR(1) == 0xffffffffc0000000 );
+    REQUIRE( th.getCA() == 0 );
     
-    ppu.setGPR(2, 0x80000001);
-    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0xffffffffc0000000 );
-    REQUIRE( ppu.getCA() == 1 );
+    th.setGPR(2, 0x80000001);
+    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &th);
+    REQUIRE( th.getGPR(1) == 0xffffffffc0000000 );
+    REQUIRE( th.getCA() == 1 );
     
-    ppu.setGPR(2, 0x8000000000000000);
-    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0xc000000000000000 );
-    REQUIRE( ppu.getCA() == 0 );
+    th.setGPR(2, 0x8000000000000000);
+    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &th);
+    REQUIRE( th.getGPR(1) == 0xc000000000000000 );
+    REQUIRE( th.getCA() == 0 );
     
-    ppu.setGPR(2, 0x8000000000000001);
-    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0xc000000000000000 );
-    REQUIRE( ppu.getCA() == 1 );
+    th.setGPR(2, 0x8000000000000001);
+    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &th);
+    REQUIRE( th.getGPR(1) == 0xc000000000000000 );
+    REQUIRE( th.getCA() == 1 );
 }
 
 TEST_CASE("shifts") {
@@ -1278,67 +1313,68 @@ TEST_CASE("shifts") {
 105f0:       7c 41 1c 36     srd     r1,r2,r3
 105f4:       7c 41 1c 30     srw     r1,r2,r3
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x7c, 0x41, 0x18, 0x36
         , 0x7c, 0x41, 0x18, 0x30
         , 0x7c, 0x41, 0x1c, 0x36
         , 0x7c, 0x41, 0x1c, 0x30
     };
-    ppu.setGPR(2, 0xc000000000000001);
-    ppu.setGPR(3, 1);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x8000000000000002 );
+    th.setGPR(2, 0xc000000000000001);
+    th.setGPR(3, 1);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x8000000000000002 );
     
-    ppu.setGPR(2, 0xff000000c0000001);
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x0000000080000002 );
+    th.setGPR(2, 0xff000000c0000001);
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x0000000080000002 );
     
-    ppu.setGPR(2, 0xc000000000000001);
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x6000000000000000 );
+    th.setGPR(2, 0xc000000000000001);
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x6000000000000000 );
     
-    ppu.setGPR(2, 0xff00000fc0000001);
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x0000000060000000 );
+    th.setGPR(2, 0xff00000fc0000001);
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x0000000060000000 );
     
-    ppu.setGPR(2, 1);
-    ppu.setGPR(3, 55);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x80000000000000 );
+    th.setGPR(2, 1);
+    th.setGPR(3, 55);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x80000000000000 );
     
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0 );
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getGPR(1) == 0 );
     
-    ppu.setGPR(3, 22);
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x400000 );
+    th.setGPR(3, 22);
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x400000 );
     
-    ppu.setGPR(2, 0x8000000000000000);
-    ppu.setGPR(3, 59);
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 16 );
+    th.setGPR(2, 0x8000000000000000);
+    th.setGPR(3, 59);
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getGPR(1) == 16 );
     
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0 );
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getGPR(1) == 0 );
     
-    ppu.setGPR(2, 0x80000000);
-    ppu.setGPR(3, 28);
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 8 );
+    th.setGPR(2, 0x80000000);
+    th.setGPR(3, 28);
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getGPR(1) == 8 );
     
-    ppu.setGPR(2, 0xff0000000000ff00);
-    ppu.setGPR(3, 80);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0 );
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0 );
+    th.setGPR(2, 0xff0000000000ff00);
+    th.setGPR(3, 80);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(1) == 0 );
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getGPR(1) == 0 );
     
-    ppu.setGPR(3, 50);
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0 );
-    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0 );
+    th.setGPR(3, 50);
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getGPR(1) == 0 );
+    ppu_dasm<DasmMode::Emulate>(instr + 12, 0, &th);
+    REQUIRE( th.getGPR(1) == 0 );
 }
 
 TEST_CASE("rolls") {
@@ -1357,7 +1393,8 @@ TEST_CASE("fixed mulls") {
    10614:       7d 42 18 16     mulhwu  r10,r2,r3
    10618:       1d 62 ff 38     mulli   r11,r2,-200             # ffffff38
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x1c, 0x82, 0x00, 0x78
         , 0x7c, 0xa2, 0x19, 0xd2
@@ -1368,39 +1405,40 @@ TEST_CASE("fixed mulls") {
         //, 0x7d, 0x42, 0x18, 0x16
         , 0x1d, 0x62, 0xff, 0x38
     };
-    ppu.setGPR(2, 0x12345678abcdef90);
-    ppu.setGPR(3, 0xa1b2c3d4e5f67890);
+    th.setGPR(2, 0x12345678abcdef90);
+    th.setGPR(3, 0xa1b2c3d4e5f67890);
     
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( ppu.getGPR(4) == 0x8888889088884b80 );
-    REQUIRE( ppu.getGPR(5) == 0x15c296d930824100 );
-    REQUIRE( ppu.getGPR(6) == 0x9a54a01930824100 );
-    REQUIRE( ppu.getGPR(7) == 0xb7fa0b30583d7de );
-    REQUIRE( (ppu.getGPR(8) & 0xffffffff) == 0x89037f9 );
-    REQUIRE( ppu.getGPR(9) == 0xb7fa0b30583d7de );
-    //REQUIRE( ppu.getGPR(10) == 0x8888889088884b80 );
-    REQUIRE( ppu.getGPR(11) == 0xc71c71b9c71cd780 );
+    REQUIRE( th.getGPR(4) == 0x8888889088884b80 );
+    REQUIRE( th.getGPR(5) == 0x15c296d930824100 );
+    REQUIRE( th.getGPR(6) == 0x9a54a01930824100 );
+    REQUIRE( th.getGPR(7) == 0xb7fa0b30583d7de );
+    REQUIRE( (th.getGPR(8) & 0xffffffff) == 0x89037f9 );
+    REQUIRE( th.getGPR(9) == 0xb7fa0b30583d7de );
+    //REQUIRE( th.getGPR(10) == 0x8888889088884b80 );
+    REQUIRE( th.getGPR(11) == 0xc71c71b9c71cd780 );
         
-    ppu.setGPR(2, 0xffffffffffff8a69ull);
-    ppu.setGPR(3, 0x14f8b589ull);
-    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &ppu);
-    REQUIRE( (ppu.getGPR(8) & 0xffffffffull) == 0xfffff65dull);
+    th.setGPR(2, 0xffffffffffff8a69ull);
+    th.setGPR(3, 0x14f8b589ull);
+    ppu_dasm<DasmMode::Emulate>(instr + 16, 0, &th);
+    REQUIRE( (th.getGPR(8) & 0xffffffffull) == 0xfffff65dull);
     
-    ppu.setGPR(2, ~0ull);
-    ppu.setGPR(3, 10);
-    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &ppu);
-    REQUIRE( (ppu.getGPR(9) ) == 9);
+    th.setGPR(2, ~0ull);
+    th.setGPR(3, 10);
+    ppu_dasm<DasmMode::Emulate>(instr + 20, 0, &th);
+    REQUIRE( (th.getGPR(9) ) == 9);
 }
 
 TEST_CASE("rlwinm r0,r9,0,17,27") {
-    PPU ppu;
-    ppu.setGPR(9, 0xffffffff);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(9, 0xffffffff);
     uint8_t instr[] = { 0x55, 0x20, 0x04, 0x76 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(0) == 0x7ff0 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(0) == 0x7ff0 );
 }
 
 TEST_CASE("fixed divs") {
@@ -1410,43 +1448,45 @@ TEST_CASE("fixed divs") {
    1062c:       7c c2 1b 92     divdu   r6,r2,r3
    10630:       7c e2 1b 96     divwu   r7,r2,r3
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x7c, 0x82, 0x1b, 0xd2
         , 0x7c, 0xa2, 0x1b, 0xd6
         , 0x7c, 0xc2, 0x1b, 0x92
         , 0x7c, 0xe2, 0x1b, 0x96
     };
-    ppu.setGPR(2, 0xf1f23456abcdef09);
-    ppu.setGPR(3, 0x1234567887654321);
+    th.setGPR(2, 0xf1f23456abcdef09);
+    th.setGPR(3, 0x1234567887654321);
     
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( ppu.getGPR(4) == 0 );
-    REQUIRE( (ppu.getGPR(5) & 0xffffffff) == 0 );
-    REQUIRE( ppu.getGPR(6) == 13 );
-    REQUIRE( (ppu.getGPR(7) & 0xffffffff) == 1 );
+    REQUIRE( th.getGPR(4) == 0 );
+    REQUIRE( (th.getGPR(5) & 0xffffffff) == 0 );
+    REQUIRE( th.getGPR(6) == 13 );
+    REQUIRE( (th.getGPR(7) & 0xffffffff) == 1 );
     
-    ppu.setGPR(3, 2);
+    th.setGPR(3, 2);
     
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( ppu.getGPR(4) == -506344709675354235 );
-    REQUIRE( (ppu.getGPR(5) & 0xffffffff) == -706283643 );
-    REQUIRE( ppu.getGPR(6) == 8717027327179421572 );
-    REQUIRE( (ppu.getGPR(7) & 0xffffffff) == 0x55e6f784 );
+    REQUIRE( th.getGPR(4) == -506344709675354235 );
+    REQUIRE( (th.getGPR(5) & 0xffffffff) == -706283643 );
+    REQUIRE( th.getGPR(6) == 8717027327179421572 );
+    REQUIRE( (th.getGPR(7) & 0xffffffff) == 0x55e6f784 );
 }
 
 TEST_CASE("fcfid f1,f2") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0xfc, 0x20, 0x16, 0x9c };
-    ppu.setFPR(2, 0x12345678abcdef90);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getFPR(1) == 0x43b2345678abcdf0 );
+    th.setFPR(2, 0x12345678abcdef90);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getFPR(1) == 0x43b2345678abcdf0 );
 }
 
 TEST_CASE("mtspr") {
@@ -1455,50 +1495,53 @@ TEST_CASE("mtspr") {
    10648:       7c 28 03 a6     mtlr    r1
    1064c:       7c 29 03 a6     mtctr   r1
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = {
           0x7c, 0x21, 0x03, 0xa6
         , 0x7c, 0x28, 0x03, 0xa6
         , 0x7c, 0x29, 0x03, 0xa6
     };
-    ppu.setGPR(1, 0x12345678abcdef90);
-    ppu.setCR(0);
-    ppu.setXER(0);
-    ppu.setLR(0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getXER() == 0x12345678abcdef90 );
-    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &ppu);
-    REQUIRE( ppu.getLR() == 0x12345678abcdef90 );
-    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &ppu);
-    REQUIRE( ppu.getCTR() == 0x12345678abcdef90 );
+    th.setGPR(1, 0x12345678abcdef90);
+    th.setCR(0);
+    th.setXER(0);
+    th.setLR(0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getXER() == 0x12345678abcdef90 );
+    ppu_dasm<DasmMode::Emulate>(instr + 4, 0, &th);
+    REQUIRE( th.getLR() == 0x12345678abcdef90 );
+    ppu_dasm<DasmMode::Emulate>(instr + 8, 0, &th);
+    REQUIRE( th.getCTR() == 0x12345678abcdef90 );
 }
 
 TEST_CASE("mfcr r1") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0x7c, 0x20, 0x00, 0x26 };
-    ppu.setCR(0x12345678);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(1) == 0x12345678 );
+    th.setCR(0x12345678);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(1) == 0x12345678 );
 }
 
 TEST_CASE("fctiwz f1,f2") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 0xfc, 0x20, 0x10, 0x1e };
-    ppu.setFPRd(2, 0);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getFPR(1) & 0xffffffff) == 0 );    
-    ppu.setFPRd(2, 3.14);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getFPR(1) & 0xffffffff) == 3 );    
-    ppu.setFPRd(2, -3.14);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getFPR(1) & 0xffffffff) == -3 );
-    ppu.setFPRd(2, 4294967295.);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getFPR(1) & 0xffffffff) == 0x7fffffff );
-    ppu.setFPRd(2, -4294967295.);
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getFPR(1) & 0xffffffff) == 0x80000000 );
+    th.setFPRd(2, 0);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getFPR(1) & 0xffffffff) == 0 );    
+    th.setFPRd(2, 3.14);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getFPR(1) & 0xffffffff) == 3 );    
+    th.setFPRd(2, -3.14);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getFPR(1) & 0xffffffff) == -3 );
+    th.setFPRd(2, 4294967295.);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getFPR(1) & 0xffffffff) == 0x7fffffff );
+    th.setFPRd(2, -4294967295.);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getFPR(1) & 0xffffffff) == 0x80000000 );
 }
 
 TEST_CASE("fixed logical") {
@@ -1522,7 +1565,8 @@ TEST_CASE("fixed logical") {
    106b4:       7c 33 10 78     andc    r19,r1,r2
    106b8:       7c 34 13 38     orc     r20,r1,r2
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x70, 0x43, 0x00, 0x71
         , 0x74, 0x44, 0x03, 0xd6
@@ -1543,31 +1587,31 @@ TEST_CASE("fixed logical") {
         , 0x7c, 0x33, 0x10, 0x78
         , 0x7c, 0x34, 0x13, 0x38
     };
-    ppu.setGPR(1, 0x1234567887654321);
-    ppu.setGPR(2, 0xabcdef1198765430);
+    th.setGPR(1, 0x1234567887654321);
+    th.setGPR(2, 0xabcdef1198765430);
     
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( ppu.getGPR(3) == 48 );
-    REQUIRE( ppu.getGPR(4) == 5636096 );
-    REQUIRE( ppu.getGPR(5) == 21552 );
-    REQUIRE( ppu.getGPR(6) == 2557870080 );
-    REQUIRE( ppu.getGPR(7) == 0xabcdef119876573c );
-    REQUIRE( ppu.getGPR(8) == 0xabcdef119bf75430 );
-    REQUIRE( ppu.getGPR(9) == 0xabcdef11f8775430 );
-    REQUIRE( ppu.getGPR(10) == 0xabcdef119876543c );
-    REQUIRE( ppu.getGPR(11) == 0xabcdef1198575430 );
-    REQUIRE( ppu.getGPR(12) == 0xabcdef1118775430 );
-    REQUIRE( ppu.getGPR(13) == 0x204461080644020 );
-    REQUIRE( ppu.getGPR(14) == 0xbbfdff799f775731 );
-    REQUIRE( ppu.getGPR(15) == 0xb9f9b9691f131711 );
-    REQUIRE( ppu.getGPR(16) == 0xfdfbb9ef7f9bbfdf );
-    REQUIRE( ppu.getGPR(17) == 0x440200866088a8ce );
-    REQUIRE( ppu.getGPR(18) == 0x46064696e0ece8ee );
-    REQUIRE( ppu.getGPR(19) == 0x1030106807010301 );
-    REQUIRE( ppu.getGPR(20) == 0x563656fee7edebef );
+    REQUIRE( th.getGPR(3) == 48 );
+    REQUIRE( th.getGPR(4) == 5636096 );
+    REQUIRE( th.getGPR(5) == 21552 );
+    REQUIRE( th.getGPR(6) == 2557870080 );
+    REQUIRE( th.getGPR(7) == 0xabcdef119876573c );
+    REQUIRE( th.getGPR(8) == 0xabcdef119bf75430 );
+    REQUIRE( th.getGPR(9) == 0xabcdef11f8775430 );
+    REQUIRE( th.getGPR(10) == 0xabcdef119876543c );
+    REQUIRE( th.getGPR(11) == 0xabcdef1198575430 );
+    REQUIRE( th.getGPR(12) == 0xabcdef1118775430 );
+    REQUIRE( th.getGPR(13) == 0x204461080644020 );
+    REQUIRE( th.getGPR(14) == 0xbbfdff799f775731 );
+    REQUIRE( th.getGPR(15) == 0xb9f9b9691f131711 );
+    REQUIRE( th.getGPR(16) == 0xfdfbb9ef7f9bbfdf );
+    REQUIRE( th.getGPR(17) == 0x440200866088a8ce );
+    REQUIRE( th.getGPR(18) == 0x46064696e0ece8ee );
+    REQUIRE( th.getGPR(19) == 0x1030106807010301 );
+    REQUIRE( th.getGPR(20) == 0x563656fee7edebef );
 }
 
 TEST_CASE("extend sign") {
@@ -1579,7 +1623,8 @@ TEST_CASE("extend sign") {
    106d0:       7c 27 07 b4     extsw   r7,r1
    106d4:       7c 48 07 b4     extsw   r8,r2
 */
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     uint8_t instr[] = { 
           0x7c, 0x23, 0x07, 0x74
         , 0x7c, 0x44, 0x07, 0x74
@@ -1588,47 +1633,51 @@ TEST_CASE("extend sign") {
         , 0x7c, 0x27, 0x07, 0xb4
         , 0x7c, 0x48, 0x07, 0xb4
     };
-    ppu.setGPR(1, 0xff77777781228384);
-    ppu.setGPR(2, 0xff77777711223344);
+    th.setGPR(1, 0xff77777781228384);
+    th.setGPR(2, 0xff77777711223344);
     
     for (auto i = 0u; i < sizeof(instr); i += 4) {
-        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &ppu);
+        ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( ppu.getGPR(3) == 0xffffffffffffff84 );
-    REQUIRE( ppu.getGPR(4) == 0x44 );
-    REQUIRE( ppu.getGPR(5) == 0xffffffffffff8384 );
-    REQUIRE( ppu.getGPR(6) == 0x3344 );
-    REQUIRE( ppu.getGPR(7) == 0xffffffff81228384 );
-    REQUIRE( ppu.getGPR(8) == 0x11223344 );
+    REQUIRE( th.getGPR(3) == 0xffffffffffffff84 );
+    REQUIRE( th.getGPR(4) == 0x44 );
+    REQUIRE( th.getGPR(5) == 0xffffffffffff8384 );
+    REQUIRE( th.getGPR(6) == 0x3344 );
+    REQUIRE( th.getGPR(7) == 0xffffffff81228384 );
+    REQUIRE( th.getGPR(8) == 0x11223344 );
 }
 
 TEST_CASE("blrl") {
-    PPU ppu;
-    ppu.setLR(0x33114450);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setLR(0x33114450);
     uint8_t instr[] = { 0x4e, 0x80, 0x00, 0x21 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getNIP() == 0x33114450 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getNIP() == 0x33114450 );
 }
 
 TEST_CASE("bctrl") {
-    PPU ppu;
-    ppu.setCTR(0x33114450);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setCTR(0x33114450);
     uint8_t instr[] = { 0x4e, 0x80, 0x04, 0x21 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getNIP() == 0x33114450 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getNIP() == 0x33114450 );
 }
 
 TEST_CASE("cntlzw r11,r11") {
-    PPU ppu;
-    ppu.setGPR(11, 0x8000);
+    MainMemory mm;
+    PPUThread th(&mm);
+    th.setGPR(11, 0x8000);
     uint8_t instr[] = { 0x7d, 0x6b, 0x00, 0x34 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( ppu.getGPR(11) == 16 );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(11) == 16 );
 }
 
 TEST_CASE("vsldoi") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     unsigned __int128 i = 0x1122334455667788ull;
     i <<= 64;
     i |= 0xaabbccddeeff0099ull;
@@ -1637,25 +1686,26 @@ TEST_CASE("vsldoi") {
     res <<= 64;
     res |= 0xbbccddeeff009911ull;
     
-    ppu.setV(0, i);
+    th.setV(0, i);
     // vsldoi v2,v0,v0,1
     uint8_t instr[] = { 0x10, 0x40, 0x00, 0x6c };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getV(2) == res) );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getV(2) == res) );
     
     // vsldoi v2,v0,v0,0
     uint8_t instr2[] = { 0x10, 0x40, 0x00, 0x2c };
-    ppu_dasm<DasmMode::Emulate>(instr2, 0, &ppu);
-    REQUIRE( (ppu.getV(2) == i) );
+    ppu_dasm<DasmMode::Emulate>(instr2, 0, &th);
+    REQUIRE( (th.getV(2) == i) );
 }
 
 TEST_CASE("vxor v0,v0,v0") {
-    PPU ppu;
+    MainMemory mm;
+    PPUThread th(&mm);
     unsigned __int128 i = 0x1122334455667788ull;
     i <<= 64;
     i |= 0xaabbccddeeff0099ull;
-    ppu.setV(0, i);
+    th.setV(0, i);
     uint8_t instr[] = { 0x10, 0x00, 0x04, 0xc4 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &ppu);
-    REQUIRE( (ppu.getV(0) == 0) );
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( (th.getV(0) == 0) );
 }

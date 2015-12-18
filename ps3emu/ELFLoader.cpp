@@ -1,4 +1,5 @@
 #include "ELFLoader.h"
+#include "PPUThread.h"
 #include "utils.h"
 #include <assert.h>
 #include <stdio.h>
@@ -124,8 +125,8 @@ struct fdescr {
 };
 static_assert(sizeof(fdescr) == 8, "");
 
-void ELFLoader::map(PPU* ppu, std::vector<std::string> args) {
-    ppu->setELFLoader(this);
+void ELFLoader::map(PPUThread* thread, std::vector<std::string> args) {
+    auto mm = thread->mm();
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -138,37 +139,31 @@ void ELFLoader::map(PPU* ppu, std::vector<std::string> args) {
             (uint64_t)ph->p_filesz, (uint64_t)ph->p_vaddr, (ph->p_paddr + ph->p_memsz));
         
         assert(ph->p_memsz >= ph->p_filesz);
-        ppu->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
-        ppu->setMemory(ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
-    }
-    
-    auto procParamSectionName = ".sys_proc_param"; // ppu/include/sys/process.h
-    auto procParamSection = findSectionByName(procParamSectionName);
-    if (procParamSection) {
-        BOOST_LOG_TRIVIAL(error) << "proc param section not implemented";
+        mm->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
+        mm->setMemory(ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
     }
     
     // PPU_ABI-Specifications_e
-    ppu->setMemory(StackBase, 0, StackSize, true);
-    ppu->setGPR(1, StackBase + StackSize - sizeof(uint64_t));
-        
-    fdescr entry;
-    ppu->readMemory(_header->e_entry, &entry, sizeof(entry));
-    ppu->setGPR(2, entry.tocBase);
+    mm->setMemory(StackBase, 0, StackSize, true);
+    thread->setGPR(1, StackBase + StackSize - sizeof(uint64_t));
     
-    auto vaArgs = storeArgs(ppu, args);
-    ppu->setGPR(3, args.size());
-    ppu->setGPR(4, vaArgs);
+    fdescr entry;
+    mm->readMemory(_header->e_entry, &entry, sizeof(entry));
+    thread->setGPR(2, entry.tocBase);
+    
+    auto vaArgs = storeArgs(mm, args);
+    thread->setGPR(3, args.size());
+    thread->setGPR(4, vaArgs);
     
     // undocumented:
-    ppu->setGPR(5, StackBase);
-    ppu->setGPR(6, 0);
-    ppu->setGPR(12, DefaultMainMemoryPageSize);
+    thread->setGPR(5, StackBase);
+    thread->setGPR(6, 0);
+    thread->setGPR(12, DefaultMainMemoryPageSize);
     
-    ppu->setMemory(vaTLS, 0, tlsSize, true);
-    ppu->setGPR(13, vaTLS);
-    ppu->setFPSCR(0);
-    ppu->setNIP(entry.va);
+    mm->setMemory(vaTLS, 0, tlsSize, true);
+    thread->setGPR(13, vaTLS);
+    thread->setFPSCR(0);
+    thread->setNIP(entry.va);
 }
 
 Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
@@ -183,7 +178,7 @@ template <typename Elem>
 std::vector<Elem> readSection(Elf64_be_Shdr* sections,
                               Elf64_be_Ehdr* header,
                               uint32_t va,
-                              PPU* ppu) {
+                              MainMemory* mm) {
     auto section = std::find_if(sections, sections + header->e_shnum, [&](auto& sh) {
         return sh.sh_addr == va;
     });
@@ -195,11 +190,11 @@ std::vector<Elem> readSection(Elf64_be_Shdr* sections,
         throw std::runtime_error("section size inconsistency");
     
     std::vector<Elem> vec(section->sh_size / sizeof(Elem));
-    ppu->readMemory(section->sh_addr, &vec[0], section->sh_size);
+    mm->readMemory(section->sh_addr, &vec[0], section->sh_size);
     return vec;
 }
 
-void ELFLoader::link(PPU* ppu) {
+void ELFLoader::link(MainMemory* mm) {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
     });
@@ -208,10 +203,10 @@ void ELFLoader::link(PPU* ppu) {
         throw std::runtime_error("PRXINFO segment not present");
     
     sys_process_prx_info prxInfo;
-    ppu->readMemory(phprx->p_vaddr, &prxInfo, sizeof(prxInfo));
+    mm->readMemory(phprx->p_vaddr, &prxInfo, sizeof(prxInfo));
     
     auto prxInfos = readSection<prx_info>(
-        _sections, _header, prxInfo.prx_infos, ppu);
+        _sections, _header, prxInfo.prx_infos, mm);
     
     auto firstPrxName = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
         return l.prx_name < r.prx_name;
@@ -224,19 +219,19 @@ void ELFLoader::link(PPU* ppu) {
     });
     
     auto prxNames = readSection<char>(
-        _sections, _header, firstPrxName->prx_name - 4, ppu);
+        _sections, _header, firstPrxName->prx_name - 4, mm);
     
     auto prxFnids = readSection<big_uint32_t>(
-        _sections, _header, firstPrxFnid->prx_fnids, ppu);
+        _sections, _header, firstPrxFnid->prx_fnids, mm);
     
     auto prxStubs = readSection<big_uint32_t>(
-        _sections, _header, firstPrxStub->prx_stubs, ppu);
+        _sections, _header, firstPrxStub->prx_stubs, mm);
     
     if (prxFnids.size() != prxStubs.size())
         throw std::runtime_error("prx infos/stubs/fnids inconsistency");
     
     auto vaDescr = FunctionDescriptorsVa;
-    ppu->setMemory(vaDescr, 0, prxFnids.size() * 8, true);
+    mm->setMemory(vaDescr, 0, prxFnids.size() * 8, true);
     uint32_t curUnknownNcall = 2000;
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("resolving %d rsx modules", prxInfos.size());
     for (auto& info : prxInfos) {
@@ -251,7 +246,7 @@ void ELFLoader::link(PPU* ppu) {
             auto& stub = prxStubs.at(firstStub + i);
             
             uint32_t index = 0;
-            auto ncallEntry = ppu->findNCallEntry(fnid, index);
+            auto ncallEntry = findNCallEntry(fnid, index);
             std::string name;
             if (!ncallEntry) {
                 index = curUnknownNcall--;
@@ -259,8 +254,8 @@ void ELFLoader::link(PPU* ppu) {
             } else {
                 name = ncallEntry->name;
             }
-            ppu->store<4>(vaDescr, vaDescr + 4);
-            encodeNCall(ppu, vaDescr + 4, index);
+            mm->store<4>(vaDescr, vaDescr + 4);
+            encodeNCall(mm, vaDescr + 4, index);
             BOOST_LOG_TRIVIAL(trace) << ssnprintf("    %x -> %s (ncall %x)",
                 stub, name, index);
             stub = vaDescr;
@@ -268,7 +263,7 @@ void ELFLoader::link(PPU* ppu) {
         }
     }
     
-    ppu->writeMemory(firstPrxStub->prx_stubs, &prxStubs[0], prxStubs.size() * sizeof(big_uint32_t));
+    mm->writeMemory(firstPrxStub->prx_stubs, &prxStubs[0], prxStubs.size() * sizeof(big_uint32_t));
 }
 
 uint64_t ELFLoader::entryPoint() {
@@ -287,19 +282,19 @@ Elf64_be_Sym* ELFLoader::getGlobalSymbolByValue(uint32_t value, uint32_t section
     return res;
 }
 
-ps3_uintptr_t ELFLoader::storeArgs(PPU* ppu, std::vector<std::string> const& args) {
+ps3_uintptr_t ELFLoader::storeArgs(MainMemory* mm, std::vector<std::string> const& args) {
     const auto vaArgs = vaTLS + tlsSize;
     std::vector<big_uint64_t> arr;
-    ppu->setMemory(vaArgs, 0, (args.size() + 1) * 8, true);
+    mm->setMemory(vaArgs, 0, (args.size() + 1) * 8, true);
     auto len = 0;
     for (auto arg : args) {
         auto vaPtr = vaArgs + (args.size() + 1) * 8 + len;
-        ppu->writeMemory(vaPtr, arg.data(), arg.size() + 1, true);
+        mm->writeMemory(vaPtr, arg.data(), arg.size() + 1, true);
         arr.push_back(vaPtr);
         len += arg.size() + 1;
     }
     arr.push_back(0);
-    ppu->writeMemory(vaArgs, arr.data(), arr.size() * 8);
+    mm->writeMemory(vaArgs, arr.data(), arr.size() * 8);
     return vaArgs;
 }
 

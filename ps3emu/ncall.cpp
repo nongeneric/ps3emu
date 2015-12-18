@@ -1,4 +1,4 @@
-#include "PPU.h"
+#include "Process.h"
 #include "utils.h"
 #include "../libs/sys.h"
 #include "../libs/Controller.h"
@@ -58,15 +58,29 @@ uint32_t calcFnid(const char* name) {
 
 template <int ArgN, class T, class Enable = void>
 struct get_arg {
-    inline T value(PPU* ppu) {
-        return (T)ppu->getGPR(3 + ArgN);
+    inline T value(PPUThread* thread) {
+        return (T)thread->getGPR(3 + ArgN);
     }
 };
 
 template <int ArgN>
-struct get_arg<ArgN, PPU*> {
-    inline PPU* value(PPU* ppu) {
-        return ppu;
+struct get_arg<ArgN, PPUThread*> {
+    inline PPUThread* value(PPUThread* thread) {
+        return thread;
+    }
+};
+
+template <int ArgN>
+struct get_arg<ArgN, Process*> {
+    inline Process* value(PPUThread* thread) {
+        return thread->proc();
+    }
+};
+
+template <int ArgN>
+struct get_arg<ArgN, MainMemory*> {
+    inline MainMemory* value(PPUThread* thread) {
+        return thread->mm();
     }
 };
 
@@ -75,95 +89,94 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
     typedef typename boost::remove_pointer<T>::type elem_type;
     elem_type _t;
     uint64_t _va;
-    PPU* _ppu;
-    inline T value(PPU* ppu) {
-        _va = (ps3_uintptr_t)ppu->getGPR(3 + ArgN);
+    PPUThread* _thread;
+    inline T value(PPUThread* thread) {
+        _va = (ps3_uintptr_t)thread->getGPR(3 + ArgN);
         if (_va == 0)
             return nullptr;
-        ppu->readMemory(_va, &_t, sizeof(elem_type));
-        _ppu = ppu;
+        thread->mm()->readMemory(_va, &_t, sizeof(elem_type));
+        _thread = thread;
         return &_t; 
     }
     inline ~get_arg() {
         if (_va == 0)
             return;
-        _ppu->writeMemory(_va, &_t, sizeof(elem_type));
+        _thread->mm()->writeMemory(_va, &_t, sizeof(elem_type));
     }
 };
 
-void nstub_sys_initialize_tls(PPU* ppu) {
+void nstub_sys_initialize_tls(PPUThread* thread) {
     
 }
 
-void nstub_sys_process_exit(PPU* ppu) {
-    ppu->getRsx()->shutdown();
+void nstub_sys_process_exit(PPUThread* thread) {
     throw ProcessFinishedException();
 }
 
 #define ARG(n, f) get_arg<n - 1, \
     typename boost::function_traits< \
         typename boost::remove_pointer<decltype(&f)>::type >::arg##n##_type >() \
-            .value(ppu)
+            .value(thread)
 
-#define ARG_VOID_PTR(n, lenArg, f) get_arg<n - 1, void*>().value(ppu, lenArg)
+#define ARG_VOID_PTR(n, lenArg, f) get_arg<n - 1, void*>().value(thread, lenArg)
 
-#define STUB_12(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), \
+#define STUB_12(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), \
                      ARG(5, f), ARG(6, f), ARG(7, f), ARG(8, f), \
                      ARG(9, f), ARG(10, f), ARG(11, f), ARG(12, f))); \
 }
 
-#define STUB_8(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f), ARG(6, f), ARG(7, f), ARG(8, f))); \
+#define STUB_8(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f), ARG(6, f), ARG(7, f), ARG(8, f))); \
 }
 
-#define STUB_7(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f), ARG(6, f), ARG(7, f))); \
+#define STUB_7(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f), ARG(6, f), ARG(7, f))); \
 }
 
-#define STUB_6(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f), ARG(6, f))); \
+#define STUB_6(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f), ARG(6, f))); \
 }
 
-#define STUB_5(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f))); \
+#define STUB_5(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), ARG(5, f))); \
 }
 
-#define STUB_4(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f))); \
+#define STUB_4(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f))); \
 }
 
-#define STUB_3(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f))); \
+#define STUB_3(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f))); \
 }
 
-#define STUB_2(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f), ARG(2, f))); \
+#define STUB_2(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f))); \
 }
 
-#define STUB_1(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f(ARG(1, f))); \
+#define STUB_1(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f))); \
 }
 
-#define STUB_0(f) void nstub_##f(PPU* ppu) { \
-    ppu->setGPR(3, f()); \
+#define STUB_0(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f()); \
 }
 
-#define STUB_sys_tty_write(f) void nstub_##f(PPU* ppu) { \
-    auto va = ppu->getGPR(3 + 1); \
-    auto len = ppu->getGPR(3 + 2); \
+#define STUB_sys_tty_write(f) void nstub_##f(PPUThread* thread) { \
+    auto va = thread->getGPR(3 + 1); \
+    auto len = thread->getGPR(3 + 2); \
     std::unique_ptr<char[]> buf(new char[len]); \
-    ppu->readMemory(va, buf.get(), len); \
-    ppu->setGPR(3, f(ARG(1, f), buf.get(), len, ARG(4, f))); \
+    thread->mm()->readMemory(va, buf.get(), len); \
+    thread->setGPR(3, f(ARG(1, f), buf.get(), len, ARG(4, f))); \
 }
 
-void readString(PPU* ppu, uint32_t va, std::string& str) {
+void readString(MainMemory* mm, uint32_t va, std::string& str) {
     constexpr size_t chunk = 16;
     str.resize(0);
     auto pos = 0u;
     do {
         str.resize(str.size() + chunk);
-        ppu->readMemory(va + pos, &str[0] + pos, chunk);
+        mm->readMemory(va + pos, &str[0] + pos, chunk);
         pos += chunk;
     } while (std::find(begin(str), end(str), 0) == end(str));
 }
@@ -174,23 +187,23 @@ uint32_t sys_fs_open_proxy(uint32_t path,
                            uint64_t mode,
                            uint32_t arg,
                            uint64_t size,
-                           PPU* ppu)
+                           PPUThread* thread)
 {
     std::string pathStr;
-    readString(ppu, path, pathStr);
+    readString(thread->mm(), path, pathStr);
     std::vector<uint8_t> argVec(size + 1);
     if (arg) {
-        ppu->readMemory(arg, &argVec[0], size);
+        thread->mm()->readMemory(arg, &argVec[0], size);
     } else {
         argVec[0] = 0;
     }
     return sys_fs_open_impl(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
 }
 
-CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, PPU* ppu) {
+CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, PPUThread* thread) {
     std::string pathStr;
-    readString(ppu, path, pathStr);
-    return cellFsStat(pathStr.c_str(), sb, ppu);
+    readString(thread->mm(), path, pathStr);
+    return cellFsStat(pathStr.c_str(), sb, thread);
 }
 
 CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path, 
@@ -198,11 +211,11 @@ CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path,
                              big_int32_t* fd,
                              uint64_t arg, 
                              uint64_t size, 
-                             PPU* ppu)
+                             PPUThread* thread)
 {
     std::string pathStr;
-    readString(ppu, path, pathStr);
-    return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, ppu);
+    readString(thread->mm(), path, pathStr);
+    return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, thread);
 }
 
 STUB_2(defaultContextCallback);
@@ -333,14 +346,14 @@ NCallEntry ncallTable[] {
     ENTRY(cellFsRead),
 };
 
-void PPU::ncall(uint32_t index) {
+void PPUThread::ncall(uint32_t index) {
     if (index >= sizeof(ncallTable) / sizeof(NCallEntry))
         throw std::runtime_error(ssnprintf("unknown ncall index %d", index));
     ncallTable[index].stub(this);
     setNIP(getLR());
 }
 
-void PPU::scall() {
+void PPUThread::scall() {
     auto index = getGPR(11);
     switch (index) {
         case 352: nstub_sys_memory_get_user_memory_size(this); break;
@@ -363,7 +376,7 @@ void PPU::scall() {
     }
 }
 
-const NCallEntry* PPU::findNCallEntry(uint32_t fnid, uint32_t& index) {
+const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index) {
     auto count = sizeof(ncallTable) / sizeof(NCallEntry);
     for (uint32_t i = 0; i < count; ++i) {
         if (ncallTable[i].fnid == fnid) {

@@ -120,6 +120,12 @@ union XForm_24 {
     BitField<9, 11> L;
 };
 
+union XForm_25 {
+    BitField<6, 11> TO;
+    RA_t RA;
+    RB_t RB;
+};
+
 union XForm_26 {
     FRT_t FRT;
     RA_t RA;

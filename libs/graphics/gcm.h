@@ -7,7 +7,7 @@
 #define GCM_EMU
 #include <gcm_tool.h>
 
-class PPU;
+class Process;
 
 extern int gcmResetCommandsSize;
 extern int gcmInitCommandsSize;
@@ -24,7 +24,7 @@ struct TargetCellGcmContextData {
 namespace emu {
 namespace Gcm {
 
-uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, PPU* ppu);
+uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, Process* proc);
 uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count);
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode);
@@ -35,12 +35,12 @@ int32_t cellGcmSetDisplayBuffer(const uint8_t id,
                                 const uint32_t pitch,
                                 const uint32_t width,
                                 const uint32_t height,
-                                PPU* ppu);
+                                Process* proc);
 ps3_uintptr_t cellGcmGetControlRegister();
 ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index);
-uint32_t cellGcmGetFlipStatus(PPU* ppu);
-emu_void_t cellGcmResetFlipStatus(PPU* ppu);
-emu_void_t _cellGcmSetFlipCommand(PPU* ppu, uint32_t buffer);
+uint32_t cellGcmGetFlipStatus(Process* proc);
+emu_void_t cellGcmResetFlipStatus(Process* proc);
+emu_void_t _cellGcmSetFlipCommand(Process* proc, uint32_t buffer);
 int32_t cellGcmIoOffsetToAddress(uint32_t offset, boost::endian::big_uint32_t *address);
 uint32_t cellGcmGetTiledPitchSize(uint32_t size);
 int32_t cellGcmSetTileInfo(uint8_t index,
@@ -51,7 +51,7 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint8_t comp,
                            uint16_t base,
                            uint8_t bank);
-uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, PPU* ppu);
+uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, Process* proc);
 int32_t cellGcmBindTile(uint8_t index);
 int32_t cellGcmUnbindTile(uint8_t index);
 int32_t cellGcmBindZcull(uint8_t index,
@@ -69,8 +69,8 @@ int32_t cellGcmBindZcull(uint8_t index,
 int32_t cellGcmMapMainMemory(ps3_uintptr_t address, 
                              uint32_t size, 
                              boost::endian::big_uint32_t *offset,
-                             PPU* ppu);
+                             Process* proc);
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler);
-emu_void_t cellGcmSetDefaultCommandBuffer(PPU* ppu);
+emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc);
 
 }}

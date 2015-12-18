@@ -105,14 +105,14 @@ bool isAbsoluteBranch(void* instr) {
     return iform->OPCD.u() == 18 || iform->OPCD.u() == 16;
 }
 
-bool isTaken(void* branchInstr, uint64_t cia, PPU* ppu) {
+bool isTaken(void* branchInstr, uint64_t cia, PPUThread* thread) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(branchInstr));
     auto iform = reinterpret_cast<IForm*>(&x);
     if (iform->OPCD.u() == 18) {
         return true;
     } else if (iform->OPCD.u() == 16) {
         auto b = reinterpret_cast<BForm*>(&x);
-        return isTaken(b->BO0, b->BO1, b->BO2, b->BO3, ppu, b->BI);
+        return isTaken(b->BO0, b->BO1, b->BO2, b->BO3, thread, b->BI);
     }
     throw std::runtime_error("not absolute branch");
 }

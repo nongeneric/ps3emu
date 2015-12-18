@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ps3emu/PPU.h"
+#include "../ps3emu/Process.h"
 #include "ppu_dasm_forms.h"
 #include "utils.h"
 
@@ -14,11 +14,24 @@
 #include <stdio.h>
 #include <cinttypes>
 #include <limits>
+#include <tuple>
 
 using namespace boost::endian;
 
+class IllegalInstructionException : public virtual std::runtime_error {
+public:
+    IllegalInstructionException() : std::runtime_error("illegal instruction") { }
+};
+
+class BreakpointException : public virtual std::runtime_error {
+public:
+    BreakpointException() : std::runtime_error("breakpoint") { }
+};
+
+#define MM thread->mm()
+#define TH thread
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
-#define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPU* ppu)
+#define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPUThread* thread)
 
 inline std::string format_u(const char* mnemonic, uint64_t u) {
     return ssnprintf("%s %" PRIx64, mnemonic, u);
@@ -109,9 +122,9 @@ PRINT(B, IForm) {
 }
 
 EMU(B, IForm) {
-    ppu->setNIP(getNIA(i, cia));
+    TH->setNIP(getNIA(i, cia));
     if (i->LK.u())
-        ppu->setLR(cia + 4);
+        TH->setLR(cia + 4);
 }
 
 // Branch Conditional B-form, p24
@@ -158,27 +171,27 @@ inline bool isTaken(BitField<P1, P1 + 1> bo0,
                     BitField<P2, P2 + 1> bo1,
                     BitField<P3, P3 + 1> bo2,
                     BitField<P4, P4 + 1> bo3,
-                    PPU* ppu,
+                    PPUThread* thread,
                     BI_t bi)
 {
-    auto ctr_ok = bo2.u() | ((ppu->getCTR() != 0) ^ bo3.u());
-    auto cond_ok = bo0.u() | (bit_test(ppu->getCR(), 32, bi) == bo1.u());
+    auto ctr_ok = bo2.u() | ((TH->getCTR() != 0) ^ bo3.u());
+    auto cond_ok = bo0.u() | (bit_test(TH->getCR(), 32, bi) == bo1.u());
     return ctr_ok && cond_ok;
 }
 
 EMU(BC, BForm) {
     if (!i->BO2.u())
-        ppu->setCTR(ppu->getCTR() - 1);
-    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
-        ppu->setNIP(getNIA(i, cia));
+        TH->setCTR(TH->getCTR() - 1);
+    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, TH, i->BI))
+        TH->setNIP(getNIA(i, cia));
     if (i->LK.u())
-        ppu->setLR(cia + 4);
+        TH->setLR(cia + 4);
 }
 
 // Branch Conditional to Link Register XL-form, p25
 
-inline int64_t getB(RA_t ra, PPU* ppu) {
-    return ra.u() == 0 ? 0 : ppu->getGPR(ra);
+inline int64_t getB(RA_t ra, PPUThread* thread) {
+    return ra.u() == 0 ? 0 : TH->getGPR(ra);
 }
 
 PRINT(BCLR, XLForm_2) {
@@ -197,11 +210,11 @@ PRINT(BCLR, XLForm_2) {
 
 EMU(BCLR, XLForm_2) {
     if (!i->BO2.u())
-        ppu->setCTR(ppu->getCTR() - 1);
-    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, ppu, i->BI))
-        ppu->setNIP(ppu->getLR() & ~3ul);
+        TH->setCTR(TH->getCTR() - 1);
+    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, TH, i->BI))
+        TH->setNIP(TH->getLR() & ~3ul);
     if (i->LK.u())
-        ppu->setLR(cia + 4);
+        TH->setLR(cia + 4);
 }
 
 // Branch Conditional to Count Register, p25
@@ -221,11 +234,11 @@ PRINT(BCCTR, XLForm_2) {
 }
 
 EMU(BCCTR, XLForm_2) {
-    auto cond_ok = i->BO0.u() || bit_test(ppu->getCR(), 32, i->BI) == i->BO1.u();
+    auto cond_ok = i->BO0.u() || bit_test(TH->getCR(), 32, i->BI) == i->BO1.u();
     if (cond_ok)
-        ppu->setNIP(ppu->getCTR() & ~3);
+        TH->setNIP(TH->getCTR() & ~3);
     if (i->LK.u())
-        ppu->setLR(cia + 4);
+        TH->setLR(cia + 4);
 }
 
 // Condition Register AND, p28
@@ -235,9 +248,9 @@ PRINT(CRAND, XLForm_1) {
 }
 
 EMU(CRAND, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, bit_test(cr, i->BA) & bit_test(cr, i->BB));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register OR, p28
@@ -247,9 +260,9 @@ PRINT(CROR, XLForm_1) {
 }
 
 EMU(CROR, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, bit_test(cr, i->BA) | bit_test(cr, i->BB));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register XOR, p28
@@ -259,9 +272,9 @@ PRINT(CRXOR, XLForm_1) {
 }
 
 EMU(CRXOR, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, bit_test(cr, i->BA) ^ bit_test(cr, i->BB));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register NAND, p28
@@ -271,9 +284,9 @@ PRINT(CRNAND, XLForm_1) {
 }
 
 EMU(CRNAND, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, !(bit_test(cr, i->BA) & bit_test(cr, i->BB)));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register NOR, p29
@@ -283,9 +296,9 @@ PRINT(CRNOR, XLForm_1) {
 }
 
 EMU(CRNOR, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, (!bit_test(cr, i->BA)) | bit_test(cr, i->BB));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register Equivalent, p29
@@ -295,9 +308,9 @@ PRINT(CREQV, XLForm_1) {
 }
 
 EMU(CREQV, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, bit_test(cr, i->BA) == bit_test(cr, i->BB));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register AND with Complement, p29
@@ -307,9 +320,9 @@ PRINT(CRANDC, XLForm_1) {
 }
 
 EMU(CRANDC, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, bit_test(cr, i->BA) & (!bit_test(cr, i->BB)));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register OR with Complement, p29
@@ -319,9 +332,9 @@ PRINT(CRORC, XLForm_1) {
 }
 
 EMU(CRORC, XLForm_1) {
-    auto cr = ppu->getCR();
+    auto cr = TH->getCR();
     bit_set(cr, bit_test(cr, i->BA) | (!bit_test(cr, i->BB)));
-    ppu->setCR(cr);
+    TH->setCR(cr);
 }
 
 // Condition Register Field Instruction, p30
@@ -331,7 +344,7 @@ PRINT(MCRF, XLForm_3) {
 }
 
 EMU(MCRF, XLForm_3) {
-    ppu->setCRF(i->BF.u(), ppu->getCRF(i->BFA.u()));
+    TH->setCRF(i->BF.u(), TH->getCRF(i->BFA.u()));
 }
 
 // Load Byte and Zero, p34
@@ -341,9 +354,9 @@ PRINT(LBZ, DForm_1) {
 }
 
 EMU(LBZ, DForm_1) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->setGPR(i->RT, ppu->load<1>(ea));
+    TH->setGPR(i->RT, MM->load<1>(ea));
 }
 
 // Load Byte and Zero, p34
@@ -353,9 +366,9 @@ PRINT(LBZX, XForm_1) {
 }
 
 EMU(LBZX, XForm_1) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<1>(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<1>(ea));
 }
 
 // Load Byte and Zero with Update, p34
@@ -365,9 +378,9 @@ PRINT(LBZU, DForm_1) {
 }
 
 EMU(LBZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->setGPR(i->RT, ppu->load<1>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    TH->setGPR(i->RT, MM->load<1>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Byte and Zero with Update Indexed, p34
@@ -377,9 +390,9 @@ PRINT(LBZUX, XForm_1) {
 }
 
 EMU(LBZUX, XForm_1) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<1>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<1>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Halfword and Zero, p35
@@ -389,9 +402,9 @@ PRINT(LHZ, DForm_1) {
 }
 
 EMU(LHZ, DForm_1) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->setGPR(i->RT, ppu->load<2>(ea));
+    TH->setGPR(i->RT, MM->load<2>(ea));
 }
 
 // Load Halfword and Zero Indexed, p35
@@ -401,9 +414,9 @@ PRINT(LHZX, XForm_1) {
 }
 
 EMU(LHZX, XForm_1) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<2>(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<2>(ea));
 }
 
 // Load Halfword and Zero with Update, p35
@@ -413,9 +426,9 @@ PRINT(LHZU, DForm_1) {
 }
 
 EMU(LHZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->setGPR(i->RT, ppu->load<2>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    TH->setGPR(i->RT, MM->load<2>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Halfword and Zero with Update Indexed, p35
@@ -425,9 +438,9 @@ PRINT(LHZUX, XForm_1) {
 }
 
 EMU(LHZUX, XForm_1) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<2>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<2>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Halfword Algebraic, p36
@@ -437,9 +450,9 @@ PRINT(LHA, DForm_1) {
 }
 
 EMU(LHA, DForm_1) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->setGPR(i->RT, ppu->loads<2>(ea));
+    TH->setGPR(i->RT, MM->loads<2>(ea));
 }
 
 // Load Halfword Algebraic Indexed, p36
@@ -449,9 +462,9 @@ PRINT(LHAX, XForm_1) {
 }
 
 EMU(LHAX, XForm_1) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->loads<2>(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->loads<2>(ea));
 }
 
 // Load Halfword Algebraic with Update, p36
@@ -461,9 +474,9 @@ PRINT(LHAU, DForm_1) {
 }
 
 EMU(LHAU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->setGPR(i->RT, ppu->loads<2>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    TH->setGPR(i->RT, MM->loads<2>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Halfword Algebraic with Update Indexed, p36
@@ -473,9 +486,9 @@ PRINT(LHAUX, XForm_1) {
 }
 
 EMU(LHAUX, XForm_1) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->loads<2>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->loads<2>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Word and Zero, p37
@@ -485,9 +498,9 @@ PRINT(LWZ, DForm_1) {
 }
 
 EMU(LWZ, DForm_1) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->setGPR(i->RT, ppu->load<4>(ea));
+    TH->setGPR(i->RT, MM->load<4>(ea));
 }
 
 // Load Word and Zero Indexed, p37
@@ -497,9 +510,9 @@ PRINT(LWZX, XForm_1) {
 }
 
 EMU(LWZX, XForm_1) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<4>(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<4>(ea));
 }
 
 // Load Word and Zero with Update, p37
@@ -509,9 +522,9 @@ PRINT(LWZU, DForm_1) {
 }
 
 EMU(LWZU, DForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->setGPR(i->RT, ppu->load<4>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    TH->setGPR(i->RT, MM->load<4>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Word and Zero with Update Indexed, p37
@@ -521,9 +534,9 @@ PRINT(LWZUX, XForm_1) {
 }
 
 EMU(LWZUX, XForm_1) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<4>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<4>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Word Algebraic, p38
@@ -533,9 +546,9 @@ PRINT(LWA, DSForm_1) {
 }
 
 EMU(LWA, DSForm_1) {
-    auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = i->RA.u() == 0 ? 0 : TH->getGPR(i->RA);
     auto ea = b + i->DS.native();
-    ppu->setGPR(i->RT, ppu->loads<4>(ea));
+    TH->setGPR(i->RT, MM->loads<4>(ea));
 }
 
 // Load Word Algebraic Indexed, p38
@@ -545,9 +558,9 @@ PRINT(LWAX, XForm_1) {
 }
 
 EMU(LWAX, XForm_1) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->loads<4>(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->loads<4>(ea));
 }
 
 // Load Word Algebraic with Update Indexed, p38
@@ -557,9 +570,9 @@ PRINT(LWAUX, XForm_1) {
 }
 
 EMU(LWAUX, XForm_1) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->loads<4>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->loads<4>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Doubleword, p39
@@ -569,9 +582,9 @@ PRINT(LD, DSForm_1) {
 }
 
 EMU(LD, DSForm_1) {
-    auto b = i->RA.u() == 0 ? 0 : ppu->getGPR(i->RA);
+    auto b = i->RA.u() == 0 ? 0 : TH->getGPR(i->RA);
     auto ea = b + i->DS.native();
-    ppu->setGPR(i->RT, ppu->load<8>(ea));
+    TH->setGPR(i->RT, MM->load<8>(ea));
 }
 
 // Load Doubleword Indexed, p39
@@ -581,9 +594,9 @@ PRINT(LDX, XForm_1) {
 }
 
 EMU(LDX, XForm_1) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<8>(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<8>(ea));
 }
 
 // Load Doubleword with Update, p39
@@ -593,9 +606,9 @@ PRINT(LDU, DSForm_1) {
 }
 
 EMU(LDU, DSForm_1) {
-    auto ea = ppu->getGPR(i->RA) + i->DS.native();
-    ppu->setGPR(i->RT, ppu->load<8>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->DS.native();
+    TH->setGPR(i->RT, MM->load<8>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // Load Doubleword with Update Indexed, p39
@@ -605,40 +618,40 @@ PRINT(LDUX, XForm_1) {
 }
 
 EMU(LDUX, XForm_1) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, ppu->load<8>(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, MM->load<8>(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 // STORES
 //
 
 template <int Bytes>
-void EmuStore(DForm_3* i, PPU* ppu) {
-    auto b = getB(i->RA, ppu);
+void EmuStore(DForm_3* i, PPUThread* thread) {
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
+    MM->store<Bytes>(ea, TH->getGPR(i->RS));
 }
 
 template <int Bytes>
-void EmuStoreIndexed(XForm_8* i, PPU* ppu) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
+void EmuStoreIndexed(XForm_8* i, PPUThread* thread) {
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    MM->store<Bytes>(ea, TH->getGPR(i->RS));
 }
 
 template <int Bytes>
-void EmuStoreUpdate(DForm_3* i, PPU* ppu) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
-    ppu->setGPR(i->RA, ea);
+void EmuStoreUpdate(DForm_3* i, PPUThread* thread) {
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    MM->store<Bytes>(ea, TH->getGPR(i->RS));
+    TH->setGPR(i->RA, ea);
 }
 
 template <int Bytes>
-void EmuStoreUpdateIndexed(XForm_8* i, PPU* ppu) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->store<Bytes>(ea, ppu->getGPR(i->RS));
-    ppu->setGPR(i->RA, ea);
+void EmuStoreUpdateIndexed(XForm_8* i, PPUThread* thread) {
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    MM->store<Bytes>(ea, TH->getGPR(i->RS));
+    TH->setGPR(i->RA, ea);
 }
 
 inline void PrintStore(const char* mnemonic, DForm_3* i, std::string* result) {
@@ -650,83 +663,83 @@ inline void PrintStoreIndexed(const char* mnemonic, XForm_8* i, std::string* res
 }
 
 PRINT(STB, DForm_3) { PrintStore("stb", i, result); }
-EMU(STB, DForm_3) { EmuStore<1>(i, ppu); }
+EMU(STB, DForm_3) { EmuStore<1>(i, TH); }
 PRINT(STBX, XForm_8) { PrintStoreIndexed("stbx", i, result); }
-EMU(STBX, XForm_8) { EmuStoreIndexed<1>(i, ppu); }
+EMU(STBX, XForm_8) { EmuStoreIndexed<1>(i, TH); }
 PRINT(STBU, DForm_3) { PrintStore("stbu", i, result); }
-EMU(STBU, DForm_3) { EmuStoreUpdate<1>(i, ppu); }
+EMU(STBU, DForm_3) { EmuStoreUpdate<1>(i, TH); }
 PRINT(STBUX, XForm_8) { PrintStoreIndexed("stbux", i, result); }
-EMU(STBUX, XForm_8) { EmuStoreUpdateIndexed<1>(i, ppu); }
+EMU(STBUX, XForm_8) { EmuStoreUpdateIndexed<1>(i, TH); }
 
 PRINT(STH, DForm_3) { PrintStore("sth", i, result); }
-EMU(STH, DForm_3) { EmuStore<2>(i, ppu); }
+EMU(STH, DForm_3) { EmuStore<2>(i, TH); }
 PRINT(STHX, XForm_8) { PrintStoreIndexed("sthx", i, result); }
-EMU(STHX, XForm_8) { EmuStoreIndexed<2>(i, ppu); }
+EMU(STHX, XForm_8) { EmuStoreIndexed<2>(i, TH); }
 PRINT(STHU, DForm_3) { PrintStore("sthu", i, result); }
-EMU(STHU, DForm_3) { EmuStoreUpdate<2>(i, ppu); }
+EMU(STHU, DForm_3) { EmuStoreUpdate<2>(i, TH); }
 PRINT(STHUX, XForm_8) { PrintStoreIndexed("sthux", i, result); }
-EMU(STHUX, XForm_8) { EmuStoreUpdateIndexed<2>(i, ppu); }
+EMU(STHUX, XForm_8) { EmuStoreUpdateIndexed<2>(i, TH); }
 
 PRINT(STW, DForm_3) { PrintStore("stw", i, result); }
-EMU(STW, DForm_3) { EmuStore<4>(i, ppu); }
+EMU(STW, DForm_3) { EmuStore<4>(i, TH); }
 PRINT(STWX, XForm_8) { PrintStoreIndexed("stwx", i, result); }
-EMU(STWX, XForm_8) { EmuStoreIndexed<4>(i, ppu); }
+EMU(STWX, XForm_8) { EmuStoreIndexed<4>(i, TH); }
 PRINT(STWU, DForm_3) { PrintStore("stwu", i, result); }
-EMU(STWU, DForm_3) { EmuStoreUpdate<4>(i, ppu); }
+EMU(STWU, DForm_3) { EmuStoreUpdate<4>(i, TH); }
 PRINT(STWUX, XForm_8) { PrintStoreIndexed("stwux", i, result); }
-EMU(STWUX, XForm_8) { EmuStoreUpdateIndexed<4>(i, ppu); }
+EMU(STWUX, XForm_8) { EmuStoreUpdateIndexed<4>(i, TH); }
 
 PRINT(STD, DSForm_2) { 
     *result = format_br_nnn("std", i->RS, i->DS, i->RA);
 }
 
 EMU(STD, DSForm_2) { 
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->DS.native();
-    ppu->store<8>(ea, ppu->getGPR(i->RS));
+    MM->store<8>(ea, TH->getGPR(i->RS));
 }
 
 PRINT(STDX, XForm_8) { PrintStoreIndexed("stdx", i, result); }
-EMU(STDX, XForm_8) { EmuStoreIndexed<8>(i, ppu); }
+EMU(STDX, XForm_8) { EmuStoreIndexed<8>(i, TH); }
 
 PRINT(STDU, DSForm_2) { 
     *result = format_br_nnn("stdu", i->RS, i->DS, i->RA);
 }
 
 EMU(STDU, DSForm_2) { 
-    auto ea = ppu->getGPR(i->RA) + i->DS.native();
-    ppu->store<8>(ea, ppu->getGPR(i->RS));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->DS.native();
+    MM->store<8>(ea, TH->getGPR(i->RS));
+    TH->setGPR(i->RA, ea);
 }
 
 PRINT(STDUX, XForm_8) { PrintStoreIndexed("stdux", i, result); }
-EMU(STDUX, XForm_8) { EmuStoreUpdateIndexed<8>(i, ppu); }
+EMU(STDUX, XForm_8) { EmuStoreUpdateIndexed<8>(i, TH); }
 
 // Fixed-Point Load and Store with Byte Reversal Instructions, p44
 
 template <int Bytes>
-void EmuLoadByteReverseIndexed(XForm_1* i, PPU* ppu) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setGPR(i->RT, endian_reverse(ppu->load<Bytes>(ea)));
+void EmuLoadByteReverseIndexed(XForm_1* i, PPUThread* thread) {
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setGPR(i->RT, endian_reverse(MM->load<Bytes>(ea)));
 }
 
 PRINT(LHBRX, XForm_1) { *result = format_nnn("lhbrx", i->RT, i->RA, i->RB); }
-EMU(LHBRX, XForm_1) { EmuLoadByteReverseIndexed<2>(i, ppu); }
+EMU(LHBRX, XForm_1) { EmuLoadByteReverseIndexed<2>(i, TH); }
 PRINT(LWBRX, XForm_1) { *result = format_nnn("lwbrx", i->RT, i->RA, i->RB); }
-EMU(LWBRX, XForm_1) { EmuLoadByteReverseIndexed<4>(i, ppu); }
+EMU(LWBRX, XForm_1) { EmuLoadByteReverseIndexed<4>(i, TH); }
 
 template <int Bytes>
-void EmuStoreByteReverseIndexed(XForm_8* i, PPU* ppu) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->store<Bytes>(ea, endian_reverse(ppu->getGPR(i->RS)));
+void EmuStoreByteReverseIndexed(XForm_8* i, PPUThread* thread) {
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    MM->store<Bytes>(ea, endian_reverse(TH->getGPR(i->RS)));
 }
 
 PRINT(STHBRX, XForm_8) { *result = format_nnn("sthbrx", i->RS, i->RA, i->RB); }
-EMU(STHBRX, XForm_8) { EmuStoreByteReverseIndexed<2>(i, ppu); }
+EMU(STHBRX, XForm_8) { EmuStoreByteReverseIndexed<2>(i, TH); }
 PRINT(STWBRX, XForm_8) { *result = format_nnn("stwbrx", i->RS, i->RA, i->RB); }
-EMU(STWBRX, XForm_8) { EmuStoreByteReverseIndexed<4>(i, ppu); }
+EMU(STWBRX, XForm_8) { EmuStoreByteReverseIndexed<4>(i, TH); }
 
 // Fixed-Point Arithmetic Instructions, p51
 
@@ -735,8 +748,8 @@ PRINT(ADDI, DForm_2) {
 }
 
 EMU(ADDI, DForm_2) {
-    auto b = getB(i->RA, ppu);
-    ppu->setGPR(i->RT, i->SI.s() + b);
+    auto b = getB(i->RA, TH);
+    TH->setGPR(i->RT, i->SI.s() + b);
 }
 
 PRINT(ADDIS, DForm_2) {
@@ -744,31 +757,31 @@ PRINT(ADDIS, DForm_2) {
 }
 
 EMU(ADDIS, DForm_2) {
-    auto b = getB(i->RA, ppu);
-    ppu->setGPR(i->RT, (int32_t)(i->SI.u() << 16) + b);
+    auto b = getB(i->RA, TH);
+    TH->setGPR(i->RT, (int32_t)(i->SI.u() << 16) + b);
 }
 
 template <int N, typename T>
-inline void update_CRFSign(T result, PPU* ppu) {
+inline void update_CRFSign(T result, PPUThread* thread) {
     auto s = result < 0 ? 4
            : result > 0 ? 2
            : 1;
-    ppu->setCRF_sign(N, s);
+    TH->setCRF_sign(N, s);
 }
 
-inline void update_CR0(int64_t result, PPU* ppu) {
-    update_CRFSign<0>(result, ppu);
+inline void update_CR0(int64_t result, PPUThread* thread) {
+    update_CRFSign<0>(result, TH);
 }
 
 template <int P1, int P2>
 inline void update_CR0_OV(BitField<P1, P1 + 1> oe, 
                           BitField<P2, P2 + 1> rc, 
-                          bool ov, int64_t result, PPU* ppu) {
+                          bool ov, int64_t result, PPUThread* thread) {
     if (oe.u() && ov) {
-        ppu->setOV();
+        TH->setOV();
     }
     if (rc.u()) {
-        update_CR0(result, ppu);
+        update_CR0(result, TH);
     }
 }
 
@@ -780,12 +793,12 @@ PRINT(ADD, XOForm_1) {
 }
 
 EMU(ADD, XOForm_1) {
-    auto ra = ppu->getGPR(i->RA);
-    auto rb = ppu->getGPR(i->RB);
+    auto ra = TH->getGPR(i->RA);
+    auto rb = TH->getGPR(i->RB);
     unsigned __int128 res = (__int128)ra + rb;
     bool ov = res > 0xffffffffffffffff;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(ADDZE, XOForm_3) {
@@ -796,11 +809,11 @@ PRINT(ADDZE, XOForm_3) {
 }
 
 EMU(ADDZE, XOForm_3) {
-    auto ra = ppu->getGPR(i->RA);
-    unsigned __int128 res = (__int128)ra + ppu->getCA();
+    auto ra = TH->getGPR(i->RA);
+    unsigned __int128 res = (__int128)ra + TH->getCA();
     bool ov = res > 0xffffffffffffffff;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(SUBF, XOForm_1) {
@@ -811,16 +824,16 @@ PRINT(SUBF, XOForm_1) {
 }
 
 EMU(SUBF, XOForm_1) {
-    auto ra = ppu->getGPR(i->RA);
-    auto rb = ppu->getGPR(i->RB);
+    auto ra = TH->getGPR(i->RA);
+    auto rb = TH->getGPR(i->RB);
     uint64_t res;
     bool ov = 0;
     if (i->OE.u())
         ov = __builtin_usubl_overflow(rb, ra, &res);
     else
         res = rb - ra;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(ADDIC, DForm_2) {
@@ -828,12 +841,12 @@ PRINT(ADDIC, DForm_2) {
 }
 
 EMU(ADDIC, DForm_2) {
-    auto ra = ppu->getGPR(i->RA);
+    auto ra = TH->getGPR(i->RA);
     auto si = i->SI.s();
     uint64_t res;
     auto ov = __builtin_uaddl_overflow(ra, si, &res);
-    ppu->setGPR(i->RT, res);
-    ppu->setCA(ov);
+    TH->setGPR(i->RT, res);
+    TH->setCA(ov);
 }
 
 PRINT(ADDICD, DForm_2) {
@@ -841,13 +854,13 @@ PRINT(ADDICD, DForm_2) {
 }
 
 EMU(ADDICD, DForm_2) {
-    auto ra = ppu->getGPR(i->RA);
+    auto ra = TH->getGPR(i->RA);
     auto si = i->SI.s();
     uint64_t res;
     auto ov = __builtin_uaddl_overflow(ra, si, &res);
-    ppu->setGPR(i->RT, res);
-    ppu->setCA(ov);
-    update_CR0(res, ppu);
+    TH->setGPR(i->RT, res);
+    TH->setCA(ov);
+    update_CR0(res, TH);
 }
 
 PRINT(SUBFIC, DForm_2) {
@@ -855,12 +868,12 @@ PRINT(SUBFIC, DForm_2) {
 }
 
 EMU(SUBFIC, DForm_2) {
-    auto ra = ppu->getGPR(i->RA);
+    auto ra = TH->getGPR(i->RA);
     auto si = i->SI.s();
     int64_t res;
     auto ov = __builtin_ssubl_overflow(si, ra, &res);
-    ppu->setGPR(i->RT, res);
-    ppu->setCA(ov);
+    TH->setGPR(i->RT, res);
+    TH->setCA(ov);
 }
 
 // Fixed-Point Logical Instructions, p65
@@ -872,9 +885,9 @@ PRINT(ANDID, DForm_4) {
 }
 
 EMU(ANDID, DForm_4) {
-    auto res = ppu->getGPR(i->RS) & i->UI.u();
-    update_CR0(res, ppu);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) & i->UI.u();
+    update_CR0(res, TH);
+    TH->setGPR(i->RA, res);
 }
 
 PRINT(ANDISD, DForm_4) {
@@ -882,9 +895,9 @@ PRINT(ANDISD, DForm_4) {
 }
 
 EMU(ANDISD, DForm_4) {
-    auto res = ppu->getGPR(i->RS) & (i->UI.u() << 16);
-    update_CR0(res, ppu);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) & (i->UI.u() << 16);
+    update_CR0(res, TH);
+    TH->setGPR(i->RA, res);
 }
 
 // OR
@@ -898,8 +911,8 @@ PRINT(ORI, DForm_4) {
 }
 
 EMU(ORI, DForm_4) {
-    auto res = ppu->getGPR(i->RS) | i->UI.u();
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) | i->UI.u();
+    TH->setGPR(i->RA, res);
 }
 
 PRINT(ORIS, DForm_4) {
@@ -907,8 +920,8 @@ PRINT(ORIS, DForm_4) {
 }
 
 EMU(ORIS, DForm_4) {
-    auto res = ppu->getGPR(i->RS) | (i->UI.u() << 16);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) | (i->UI.u() << 16);
+    TH->setGPR(i->RA, res);
 }
 
 // XOR
@@ -918,8 +931,8 @@ PRINT(XORI, DForm_4) {
 }
 
 EMU(XORI, DForm_4) {
-    auto res = ppu->getGPR(i->RS) ^ i->UI.u();
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) ^ i->UI.u();
+    TH->setGPR(i->RA, res);
 }
 
 PRINT(XORIS, DForm_4) {
@@ -927,8 +940,8 @@ PRINT(XORIS, DForm_4) {
 }
 
 EMU(XORIS, DForm_4) {
-    auto res = ppu->getGPR(i->RS) ^ (i->UI.u() << 16);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) ^ (i->UI.u() << 16);
+    TH->setGPR(i->RA, res);
 }
 
 // X-forms
@@ -938,10 +951,10 @@ PRINT(AND, XForm_6) {
 }
 
 EMU(AND, XForm_6) {
-    auto res = ppu->getGPR(i->RS) & ppu->getGPR(i->RB);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) & TH->getGPR(i->RB);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(OR, XForm_6) {
@@ -953,10 +966,10 @@ PRINT(OR, XForm_6) {
 }
 
 EMU(OR, XForm_6) {
-    auto res = ppu->getGPR(i->RS) | ppu->getGPR(i->RB);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) | TH->getGPR(i->RB);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(XOR, XForm_6) {
@@ -964,10 +977,10 @@ PRINT(XOR, XForm_6) {
 }
 
 EMU(XOR, XForm_6) {
-    auto res = ppu->getGPR(i->RS) ^ ppu->getGPR(i->RB);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) ^ TH->getGPR(i->RB);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(NAND, XForm_6) {
@@ -975,10 +988,10 @@ PRINT(NAND, XForm_6) {
 }
 
 EMU(NAND, XForm_6) {
-    auto res = ~(ppu->getGPR(i->RS) & ppu->getGPR(i->RB));
-    ppu->setGPR(i->RA, res);
+    auto res = ~(TH->getGPR(i->RS) & TH->getGPR(i->RB));
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(NOR, XForm_6) {
@@ -986,10 +999,10 @@ PRINT(NOR, XForm_6) {
 }
 
 EMU(NOR, XForm_6) {
-    auto res = ~(ppu->getGPR(i->RS) | ppu->getGPR(i->RB));
-    ppu->setGPR(i->RA, res);
+    auto res = ~(TH->getGPR(i->RS) | TH->getGPR(i->RB));
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(EQV, XForm_6) {
@@ -997,10 +1010,10 @@ PRINT(EQV, XForm_6) {
 }
 
 EMU(EQV, XForm_6) {
-    auto res = ~(ppu->getGPR(i->RS) ^ ppu->getGPR(i->RB));
-    ppu->setGPR(i->RA, res);
+    auto res = ~(TH->getGPR(i->RS) ^ TH->getGPR(i->RB));
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(ANDC, XForm_6) {
@@ -1008,10 +1021,10 @@ PRINT(ANDC, XForm_6) {
 }
 
 EMU(ANDC, XForm_6) {
-    auto res = ppu->getGPR(i->RS) & ~ppu->getGPR(i->RB);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) & ~TH->getGPR(i->RB);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(ORC, XForm_6) {
@@ -1019,10 +1032,10 @@ PRINT(ORC, XForm_6) {
 }
 
 EMU(ORC, XForm_6) {
-    auto res = ppu->getGPR(i->RS) | ~ppu->getGPR(i->RB);
-    ppu->setGPR(i->RA, res);
+    auto res = TH->getGPR(i->RS) | ~TH->getGPR(i->RB);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 // Extend Sign
@@ -1032,7 +1045,7 @@ PRINT(EXTSB, XForm_11) {
 }
 
 EMU(EXTSB, XForm_11) {
-    ppu->setGPR(i->RA, (int64_t)static_cast<int8_t>(ppu->getGPR(i->RS)));
+    TH->setGPR(i->RA, (int64_t)static_cast<int8_t>(TH->getGPR(i->RS)));
 }
 
 PRINT(EXTSH, XForm_11) {
@@ -1040,7 +1053,7 @@ PRINT(EXTSH, XForm_11) {
 }
 
 EMU(EXTSH, XForm_11) {
-    ppu->setGPR(i->RA, (int64_t)static_cast<int16_t>(ppu->getGPR(i->RS)));
+    TH->setGPR(i->RA, (int64_t)static_cast<int16_t>(TH->getGPR(i->RS)));
 }
 
 PRINT(EXTSW, XForm_11) {
@@ -1048,7 +1061,7 @@ PRINT(EXTSW, XForm_11) {
 }
 
 EMU(EXTSW, XForm_11) {
-    ppu->setGPR(i->RA, (int64_t)static_cast<int32_t>(ppu->getGPR(i->RS)));
+    TH->setGPR(i->RA, (int64_t)static_cast<int32_t>(TH->getGPR(i->RS)));
 }
 
 // Move To/From System Register Instructions, p81
@@ -1073,20 +1086,20 @@ PRINT(MTSPR, XFXForm_7) {
     if (mnemonic) {
         *result = format_n(mnemonic, i->RS);
     } else {
-        throw std::runtime_error("illegal");
+        throw IllegalInstructionException();
     }
 }
 
 EMU(MTSPR, XFXForm_7) {
-    auto rs = ppu->getGPR(i->RS);
+    auto rs = TH->getGPR(i->RS);
     if (isXER(i->spr)) {
-        ppu->setXER(rs);
+        TH->setXER(rs);
     } else if (isLR(i->spr)) {
-        ppu->setLR(rs);
+        TH->setLR(rs);
     } else if (isCTR(i->spr)) {
-        ppu->setCTR(rs);
+        TH->setCTR(rs);
     } else {
-        throw std::runtime_error("illegal");
+        throw IllegalInstructionException();
     }
 }
 
@@ -1098,16 +1111,16 @@ PRINT(MFSPR, XFXForm_7) {
     if (mnemonic) {
         *result = format_n(mnemonic, i->RS);
     } else {
-        throw std::runtime_error("illegal");
+        throw IllegalInstructionException();
     }
 }
 
 EMU(MFSPR, XFXForm_7) {
-    auto v = isXER(i->spr) ? ppu->getXER()
-           : isLR(i->spr) ? ppu->getLR()
-           : isCTR(i->spr) ? ppu->getCTR()
+    auto v = isXER(i->spr) ? TH->getXER()
+           : isLR(i->spr) ? TH->getLR()
+           : isCTR(i->spr) ? TH->getCTR()
            : (throw std::runtime_error("illegal"), 0);
-     ppu->setGPR(i->RS, v);
+     TH->setGPR(i->RS, v);
 }
 
 template <int Pos04, int Pos5>
@@ -1151,12 +1164,12 @@ PRINT(RLDICL, MDForm_1) {
 EMU(RLDICL, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);
-    auto r = rol(ppu->getGPR(i->RS), n);
+    auto r = rol(TH->getGPR(i->RS), n);
     auto m = mask<64>(b, 63);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLDICR, MDForm_2) {
@@ -1176,12 +1189,12 @@ PRINT(RLDICR, MDForm_2) {
 EMU(RLDICR, MDForm_2) {
     auto n = getNBE(i->sh04, i->sh5);
     auto e = getNBE(i->me04, i->me5);
-    auto r = rol(ppu->getGPR(i->RS), n);
+    auto r = rol(TH->getGPR(i->RS), n);
     auto m = mask<64>(0, e);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLDIMI, MDForm_1) {
@@ -1197,12 +1210,12 @@ PRINT(RLDIMI, MDForm_1) {
 EMU(RLDIMI, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);
-    auto r = rol(ppu->getGPR(i->RS), n);
+    auto r = rol(TH->getGPR(i->RS), n);
     auto m = mask<64>(b, ~n & 63);
-    auto res = (r & m) | (ppu->getGPR(i->RA) & (~m));
-    ppu->setGPR(i->RA, res);
+    auto res = (r & m) | (TH->getGPR(i->RA) & (~m));
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLDCL, MDSForm_1) {
@@ -1214,14 +1227,14 @@ PRINT(RLDCL, MDSForm_1) {
 }
     
 EMU(RLDCL, MDSForm_1) {
-    auto n = ppu->getGPR(i->RB) & 127;
-    auto r = rol(ppu->getGPR(i->RS), n);
+    auto n = TH->getGPR(i->RB) & 127;
+    auto r = rol(TH->getGPR(i->RS), n);
     auto b = i->mb.u();
     auto m = mask<64>(b, 63);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLDCR, MDSForm_2) {
@@ -1229,14 +1242,14 @@ PRINT(RLDCR, MDSForm_2) {
 }
 
 EMU(RLDCR, MDSForm_2) {
-    auto n = ppu->getGPR(i->RB) & 127;
-    auto r = rol(ppu->getGPR(i->RS), n);
+    auto n = TH->getGPR(i->RB) & 127;
+    auto r = rol(TH->getGPR(i->RS), n);
     auto e = i->me.u();
     auto m = mask<64>(0, e);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLDIC, MDForm_1) {
@@ -1252,12 +1265,12 @@ PRINT(RLDIC, MDForm_1) {
 EMU(RLDIC, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);    
-    auto r = rol(ppu->getGPR(i->RS), n);
+    auto r = rol(TH->getGPR(i->RS), n);
     auto m = mask<64>(b, ~n & 63);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLWINM, MForm_2) {
@@ -1291,12 +1304,12 @@ PRINT(RLWINM, MForm_2) {
 
 EMU(RLWINM, MForm_2) {
     auto n = i->SH.u();
-    auto r = rol32(ppu->getGPR(i->RS), n);
+    auto r = rol32(TH->getGPR(i->RS), n);
     auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLWNM, MForm_1) {
@@ -1308,13 +1321,13 @@ PRINT(RLWNM, MForm_1) {
 }
 
 EMU(RLWNM, MForm_1) {
-    auto n = ppu->getGPR(i->RB) & 31;
-    auto r = rol32(ppu->getGPR(i->RS), n);
+    auto n = TH->getGPR(i->RB) & 31;
+    auto r = rol32(TH->getGPR(i->RS), n);
     auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
     auto res = r & m;
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(RLWIMI, MForm_2) {
@@ -1332,12 +1345,12 @@ PRINT(RLWIMI, MForm_2) {
 
 EMU(RLWIMI, MForm_2) {
     auto n = i->SH.u();
-    auto r = rol32(ppu->getGPR(i->RS), n);
+    auto r = rol32(TH->getGPR(i->RS), n);
     auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
-    auto res = (r & m) | (ppu->getGPR(i->RA) & ~m);
-    ppu->setGPR(i->RA, res);
+    auto res = (r & m) | (TH->getGPR(i->RA) & ~m);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(SC, SCForm) {
@@ -1345,7 +1358,7 @@ PRINT(SC, SCForm) {
 }
 
 EMU(SC, SCForm) {
-    ppu->scall();
+    TH->scall();
 }
 
 PRINT(NCALL, NCallForm) {
@@ -1353,7 +1366,7 @@ PRINT(NCALL, NCallForm) {
 }
 
 EMU(NCALL, NCallForm) {
-    ppu->ncall(i->idx.u());
+    TH->ncall(i->idx.u());
 }
 
 template <int LPos>
@@ -1376,11 +1389,11 @@ PRINT(CMPI, DForm_5) {
 }
 
 EMU(CMPI, DForm_5) {
-    auto a = get_cmp_ab(i->L, ppu->getGPR(i->RA));
+    auto a = get_cmp_ab(i->L, TH->getGPR(i->RA));
     auto c = a < i->SI.s() ? 4
            : a > i->SI.s() ? 2
            : 1;
-    ppu->setCRF_sign(i->BF.u(), c);
+    TH->setCRF_sign(i->BF.u(), c);
 }
 
 PRINT(CMP, XForm_16) {
@@ -1393,12 +1406,12 @@ PRINT(CMP, XForm_16) {
 }
 
 EMU(CMP, XForm_16) {
-    auto a = get_cmp_ab(i->L, ppu->getGPR(i->RA));
-    auto b = get_cmp_ab(i->L, ppu->getGPR(i->RB));
+    auto a = get_cmp_ab(i->L, TH->getGPR(i->RA));
+    auto b = get_cmp_ab(i->L, TH->getGPR(i->RB));
     auto c = a < b ? 4
            : a > b ? 2
            : 1;
-    ppu->setCRF_sign(i->BF.u(), c);
+    TH->setCRF_sign(i->BF.u(), c);
 }
 
 template <int LPos>
@@ -1416,11 +1429,11 @@ PRINT(CMPLI, DForm_6) {
 }
 
 EMU(CMPLI, DForm_6) {
-    auto a = get_cmpl_ab(i->L, ppu->getGPR(i->RA));
+    auto a = get_cmpl_ab(i->L, TH->getGPR(i->RA));
     auto c = a < i->UI.u() ? 4
            : a > i->UI.u() ? 2
            : 1;
-    ppu->setCRF_sign(i->BF.u(), c);
+    TH->setCRF_sign(i->BF.u(), c);
 }
 
 PRINT(CMPL, XForm_16) {
@@ -1433,12 +1446,12 @@ PRINT(CMPL, XForm_16) {
 }
 
 EMU(CMPL, XForm_16) {
-    auto a = get_cmpl_ab(i->L, ppu->getGPR(i->RA));
-    auto b = get_cmpl_ab(i->L, ppu->getGPR(i->RB));
+    auto a = get_cmpl_ab(i->L, TH->getGPR(i->RA));
+    auto b = get_cmpl_ab(i->L, TH->getGPR(i->RB));
     auto c = a < b ? 4
            : a > b ? 2
            : 1;
-    ppu->setCRF_sign(i->BF.u(), c);
+    TH->setCRF_sign(i->BF.u(), c);
 }
 
 PRINT(MFCR, XFXForm_3) {
@@ -1446,7 +1459,7 @@ PRINT(MFCR, XFXForm_3) {
 }
 
 EMU(MFCR, XFXForm_3) {
-    ppu->setGPR(i->RT, ppu->getCR());
+    TH->setGPR(i->RT, TH->getCR());
 }
 
 PRINT(SLD, XForm_6) {
@@ -1454,11 +1467,11 @@ PRINT(SLD, XForm_6) {
 }
 
 EMU(SLD, XForm_6) {
-    auto b = ppu->getGPR(i->RB) & 127;
-    auto res = b > 63 ? 0 : ppu->getGPR(i->RS) << b;
-    ppu->setGPR(i->RA, res);
+    auto b = TH->getGPR(i->RB) & 127;
+    auto res = b > 63 ? 0 : TH->getGPR(i->RS) << b;
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(SLW, XForm_6) {
@@ -1466,11 +1479,11 @@ PRINT(SLW, XForm_6) {
 }
 
 EMU(SLW, XForm_6) {
-    auto b = ppu->getGPR(i->RB) & 63;
-    auto res = b > 31 ? 0 : (uint32_t)ppu->getGPR(i->RS) << b;
-    ppu->setGPR(i->RA, res);
+    auto b = TH->getGPR(i->RB) & 63;
+    auto res = b > 31 ? 0 : (uint32_t)TH->getGPR(i->RS) << b;
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(SRD, XForm_6) {
@@ -1478,11 +1491,11 @@ PRINT(SRD, XForm_6) {
 }
 
 EMU(SRD, XForm_6) {
-    auto b = ppu->getGPR(i->RB) & 127;
-    auto res = b > 63 ? 0 : ppu->getGPR(i->RS) >> b;
-    ppu->setGPR(i->RA, res);
+    auto b = TH->getGPR(i->RB) & 127;
+    auto res = b > 63 ? 0 : TH->getGPR(i->RS) >> b;
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(SRW, XForm_6) {
@@ -1490,11 +1503,11 @@ PRINT(SRW, XForm_6) {
 }
 
 EMU(SRW, XForm_6) {
-    auto b = ppu->getGPR(i->RB) & 63;
-    auto res = b > 31 ? 0 : (uint32_t)ppu->getGPR(i->RS) >> b;
-    ppu->setGPR(i->RA, res);
+    auto b = TH->getGPR(i->RB) & 63;
+    auto res = b > 31 ? 0 : (uint32_t)TH->getGPR(i->RS) >> b;
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(SRADI, XSForm) {
@@ -1504,14 +1517,14 @@ PRINT(SRADI, XSForm) {
 
 EMU(SRADI, XSForm) {
     auto n =  getNBE(i->sh04, i->sh5);
-    auto rs = ppu->getGPR(i->RS);
+    auto rs = TH->getGPR(i->RS);
     auto sign = rs & (1ul << 63);
     auto ca = n == 0 ? 0 : (sign && (rs & mask<64>(64 - n, 63)));
     auto res = (rs >> n) | (sign ? mask<64>(0, n) : 0);
-    ppu->setGPR(i->RA, res);
-    ppu->setCA(ca);
+    TH->setGPR(i->RA, res);
+    TH->setCA(ca);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(SRAWI, XForm_10) {
@@ -1520,14 +1533,14 @@ PRINT(SRAWI, XForm_10) {
 
 EMU(SRAWI, XForm_10) {
     auto n =  i->SH.u();
-    auto rs = ppu->getGPR(i->RS) & 0xffffffff;
+    auto rs = TH->getGPR(i->RS) & 0xffffffff;
     auto sign = rs & (1ul << 31);
     auto ca = n == 0 ? 0 : (sign && (rs & mask<64>(64 - n, 63)));
     auto res = (int32_t)((rs >> n) | (sign ? mask<32>(0, n) : 0));
-    ppu->setGPR(i->RA, res);
-    ppu->setCA(ca);
+    TH->setGPR(i->RA, res);
+    TH->setCA(ca);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 
@@ -1539,11 +1552,11 @@ PRINT(NEG, XOForm_3) {
 }
 
 EMU(NEG, XOForm_3) {
-    auto ra = ppu->getGPR(i->RA);
+    auto ra = TH->getGPR(i->RA);
     auto ov = ra == (1ull << 63);
     auto res = ov ? ra : (~ra + 1);
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);    
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);    
 }
 
 PRINT(DIVD, XOForm_1) {
@@ -1554,12 +1567,12 @@ PRINT(DIVD, XOForm_1) {
 }
 
 EMU(DIVD, XOForm_1) {
-    int64_t dividend = ppu->getGPR(i->RA);
-    int64_t divisor = ppu->getGPR(i->RB);
+    int64_t dividend = TH->getGPR(i->RA);
+    int64_t divisor = TH->getGPR(i->RB);
     auto ov = divisor == 0 || ((uint64_t)dividend == 0x8000000000000000 && divisor == -1ll);
     int64_t res = ov ? 0 : dividend / divisor;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(DIVW, XOForm_1) {
@@ -1570,12 +1583,12 @@ PRINT(DIVW, XOForm_1) {
 }
 
 EMU(DIVW, XOForm_1) {
-    int64_t dividend = (int32_t)(ppu->getGPR(i->RA) & 0xffffffff);
-    int64_t divisor = (int32_t)(ppu->getGPR(i->RB) & 0xffffffff);
+    int64_t dividend = (int32_t)(TH->getGPR(i->RA) & 0xffffffff);
+    int64_t divisor = (int32_t)(TH->getGPR(i->RB) & 0xffffffff);
     auto ov = divisor == 0 || ((uint64_t)dividend == 0x80000000 && divisor == -1l);
     int64_t res = ov ? 0 : dividend / divisor;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(DIVDU, XOForm_1) {
@@ -1586,12 +1599,12 @@ PRINT(DIVDU, XOForm_1) {
 }
 
 EMU(DIVDU, XOForm_1) {
-    auto dividend = ppu->getGPR(i->RA);
-    auto divisor = ppu->getGPR(i->RB);
+    auto dividend = TH->getGPR(i->RA);
+    auto divisor = TH->getGPR(i->RB);
     auto ov = divisor == 0;
     auto res = ov ? 0 : dividend / divisor;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(DIVWU, XOForm_1) {
@@ -1602,12 +1615,12 @@ PRINT(DIVWU, XOForm_1) {
 }
 
 EMU(DIVWU, XOForm_1) {
-    auto dividend = static_cast<uint32_t>(ppu->getGPR(i->RA));
-    auto divisor = static_cast<uint32_t>(ppu->getGPR(i->RB));
+    auto dividend = static_cast<uint32_t>(TH->getGPR(i->RA));
+    auto divisor = static_cast<uint32_t>(TH->getGPR(i->RB));
     auto ov = divisor == 0;
     auto res = ov ? 0 : dividend / divisor;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(MULLD, XOForm_1) {
@@ -1618,12 +1631,12 @@ PRINT(MULLD, XOForm_1) {
 }
 
 EMU(MULLD, XOForm_1) {
-    auto a = ppu->getGPR(i->RA);
-    auto b = ppu->getGPR(i->RB);
+    auto a = TH->getGPR(i->RA);
+    auto b = TH->getGPR(i->RB);
     unsigned __int128 res = a * b;
     auto ov = res > 0xffffffffffffffff;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 
@@ -1635,11 +1648,11 @@ PRINT(MULLW, XOForm_1) {
 }
 
 EMU(MULLW, XOForm_1) {
-    auto res = (ppu->getGPR(i->RA) & 0xffffffff)
-             * (ppu->getGPR(i->RB) & 0xffffffff);
+    auto res = (TH->getGPR(i->RA) & 0xffffffff)
+             * (TH->getGPR(i->RB) & 0xffffffff);
     auto ov = res > 0xffffffff;
-    ppu->setGPR(i->RT, res);
-    update_CR0_OV(i->OE, i->Rc, ov, res, ppu);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ov, res, TH);
 }
 
 PRINT(MULHD, XOForm_1) {
@@ -1647,11 +1660,11 @@ PRINT(MULHD, XOForm_1) {
 }
 
 EMU(MULHD, XOForm_1) {
-    unsigned __int128 prod = (__int128)ppu->getGPR(i->RA) * ppu->getGPR(i->RB);
+    unsigned __int128 prod = (__int128)TH->getGPR(i->RA) * TH->getGPR(i->RB);
     auto res = prod >> 64;
-    ppu->setGPR(i->RT, res);
+    TH->setGPR(i->RT, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(MULHW, XOForm_1) {
@@ -1659,12 +1672,12 @@ PRINT(MULHW, XOForm_1) {
 }
 
 EMU(MULHW, XOForm_1) {
-    int64_t prod = (int64_t)(int32_t)ppu->getGPR(i->RA)
-                 * (int64_t)(int32_t)ppu->getGPR(i->RB);
+    int64_t prod = (int64_t)(int32_t)TH->getGPR(i->RA)
+                 * (int64_t)(int32_t)TH->getGPR(i->RB);
     auto res = (int64_t)((uint64_t)prod >> 32);
-    ppu->setGPR(i->RT, res);
+    TH->setGPR(i->RT, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(MULHWU, XOForm_1) {
@@ -1672,12 +1685,12 @@ PRINT(MULHWU, XOForm_1) {
 }
 
 EMU(MULHWU, XOForm_1) {
-    uint64_t prod = (uint64_t)(int32_t)ppu->getGPR(i->RA)
-                  * (uint64_t)(int32_t)ppu->getGPR(i->RB);
+    uint64_t prod = (uint64_t)(int32_t)TH->getGPR(i->RA)
+                  * (uint64_t)(int32_t)TH->getGPR(i->RB);
     auto res = (uint64_t)((uint64_t)prod >> 32);
-    ppu->setGPR(i->RT, res);
+    TH->setGPR(i->RT, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(MULHDU, XOForm_1) {
@@ -1685,12 +1698,12 @@ PRINT(MULHDU, XOForm_1) {
 }
 
 EMU(MULHDU, XOForm_1) {
-    unsigned __int128 prod = (unsigned __int128)ppu->getGPR(i->RA) * 
-                             (unsigned __int128)ppu->getGPR(i->RB);
+    unsigned __int128 prod = (unsigned __int128)TH->getGPR(i->RA) * 
+                             (unsigned __int128)TH->getGPR(i->RB);
     auto res = prod >> 64;
-    ppu->setGPR(i->RT, res);
+    TH->setGPR(i->RT, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(MULLI, DForm_2) {
@@ -1698,9 +1711,9 @@ PRINT(MULLI, DForm_2) {
 }
 
 EMU(MULLI, DForm_2) {
-    __int128 a = (int64_t)ppu->getGPR(i->RA);
+    __int128 a = (int64_t)TH->getGPR(i->RA);
     auto prod = a * i->SI.s();
-    ppu->setGPR(i->RT, prod);
+    TH->setGPR(i->RT, prod);
 }
 
 PRINT(MTOCRF, XFXForm_6) {
@@ -1717,9 +1730,9 @@ EMU(MTOCRF, XFXForm_6) {
            : fxm & 4 ? 5
            : fxm & 2 ? 6
            : 7;
-    auto cr = ppu->getCR() & ~mask<32>(4*n, 4*n + 3);
-    auto rs = ppu->getGPR(i->RS) & mask<32>(4*n, 4*n + 3);
-    ppu->setCR(cr | rs);
+    auto cr = TH->getCR() & ~mask<32>(4*n, 4*n + 3);
+    auto rs = TH->getGPR(i->RS) & mask<32>(4*n, 4*n + 3);
+    TH->setCR(cr | rs);
 }
 
 PRINT(DCBT, XForm_31) {
@@ -1734,11 +1747,11 @@ PRINT(CNTLZD, XForm_11) {
 
 EMU(CNTLZD, XForm_11) {
     static_assert(sizeof(unsigned long long int) == 8, "");
-    auto rs = ppu->getGPR(i->RS);
+    auto rs = TH->getGPR(i->RS);
     auto res = !rs ? 64 : __builtin_clzll(rs);
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(CNTLZW, XForm_11) {
@@ -1747,11 +1760,11 @@ PRINT(CNTLZW, XForm_11) {
 
 EMU(CNTLZW, XForm_11) {
     static_assert(sizeof(unsigned int) == 4, "");
-    auto rs = ppu->getGPR(i->RS);
+    auto rs = TH->getGPR(i->RS);
     auto res = !rs ? 32 : __builtin_clz(rs);
-    ppu->setGPR(i->RA, res);
+    TH->setGPR(i->RA, res);
     if (i->Rc.u())
-        update_CR0(res, ppu);
+        update_CR0(res, TH);
 }
 
 PRINT(LFS, DForm_8) {
@@ -1759,9 +1772,9 @@ PRINT(LFS, DForm_8) {
 }
 
 EMU(LFS, DForm_8) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->setFPRd(i->FRT, ppu->loadf(ea));
+    TH->setFPRd(i->FRT, MM->loadf(ea));
 }
 
 PRINT(LFSX, XForm_26) {
@@ -1769,9 +1782,9 @@ PRINT(LFSX, XForm_26) {
 }
 
 EMU(LFSX, XForm_26) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setFPRd(i->FRT, ppu->loadf(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setFPRd(i->FRT, MM->loadf(ea));
 }
 
 PRINT(LFSU, DForm_8) {
@@ -1779,9 +1792,9 @@ PRINT(LFSU, DForm_8) {
 }
 
 EMU(LFSU, DForm_8) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->setFPRd(i->FRT, ppu->loadf(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    TH->setFPRd(i->FRT, MM->loadf(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 PRINT(LFSUX, XForm_26) {
@@ -1789,9 +1802,9 @@ PRINT(LFSUX, XForm_26) {
 }
 
 EMU(LFSUX, XForm_26) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setFPRd(i->FRT, ppu->loadf(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setFPRd(i->FRT, MM->loadf(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 PRINT(LFD, DForm_8) {
@@ -1799,9 +1812,9 @@ PRINT(LFD, DForm_8) {
 }
 
 EMU(LFD, DForm_8) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    ppu->setFPRd(i->FRT, ppu->loadd(ea));
+    TH->setFPRd(i->FRT, MM->loadd(ea));
 }
 
 PRINT(LFDX, XForm_26) {
@@ -1809,9 +1822,9 @@ PRINT(LFDX, XForm_26) {
 }
 
 EMU(LFDX, XForm_26) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    ppu->setFPRd(i->FRT, ppu->loadd(ea));
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    TH->setFPRd(i->FRT, MM->loadd(ea));
 }
 
 PRINT(LFDU, DForm_8) {
@@ -1819,9 +1832,9 @@ PRINT(LFDU, DForm_8) {
 }
 
 EMU(LFDU, DForm_8) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    ppu->setFPRd(i->FRT, ppu->loadd(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    TH->setFPRd(i->FRT, MM->loadd(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 PRINT(LFDUX, XForm_26) {
@@ -1829,9 +1842,9 @@ PRINT(LFDUX, XForm_26) {
 }
 
 EMU(LFDUX, XForm_26) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    ppu->setFPRd(i->FRT, ppu->loadd(ea));
-    ppu->setGPR(i->RA, ea);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    TH->setFPRd(i->FRT, MM->loadd(ea));
+    TH->setGPR(i->RA, ea);
 }
 
 PRINT(STFS, DForm_9) {
@@ -1839,10 +1852,10 @@ PRINT(STFS, DForm_9) {
 }
 
 EMU(STFS, DForm_9) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->storef(ea, frs);
+    auto frs = TH->getFPRd(i->FRS);
+    MM->storef(ea, frs);
 }
 
 PRINT(STFSX, XForm_29) {
@@ -1850,10 +1863,10 @@ PRINT(STFSX, XForm_29) {
 }
 
 EMU(STFSX, XForm_29) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->storef(ea, frs);
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    auto frs = TH->getFPRd(i->FRS);
+    MM->storef(ea, frs);
 }
 
 PRINT(STFSU, DForm_9) {
@@ -1861,9 +1874,9 @@ PRINT(STFSU, DForm_9) {
 }
 
 EMU(STFSU, DForm_9) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->storef(ea, frs);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    auto frs = TH->getFPRd(i->FRS);
+    MM->storef(ea, frs);
 }
 
 PRINT(STFSUX, XForm_29) {
@@ -1871,9 +1884,9 @@ PRINT(STFSUX, XForm_29) {
 }
 
 EMU(STFSUX, XForm_29) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->storef(ea, frs);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    auto frs = TH->getFPRd(i->FRS);
+    MM->storef(ea, frs);
 }
 
 PRINT(STFD, DForm_9) {
@@ -1881,10 +1894,10 @@ PRINT(STFD, DForm_9) {
 }
 
 EMU(STFD, DForm_9) {
-    auto b = getB(i->RA, ppu);
+    auto b = getB(i->RA, TH);
     auto ea = b + i->D.s();
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->stored(ea, frs);
+    auto frs = TH->getFPRd(i->FRS);
+    MM->stored(ea, frs);
 }
 
 PRINT(STFDX, XForm_29) {
@@ -1892,10 +1905,10 @@ PRINT(STFDX, XForm_29) {
 }
 
 EMU(STFDX, XForm_29) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->stored(ea, frs);
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    auto frs = TH->getFPRd(i->FRS);
+    MM->stored(ea, frs);
 }
 
 PRINT(STFDU, DForm_9) {
@@ -1903,9 +1916,9 @@ PRINT(STFDU, DForm_9) {
 }
 
 EMU(STFDU, DForm_9) {
-    auto ea = ppu->getGPR(i->RA) + i->D.s();
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->stored(ea, frs);
+    auto ea = TH->getGPR(i->RA) + i->D.s();
+    auto frs = TH->getFPRd(i->FRS);
+    MM->stored(ea, frs);
 }
 
 PRINT(STFDUX, XForm_29) {
@@ -1913,9 +1926,9 @@ PRINT(STFDUX, XForm_29) {
 }
 
 EMU(STFDUX, XForm_29) {
-    auto ea = ppu->getGPR(i->RA) + ppu->getGPR(i->RB);
-    auto frs = ppu->getFPRd(i->FRS);
-    ppu->stored(ea, frs);
+    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
+    auto frs = TH->getFPRd(i->FRS);
+    MM->stored(ea, frs);
 }
 
 PRINT(STFIWX, XForm_29) {
@@ -1923,10 +1936,10 @@ PRINT(STFIWX, XForm_29) {
 }
 
 EMU(STFIWX, XForm_29) {
-    auto b = getB(i->RA, ppu);
-    auto ea = b + ppu->getGPR(i->RB);
-    auto frs = (uint32_t)ppu->getFPR(i->FRS);
-    ppu->store<4>(ea, frs);
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    auto frs = (uint32_t)TH->getFPR(i->FRS);
+    MM->store<4>(ea, frs);
 }
 
 PRINT(FMR, XForm_27) {
@@ -1934,10 +1947,10 @@ PRINT(FMR, XForm_27) {
 }
 
 EMU(FMR, XForm_27) {
-    auto res = ppu->getFPRd(i->FRB);
-    ppu->setFPRd(i->FRT, res);
+    auto res = TH->getFPRd(i->FRB);
+    TH->setFPRd(i->FRT, res);
     if (i->Rc.u())
-        update_CRFSign<1>(res, ppu);
+        update_CRFSign<1>(res, TH);
 }
 
 PRINT(FNEG, XForm_27) {
@@ -1945,10 +1958,10 @@ PRINT(FNEG, XForm_27) {
 }
 
 EMU(FNEG, XForm_27) {
-    auto res = -ppu->getFPRd(i->FRB);
-    ppu->setFPRd(i->FRT, res);
+    auto res = -TH->getFPRd(i->FRB);
+    TH->setFPRd(i->FRT, res);
     if (i->Rc.u())
-        update_CRFSign<1>(res, ppu);
+        update_CRFSign<1>(res, TH);
 }
 
 PRINT(FABS, XForm_27) {
@@ -1956,10 +1969,10 @@ PRINT(FABS, XForm_27) {
 }
 
 EMU(FABS, XForm_27) {
-    auto res = std::abs(ppu->getFPRd(i->FRB));
-    ppu->setFPRd(i->FRT, res);
+    auto res = std::abs(TH->getFPRd(i->FRB));
+    TH->setFPRd(i->FRT, res);
     if (i->Rc.u())
-        update_CRFSign<1>(res, ppu);
+        update_CRFSign<1>(res, TH);
 }
 
 PRINT(FNABS, XForm_27) {
@@ -1967,10 +1980,10 @@ PRINT(FNABS, XForm_27) {
 }
 
 EMU(FNABS, XForm_27) {
-    auto res = -std::abs(ppu->getFPRd(i->FRB));
-    ppu->setFPRd(i->FRT, res);
+    auto res = -std::abs(TH->getFPRd(i->FRB));
+    TH->setFPRd(i->FRT, res);
     if (i->Rc.u())
-        update_CRFSign<1>(res, ppu);
+        update_CRFSign<1>(res, TH);
 }
 
 namespace FPRF {
@@ -2005,10 +2018,10 @@ inline uint32_t getFPRF(double r) {
 }
 
 template <typename T>
-inline void completeFPInstr(T a, T b, T c, T r, Rc_t rc, PPU* ppu) {
+inline void completeFPInstr(T a, T b, T c, T r, Rc_t rc, PPUThread* thread) {
     // TODO: set FI
     // TODO: set FR
-    auto fpscr = ppu->getFPSCR();
+    auto fpscr = TH->getFPSCR();
     fpscr.fprf.v = getFPRF(r);
     uint32_t fx = fpscr.f.FX;
     if (std::fetestexcept(FE_OVERFLOW)) {
@@ -2030,9 +2043,9 @@ inline void completeFPInstr(T a, T b, T c, T r, Rc_t rc, PPU* ppu) {
         }
     }
     fpscr.f.FX = fx;
-    ppu->setFPSCR(fpscr.v);
+    TH->setFPSCR(fpscr.v);
     if (rc.u())
-        update_CRFSign<1>(r, ppu);
+        update_CRFSign<1>(r, TH);
 }
 
 PRINT(FADD, AForm_2) {
@@ -2040,12 +2053,12 @@ PRINT(FADD, AForm_2) {
 }
 
 EMU(FADD, AForm_2) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a + b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, TH);
 }
 
 PRINT(FSUB, AForm_2) {
@@ -2053,12 +2066,12 @@ PRINT(FSUB, AForm_2) {
 }
 
 EMU(FSUB, AForm_2) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a - b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, TH);
 }
 
 PRINT(FSUBS, AForm_2) {
@@ -2066,12 +2079,12 @@ PRINT(FSUBS, AForm_2) {
 }
 
 EMU(FSUBS, AForm_2) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a - b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, TH);
 }
 
 PRINT(FADDS, AForm_2) {
@@ -2079,12 +2092,12 @@ PRINT(FADDS, AForm_2) {
 }
 
 EMU(FADDS, AForm_2) {
-    float a = ppu->getFPRd(i->FRA);
-    float b = ppu->getFPRd(i->FRB);
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRB);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a + b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0f, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0f, r, i->Rc, TH);
 }
 
 PRINT(FMUL, AForm_3) {
@@ -2092,12 +2105,12 @@ PRINT(FMUL, AForm_3) {
 }
 
 EMU(FMUL, AForm_3) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRC);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRC);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a * b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, TH);
 }
 
 PRINT(FMULS, AForm_3) {
@@ -2105,12 +2118,12 @@ PRINT(FMULS, AForm_3) {
 }
 
 EMU(FMULS, AForm_3) {
-    float a = ppu->getFPRd(i->FRA);
-    float b = ppu->getFPRd(i->FRC);
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRC);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a * b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0f, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0f, r, i->Rc, TH);
 }
 
 PRINT(FDIV, AForm_2) {
@@ -2118,12 +2131,12 @@ PRINT(FDIV, AForm_2) {
 }
 
 EMU(FDIV, AForm_2) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a / b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0, r, i->Rc, TH);
 }
 
 PRINT(FDIVS, AForm_2) {
@@ -2131,12 +2144,12 @@ PRINT(FDIVS, AForm_2) {
 }
 
 EMU(FDIVS, AForm_2) {
-    float a = ppu->getFPRd(i->FRA);
-    float b = ppu->getFPRd(i->FRB);
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRB);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a / b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0f, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, .0f, r, i->Rc, TH);
 }
 
 PRINT(FMADD, AForm_1) {
@@ -2144,13 +2157,13 @@ PRINT(FMADD, AForm_1) {
 }
 
 EMU(FMADD, AForm_1) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
-    auto c = ppu->getFPRd(i->FRC);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
+    auto c = TH->getFPRd(i->FRC);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a * c + b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
 }
 
 PRINT(FMADDS, AForm_1) {
@@ -2158,13 +2171,13 @@ PRINT(FMADDS, AForm_1) {
 }
 
 EMU(FMADDS, AForm_1) {
-    float a = ppu->getFPRd(i->FRA);
-    float b = ppu->getFPRd(i->FRB);
-    float c = ppu->getFPRd(i->FRC);
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRB);
+    float c = TH->getFPRd(i->FRC);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a * c + b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
 }
 
 PRINT(FMSUBS, AForm_1) {
@@ -2172,13 +2185,13 @@ PRINT(FMSUBS, AForm_1) {
 }
 
 EMU(FMSUBS, AForm_1) {
-    float a = ppu->getFPRd(i->FRA);
-    float b = ppu->getFPRd(i->FRB);
-    float c = ppu->getFPRd(i->FRC);
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRB);
+    float c = TH->getFPRd(i->FRC);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a * c - b;
-    ppu->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc, ppu);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
 }
 
 PRINT(FCFID, XForm_27) {
@@ -2186,14 +2199,14 @@ PRINT(FCFID, XForm_27) {
 }
 
 EMU(FCFID, XForm_27) {
-    double b = (int64_t)ppu->getFPR(i->FRB);
-    ppu->setFPRd(i->FRT, b);
-    auto fpscr = ppu->getFPSCR();
+    double b = (int64_t)TH->getFPR(i->FRB);
+    TH->setFPRd(i->FRT, b);
+    auto fpscr = TH->getFPSCR();
     fpscr.fprf.v = getFPRF(b);
-    ppu->setFPSCR(fpscr.v);
+    TH->setFPSCR(fpscr.v);
     // TODO: FX XX
     if (i->Rc.u())
-        update_CRFSign<1>(b, ppu);
+        update_CRFSign<1>(b, TH);
 }
 
 PRINT(FCMPU, XForm_17) {
@@ -2201,20 +2214,20 @@ PRINT(FCMPU, XForm_17) {
 }
 
 EMU(FCMPU, XForm_17) {
-    auto a = ppu->getFPRd(i->FRA);
-    auto b = ppu->getFPRd(i->FRB);
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
     uint32_t c = isnan(a) || isnan(b) ? 1
                : a < b ? 8
                : a > b ? 4
                : 2;
-    auto fpscr = ppu->getFPSCR();
+    auto fpscr = TH->getFPSCR();
     fpscr.fpcc.v = c;
-    ppu->setCRF(i->BF.u(), c);
+    TH->setCRF(i->BF.u(), c);
     if (issignaling(a) || issignaling(b)) {
         fpscr.f.FX |= 1;
         fpscr.f.VXSNAN = 1;
     }
-    ppu->setFPSCR(fpscr.v);
+    TH->setFPSCR(fpscr.v);
 }
 
 PRINT(FCTIWZ, XForm_27) {
@@ -2222,20 +2235,20 @@ PRINT(FCTIWZ, XForm_27) {
 }
 
 EMU(FCTIWZ, XForm_27) {
-    auto b = ppu->getFPRd(i->FRB);
+    auto b = TH->getFPRd(i->FRB);
     int32_t res = b > 2147483647. ? 0x7fffffff
                 : b < -2147483648. ? 0x80000000
                 : (int32_t)b;
     // TODO invalid operation, XX
-    auto fpscr = ppu->getFPSCR();
+    auto fpscr = TH->getFPSCR();
     if (issignaling(b)) {
         fpscr.f.FX = 1;
         fpscr.f.VXSNAN = 1;
     }
-    ppu->setFPR(i->FRT, res);
-    ppu->setFPSCR(fpscr.v);
+    TH->setFPR(i->FRT, res);
+    TH->setFPSCR(fpscr.v);
     if (i->Rc.u())
-        update_CRFSign<1>(res, ppu);
+        update_CRFSign<1>(res, TH);
 }
 
 PRINT(FCTIDZ, XForm_27) { // test, change rounding mode
@@ -2243,20 +2256,20 @@ PRINT(FCTIDZ, XForm_27) { // test, change rounding mode
 }
 
 EMU(FCTIDZ, XForm_27) {
-    auto b = ppu->getFPRd(i->FRB);
+    auto b = TH->getFPRd(i->FRB);
     int32_t res = b > 2147483647. ? 0x7fffffff
     : b < -2147483648. ? 0x80000000
     : (int32_t)b;
     // TODO invalid operation, XX
-    auto fpscr = ppu->getFPSCR();
+    auto fpscr = TH->getFPSCR();
     if (issignaling(b)) {
         fpscr.f.FX = 1;
         fpscr.f.VXSNAN = 1;
     }
-    ppu->setFPR(i->FRT, res);
-    ppu->setFPSCR(fpscr.v);
+    TH->setFPR(i->FRT, res);
+    TH->setFPSCR(fpscr.v);
     if (i->Rc.u())
-        update_CRFSign<1>(res, ppu);
+        update_CRFSign<1>(res, TH);
 }
 
 PRINT(FRSP, XForm_27) {
@@ -2265,8 +2278,8 @@ PRINT(FRSP, XForm_27) {
 
 EMU(FRSP, XForm_27) {
     // TODO: set class etc
-    float b = ppu->getFPRd(i->FRB);
-    ppu->setFPRd(i->FRT, b);
+    float b = TH->getFPRd(i->FRB);
+    TH->setFPRd(i->FRT, b);
 }
 
 PRINT(MFFS, XForm_28) {
@@ -2274,10 +2287,10 @@ PRINT(MFFS, XForm_28) {
 }
 
 EMU(MFFS, XForm_28) {
-    uint32_t fpscr = ppu->getFPSCR().v;
-    ppu->setFPR(i->FRT, fpscr);
+    uint32_t fpscr = TH->getFPSCR().v;
+    TH->setFPR(i->FRT, fpscr);
     if (i->Rc.u())
-        update_CRFSign<1>(fpscr, ppu);
+        update_CRFSign<1>(fpscr, TH);
 }
 
 PRINT(MTFSF, XFLForm) {
@@ -2286,10 +2299,10 @@ PRINT(MTFSF, XFLForm) {
 
 EMU(MTFSF, XFLForm) {
     auto n = __builtin_clzll(i->FLM.u()) - 64 + FLM_t::W;
-    auto r = ppu->getFPSCRF(n);
-    ppu->setFPSCRF(n, r);
+    auto r = TH->getFPSCRF(n);
+    TH->setFPSCRF(n, r);
     if (i->Rc.u())
-        update_CRFSign<1>(r, ppu);
+        update_CRFSign<1>(r, TH);
 }
 
 PRINT(SYNC, XForm_24) {
@@ -2300,17 +2313,27 @@ EMU(SYNC, XForm_24) {
     __sync_synchronize();
 }
 
+PRINT(TD, XForm_25) {
+    *result = format_nnn("td", i->TO, i->RA, i->RB);
+}
+
+EMU(TD, XForm_25) {
+    if (i->TO.u() == 31 && i->RA.u() == i->RB.u())
+        throw BreakpointException();
+    throw IllegalInstructionException();
+}
+
 PRINT(MFTB, XFXForm_2) {
     *result = format_n("mftb", i->tbr);
 }
 
 EMU(MFTB, XFXForm_2) {
     auto tbr = i->tbr.u();
-    auto tb = ppu->getTimeBase();
+    auto tb = MM->getTimeBase();
     assert(tbr == 392 || tbr == 424);
     if (tbr == 424)
         tb &= 0xffffffff;
-    ppu->setGPR(i->RT, tb);
+    TH->setGPR(i->RT, tb);
 }
 
 PRINT(STVX, SIMDForm) {
@@ -2318,9 +2341,9 @@ PRINT(STVX, SIMDForm) {
 }
 
 EMU(STVX, SIMDForm) {
-    auto b = getB(i->rA, ppu);
-    auto ea = b + ppu->getGPR(i->rB);
-    ppu->store16(ea, ppu->getV(i->vS));
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
+    MM->store16(ea, TH->getV(i->vS));
 }
 
 PRINT(LVX, SIMDForm) {
@@ -2328,9 +2351,9 @@ PRINT(LVX, SIMDForm) {
 }
 
 EMU(LVX, SIMDForm) {
-    auto b = getB(i->rA, ppu);
-    auto ea = b + ppu->getGPR(i->rB);
-    ppu->setV(i->vD, ppu->load16(ea));
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
+    TH->setV(i->vD, MM->load16(ea));
 }
 
 PRINT(LVLX, SIMDForm) {
@@ -2338,11 +2361,11 @@ PRINT(LVLX, SIMDForm) {
 }
 
 EMU(LVLX, SIMDForm) {
-    auto b = getB(i->rA, ppu);
-    auto ea = b + ppu->getGPR(i->rB);
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
     uint8_t be[16];
-    ppu->readMemory(ea, be, 16);
-    ppu->setV(i->vD, be);
+    MM->readMemory(ea, be, 16);
+    TH->setV(i->vD, be);
 }
 
 PRINT(VSLDOI, SIMDForm) {
@@ -2352,9 +2375,9 @@ PRINT(VSLDOI, SIMDForm) {
 EMU(VSLDOI, SIMDForm) {
     assert(i->SHB.u() <= 16);
     uint8_t be[32];
-    ppu->getV(i->vA, be);
-    ppu->getV(i->vB, be + 16);
-    ppu->setV(i->vD, be + i->SHB.u());
+    TH->getV(i->vA, be);
+    TH->getV(i->vB, be + 16);
+    TH->setV(i->vD, be + i->SHB.u());
 }
 
 PRINT(LVEWX, SIMDForm) { // TODO: test
@@ -2362,11 +2385,11 @@ PRINT(LVEWX, SIMDForm) { // TODO: test
 }
 
 EMU(LVEWX, SIMDForm) {
-    auto b = getB(i->rA, ppu);
-    auto ea = b + ppu->getGPR(i->rB);
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
     uint8_t be[16];
-    ppu->readMemory(ea, be, 16);
-    ppu->setV(i->vD, be);
+    MM->readMemory(ea, be, 16);
+    TH->setV(i->vD, be);
 }
 
 PRINT(VSPLTW, SIMDForm) { // TODO: test
@@ -2375,13 +2398,13 @@ PRINT(VSPLTW, SIMDForm) { // TODO: test
 
 EMU(VSPLTW, SIMDForm) {
     uint32_t be[4];
-    ppu->getV(i->vB, (uint8_t*)be);
+    TH->getV(i->vB, (uint8_t*)be);
     auto b = i->UIMM.u();
     be[0] = be[b];
     be[1] = be[b];
     be[2] = be[b];
     be[3] = be[b];
-    ppu->setV(i->vD, (uint8_t*)be);
+    TH->setV(i->vD, (uint8_t*)be);
 }
 
 PRINT(VSPLTISW, SIMDForm) { // TODO: test
@@ -2391,7 +2414,7 @@ PRINT(VSPLTISW, SIMDForm) { // TODO: test
 EMU(VSPLTISW, SIMDForm) {
     int32_t v = i->SIMM.s();
     big_uint32_t be[4] = { v, v, v, v };
-    ppu->setV(i->vD, (uint8_t*)be);
+    TH->setV(i->vD, (uint8_t*)be);
 }
 
 inline void endian_reverse_v(void* vbe) {
@@ -2409,9 +2432,9 @@ EMU(VMADDFP, SIMDForm) {
     float abe[4];
     float bbe[4];
     float cbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
-    ppu->getV(i->vC, (uint8_t*)cbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vC, (uint8_t*)cbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     endian_reverse_v(cbe);
@@ -2420,7 +2443,7 @@ EMU(VMADDFP, SIMDForm) {
         dbe[i] = abe[i] * cbe[i] + bbe[i];
     }
     endian_reverse_v(dbe);
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VNMSUBFP, SIMDForm) { // TODO: test
@@ -2431,9 +2454,9 @@ EMU(VNMSUBFP, SIMDForm) {
     float abe[4];
     float bbe[4];
     float cbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
-    ppu->getV(i->vC, (uint8_t*)cbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vC, (uint8_t*)cbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     endian_reverse_v(cbe);
@@ -2442,7 +2465,7 @@ EMU(VNMSUBFP, SIMDForm) {
         dbe[i] = -(abe[i] * cbe[i] - bbe[i]);
     }
     endian_reverse_v(dbe);
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VXOR, SIMDForm) {
@@ -2450,8 +2473,8 @@ PRINT(VXOR, SIMDForm) {
 }
 
 EMU(VXOR, SIMDForm) {
-    auto d = ppu->getV(i->vA) ^ ppu->getV(i->vB);
-    ppu->setV(i->vD, d);
+    auto d = TH->getV(i->vA) ^ TH->getV(i->vB);
+    TH->setV(i->vD, d);
 }
 
 PRINT(VAND, SIMDForm) {
@@ -2459,8 +2482,8 @@ PRINT(VAND, SIMDForm) {
 }
 
 EMU(VAND, SIMDForm) {
-    auto d = ppu->getV(i->vA) & ppu->getV(i->vB);
-    ppu->setV(i->vD, d);
+    auto d = TH->getV(i->vA) & TH->getV(i->vB);
+    TH->setV(i->vD, d);
 }
 
 PRINT(VSEL, SIMDForm) { // TODO: test
@@ -2468,11 +2491,11 @@ PRINT(VSEL, SIMDForm) { // TODO: test
 }
 
 EMU(VSEL, SIMDForm) {
-    auto m = ppu->getV(i->vC);
-    auto a = ppu->getV(i->vA);
-    auto b = ppu->getV(i->vB);
+    auto m = TH->getV(i->vC);
+    auto a = TH->getV(i->vA);
+    auto b = TH->getV(i->vB);
     auto d = (m & b) | (~m & a);
-    ppu->setV(i->vD, d);
+    TH->setV(i->vD, d);
 }
 
 PRINT(VADDFP, SIMDForm) {
@@ -2482,8 +2505,8 @@ PRINT(VADDFP, SIMDForm) {
 EMU(VADDFP, SIMDForm) {
     float abe[4];
     float bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     float dbe[4];
@@ -2491,7 +2514,7 @@ EMU(VADDFP, SIMDForm) {
         dbe[i] = abe[i] + bbe[i];
     }
     endian_reverse_v(dbe);
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VSUBFP, SIMDForm) {
@@ -2501,8 +2524,8 @@ PRINT(VSUBFP, SIMDForm) {
 EMU(VSUBFP, SIMDForm) {
     float abe[4];
     float bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     float dbe[4];
@@ -2510,7 +2533,7 @@ EMU(VSUBFP, SIMDForm) {
         dbe[i] = abe[i] - bbe[i];
     }
     endian_reverse_v(dbe);
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VRSQRTEFP, SIMDForm) {
@@ -2519,14 +2542,14 @@ PRINT(VRSQRTEFP, SIMDForm) {
 
 EMU(VRSQRTEFP, SIMDForm) {
     float bbe[4];
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(bbe);
     float dbe[4];
     for (int i = 0; i < 4; ++i) {
         dbe[i] = 1.f / sqrt(bbe[i]);
     }
     endian_reverse_v(dbe);
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VCTSXS, SIMDForm) { // TODO: test, set sat
@@ -2535,7 +2558,7 @@ PRINT(VCTSXS, SIMDForm) { // TODO: test, set sat
 
 EMU(VCTSXS, SIMDForm) {
     float bbe[4];
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(bbe);
     unsigned __int128 mult = 1;
     mult <<= i->UIMM.u();
@@ -2543,7 +2566,7 @@ EMU(VCTSXS, SIMDForm) {
     for (int i = 0; i < 4; ++i) {
         dbe[i] = bbe[i] * mult;
     }
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VCFSX, SIMDForm) { // TODO: test, set sat
@@ -2552,7 +2575,7 @@ PRINT(VCFSX, SIMDForm) { // TODO: test, set sat
 
 EMU(VCFSX, SIMDForm) {
     big_int32_t bbe[4];
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     float div = 1u << i->UIMM.u();
     float dbe[4];
     for (int n = 0; n < 4; ++n) {
@@ -2560,7 +2583,7 @@ EMU(VCFSX, SIMDForm) {
         dbe[n] /= div;
     }
     endian_reverse_v(dbe);
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VADDUWM, SIMDForm) { // TODO: test
@@ -2570,15 +2593,15 @@ PRINT(VADDUWM, SIMDForm) { // TODO: test
 EMU(VADDUWM, SIMDForm) {
     uint32_t abe[4];
     uint32_t bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     big_uint32_t dbe[4];
     for (int n = 0; n < 4; ++n) {
         dbe[n] = abe[n] + bbe[n];
     }
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VCMPEQUW, SIMDForm) { // TODO: test
@@ -2588,21 +2611,21 @@ PRINT(VCMPEQUW, SIMDForm) { // TODO: test
 EMU(VCMPEQUW, SIMDForm) {
     uint32_t abe[4];
     uint32_t bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     big_uint32_t dbe[4];
     for (int i = 0; i < 4; ++i) {
         dbe[i] = abe[i] == bbe[i] ? ~0u : 0u;
     }
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
     if (i->Rc.u()) {
         auto ui = *(unsigned __int128*)dbe;
         auto t = ui + 1 == 0;
         auto f = ui == 0;
         auto c = t << 3 | f << 1;
-        ppu->setCRF(6, c);   
+        TH->setCRF(6, c);   
     }
 }
 
@@ -2613,8 +2636,8 @@ PRINT(VCMPEQFP, SIMDForm) { // TODO: test
 EMU(VCMPEQFP, SIMDForm) {
     float abe[4];
     float bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     union {
@@ -2624,13 +2647,13 @@ EMU(VCMPEQFP, SIMDForm) {
     for (int i = 0; i < 4; ++i) {
         dbe.f[i] = abe[i] == bbe[i] ? ~0u : 0u;
     }
-    ppu->setV(i->vD, (uint8_t*)dbe.f);
+    TH->setV(i->vD, (uint8_t*)dbe.f);
     if (i->Rc.u()) {
         auto ui = dbe.i128;
         auto t = ui + 1 == 0;
         auto f = ui == 0;
         auto c = t << 3 | f << 1;
-        ppu->setCRF(6, c);   
+        TH->setCRF(6, c);   
     }
 }
 
@@ -2642,15 +2665,15 @@ PRINT(VSLW, SIMDForm) { // TODO: test
 EMU(VSLW, SIMDForm) {
     uint32_t abe[4];
     uint32_t bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     endian_reverse_v(abe);
     endian_reverse_v(bbe);
     big_uint32_t dbe[4];
     for (int i = 0; i < 4; ++i) {
         dbe[i] = abe[i] << (bbe[i] & 31);
     }
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VMRGHW, SIMDForm) { // TODO: test
@@ -2660,14 +2683,14 @@ PRINT(VMRGHW, SIMDForm) { // TODO: test
 EMU(VMRGHW, SIMDForm) {
     uint32_t abe[4];
     uint32_t bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     uint32_t dbe[4];
     dbe[0] = abe[0];
     dbe[1] = bbe[0];
     dbe[2] = abe[1];
     dbe[3] = bbe[1];
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VMRGLW, SIMDForm) { // TODO: test
@@ -2677,14 +2700,14 @@ PRINT(VMRGLW, SIMDForm) { // TODO: test
 EMU(VMRGLW, SIMDForm) {
     uint32_t abe[4];
     uint32_t bbe[4];
-    ppu->getV(i->vA, (uint8_t*)abe);
-    ppu->getV(i->vB, (uint8_t*)bbe);
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
     uint32_t dbe[4];
     dbe[0] = abe[2];
     dbe[1] = bbe[2];
     dbe[2] = abe[3];
     dbe[3] = bbe[3];
-    ppu->setV(i->vD, (uint8_t*)dbe);
+    TH->setV(i->vD, (uint8_t*)dbe);
 }
 
 PRINT(VPERM, SIMDForm) { // TODO: test
@@ -2693,16 +2716,16 @@ PRINT(VPERM, SIMDForm) { // TODO: test
 
 EMU(VPERM, SIMDForm) {
     uint8_t be[32];
-    ppu->getV(i->vA, be);
-    ppu->getV(i->vB, be + 16);
+    TH->getV(i->vA, be);
+    TH->getV(i->vB, be + 16);
     uint8_t cbe[16];
-    ppu->getV(i->vC, cbe);
+    TH->getV(i->vC, cbe);
     uint8_t dbe[16] = { 0 };
     for (int i = 0; i < 15; ++i) {
         auto b = cbe[i] & 31;
         dbe[i] = be[b];
     }
-    ppu->setV(i->vD, dbe);
+    TH->setV(i->vD, dbe);
 }
 
 inline unsigned __int128 make128(uint64_t low, uint64_t high) {
@@ -2716,8 +2739,8 @@ PRINT(LVSR, SIMDForm) { // TODO: test
 }
 
 EMU(LVSR, SIMDForm) {
-    auto b = getB(i->rA, ppu);
-    auto ea = b + ppu->getGPR(i->rB);
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
     auto sh = ea & 15;
     unsigned __int128 vd;
     switch (sh) {
@@ -2738,7 +2761,7 @@ EMU(LVSR, SIMDForm) {
         case 14: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break;
         case 15: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break;
     }
-    ppu->setV(i->vD, vd);
+    TH->setV(i->vD, vd);
 }
 
 PRINT(VANDC, SIMDForm) { // TODO: test
@@ -2746,10 +2769,10 @@ PRINT(VANDC, SIMDForm) { // TODO: test
 }
 
 EMU(VANDC, SIMDForm) {
-    auto a = ppu->getV(i->vA);
-    auto b = ppu->getV(i->vB);
+    auto a = TH->getV(i->vA);
+    auto b = TH->getV(i->vB);
     auto d = a & ~b;
-    ppu->setV(i->vD, d);
+    TH->setV(i->vD, d);
 }
 
 enum class DasmMode {
@@ -2810,7 +2833,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                                 case 396: invoke(VMRGLW);
                                 case 330: invoke(VRSQRTEFP);
                                 case 1092: invoke(VANDC);
-                                default: throw std::runtime_error("unknown extented opcode");
+                                default: throw IllegalInstructionException();
                             }
                     }
             }
@@ -2841,7 +2864,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 129: invoke(CRANDC);
                 case 417: invoke(CRORC);
                 case 0: invoke(MCRF);
-                default: throw std::runtime_error("unknown extented opcode");
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -2867,7 +2890,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 1: invoke(RLDICR);
                 case 2: invoke(RLDIC);
                 case 3: invoke(RLDIMI);
-                default: throw std::runtime_error("unknown extented opcode");
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -2960,7 +2983,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 71: invoke(LVEWX);
                 case 11: invoke(MULHWU);
                 case 38: invoke(LVSR);
-                default: throw std::runtime_error("unknown extented opcode");
+                case 68: invoke(TD);
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -2991,7 +3015,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 2: invoke(LWA);
                 case 0: invoke(LD);
                 case 1: invoke(LDU);
-                default: throw std::runtime_error("unknown extented opcode");
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -3004,7 +3028,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 28: invoke(FMSUBS);
                 case 29: invoke(FMADDS);
                 case 20: invoke(FSUBS);
-                default: throw std::runtime_error("unknown extented opcode");
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -3013,7 +3037,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
             switch (dsform->XO.u()) {
                 case 0: invoke(STD);
                 case 1: invoke(STDU);
-                default: throw std::runtime_error("unknown extented opcode");
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -3043,7 +3067,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 12: invoke(FRSP);
                 case 583: invoke(MFFS);
                 case 711: invoke(MTFSF);
-                default: throw std::runtime_error("unknown extented opcode");
+                default: throw IllegalInstructionException();
             }
             break;
         }
@@ -3052,7 +3076,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
 }
 
 bool isAbsoluteBranch(void* instr);
-bool isTaken(void* branchInstr, uint64_t cia, PPU* ppu);
+bool isTaken(void* branchInstr, uint64_t cia, PPUThread* thread);
 uint64_t getTargetAddress(void* branchInstr, uint64_t cia);
 
 #undef PRINT

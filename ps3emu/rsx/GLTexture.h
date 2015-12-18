@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include "GLBuffer.h"
+#include "../MainMemory.h"
 #include "../constants.h"
 #include <stdint.h>
 #include <functional>
@@ -40,10 +41,10 @@ class GLTexture {
     GLTexture(GLTexture const&) = delete;
     void operator=(GLTexture const&) = delete;
 public:
-    GLTexture(PPU* ppu, RsxTextureInfo const& info);
+    GLTexture(MainMemory* mm, RsxTextureInfo const& info);
     ~GLTexture();
     RsxTextureInfo const& info() const;
-    void update(PPU* ppu);
+    void update(MainMemory* mm);
     void bind(GLuint samplerIndex);
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PPU.h"
+#include "MainMemory.h"
 #include <stdint.h>
 #include <elf.h>
 #include <string>
@@ -75,7 +75,7 @@ class ELFLoader {
     Elf64_be_Phdr* _pheaders;
     Elf64_be_Shdr* _sections;
     Elf64_be_Shdr* findSectionByName(std::string name);
-    ps3_uintptr_t storeArgs(PPU* ppu, std::vector<std::string> const& args);
+    ps3_uintptr_t storeArgs(MainMemory* mm, std::vector<std::string> const& args);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
 public:
     uint64_t entryPoint();
@@ -85,6 +85,6 @@ public:
     uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
     std::string loadedFilePath();
-    void map(PPU* ppu, std::vector<std::string> args);
-    void link(PPU* ppu);
+    void map(PPUThread* thread, std::vector<std::string> args);
+    void link(MainMemory* mm);
 };

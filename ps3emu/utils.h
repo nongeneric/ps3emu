@@ -63,3 +63,5 @@ private:
     S _s;
     D _d;
 };
+
+void ums_sleep(uint64_t microseconds);

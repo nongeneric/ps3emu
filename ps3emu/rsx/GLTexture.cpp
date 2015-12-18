@@ -1,7 +1,7 @@
 #include "GLTexture.h"
-#include "../PPU.h"
-
+#include "../MainMemory.h"
 #include <boost/log/trivial.hpp>
+#include <gcm_tool.h>
 
 using namespace glm;
 
@@ -290,16 +290,16 @@ public:
     }
 };
 
-GLTexture::GLTexture(PPU* ppu, const RsxTextureInfo& info): _info(info) {
+GLTexture::GLTexture(MainMemory* mm, const RsxTextureInfo& info): _info(info) {
     glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
     glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
 }
 
-void GLTexture::update(PPU* ppu) {
+void GLTexture::update(MainMemory* mm) {
     auto size = _info.pitch * _info.height;
     std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
     auto va = addressToMainMemory(_info.location, _info.offset);
-    ppu->readMemory(va, buf.get(), size);
+    mm->readMemory(va, buf.get(), size);
     
     std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
 

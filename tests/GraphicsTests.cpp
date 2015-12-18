@@ -36,7 +36,7 @@ void compareLastFrame(const char* expected, int n = 0) {
                              << QString("/tmp/ps3frame%1_bad%2.png").arg(n).arg(comparisonNum);
         proc.start("mv", args);
         proc.waitForFinished(-1);
-    REQUIRE( proc.exitCode() == 0 );
+        REQUIRE( proc.exitCode() == 0 );
     }
     REQUIRE( output == "0" );
 }

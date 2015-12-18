@@ -22,7 +22,7 @@ typedef struct {
 constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 
 class RsxContext;
-class PPU;
+class MainMemory;
 class Rsx {
     uint32_t _get = 0;
     uint32_t _put = 0;
@@ -30,7 +30,7 @@ class Rsx {
     std::atomic<uint32_t> _ret;
     bool _shutdown = false;
     bool _initialized = false;
-    PPU* _ppu;
+    MainMemory* _mm;
     mutable boost::mutex _mutex;
     boost::condition_variable _cv;
     mutable boost::mutex _initMutex;
@@ -42,7 +42,7 @@ class Rsx {
     uint32_t _gcmIoSize;
     ps3_uintptr_t _gcmIoAddress;
     int64_t interpret(uint32_t get);
-    Window window;
+    Window _window;
     void watchCaches();
     void memoryBreakHandler(uint32_t va, uint32_t size);
     void waitForIdle();
@@ -200,7 +200,7 @@ class Rsx {
                uint16_t inSizeY);
     void Color(std::vector<uint32_t> const& vec);
 public:
-    Rsx(PPU* ppu);
+    Rsx();
     ~Rsx();
     void shutdown();
     void setPut(uint32_t put);
@@ -218,6 +218,6 @@ public:
                           uint32_t pitch,
                           uint32_t width,
                           uint32_t height);
-    void init();
+    void init(MainMemory* mm);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
 };

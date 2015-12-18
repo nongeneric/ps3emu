@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../ps3emu/PPU.h"
-#include "../ps3emu/ELFLoader.h"
+#include "../ps3emu/Process.h"
 #include "MonospaceGrid.h"
 #include <QString>
 #include <string>
@@ -12,12 +11,11 @@ class DasmModel;
 class Rsx;
 class DebuggerModel : public QWidget {
     Q_OBJECT
-    
-    ELFLoader _elf;
+
+    PPUThread* _activeThread;
     std::unique_ptr<GPRModel> _gprModel;
     std::unique_ptr<DasmModel> _dasmModel;
-    std::unique_ptr<PPU> _ppu;
-    std::unique_ptr<Rsx> _rsx;
+    std::unique_ptr<Process> _proc;
     bool _elfLoaded = false;
     void log(std::string str);
     void printMemory(uint64_t va);
@@ -39,7 +37,6 @@ public:
     void run();
     void runto(ps3_uintptr_t va);
     void runToLR();
-    void restart();
 signals:
     void message(QString text);
 };

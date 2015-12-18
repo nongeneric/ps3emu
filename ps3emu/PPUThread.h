@@ -1,60 +1,24 @@
 #pragma once
-#include "rsx/Rsx.h"
-#include "BitField.h"
+
 #include "constants.h"
-#include "utils.h"
+#include "BitField.h"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread.hpp>
 #include <stdint.h>
-#include <memory>
-#include <type_traits>
-#include <stdexcept>
-#include <algorithm>
-#include <array>
+#include <functional>
 #include <atomic>
-#include <bitset>
-#include <boost/endian/arithmetic.hpp>
-#include <boost/chrono.hpp>
+#include <array>
+
+enum class PPUThreadEvent {
+    Breakpoint,
+    Started,
+    Finished,
+    InvalidInstruction,
+    MemoryAccessError,
+    Failure
+};
 
 class ProcessFinishedException : public std::exception { };
-
-union VirtualAddress {
-    uint32_t val;
-    BitField<0, DefaultMainMemoryPageBits> page;
-    BitField<DefaultMainMemoryPageBits, 32> offset;
-};
-
-struct MemoryPage {
-    std::atomic<uintptr_t> ptr;
-    void alloc();
-    void dealloc();
-    inline MemoryPage() { ptr = 0; }
-};
-
-template <int Bytes>
-struct BytesToBEType { };
-template <>
-struct BytesToBEType<1> { 
-    typedef boost::endian::big_uint8_t beType;
-    typedef uint8_t type;
-    typedef int8_t stype;
-};
-template <>
-struct BytesToBEType<2> { 
-    typedef boost::endian::big_uint16_t beType;
-    typedef uint16_t type;
-    typedef int16_t stype;
-};
-template <>
-struct BytesToBEType<4> { 
-    typedef boost::endian::big_uint32_t beType;
-    typedef uint32_t type;
-    typedef int32_t stype;
-};
-template <>
-struct BytesToBEType<8> { 
-    typedef boost::endian::big_uint64_t beType;
-    typedef uint64_t type;
-    typedef int64_t stype;
-};
 
 union CR_t {
     struct {
@@ -135,30 +99,27 @@ union XER_t {
 };
 static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 
-struct NCallEntry {
-    const char* name;
-    uint32_t fnid;
-    void (*stub)(PPU*);
-};
-
-class ELFLoader;
-class PPU {
+class MainMemory;
+class Process;
+class PPUThread {
+    Process* _proc;
+    MainMemory* _mm;
+    std::function<void(PPUThread*, PPUThreadEvent)> _eventHandler;
+    boost::thread _thread;
+    bool _init;
+    std::atomic<bool> _dbgPaused;
+    std::atomic<bool> _singleStep;
+    
+    uint64_t _NIP;
     uint64_t _LR = 0;
     uint64_t _CTR = 0;
-    uint64_t _NIP = 0;
+    
     std::array<uint64_t, 32> _GPR;
     std::array<double, 32> _FPR;
     std::array<unsigned __int128, 32> _V;
     FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
-    std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;
-    
-    std::unique_ptr<MemoryPage[]> _pages;
-    std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
-    Rsx* _rsx = nullptr;
-    ELFLoader* _elfLoader = nullptr;
-    boost::chrono::high_resolution_clock::time_point _systemStart;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -173,84 +134,17 @@ class PPU {
         return (r & fmask) | f;
     }
     
+    void loop();
 public:
-    PPU();
-    void shutdown();
-    void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
-    void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
-    void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
-    ps3_uintptr_t malloc(ps3_uintptr_t size);
-    void allocPage(void** ptr, ps3_uintptr_t* va);
-    void reset();
-    void ncall(uint32_t index);
-    void scall();
-    const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index);
-    int allocatedPages();
-    bool isAllocated(ps3_uintptr_t va);
-    void setRsx(Rsx* rsx);
-    void setELFLoader(ELFLoader* elfLoader);
-    ELFLoader* getELFLoader();
-    void map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size);
-    void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
+    PPUThread(MainMemory* mm);
+    PPUThread(Process* proc,
+              std::function<void(PPUThread*, PPUThreadEvent)> eventHandler);
     
-    uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
-    
-    uint64_t getFrequency();
-    uint64_t getTimeBase();
-    
-    void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
-    void memoryBreak(uint32_t va, uint32_t size);
-    
-    template <int Bytes>
-    typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
-        typename BytesToBEType<Bytes>::beType res;
-        readMemory(va, &res, Bytes);
-        return res;
-    }
-    
-    template <int Bytes>
-    typename BytesToBEType<Bytes>::stype loads(ps3_uintptr_t va) {
-        return load<Bytes>(va);
-    }
-    
-    template <int Bytes, typename V>
-    void store(uint64_t va, V value) {
-        typename BytesToBEType<Bytes>::beType x = getUValue(value);
-        writeMemory(va, &x, Bytes);
-    }
-    
-    void store16(uint64_t va, unsigned __int128 value) {
-        uint8_t *bytes = (uint8_t*)&value;
-        std::reverse(bytes, bytes + 16);
-        writeMemory(va, bytes, 16);
-    }
-    
-    void storef(ps3_uintptr_t va, float value) {
-        store<sizeof(float)>(va, union_cast<float, uint32_t>(value));
-    }
-    
-    void stored(ps3_uintptr_t va, double value) {
-        store<sizeof(double)>(va, union_cast<double, uint64_t>(value));
-    }
-    
-    float loadf(ps3_uintptr_t va) {
-        auto f = (uint32_t)load<sizeof(float)>(va);
-        return union_cast<uint32_t, float>(f);
-    }
-    
-    unsigned __int128 load16(uint64_t va) {
-        unsigned __int128 i = load<8>(va);
-        i <<= 64;
-        i |= load<8>(va + 8);
-        return i;
-    }
-    
-    double loadd(ps3_uintptr_t va) {
-        auto f = (uint64_t)load<sizeof(double)>(va);
-        return union_cast<uint64_t, double>(f);
-    }
-    
+    void singleStepBreakpoint();
+    void dbgPause(bool val);
     void run();
+    MainMemory* mm();
+    Process* proc();
     
     template <typename V>
     inline void setGPR(V i, uint64_t value) {
@@ -403,10 +297,6 @@ public:
         return _NIP;
     }
     
-    inline Rsx* getRsx() {
-        return _rsx;
-    }
+    void ncall(uint32_t index);
+    void scall();
 };
-
-uint32_t calcFnid(const char* name);
-void encodeNCall(PPU* ppu, ps3_uintptr_t va, uint32_t index);

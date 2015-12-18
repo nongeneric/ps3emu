@@ -1,6 +1,4 @@
-#include "../ps3emu/PPU.h"
-#include "../ps3emu/ELFLoader.h"
-#include "../ps3emu/rsx/Rsx.h"
+#include "../ps3emu/Process.h"
 #include "../ps3emu/ppu_dasm.h"
 #include "stdio.h"
 #include <boost/log/utility/setup/file.hpp>
@@ -9,27 +7,20 @@
 using namespace boost::log;
 
 void emulate(const char* path, std::vector<std::string> args) {
-    PPU ppu;
-    ELFLoader elf;
-    Rsx rsx(&ppu);
-    elf.load(path);
-    elf.map(&ppu, args);
-    elf.link(&ppu);
-    ppu.setRsx(&rsx);
-    
-    try {
-        for(;;) {
-            uint32_t instr;
-            auto cia = ppu.getNIP();
-            ppu.readMemory(cia, &instr, sizeof instr);
-            ppu.setNIP(cia + sizeof instr);
-            ppu_dasm<DasmMode::Emulate>(&instr, cia, &ppu);
+    Process proc;
+    proc.init(path, args);
+    for (;;) {
+        auto evInfo = proc.run();
+        switch (evInfo.event) {
+            case ProcessEvent::InvalidInstruction:
+            case ProcessEvent::Breakpoint:
+                BOOST_LOG_TRIVIAL(error) << 
+                    ssnprintf("invalid instruction at %x", evInfo.thread->getNIP());
+                return;
+            case ProcessEvent::ProcessFinished:
+                return;
+            default: ;
         }
-    } catch (ProcessFinishedException& e) {
-        return;
-    } catch (std::exception& e) {
-        BOOST_LOG_TRIVIAL(error) << 
-            ssnprintf("exception: %s (NIP=%" PRIx64 ")\n", e.what(), ppu.getNIP());
     }
 }
 

@@ -1,10 +1,11 @@
 #include "Rsx.h"
-
-#include "../PPU.h"
 #include "../utils.h"
+#include "../BitField.h"
+#include "../MainMemory.h"
+#include "../../libs/graphics/graphics.h"
+
 #include <vector>
 #include <boost/log/trivial.hpp>
-#include "../../libs/graphics/graphics.h"
 
 union MethodHeader {
     uint32_t val;
@@ -52,11 +53,11 @@ std::array<float, 4> parseColor(uint32_t raw) {
 }
 
 int64_t Rsx::interpret(uint32_t get) {
-    MethodHeader header { _ppu->load<4>(GcmLocalMemoryBase + get) };
+    MethodHeader header { _mm->load<4>(GcmLocalMemoryBase + get) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
         assert(n != 0);\
-        return _ppu->load<4>(GcmLocalMemoryBase + get + 4 * n);\
+        return _mm->load<4>(GcmLocalMemoryBase + get + 4 * n);\
     })(x)
     if (header.val == 0) {
         BOOST_LOG_TRIVIAL(trace) << "rsx nop";
@@ -591,6 +592,7 @@ int64_t Rsx::interpret(uint32_t get) {
                 int first = arg & 0xff;
                 int c = (arg >> 24) + 1;
                 assert(first == 0);
+                (void)first;
                 indexCount += c;
             }
             DrawIndexArray(veryFirst, indexCount);
@@ -1463,5 +1465,5 @@ void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
     MethodHeader header { 0 };
     header.prefix.set(1);
     header.jumpoffset.set(destOffset);
-    _ppu->store<4>(va, header.val);
+    _mm->store<4>(va, header.val);
 }

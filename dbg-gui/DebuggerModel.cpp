@@ -40,11 +40,11 @@ QString printHex(void* ptr, int len) {
 }
 
 class GPRModel : public MonospaceGridModel {
-    PPU* _ppu;
+    PPUThread* _thread;
     GridModelChangeTracker _tracker;
     int _view = 1;
 public:
-    GPRModel(PPU* ppu) : _ppu(ppu), _tracker(this) {
+    GPRModel() : _thread(nullptr), _tracker(this) {
         _tracker.track();
         _tracker.track();
     }
@@ -68,7 +68,13 @@ public:
         return QString("%1").arg(value);
     }
     
+    void setThread(PPUThread* thread) {
+        _thread = thread;
+    }
+    
     virtual QString getCell(uint64_t row, int col) override {
+        if (!_thread)
+            return "";
         if (col == 0) {
             if (8 <= row && row <= 15) {
                 return QString("CR%1").arg(row - 8);
@@ -89,7 +95,7 @@ public:
         if (col == 1) {
             if (8 <= row && row <= 15) {
                 auto fpos = (row - 8) * 4;
-                auto field = (_ppu->getCR() >> (31 - fpos - 3)) & 0xf;
+                auto field = (_thread->getCR() >> (31 - fpos - 3)) & 0xf;
                 return QString("%1%2%3%4")
                     .arg(field & 8 ? "<" : " ")
                     .arg(field & 4 ? ">" : " ")
@@ -97,16 +103,16 @@ public:
                     .arg(field & 1 ? "SO" : "");
             }
             switch (row) {
-                case 0: return print(_ppu->getLR());
-                case 1: return print(_ppu->getCTR());
-                case 2: return print(_ppu->getXER());
-                case 3: return print(_ppu->getCR());
-                case 4: return printBit(_ppu->getCA());
-                case 5: return printBit(_ppu->getOV());
-                case 6: return printBit(_ppu->getSO());
-                case 17: return print(_ppu->getNIP());
+                case 0: return print(_thread->getLR());
+                case 1: return print(_thread->getCTR());
+                case 2: return print(_thread->getXER());
+                case 3: return print(_thread->getCR());
+                case 4: return printBit(_thread->getCA());
+                case 5: return printBit(_thread->getOV());
+                case 6: return printBit(_thread->getSO());
+                case 17: return print(_thread->getNIP());
                 case 19: {
-                    auto pages = _ppu->allocatedPages();
+                    auto pages = _thread->mm()->allocatedPages();
                     auto usage = pages * DefaultMainMemoryPageSize;
                     auto measure = "";
                     if (usage > (1 << 30)) {
@@ -135,20 +141,20 @@ public:
         }
         if (col == 3) {
             if (_view == 0) {
-                return QString("%1").arg(_ppu->getFPRd(row));
+                return QString("%1").arg(_thread->getFPRd(row));
             } else if (_view == 1) {
-                return print(_ppu->getGPR(row));
+                return print(_thread->getGPR(row));
             } else if (_view == 2) {
                 uint8_t be[16];
                 auto be64 = (big_uint64_t*)be;
-                _ppu->getV(row, be);
+                _thread->getV(row, be);
                 return QString::fromStdString(
                     ssnprintf("%016" PRIx64 "%016" PRIx64,
                               (uint64_t)be64[0], 
                               (uint64_t)be64[1]));
             } else if (_view == 3) {
                 uint8_t be[16];
-                _ppu->getV(row, be);
+                _thread->getV(row, be);
                 auto ui32 = (uint32_t*)be;
                 auto fs = (float*)be;
                 for (int i = 0; i < 4; ++i) {
@@ -184,19 +190,26 @@ public:
 };
 
 class DasmModel : public MonospaceGridModel {
-    PPU* _ppu;
+    PPUThread* _thread;
     ELFLoader* _elf;
 public:
-    DasmModel(PPU* ppu, ELFLoader* elf) : _ppu(ppu), _elf(elf) { }
+    DasmModel() : _thread(nullptr), _elf(nullptr) { }
+    
+    void setThread(PPUThread* thread) {
+        _thread = thread;
+        _elf = thread->proc()->elfLoader();
+    }
     
     virtual QString getCell(uint64_t row, int col) override {
+        if (!_thread)
+            return "";
         if (col == 0) {
             return QString("%1").arg(row, 16, 16, QChar('0'));
         }
-        if (!_ppu->isAllocated(row) || col == 2)
+        if (!_thread->mm()->isAllocated(row) || col == 2)
             return "";
         uint32_t instr;
-        _ppu->readMemory(row, &instr, sizeof instr);
+        _thread->mm()->readMemory(row, &instr, sizeof instr);
         if (col == 1)
             return printHex(&instr, sizeof instr);
         if (col == 4) {
@@ -234,17 +247,17 @@ public:
     }
     
     virtual bool isHighlighted(uint64_t row, int col) override {
-        return row == _ppu->getNIP();
+        return row == _thread->getNIP();
     }
     
     virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) {
-        if (!_ppu->isAllocated(row))
+        if (!_thread->mm()->isAllocated(row))
             return false;
         uint32_t instr;
-        _ppu->readMemory(row, &instr, sizeof instr);
+        _thread->mm()->readMemory(row, &instr, sizeof instr);
         if (isAbsoluteBranch(&instr)) {
             to = getTargetAddress(&instr, row);
-            highlighted = row == _ppu->getNIP() && isTaken(&instr, row, _ppu);
+            highlighted = row == _thread->getNIP() && isTaken(&instr, row, _thread);
             return true;
         }
         return false;
@@ -252,15 +265,11 @@ public:
 };
 
 DebuggerModel::DebuggerModel() {
-    _ppu.reset(new PPU());
-    _rsx.reset(new Rsx(_ppu.get()));
-    _ppu->setRsx(_rsx.get());
-    _gprModel.reset(new GPRModel(_ppu.get()));
-    _dasmModel.reset(new DasmModel(_ppu.get(), &_elf));
+     _gprModel.reset(new GPRModel());
+     _dasmModel.reset(new DasmModel());
 }
 
 DebuggerModel::~DebuggerModel() {
-    _rsx->shutdown();
 }
 
 MonospaceGridModel* DebuggerModel::getGPRModel() {
@@ -272,64 +281,36 @@ MonospaceGridModel* DebuggerModel::getDasmModel() {
 }
 
 void DebuggerModel::loadFile(QString path, QStringList args) {
-    _ppu->reset();
+    _proc.reset(new Process());
     auto str = path.toStdString();
-    _elf.load(str);
     std::vector<std::string> argsVec;
     for (auto arg : args) {
         argsVec.push_back(arg.toStdString());
     }
-    _elf.map(_ppu.get(), argsVec);
-    _elf.link(_ppu.get());
+    _proc->init(str, argsVec);
+    auto ev = _proc->run();
+    assert(ev.event == ProcessEvent::ThreadCreated);
+    _activeThread = ev.thread;
     updateUI();
     _elfLoaded = true;
     emit message(QString("Loaded %1").arg(path));
 }
 
 void DebuggerModel::stepIn(bool updateUI) {
-    if (!_elfLoaded)
+    if (!_activeThread)
         return;
-    uint32_t instr;
-    try {
-        auto cia = _ppu->getNIP();
-        _ppu->readMemory(cia, &instr, sizeof instr);
-        _ppu->setNIP(cia + sizeof instr);
-        ppu_dasm<DasmMode::Emulate>(&instr, cia, _ppu.get());
-        if (updateUI) {
-            this->updateUI();
-        }
-    } catch (ProcessFinishedException& exc) {
-        emit message("process terminated");
-        throw exc;
-    } catch (std::exception& exc) {
-        auto msg = QString("error: %1 (NIP: %2)")
-            .arg(exc.what()).arg(_ppu->getNIP(), 16, 16);
-        emit message(msg);
-        BOOST_LOG_TRIVIAL(fatal) << msg.toStdString();
-        throw exc;
+    _activeThread->singleStepBreakpoint();
+    _proc->run();
+    if (updateUI) {
+        this->updateUI();
     }
 }
 
 void DebuggerModel::stepOver() {}
 
 void DebuggerModel::run() {
-    try {
-        for (int i = 0; i < 15000; ++i) {
-            uint32_t instr;
-            auto cia = _ppu->getNIP();
-            _ppu->readMemory(cia, &instr, sizeof instr);
-            _ppu->setNIP(cia + sizeof instr);
-            ppu_dasm<DasmMode::Emulate>(&instr, cia, _ppu.get());
-        }
-        updateUI();
-    } catch (std::exception& e) {
-        auto msg = QString("error: %1 (NIP: %2)")
-            .arg(e.what()).arg(_ppu->getNIP(), 16, 16);
-        BOOST_LOG_TRIVIAL(fatal) << msg.toStdString();
-    }
+    _proc->run();
 }
-
-void DebuggerModel::restart() {}
 
 void DebuggerModel::log(std::string str) {
     emit message(QString::fromStdString(str));
@@ -372,7 +353,7 @@ void DebuggerModel::exec(QString command) {
 void DebuggerModel::printMemory(uint64_t va) {
     auto s = QString("%1    ").arg(va, 8, 16, QChar('0'));
     uint8_t buf[16];
-    _ppu->readMemory(va, buf, sizeof buf);
+    _proc->mm()->readMemory(va, buf, sizeof buf);
     for (auto i = 0u; i < sizeof buf; ++i) {
         s += QString("%1 ").arg(buf[i], 2, 16, QChar('0'));
     }
@@ -380,14 +361,7 @@ void DebuggerModel::printMemory(uint64_t va) {
 }
 
 void DebuggerModel::runToLR() {
-    try {
-        auto lr = _ppu->getLR();
-        while (_ppu->getNIP() != lr) {
-            stepIn();
-        }
-    } catch (...) {
-        emit message("unhandled exception");
-    }
+    runto(_activeThread->getLR());
 }
 
 void DebuggerModel::toggleFPR() {
@@ -400,9 +374,9 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
     ps3_uintptr_t nip;
     std::string str;
     std::map<std::string, int> counts;
-    while ((nip = _ppu->getNIP()) != va) {
+    while ((nip = _activeThread->getNIP()) != va) {
         uint32_t instr;
-        _ppu->readMemory(nip, &instr, sizeof instr);
+        _proc->mm()->readMemory(nip, &instr, sizeof instr);
         ppu_dasm<DasmMode::Print>(&instr, nip, &str);
         std::string name;
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
@@ -425,13 +399,19 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
 }
 
 void DebuggerModel::updateUI() {
+    _gprModel->setThread(_activeThread);
+    _dasmModel->setThread(_activeThread);
     _gprModel->update();
     _dasmModel->update();
-    _dasmModel->navigate(_ppu->getNIP());
+    if (_activeThread) {
+        _dasmModel->navigate(_activeThread->getNIP());
+    }
 }
 
 void DebuggerModel::runto(ps3_uintptr_t va) {
-     while (_ppu->getNIP() != va)
-        stepIn(false);
-     updateUI();
+    uint32_t bytes = _proc->mm()->load<4>(va);
+    _proc->mm()->store<4>(va, 0x7fe00088);
+    _proc->run();
+    _proc->mm()->store<4>(va, bytes);
+    updateUI();
 }

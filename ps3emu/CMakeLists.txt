@@ -5,13 +5,18 @@ project(ps3emu)
 set(SRC
     ELFLoader.cpp
     ELFLoader.h
-    PPU.cpp
-    PPU.h
     ppu_dasm.cpp
     ppu_dasm.h
     ppu_dasm_forms.h
     ncall.cpp
     utils.h
+    utils.cpp
+    MainMemory.h
+    MainMemory.cpp
+    Process.h
+    Process.cpp
+    PPUThread.h
+    PPUThread.cpp
     shaders/shader_dasm.h
     shaders/shader_dasm.cpp
     shaders/ShaderRewriter.h

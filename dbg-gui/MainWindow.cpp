@@ -94,10 +94,10 @@ void MainWindow::setupMenu() {
     connect(runto, &QAction::triggered, this, [=]() { _model.runto(0); });
     trace->addAction(runto);
     
-    auto restart = new QAction("Restart", this);
-    restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
-    connect(restart, &QAction::triggered, this, [=]() { _model.restart(); });
-    trace->addAction(restart);
+//     auto restart = new QAction("Restart", this);
+//     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
+//     connect(restart, &QAction::triggered, this, [=]() { _model.restart(); });
+//     trace->addAction(restart);
     
     auto view = menuBar()->addMenu("&View");
     auto toggleFPR = new QAction("Toggle GPR/FPR", this);

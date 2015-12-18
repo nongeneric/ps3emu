@@ -4,7 +4,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdexcept>
-#include "../ps3emu/PPU.h"
+#include "../ps3emu/Process.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
@@ -41,9 +41,9 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     return CELL_OK;
 }
 
-cell_system_time_t sys_time_get_system_time(PPU* ppu) {
+cell_system_time_t sys_time_get_system_time(PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    auto sec = (float)ppu->getTimeBase() / (float)ppu->getFrequency();
+    auto sec = (float)thread->mm()->getTimeBase() / (float)thread->mm()->getFrequency();
     return sec * 1000000;
 }
 
@@ -132,16 +132,16 @@ int sys_prx_exitspawn_with_level(uint64_t level) {
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
-int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPU* ppu) {
+int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
-    *alloc_addr = ppu->malloc(size);
+    *alloc_addr = thread->mm()->malloc(size);
     return CELL_OK;
 }
 
 int sys_timer_usleep(usecond_t sleep_time) {
-    boost::this_thread::sleep_for( boost::chrono::microseconds(sleep_time) );
+    ums_sleep(sleep_time);
     return CELL_OK;
 }
 
@@ -210,9 +210,9 @@ int sys_event_port_connect_local(sys_event_port_t event_port_id,
     return CELL_OK;
 }
 
-uint64_t sys_time_get_timebase_frequency(PPU* ppu) {
+uint64_t sys_time_get_timebase_frequency(PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    return ppu->getFrequency();
+    return thread->mm()->getFrequency();
 }
 
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info) {

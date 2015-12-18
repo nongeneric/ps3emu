@@ -1,8 +1,6 @@
-#include "PPU.h"
-#include <string.h>
-#include <functional>
-#include <stdio.h>
-#include <assert.h>
+#include "MainMemory.h"
+
+#include "rsx/Rsx.h"
 
 using namespace boost::endian;
 
@@ -38,7 +36,7 @@ void copy(ps3_uintptr_t va,
             if (allocate) {
                 page.alloc();
             } else {
-                throw std::runtime_error("accessing non existing page");
+                throw MemoryAccessException();
             }
         }
         auto offset = split.offset.u();
@@ -54,7 +52,7 @@ void copy(ps3_uintptr_t va,
     }
 }
 
-void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
+void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
     if (coversRsxRegsRange(va, len)) {
         if (!_rsx) {
             throw std::runtime_error("rsx not set");
@@ -77,7 +75,7 @@ void PPU::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate
     copy<false>(va, buf, len, allocate, _pages.get(), _memoryWriteHandler);
 }
 
-void PPU::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
+void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
     std::unique_ptr<uint8_t[]> buf(new uint8_t[len]);
     memset(buf.get(), value, len);
     writeMemory(va, buf.get(), len, allocate);
@@ -88,10 +86,7 @@ struct IForm {
     uint8_t _ : 2;
 };
 
-void PPU::run() {
-}
-
-void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
+void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
     assert(buf);
     
     if (coversRsxRegsRange(va, len)) {
@@ -106,12 +101,12 @@ void PPU::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
     copy<true>(va, buf, len, allocate, _pages.get(), _memoryWriteHandler);
 }
 
-bool PPU::isAllocated(ps3_uintptr_t va) {
+bool MainMemory::isAllocated(ps3_uintptr_t va) {
     VirtualAddress split { va };
     return (bool)_pages[split.page.u()].ptr;
 }
 
-int PPU::allocatedPages() {
+int MainMemory::allocatedPages() {
     int i = 0;
     for (auto j = 0u; j != DefaultMainMemoryPageCount; ++j) {
         if (_pages[j].ptr) {
@@ -121,7 +116,7 @@ int PPU::allocatedPages() {
     return i;
 }
 
-void PPU::reset() {
+void MainMemory::reset() {
     if (_pages) {
         for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
             if (!_providedMemoryPages[i]) {
@@ -131,16 +126,10 @@ void PPU::reset() {
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
-    for (auto& r : _GPR)
-        r = 0;
-    for (auto& r : _FPR)
-        r = 0;
-    for (auto& r : _V)
-        r = 0;
     _systemStart = boost::chrono::high_resolution_clock::now();
 }
 
-ps3_uintptr_t PPU::malloc(ps3_uintptr_t size) {
+ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
     ps3_uintptr_t va = 0;
     for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
         auto& p =_pages[i];
@@ -153,13 +142,10 @@ ps3_uintptr_t PPU::malloc(ps3_uintptr_t size) {
     return va;
 }
 
-void PPU::setRsx(Rsx* rsx) {
+void MainMemory::setRsx(Rsx* rsx) {
     _rsx = rsx;
 }
 
-PPU::PPU() {
-    reset();
-}
 
 struct alignas(2) page_byte { uint8_t v; };
 
@@ -178,13 +164,7 @@ void MemoryPage::dealloc() {
     ptr = 0;
 }
 
-void PPU::shutdown() {
-    if (_rsx) {
-        _rsx->shutdown();
-    }
-}
-
-void PPU::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
+void MainMemory::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
     if (src == 0 || size == 0)
         throw std::runtime_error("zero size or zero source address");
     auto mbMask = 1024 * 1024 - 1;
@@ -202,22 +182,7 @@ void PPU::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
     }
 }
 
-void PPU::setELFLoader(ELFLoader* elfLoader) {
-    _elfLoader = elfLoader;
-}
-
-ELFLoader* PPU::getELFLoader() {
-    return _elfLoader;
-}
-
-void PPU::allocPage(void** ptr, ps3_uintptr_t* va) {
-    *va = malloc(DefaultMainMemoryPageSize);
-    VirtualAddress split { *va };
-    assert(split.offset.u() == 0);
-    *ptr = (void*)(_pages[split.page.u()].ptr.load() & PagePtrMask);
-}
-
-uint8_t* PPU::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
+uint8_t* MainMemory::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
     VirtualAddress split { va };
     auto& page = _pages[split.page.u()];
     if (!page.ptr)
@@ -228,12 +193,13 @@ uint8_t* PPU::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
     return (uint8_t*)((page.ptr & PagePtrMask) + offset);
 }
 
-void PPU::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
+void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
     VirtualAddress split { src };
     if (split.offset.u() != 0 || size % DefaultMainMemoryPageSize != 0)
         throw std::runtime_error("expecting multiple of page size");
     auto pageCount = size / DefaultMainMemoryPageSize;
     auto firstPage = split.page.u();
+    assert(firstPage < DefaultMainMemoryPageCount);
     for (auto i = 0u; i < pageCount; ++i) {
         auto& page = _pages[firstPage + i];
         auto memoryPtr = (uint8_t*)memory + i * DefaultMainMemoryPageSize;
@@ -245,18 +211,18 @@ void PPU::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
     }
 }
 
-uint64_t PPU::getFrequency() {
+uint64_t MainMemory::getFrequency() {
     return 79800000;
 }
 
-uint64_t PPU::getTimeBase() {
+uint64_t MainMemory::getTimeBase() {
     auto now = boost::chrono::high_resolution_clock::now();
     auto diff = now - _systemStart;
     auto us = boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
     return 1000000 * us.count() * getFrequency();
 }
 
-void PPU::memoryBreak(uint32_t va, uint32_t size) {
+void MainMemory::memoryBreak(uint32_t va, uint32_t size) {
     VirtualAddress split { va };
     auto* page = &_pages[split.page.u()];
     for (auto i = 0u; i <= size / DefaultMainMemoryPageSize; ++i) {
@@ -266,12 +232,22 @@ void PPU::memoryBreak(uint32_t va, uint32_t size) {
     }
 }
 
-void PPU::memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler) {
+void MainMemory::memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler) {
     _memoryWriteHandler = handler;
 }
 
-void encodeNCall(PPU* ppu, ps3_uintptr_t va, uint32_t index) {
+void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
     uint32_t ncall = (1 << 26) | index;
-    ppu->store<4>(va, ncall);
+    mm->store<4>(va, ncall);
 }
 
+void MainMemory::allocPage(void** ptr, ps3_uintptr_t* va) {
+    *va = malloc(DefaultMainMemoryPageSize);
+    VirtualAddress split { *va };
+    assert(split.offset.u() == 0);
+    *ptr = (void*)(_pages[split.page.u()].ptr.load() & PagePtrMask);
+}
+
+MainMemory::MainMemory() {
+    reset();
+}

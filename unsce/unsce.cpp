@@ -298,7 +298,7 @@ bool decrypt_npdrm(std::vector<key_info_t>& keys,
     assert(it != control_infos.end());
     
     auto npdrm = reinterpret_cast<ci_data_npdrm*>(*it + 1);
-    
+    (void)npdrm;
     assert(npdrm->license_type == NP_LICENSE_FREE);
     auto key = std::find_if(keys.begin(), keys.end(), [=](auto& key) {
         return key.name == "NP_klic_free";

@@ -4,7 +4,7 @@
 #include "Cache.h"
 #include "GLFramebuffer.h"
 #include "GLTexture.h"
-#include "../PPU.h"
+#include "../MainMemory.h"
 #include "../shaders/ShaderGenerator.h"
 #include "../shaders/shader_dasm.h"
 #include "../utils.h"
@@ -261,7 +261,7 @@ public:
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
 };
 
-Rsx::Rsx(PPU* ppu) : _ppu(ppu) { }
+Rsx::Rsx() = default;
 
 Rsx::~Rsx() {
     shutdown();
@@ -329,7 +329,7 @@ public:
 void Rsx::setLabel(int index, uint32_t value) {
     auto offset = index * 0x10;
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("setting rsx label at offset %x", offset);
-    auto ptr = _ppu->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     atomic->store(boost::endian::native_to_big(value));
 }
@@ -347,7 +347,7 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
-    auto ptr = _ppu->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     while (boost::endian::big_to_native(atomic->load()) != value) ;
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("acquired");
@@ -358,7 +358,7 @@ void Rsx::SemaphoreRelease(uint32_t value) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("releasing semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
-    auto ptr = _ppu->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     atomic->store(boost::endian::native_to_big(value));
 }
@@ -444,7 +444,7 @@ void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
 void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", size);
     auto bytes = size * 4;
-    auto src = _ppu->getMemoryPointer(GcmLocalMemoryBase + locationOffset, bytes);
+    auto src = _mm->getMemoryPointer(GcmLocalMemoryBase + locationOffset, bytes);
     memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], src, bytes);
     _context->vertexShaderDirty = true;
     _context->vertexLoadOffset += bytes;
@@ -462,7 +462,7 @@ void Rsx::ShaderProgram(uint32_t locationOffset) {
     // loads fragment program byte code from locationOffset-1 up to the last command
     // (with the "#last command" bit)
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _ppu->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _mm->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
     _context->fragmentVa = GcmLocalMemoryBase + locationOffset - 1;
     _context->fragmentShaderDirty = true;
 }
@@ -616,6 +616,7 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
     array.offset = offset;
     array.binding = index;
     GLint maxBindings;
+    (void)maxBindings;
     assert((GLint)array.binding < (glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBindings), maxBindings));
     assert(location == CELL_GCM_LOCATION_LOCAL);
 }
@@ -677,22 +678,21 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     updateFramebuffer();
     _context->textureRenderer->render(tex);
     _context->pipeline.bind();
-    window.SwapBuffers();
-    
-    auto& vec = _context->lastFrame;
-    glReadnPixels(_context->viewPort.x,
-                  _context->viewPort.y,
-                  _context->viewPort.width,
-                  _context->viewPort.height,
-                  GL_RGBA,
-                  GL_UNSIGNED_BYTE,
-                  vec.size(),
-                  &vec[0]);
+    _window.SwapBuffers();
+   
 #if DEBUG
     static int framenum = 0;
     
     if (framenum < 3) {
-        std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgba", framenum), std::ofstream::binary);
+        auto& vec = _context->lastFrame;
+        glcall(glGetTextureImage(
+            tex->handle(),
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            vec.size(),
+            &vec[0]));
+        std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgba", framenum));
         f.write((const char*)vec.data(), vec.size());
         framenum++;
     }
@@ -765,7 +765,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     // TODO: proper buffer management
     std::unique_ptr<uint8_t[]> copy(new uint8_t[count * 4]); // TODO: check index format
     auto va = first + _context->vertexIndexArrayOffset + GcmLocalMemoryBase;
-    _ppu->readMemory(va, copy.get(), count * 4);
+    _mm->readMemory(va, copy.get(), count * 4);
     auto ptr = (uint32_t*)copy.get();
     for (auto i = 0u; i < count; ++i) {
         ptr[i] = boost::endian::endian_reverse(ptr[i]);
@@ -785,7 +785,7 @@ class FragmentShaderUpdateFunctor {
     std::vector<uint8_t> _newbytecode;
     FragmentProgramInfo _info;
     RsxContext* _rsxContext;
-    PPU* _ppu;
+    MainMemory* _mm;
     
     void updateBytecode(FragmentShader* shader) {
         // TODO: handle sizes
@@ -819,11 +819,11 @@ public:
                                 uint32_t size,
                                 std::vector<uint8_t>&& bytecode,
                                 RsxContext* rsxContext,
-                                PPU* ppu)
+                                MainMemory* mm)
         : _constBuffer(GLBufferType::MapWrite, size / 2),
           _newbytecode(bytecode),
           _rsxContext(rsxContext),
-          _ppu(ppu),
+          _mm(mm),
           va(va), size(size)
     {
         assert(size % 16 == 0);
@@ -835,7 +835,7 @@ public:
             updateBytecode(shader);
             return;
         }
-        _ppu->readMemory(va, &_newbytecode[0], size);
+        _mm->readMemory(va, &_newbytecode[0], size);
         bool constsChanged = false;
         bool bytecodeChanged = false;
         for (auto i = 0u; i < size; i += 16) {
@@ -868,7 +868,7 @@ void Rsx::updateShaders() {
         
         auto& vec = _context->fragmentBytecode;
         vec.resize(512 * 16);
-        _ppu->readMemory(_context->fragmentVa, &vec[0], vec.size());
+        _mm->readMemory(_context->fragmentVa, &vec[0], vec.size());
         
         auto len = get_fragment_bytecode_length(&vec[0]);
         FragmentShaderCacheKey key { _context->fragmentVa, len };
@@ -882,7 +882,7 @@ void Rsx::updateShaders() {
                  len,
                  std::vector<uint8_t>(begin(vec), begin(vec) + len),
                  _context.get(),
-                 _ppu
+                 _mm
              );
              _context->fragmentShaderCache.insert(key, shader, updater);
         }
@@ -985,10 +985,10 @@ void Rsx::updateTextures() {
                 auto updater = new SimpleCacheItemUpdater<GLTexture> {
                     key.va, info.height * info.pitch,
                     [=](auto t) {
-                        t->update(_ppu);
+                        t->update(_mm);
                     }
                 };
-                texture = new GLTexture(_ppu, sampler.texture);
+                texture = new GLTexture(_mm, sampler.texture);
                 _context->textureCache.insert(key, texture, updater);
             }
             
@@ -1036,10 +1036,10 @@ void Rsx::updateTextures() {
                     auto updater = new SimpleCacheItemUpdater<GLTexture> {
                         key.va, info.height * info.pitch,
                         [=](auto t) {
-                            t->update(_ppu);
+                            t->update(_mm);
                         }
                     };
-                    texture = new GLTexture(_ppu, sampler.texture);
+                    texture = new GLTexture(_mm, sampler.texture);
                     _context->textureCache.insert(key, texture, std::move(updater));
                 }
                 texture->bind(textureUnit);
@@ -1067,7 +1067,9 @@ void Rsx::updateTextures() {
     _context->fragmentSamplersBuffer.unmap();
 }
 
-void Rsx::init() {
+void Rsx::init(MainMemory* mm) {
+    _mm = mm;
+    
     BOOST_LOG_TRIVIAL(trace) << "waiting for rsx loop to initialize";
     
     _thread.reset(new boost::thread([=]{ loop(); }));
@@ -1380,20 +1382,20 @@ void glDebugCallbackFunction(GLenum source,
 void Rsx::initGcm() {
     BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
     
-    window.Init();
+    _window.Init();
     
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(&glDebugCallbackFunction, nullptr);
     
     _context.reset(new RsxContext());
     
-    _ppu->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
+    _mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
     _context->pipeline.bind();
     _context->localMemory.reset(new uint8_t[GcmLocalMemorySize]);
-    _ppu->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->localMemory.get());
+    _mm->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->localMemory.get());
     
     // remap io to point to the buffer as well
-    _ppu->map(_gcmIoAddress, GcmLocalMemoryBase, _gcmIoSize);
+    _mm->map(_gcmIoAddress, GcmLocalMemoryBase, _gcmIoSize);
     
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
     _context->vertexConstBuffer = GLBuffer(GLBufferType::Dynamic, constBufferSize);
@@ -1447,7 +1449,7 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
             auto updater = new SimpleCacheItemUpdater<GLBuffer> {
                 bufferVa, bufferSize, [=](auto b) {
                     auto mapped = b->map();
-                    _ppu->readMemory(bufferVa, mapped, bufferSize);
+                    _mm->readMemory(bufferVa, mapped, bufferSize);
                     b->unmap();
                 }
             };
@@ -1467,7 +1469,7 @@ void Rsx::waitForIdle() {
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
     waitForIdle();
-    _ppu->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
+    _mm->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
     __sync_synchronize();
 }
 
@@ -1510,7 +1512,7 @@ void Rsx::Color(std::vector<uint32_t> const& vec) {
     // TODO: calc image
     auto pos = _context->transfer.pointX * 4;
     for (auto v : vec) {
-        _ppu->store<4>(_context->transfer.offsetDestin + GcmLocalMemoryBase + pos, v);
+        _mm->store<4>(_context->transfer.offsetDestin + GcmLocalMemoryBase + pos, v);
         pos += 4;
     }
 }
@@ -1530,7 +1532,7 @@ uint32_t Rsx::getGet() {
 }
 
 void Rsx::watchCaches() {
-    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { _ppu->memoryBreak(va, size); };
+    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { _mm->memoryBreak(va, size); };
     _context->bufferCache.watch(setMemoryBreak);
     _context->textureCache.watch(setMemoryBreak);
     _context->fragmentShaderCache.watch(setMemoryBreak);

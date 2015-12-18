@@ -478,3 +478,10 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "vandc v0,v1,v0");
 }
+
+TEST_CASE("") {
+    uint8_t instr[] = { 0x7f, 0xe0, 0x00, 0x88 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "td 31,r0,r0");
+}

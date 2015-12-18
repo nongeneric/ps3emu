@@ -1,8 +1,7 @@
 #include "fs.h"
 
 #include "../ps3emu/utils.h"
-#include "../ps3emu/PPU.h"
-#include "../ps3emu/ELFLoader.h"
+#include "../ps3emu/Process.h"
 #include <stdexcept>
 #include "string.h"
 #include <string>
@@ -75,8 +74,8 @@ CellFsErrno toCellErrno(int err) {
     return CELL_FS_SUCCEEDED;
 }
 
-CellFsErrno cellFsStat(const char* path, CellFsStat* sb, PPU* ppu) {
-    auto hostPath = toHostPath(path, ppu->getELFLoader()->loadedFilePath().c_str());
+CellFsErrno cellFsStat(const char* path, CellFsStat* sb, PPUThread* thread) {
+    auto hostPath = toHostPath(path, thread->proc()->elfLoader()->loadedFilePath().c_str());
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsStat(%s (%s), ...)", path, hostPath);
     struct stat st;
     auto err = stat(hostPath.c_str(), &st);
@@ -147,9 +146,9 @@ public:
 
 static FileMap fileMap;
 
-CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, PPU* ppu) {
+CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, PPUThread* thread) {
     const char* mode = flagsToMode(flags);
-    auto hostPath = toHostPath(path, ppu->getELFLoader()->loadedFilePath().c_str());
+    auto hostPath = toHostPath(path, thread->proc()->elfLoader()->loadedFilePath().c_str());
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
     auto f = fopen(hostPath.c_str(), mode);
     if (!f) {
@@ -191,10 +190,10 @@ CellFsErrno cellFsClose(int32_t fd) {
     return CELL_FS_SUCCEEDED;
 }
 
-CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t* nread, PPU* ppu) {
+CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t* nread, PPUThread* thread) {
     std::unique_ptr<char[]> localBuf(new char[nbytes]);
     auto file = fileMap.getFile(fd);
     *nread = fread(localBuf.get(), 1, nbytes, file);
-    ppu->writeMemory(buf, localBuf.get(), *nread);
+    thread->mm()->writeMemory(buf, localBuf.get(), *nread);
     return CELL_FS_SUCCEEDED;
 }

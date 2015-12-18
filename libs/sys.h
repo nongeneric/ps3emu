@@ -12,7 +12,7 @@ typedef big_uint32_t sys_adaptive_t;
 #define SYS_SYNC_NAME_LENGTH        7
 #define SYS_SYNC_NAME_SIZE          (SYS_SYNC_NAME_LENGTH + 1)
 
-class PPU;
+class PPUThread;
 
 typedef struct {
     volatile big_uint32_t owner;
@@ -56,7 +56,7 @@ typedef struct sys_memory_info {
 
 int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
 
-extern cell_system_time_t sys_time_get_system_time(PPU* ppu);
+extern cell_system_time_t sys_time_get_system_time(PPUThread* thread);
 extern int _sys_process_atexitspawn();
 extern int _sys_process_at_Exitspawn();
 
@@ -77,7 +77,7 @@ typedef big_uint32_t sys_addr_t;
 #define SYS_MEMORY_GRANULARITY_64K       0x0000000000000200ULL
 #define SYS_MEMORY_GRANULARITY_MASK      0x0000000000000f00ULL
 
-int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPU* ppu);
+int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPUThread* thread);
 int sys_timer_usleep(usecond_t sleep_time);
 
 typedef struct sys_event_queue_attr {
@@ -109,7 +109,7 @@ int sys_event_port_create(sys_event_port_t* eport_id,
 int sys_event_port_connect_local(sys_event_port_t event_port_id,
                                  sys_event_queue_t event_queue_id);
 
-uint64_t sys_time_get_timebase_frequency(PPU* ppu);
+uint64_t sys_time_get_timebase_frequency(PPUThread* thread);
 
 typedef struct {
     big_uint32_t pst_addr;

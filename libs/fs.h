@@ -29,20 +29,20 @@ struct CellFsStat {
     big_uint64_t st_blksize;
 };
 
-class PPU;
+class PPUThread;
 CellFsErrno sys_fs_open_impl(const char *path,
                              uint32_t flags,
                              big_uint32_t *fd,
                              uint64_t mode,
                              const void *arg,
                              uint64_t size);
-CellFsErrno cellFsStat(const char* path, CellFsStat* sb, PPU* ppu);
+CellFsErrno cellFsStat(const char* path, CellFsStat* sb, PPUThread* thread);
 CellFsErrno cellFsOpen(const char *path,
                        int32_t flags,
                        big_int32_t *fd,
                        uint64_t arg,
                        uint64_t size,
-                       PPU* ppu);
+                       PPUThread* thread);
 CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t *pos);
 CellFsErrno cellFsClose(int32_t fd);
-CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nread, PPU* ppu);
+CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nread, PPUThread* thread);
