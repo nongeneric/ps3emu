@@ -1709,3 +1709,27 @@ TEST_CASE("vxor v0,v0,v0") {
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
     REQUIRE( (th.getV(0) == 0) );
 }
+
+TEST_CASE("addc r5,r4,r3") {
+    MainMemory mm;
+    PPUThread th(&mm);
+    uint8_t instr[] = { 0x7C, 0xA4, 0x18, 0x14 };
+    
+    th.setGPR(3, 100);
+    th.setGPR(4, 200);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(5) == 300 );
+    REQUIRE( th.getCA() == 0 );
+    
+    th.setGPR(3, 0xffffffffffffffffull);
+    th.setGPR(4, 0xffffffffffffffffull);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(5) == -2ull );
+    REQUIRE( th.getCA() == 1 );
+    
+    th.setGPR(3, 1);
+    th.setGPR(4, 2);
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getGPR(5) == 3 );
+    REQUIRE( th.getCA() == 0 );
+}

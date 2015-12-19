@@ -876,6 +876,43 @@ EMU(SUBFIC, DForm_2) {
     TH->setCA(ov);
 }
 
+PRINT(ADDC, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "addc", "addc." }, { "addco", "addco." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(ADDC, XOForm_1) {
+    auto ra = TH->getGPR(i->RA);
+    auto rb = TH->getGPR(i->RB);
+    unsigned __int128 res = ra;
+    res += rb;
+    auto ca = res >> 64;
+    TH->setCA(ca);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ca, res, TH);
+}
+
+PRINT(SUBFC, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "subfc", "subfc." }, { "subfco", "subfco." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(SUBFC, XOForm_1) {
+    auto ra = TH->getGPR(i->RA);
+    auto rb = TH->getGPR(i->RB);
+    unsigned __int128 res = ~ra;
+    res += rb;
+    res += 1;
+    auto ca = res >> 64;
+    TH->setCA(ca);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ca, res, TH);
+}
+
 // Fixed-Point Logical Instructions, p65
 
 // AND
@@ -2984,6 +3021,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 11: invoke(MULHWU);
                 case 38: invoke(LVSR);
                 case 68: invoke(TD);
+                case 10: invoke(ADDC);
+                case 8: invoke(SUBFC);
                 default: throw IllegalInstructionException();
             }
             break;

@@ -130,14 +130,18 @@ void MainMemory::reset() {
 }
 
 ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
-    ps3_uintptr_t va = 0;
-    for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
+    VirtualAddress split { HeapArea };
+    VirtualAddress maxSplit { HeapArea + HeapAreaSize };
+    ps3_uintptr_t va = HeapArea;
+    for (uint32_t i = split.page.u(); i != maxSplit.page.u(); ++i) {
         auto& p =_pages[i];
         if (p.ptr) {
             va = std::max(va, i * DefaultMainMemoryPageSize);
         }
     }
     va += DefaultMainMemoryPageSize;
+    if (va + size > HeapArea + HeapAreaSize)
+        throw std::runtime_error("not enough memory");
     setMemory(va, 0, size, true);
     return va;
 }

@@ -43,12 +43,18 @@ void PPUThread::loop() {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Breakpoint);
         } catch (IllegalInstructionException& e) {
+            setNIP(cia);
             _eventHandler(this, PPUThreadEvent::InvalidInstruction);
             break;
         } catch (MemoryAccessException& e) {
+            setNIP(cia);
             _eventHandler(this, PPUThreadEvent::MemoryAccessError);
             break;
+        } catch (ProcessFinishedException& e) {
+            _eventHandler(this, PPUThreadEvent::ProcessFinished);
+            break;
         } catch (...) {
+            setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Failure);
             break;
         }
@@ -79,4 +85,17 @@ void PPUThread::run() {
         _thread = boost::thread([=] { loop(); });
         _init = true;
     }
+}
+
+void PPUThread::setStackInfo(uint32_t base, uint32_t size) {
+    _stackBase = base;
+    _stackSize = size;
+}
+
+uint32_t PPUThread::getStackBase() {
+    return _stackBase;
+}
+
+uint32_t PPUThread::getStackSize() {
+    return _stackSize;
 }

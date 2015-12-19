@@ -8,12 +8,21 @@ static constexpr emu_void_t emu_void = 0;
 
 static constexpr ps3_uintptr_t GcmControlRegisters = 0x40100040;
 static constexpr ps3_uintptr_t GcmLabelBaseOffset = 0x40300000;
-static constexpr ps3_uintptr_t GcmLocalMemoryBase = 0xc0000000;
-static constexpr ps3_uintptr_t GcmLocalMemorySize = 0xf900000;
+static constexpr ps3_uintptr_t RsxFbBaseAddr = 0xc0000000;
+static constexpr uint32_t GcmLocalMemorySize = 0xf900000;
 static constexpr uint32_t RsxMemoryFrequency = 650000000;
 static constexpr uint32_t RsxCoreFrequency = 500000000;
-static constexpr ps3_uintptr_t StackBase = 0xd0000000u;
-static constexpr uint32_t StackSize = 0x10000u;
+
+static constexpr ps3_uintptr_t HeapArea = 0xb0000000;
+static constexpr uint32_t HeapAreaSize = 0x10000000;
+
+static constexpr ps3_uintptr_t StackArea = 0xd0000000u;
+static constexpr uint32_t StackAreaSize = 0x8000000u;
+
+static constexpr ps3_uintptr_t TLSArea = StackArea + StackAreaSize;
+static constexpr uint32_t TLSAreaSize = 0x7000000u;
+
+static constexpr uint32_t DefaultStackSize = 0x10000u;
 
 static constexpr ps3_uintptr_t DefaultGcmBufferOverflowCallback = 0x7f000000;
 static constexpr ps3_uintptr_t DefaultGcmDefaultContextData = DefaultGcmBufferOverflowCallback + 8;

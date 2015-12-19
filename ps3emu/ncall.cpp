@@ -5,6 +5,7 @@
 #include "../libs/Sysutil.h"
 #include "../libs/graphics/gcm.h"
 #include "../libs/fs.h"
+#include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
 #include <memory>
@@ -270,7 +271,7 @@ STUB_0(cellSysutilCheckCallback);
 STUB_1(cellPadGetInfo2);
 STUB_1(cellKbGetInfo);
 STUB_1(cellMouseGetInfo);
-STUB_1(sys_ppu_thread_get_stack_information);
+STUB_2(sys_ppu_thread_get_stack_information);
 STUB_1(cellGcmSetDebugOutputLevel);
 STUB_2(sys_mutex_create);
 STUB_1(sys_mutex_destroy);
@@ -286,6 +287,13 @@ STUB_6(cellFsOpen_proxy);
 STUB_4(cellFsLseek);
 STUB_1(cellFsClose);
 STUB_5(cellFsRead);
+STUB_2(sys_time_get_current_time);
+STUB_2(sys_time_get_timezone);
+STUB_4(sys_semaphore_create);
+STUB_1(sys_semaphore_destroy);
+STUB_2(sys_semaphore_wait);
+STUB_1(sys_semaphore_trywait);
+STUB_2(sys_semaphore_post);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -372,6 +380,13 @@ void PPUThread::scall() {
         case 102: nstub_sys_mutex_lock(this); break;
         case 103: nstub_sys_mutex_trylock(this); break;
         case 104: nstub_sys_mutex_unlock(this); break;
+        case 145: nstub_sys_time_get_current_time(this); break;
+        case 144: nstub_sys_time_get_timezone(this); break;
+        case 90: nstub_sys_semaphore_create(this); break;
+        case 91: nstub_sys_semaphore_destroy(this); break;
+        case 92: nstub_sys_semaphore_wait(this); break;
+        case 93: nstub_sys_semaphore_trywait(this); break;
+        case 94: nstub_sys_semaphore_post(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

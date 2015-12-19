@@ -13,6 +13,7 @@ enum class PPUThreadEvent {
     Breakpoint,
     Started,
     Finished,
+    ProcessFinished,
     InvalidInstruction,
     MemoryAccessError,
     Failure
@@ -109,6 +110,8 @@ class PPUThread {
     bool _init;
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
+    uint32_t _stackBase;
+    uint32_t _stackSize;
     
     uint64_t _NIP;
     uint64_t _LR = 0;
@@ -139,12 +142,17 @@ public:
     PPUThread(MainMemory* mm);
     PPUThread(Process* proc,
               std::function<void(PPUThread*, PPUThreadEvent)> eventHandler);
+    void setStackInfo(uint32_t base, uint32_t size);
+    uint32_t getStackBase();
+    uint32_t getStackSize();
     
     void singleStepBreakpoint();
     void dbgPause(bool val);
     void run();
     MainMemory* mm();
     Process* proc();
+    void exit(uint64_t code);
+    uint64_t join();
     
     template <typename V>
     inline void setGPR(V i, uint64_t value) {

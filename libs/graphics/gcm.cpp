@@ -40,7 +40,7 @@ emu_void_t cellGcmGetConfiguration(CellGcmConfig* config) {
     config->coreFrequency = RsxCoreFrequency;
     config->localSize = GcmLocalMemorySize;
     config->ioSize = emuGcmState.ioMaps.at(0).size;
-    config->localAddress = GcmLocalMemoryBase;
+    config->localAddress = RsxFbBaseAddr;
     config->ioAddress = emuGcmState.ioMaps.at(0).address;
     return emu_void;
 }
@@ -52,7 +52,7 @@ int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t* of
             return CELL_OK;
         }
     }
-    *offset = address - GcmLocalMemoryBase;
+    *offset = address - RsxFbBaseAddr;
     return CELL_OK;
 }
 
@@ -153,7 +153,7 @@ int32_t cellGcmIoOffsetToAddress(uint32_t offset, big_uint32_t* address) {
             return CELL_OK;
         }
     }
-    *address = GcmLocalMemoryBase + offset;
+    *address = RsxFbBaseAddr + offset;
     return CELL_OK;
 }
 
@@ -216,7 +216,7 @@ int32_t cellGcmMapMainMemory(ps3_uintptr_t address, uint32_t size, big_uint32_t*
     auto firstFreeOffset = lastOffsetMapping->offset + lastOffsetMapping->size;
     maps.push_back({address, size, firstFreeOffset});
     *offset = firstFreeOffset;
-    proc->mm()->map(address, firstFreeOffset + GcmLocalMemoryBase, size);
+    proc->mm()->map(address, firstFreeOffset + RsxFbBaseAddr, size);
     return CELL_OK;
 }
 

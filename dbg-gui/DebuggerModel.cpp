@@ -309,7 +309,23 @@ void DebuggerModel::stepIn(bool updateUI) {
 void DebuggerModel::stepOver() {}
 
 void DebuggerModel::run() {
-    _proc->run();
+    auto ev = _proc->run();
+    switch (ev.event) {
+        case ProcessEvent::Failure:
+            emit message("failure");
+            break;
+        case ProcessEvent::InvalidInstruction:
+            emit message(QString("invalid instruction at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
+            break;
+        case ProcessEvent::MemoryAccessError:
+            emit message(QString("memory access error at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
+            break;
+        case ProcessEvent::ProcessFinished:
+            emit message("process finished");
+            break;
+        default: break;
+    }
+    updateUI();
 }
 
 void DebuggerModel::log(std::string str) {
@@ -345,6 +361,7 @@ void DebuggerModel::exec(QString command) {
             }
         } catch (...) {
             emit message("command failed");
+            return;
         }
     }
     emit message("unknown command");

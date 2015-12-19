@@ -109,29 +109,37 @@ int sys_event_port_create(sys_event_port_t* eport_id,
 int sys_event_port_connect_local(sys_event_port_t event_port_id,
                                  sys_event_queue_t event_queue_id);
 
-uint64_t sys_time_get_timebase_frequency(PPUThread* thread);
+uint32_t sys_time_get_timebase_frequency(PPUThread* thread);
+uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec);
+uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime);
 
 typedef struct {
     big_uint32_t pst_addr;
     big_uint32_t pst_size;
 } sys_ppu_thread_stack_t;
 
-int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info);
+int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUThread* thread);
+
+uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);
+uint32_t cellSysmoduleLoadModule(uint16_t id);
+uint32_t cellSysmoduleUnloadModule(uint16_t id);
+uint32_t cellSysmoduleIsLoaded(uint16_t id);
 
 // mutex
 
 typedef big_uint32_t sys_mutex_t;
 
-typedef struct mutex_attr {
+struct sys_mutex_attribute_t {
     sys_protocol_t attr_protocol;
     sys_recursive_t attr_recursive;
     sys_process_shared_t attr_pshared;
     sys_adaptive_t attr_adaptive;
     sys_ipc_key_t key;
-    int flags;
-    big_uint32_t pad;
+    big_uint32_t flags;
+    uint32_t pad;
     char name[SYS_SYNC_NAME_SIZE];
-} sys_mutex_attribute_t;
+};
+static_assert(sizeof(sys_mutex_attribute_t) == 40, "");
 
 int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr);
 int sys_mutex_destroy(sys_mutex_t mutex_id);
@@ -139,7 +147,44 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout);
 int sys_mutex_trylock(sys_mutex_t mutex_id);
 int sys_mutex_unlock(sys_mutex_t mutex_id);
 
-uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);
-uint32_t cellSysmoduleLoadModule(uint16_t id);
-uint32_t cellSysmoduleUnloadModule(uint16_t id);
-uint32_t cellSysmoduleIsLoaded(uint16_t id);
+// semaphore
+
+static constexpr uint32_t CELL_EBUSY = 0x8001000A;
+static constexpr uint32_t CELL_ETIMEDOUT = 0x8001000B;
+
+typedef big_uint32_t sys_semaphore_t;
+typedef big_uint32_t sys_semaphore_value_t;
+
+struct sys_semaphore_attribute_t {
+    sys_protocol_t attr_protocol;
+    sys_process_shared_t attr_pshared;
+    sys_ipc_key_t key;
+    big_uint32_t flags;
+    uint32_t pad;
+    char name[SYS_SYNC_NAME_SIZE];
+};
+static_assert(sizeof(sys_semaphore_attribute_t) == 32, "");
+
+int32_t sys_semaphore_create(sys_semaphore_t* sem,
+                             sys_semaphore_attribute_t* attr,
+                             sys_semaphore_value_t initial_val,
+                             sys_semaphore_value_t max_val);
+int32_t sys_semaphore_destroy(sys_semaphore_t sem);
+int32_t sys_semaphore_wait(sys_semaphore_t sem, usecond_t timeout);
+int32_t sys_semaphore_trywait(sys_semaphore_t sem);
+int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val);
+
+// ppu thread
+
+typedef big_uint64_t sys_ppu_thread_t;
+
+int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
+                              uint64_t entry,
+                              uint64_t arg,
+                              uint32_t prio,
+                              uint32_t stacksize,
+                              uint64_t flags,
+                              const char *threadname,
+                              PPUThread* thread);
+int32_t sys_ppu_thread_join(sys_ppu_thread_t* thread_id, uint64_t* exit_code, PPUThread* thread);
+int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread);

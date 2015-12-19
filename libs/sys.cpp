@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdexcept>
 #include "../ps3emu/Process.h"
+#include "../ps3emu/IDMap.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
@@ -210,43 +211,34 @@ int sys_event_port_connect_local(sys_event_port_t event_port_id,
     return CELL_OK;
 }
 
-uint64_t sys_time_get_timebase_frequency(PPUThread* thread) {
+uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return thread->mm()->getFrequency();
 }
 
-int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info) {
+uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec) {
+    auto now = boost::chrono::high_resolution_clock::now();
+    auto duration = now.time_since_epoch();
+    auto ns = boost::chrono::duration_cast<boost::chrono::nanoseconds>(duration).count();
+    *sec = ns / 1000000000;
+    *nsec = ns % 1000000000;
+    return CELL_OK;
+}
+
+uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime) {
+    *timezone = 40; // us eastern time
+    *summertime = 0;
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    info->pst_addr = StackBase;
-    info->pst_size = StackSize;
+    info->pst_addr = thread->getStackBase();
+    info->pst_size = thread->getStackSize();
     return CELL_OK;
 }
 
 // mutex
-
-template <typename ID, typename T>
-class IDMap {
-    ID _maxId = 1;
-    std::map<ID, T> _map;
-public:
-    ID create(T&& t) {
-        assert(_maxId <= 2000); // TODO: implement id reuse
-        _map.insert(std::make_pair(_maxId, std::move(t)));
-        return _maxId++;
-    }
-    
-    void destroy(ID id) {
-        auto it = _map.find(id);
-        assert(it != end(_map));
-        _map.erase(it);
-    }
-    
-    T& get(ID id) {
-        auto it = _map.find(id);
-        assert(it != end(_map));
-        return it->second;
-    }
-};
 
 IDMap<sys_mutex_t, std::unique_ptr<boost::timed_mutex>> mutexes;
 
@@ -275,7 +267,7 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
 int sys_mutex_trylock(sys_mutex_t mutex_id) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     bool locked = mutexes.get(mutex_id)->try_lock();
-    return locked ? CELL_OK : EBUSY;
+    return locked ? CELL_OK : CELL_EBUSY;
 }
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
@@ -305,4 +297,68 @@ uint32_t cellSysmoduleUnloadModule(uint16_t id) {
 
 uint32_t cellSysmoduleIsLoaded(uint16_t id) {
     return CELL_OK;
+}
+
+class CellSemaphore {
+    boost::mutex _m;
+    boost::condition_variable _cv;
+    unsigned _val;
+    unsigned _max;
+public:
+    CellSemaphore(unsigned val, unsigned max)
+        : _val(val), _max(max) { }
+        
+    bool post() {
+        boost::unique_lock<boost::mutex> lock(_m);
+        if (_val == _max)
+            return false;
+        _val++;
+        _cv.notify_all();
+        return true;
+    }
+    
+    bool wait(usecond_t timeout) {
+        boost::unique_lock<boost::mutex> lock(_m);
+        if (!lock.owns_lock())
+            return false;
+        while (!_val) {
+            _cv.timed_wait(lock, boost::posix_time::microseconds(timeout));
+        }
+        _val--;
+        return true;
+    }
+};
+
+IDMap<sys_semaphore_t, std::unique_ptr<CellSemaphore>> semaphores;
+
+int32_t sys_semaphore_create(sys_semaphore_t* sem, 
+                             sys_semaphore_attribute_t* attr, 
+                             sys_semaphore_value_t initial_val, 
+                             sys_semaphore_value_t max_val) {
+    auto csem = std::make_unique<CellSemaphore>(initial_val, max_val);
+    *sem = semaphores.create(std::move(csem));
+    return CELL_OK;
+}
+
+int32_t sys_semaphore_destroy(sys_semaphore_t sem) {
+    semaphores.destroy(sem);
+    return CELL_OK;
+}
+
+int32_t sys_semaphore_wait(sys_semaphore_t sem, usecond_t timeout) {
+    auto& csem = semaphores.get(sem);
+    if (csem->wait(timeout))
+        return CELL_OK;
+    return CELL_ETIMEDOUT;
+}
+
+int32_t sys_semaphore_trywait(sys_semaphore_t sem) {
+    return sys_semaphore_wait(sem, 0);
+}
+
+int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
+    auto& csem = semaphores.get(sem);
+    if (csem->post())
+        return CELL_OK;
+    return CELL_EBUSY;
 }

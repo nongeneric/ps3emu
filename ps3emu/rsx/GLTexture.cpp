@@ -466,6 +466,8 @@ GLuint GLSimpleTexture::format() {
 }
 
 ps3_uintptr_t addressToMainMemory(MemoryLocation location, ps3_uintptr_t address) {
-    return address < GcmLocalMemoryBase ? address + GcmLocalMemoryBase : address;
+    if (RsxFbBaseAddr <= address && address < GcmLocalMemorySize)
+        return address;
+    return address + RsxFbBaseAddr;
     //return address + (location == MemoryLocation::Local ? GcmLocalMemoryBase : 0);
 }

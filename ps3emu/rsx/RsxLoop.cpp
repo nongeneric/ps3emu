@@ -53,11 +53,11 @@ std::array<float, 4> parseColor(uint32_t raw) {
 }
 
 int64_t Rsx::interpret(uint32_t get) {
-    MethodHeader header { _mm->load<4>(GcmLocalMemoryBase + get) };
+    MethodHeader header { _mm->load<4>(RsxFbBaseAddr + get) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
         assert(n != 0);\
-        return _mm->load<4>(GcmLocalMemoryBase + get + 4 * n);\
+        return _mm->load<4>(RsxFbBaseAddr + get + 4 * n);\
     })(x)
     if (header.val == 0) {
         BOOST_LOG_TRIVIAL(trace) << "rsx nop";

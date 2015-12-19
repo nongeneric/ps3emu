@@ -8,8 +8,6 @@
 
 using namespace boost::endian;
 
-static const auto vaTLS = StackBase + StackSize;
-static const auto tlsSize = 64 * (1u << 10);
 static const uint32_t PT_TYPE_PARAMS = PT_LOOS + 1;
 static const uint32_t PT_TYPE_PRXINFO = PT_LOOS + 2;
 
@@ -125,8 +123,7 @@ struct fdescr {
 };
 static_assert(sizeof(fdescr) == 8, "");
 
-void ELFLoader::map(PPUThread* thread, std::vector<std::string> args) {
-    auto mm = thread->mm();
+void ELFLoader::map(MainMemory* mm) {
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -142,28 +139,6 @@ void ELFLoader::map(PPUThread* thread, std::vector<std::string> args) {
         mm->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
         mm->setMemory(ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
     }
-    
-    // PPU_ABI-Specifications_e
-    mm->setMemory(StackBase, 0, StackSize, true);
-    thread->setGPR(1, StackBase + StackSize - sizeof(uint64_t));
-    
-    fdescr entry;
-    mm->readMemory(_header->e_entry, &entry, sizeof(entry));
-    thread->setGPR(2, entry.tocBase);
-    
-    auto vaArgs = storeArgs(mm, args);
-    thread->setGPR(3, args.size());
-    thread->setGPR(4, vaArgs);
-    
-    // undocumented:
-    thread->setGPR(5, StackBase);
-    thread->setGPR(6, 0);
-    thread->setGPR(12, DefaultMainMemoryPageSize);
-    
-    mm->setMemory(vaTLS, 0, tlsSize, true);
-    thread->setGPR(13, vaTLS);
-    thread->setFPSCR(0);
-    thread->setNIP(entry.va);
 }
 
 Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
@@ -282,22 +257,6 @@ Elf64_be_Sym* ELFLoader::getGlobalSymbolByValue(uint32_t value, uint32_t section
     return res;
 }
 
-ps3_uintptr_t ELFLoader::storeArgs(MainMemory* mm, std::vector<std::string> const& args) {
-    const auto vaArgs = vaTLS + tlsSize;
-    std::vector<big_uint64_t> arr;
-    mm->setMemory(vaArgs, 0, (args.size() + 1) * 8, true);
-    auto len = 0;
-    for (auto arg : args) {
-        auto vaPtr = vaArgs + (args.size() + 1) * 8 + len;
-        mm->writeMemory(vaPtr, arg.data(), arg.size() + 1, true);
-        arr.push_back(vaPtr);
-        len += arg.size() + 1;
-    }
-    arr.push_back(0);
-    mm->writeMemory(vaArgs, arr.data(), arr.size() * 8);
-    return vaArgs;
-}
-
 void ELFLoader::foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action) {
     for (auto s = _sections; s != _sections + _header->e_shnum; ++s) {
         if (s->sh_type == SHT_SYMTAB) {
@@ -333,5 +292,39 @@ uint32_t ELFLoader::getSymbolValue(std::string name) {
 
 std::string ELFLoader::loadedFilePath() {
     return _loadedFilePath;
+}
+
+struct sys_process_param_t {
+    big_uint32_t size;
+    big_uint32_t magic;
+    big_uint32_t version;
+    big_uint32_t sdk_version;
+    big_int32_t primary_prio;
+    big_uint32_t primary_stacksize;
+    big_uint32_t malloc_pagesize;
+    big_uint32_t ppc_seg;
+    big_uint32_t crash_dump_param_addr;
+};
+
+ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
+    ThreadInitInfo info;
+    info.primaryStackSize = DefaultStackSize;
+    for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
+        if (ph->p_type == PT_TLS) {
+            info.tlsBase = &_file[0] + ph->p_offset;
+            info.tlsFileSize = ph->p_filesz;
+            info.tlsMemSize = ph->p_memsz;
+        } else if (ph->p_type == PT_TYPE_PARAMS) {
+            if (ph->p_filesz != 0) {
+                auto procParam = reinterpret_cast<sys_process_param_t*>(&_file[0] + ph->p_offset);
+                info.primaryStackSize = procParam->primary_stacksize;
+            }
+        }
+    }
+    fdescr entry;
+    mm->readMemory(_header->e_entry, &entry, sizeof(entry));
+    info.tocBase = entry.tocBase;
+    info.primaryEntryPoint = entry.va;
+    return info;
 }
 

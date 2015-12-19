@@ -444,7 +444,7 @@ void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
 void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", size);
     auto bytes = size * 4;
-    auto src = _mm->getMemoryPointer(GcmLocalMemoryBase + locationOffset, bytes);
+    auto src = _mm->getMemoryPointer(RsxFbBaseAddr + locationOffset, bytes);
     memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], src, bytes);
     _context->vertexShaderDirty = true;
     _context->vertexLoadOffset += bytes;
@@ -462,8 +462,8 @@ void Rsx::ShaderProgram(uint32_t locationOffset) {
     // loads fragment program byte code from locationOffset-1 up to the last command
     // (with the "#last command" bit)
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _mm->load<4>(locationOffset - 1 + GcmLocalMemoryBase));
-    _context->fragmentVa = GcmLocalMemoryBase + locationOffset - 1;
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _mm->load<4>(locationOffset - 1 + RsxFbBaseAddr));
+    _context->fragmentVa = RsxFbBaseAddr + locationOffset - 1;
     _context->fragmentShaderDirty = true;
 }
 
@@ -672,7 +672,7 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
 }
 
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
-    auto va = _context->displayBuffers[buffer].offset + GcmLocalMemoryBase;
+    auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
     auto tex = _context->framebuffer->findTexture(va);
     _context->framebuffer->bindDefault();
     updateFramebuffer();
@@ -764,7 +764,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     
     // TODO: proper buffer management
     std::unique_ptr<uint8_t[]> copy(new uint8_t[count * 4]); // TODO: check index format
-    auto va = first + _context->vertexIndexArrayOffset + GcmLocalMemoryBase;
+    auto va = first + _context->vertexIndexArrayOffset + RsxFbBaseAddr;
     _mm->readMemory(va, copy.get(), count * 4);
     auto ptr = (uint32_t*)copy.get();
     for (auto i = 0u; i < count; ++i) {
@@ -1392,10 +1392,10 @@ void Rsx::initGcm() {
     _mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
     _context->pipeline.bind();
     _context->localMemory.reset(new uint8_t[GcmLocalMemorySize]);
-    _mm->provideMemory(GcmLocalMemoryBase, GcmLocalMemorySize, _context->localMemory.get());
+    _mm->provideMemory(RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemory.get());
     
     // remap io to point to the buffer as well
-    _mm->map(_gcmIoAddress, GcmLocalMemoryBase, _gcmIoSize);
+    _mm->map(_gcmIoAddress, RsxFbBaseAddr, _gcmIoSize);
     
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
     _context->vertexConstBuffer = GLBuffer(GLBufferType::Dynamic, constBufferSize);
@@ -1512,7 +1512,7 @@ void Rsx::Color(std::vector<uint32_t> const& vec) {
     // TODO: calc image
     auto pos = _context->transfer.pointX * 4;
     for (auto v : vec) {
-        _mm->store<4>(_context->transfer.offsetDestin + GcmLocalMemoryBase + pos, v);
+        _mm->store<4>(_context->transfer.offsetDestin + RsxFbBaseAddr + pos, v);
         pos += 4;
     }
 }

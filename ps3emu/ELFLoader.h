@@ -68,6 +68,15 @@ static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mi
 static_assert(sizeof(Elf64_be_Shdr) == sizeof(Elf64_Shdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Sym) == sizeof(Elf64_Sym), "big endian struct mismatch");
 
+struct ThreadInitInfo {
+    ps3_uintptr_t tocBase;
+    void* tlsBase;
+    uint32_t tlsFileSize;
+    uint32_t tlsMemSize;
+    uint32_t primaryStackSize;
+    uint32_t primaryEntryPoint;
+};
+
 class ELFLoader {
     std::vector<uint8_t> _file;
     std::string _loadedFilePath;
@@ -75,7 +84,6 @@ class ELFLoader {
     Elf64_be_Phdr* _pheaders;
     Elf64_be_Shdr* _sections;
     Elf64_be_Shdr* findSectionByName(std::string name);
-    ps3_uintptr_t storeArgs(MainMemory* mm, std::vector<std::string> const& args);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
 public:
     uint64_t entryPoint();
@@ -85,6 +93,7 @@ public:
     uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
     std::string loadedFilePath();
-    void map(PPUThread* thread, std::vector<std::string> args);
+    void map(MainMemory* mm);
     void link(MainMemory* mm);
+    ThreadInitInfo getThreadInitInfo(MainMemory* mm);
 };
