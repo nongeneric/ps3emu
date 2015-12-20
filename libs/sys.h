@@ -1,6 +1,8 @@
 #pragma once
 
 #include "sys_defs.h"
+#include "../ps3emu/constants.h"
+#include "../ps3emu/ELFLoader.h"
 
 typedef big_uint32_t _sys_sleep_queue_t;
 typedef big_uint32_t sys_protocol_t;
@@ -12,6 +14,7 @@ typedef big_uint32_t sys_adaptive_t;
 #define SYS_SYNC_NAME_LENGTH        7
 #define SYS_SYNC_NAME_SIZE          (SYS_SYNC_NAME_LENGTH + 1)
 
+class Process;
 class PPUThread;
 
 typedef struct {
@@ -46,8 +49,6 @@ extern int sys_lwmutex_destroy(sys_lwmutex_t * lwmutex_id);
 extern int sys_lwmutex_lock(sys_lwmutex_t * lwmutex_id, usecond_t timeout);
 extern int sys_lwmutex_trylock(sys_lwmutex_t * lwmutex_id);
 extern int sys_lwmutex_unlock(sys_lwmutex_t * lwmutex_id);
-
-void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2);
 
 typedef struct sys_memory_info {
     big_uint32_t total_user_memory;
@@ -179,12 +180,15 @@ int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val);
 typedef big_uint64_t sys_ppu_thread_t;
 
 int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
-                              uint64_t entry,
+                              ps3_uintptr_t entry,
                               uint64_t arg,
                               uint32_t prio,
                               uint32_t stacksize,
                               uint64_t flags,
                               const char *threadname,
-                              PPUThread* thread);
-int32_t sys_ppu_thread_join(sys_ppu_thread_t* thread_id, uint64_t* exit_code, PPUThread* thread);
+                              Process* proc);
+int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc);
 int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread);
+
+emu_void_t sys_process_exit(PPUThread* thread);
+emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread);

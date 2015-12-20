@@ -40,8 +40,8 @@ class Process {
     boost::mutex _threadMutex;
     boost::condition_variable _cv;
     ThreadInitInfo _threadInitInfo;
-    MemoryBlockManager<StackArea, StackAreaSize, 4 * 1024> _stackBlocks;
-    MemoryBlockManager<TLSArea, TLSAreaSize, 64 * 1024> _tlsBlocks;
+    MemoryBlockManager<StackArea, StackAreaSize, 1 * 1024 * 1024> _stackBlocks;
+    MemoryBlockManager<TLSArea, TLSAreaSize, 1 * 1024 * 1024> _tlsBlocks;
     std::queue<PPUThreadEventInfo> _threadEvents;
     
     Rsx _rsx;
@@ -51,7 +51,7 @@ class Process {
     IDMap<uint64_t, PPUThread*> _threadIds;
     bool _firstRun = true;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
-    void initNewThread(PPUThread* thread, uint32_t entry, uint32_t stackSize);
+    void initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
@@ -63,5 +63,6 @@ public:
     void init(std::string elfPath, std::vector<std::string> args);
     void terminate();
     ProcessEventInfo run();
-    uint64_t createThread(uint32_t stackSize, uint32_t ep, uint64_t arg);
+    uint64_t createThread(uint32_t stackSize, ps3_uintptr_t entryPointDescriptorVa, uint64_t arg);
+    PPUThread* getThread(uint64_t id);
 };

@@ -1,15 +1,19 @@
 #include "PPUThread.h"
 #include "Process.h"
 #include "ppu_dasm.h"
+#include <boost/log/trivial.hpp>
 
 PPUThread::PPUThread(Process* proc,
-                     std::function<void(PPUThread*, PPUThreadEvent)> eventHandler)
+                     std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
+                     bool primaryThread)
     : _proc(proc),
       _mm(proc->mm()),
       _eventHandler(eventHandler),
       _init(false),
       _dbgPaused(false),
-      _singleStep(false)
+      _singleStep(false),
+      _isStackInfoSet(false),
+      _threadFinishedGracefully(primaryThread)
 {
     for (auto& r : _GPR)
         r = 0;
@@ -20,6 +24,7 @@ PPUThread::PPUThread(Process* proc,
 }
 
 void PPUThread::loop() {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
     _eventHandler(this, PPUThreadEvent::Started);
     
     for (;;) {
@@ -53,12 +58,20 @@ void PPUThread::loop() {
         } catch (ProcessFinishedException& e) {
             _eventHandler(this, PPUThreadEvent::ProcessFinished);
             break;
+        } catch (ThreadFinishedException& e) {
+            _exitCode = e.errorCode();
+            _threadFinishedGracefully = true;
+            break;
         } catch (...) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Failure);
             break;
         }
     }
+    
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop finished (%s)", 
+        _threadFinishedGracefully ? "gracefully" : "with a failure"
+    );
     _eventHandler(this, PPUThreadEvent::Finished);
 }
 
@@ -88,14 +101,25 @@ void PPUThread::run() {
 }
 
 void PPUThread::setStackInfo(uint32_t base, uint32_t size) {
+    _isStackInfoSet = true;
     _stackBase = base;
     _stackSize = size;
 }
 
 uint32_t PPUThread::getStackBase() {
+    assert(_isStackInfoSet);
     return _stackBase;
 }
 
 uint32_t PPUThread::getStackSize() {
+    assert(_isStackInfoSet);
     return _stackSize;
+}
+
+uint64_t PPUThread::join() {
+    _thread.join();
+    _eventHandler(this, PPUThreadEvent::Joined);
+    if (_threadFinishedGracefully)
+        return _exitCode;
+    throw std::runtime_error("joining failed thread");
 }

@@ -106,14 +106,6 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
     }
 };
 
-void nstub_sys_initialize_tls(PPUThread* thread) {
-    
-}
-
-void nstub_sys_process_exit(PPUThread* thread) {
-    throw ProcessFinishedException();
-}
-
 #define ARG(n, f) get_arg<n - 1, \
     typename boost::function_traits< \
         typename boost::remove_pointer<decltype(&f)>::type >::arg##n##_type >() \
@@ -219,6 +211,21 @@ CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path,
     return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, thread);
 }
 
+int32_t sys_ppu_thread_create_proxy(
+    sys_ppu_thread_t* thread_id,
+    ps3_uintptr_t entry,
+    uint64_t arg,
+    uint32_t prio,
+    uint32_t stacksize,
+    uint64_t flags,
+    uint32_t threadname,
+    Process* proc)
+{
+    std::string namestr;
+    readString(proc->mm(), threadname, namestr);
+    return sys_ppu_thread_create(thread_id, entry, arg, prio, stacksize, flags, namestr.c_str(), proc);
+}
+
 STUB_2(defaultContextCallback);
 STUB_2(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
@@ -294,6 +301,11 @@ STUB_1(sys_semaphore_destroy);
 STUB_2(sys_semaphore_wait);
 STUB_1(sys_semaphore_trywait);
 STUB_2(sys_semaphore_post);
+STUB_8(sys_ppu_thread_create_proxy);
+STUB_3(sys_ppu_thread_join);
+STUB_2(sys_ppu_thread_exit);
+STUB_4(sys_initialize_tls);
+STUB_1(sys_process_exit);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -352,6 +364,9 @@ NCallEntry ncallTable[] {
     ENTRY(cellFsLseek),
     ENTRY(cellFsClose),
     ENTRY(cellFsRead),
+    { "sys_ppu_thread_create", calcFnid("sys_ppu_thread_create"), nstub_sys_ppu_thread_create_proxy },
+    ENTRY(sys_ppu_thread_join),
+    ENTRY(sys_ppu_thread_exit),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -387,6 +402,8 @@ void PPUThread::scall() {
         case 92: nstub_sys_semaphore_wait(this); break;
         case 93: nstub_sys_semaphore_trywait(this); break;
         case 94: nstub_sys_semaphore_post(this); break;
+        case 41: nstub_sys_ppu_thread_exit(this); break;
+        case 44: nstub_sys_ppu_thread_join(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

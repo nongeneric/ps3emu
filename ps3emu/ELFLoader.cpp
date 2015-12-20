@@ -117,12 +117,6 @@ const char* ELFLoader::getSectionName(uint32_t idx) {
     return reinterpret_cast<const char*>(ptr);
 }
 
-struct fdescr {
-    big_uint32_t va;
-    big_uint32_t tocBase;
-};
-static_assert(sizeof(fdescr) == 8, "");
-
 void ELFLoader::map(MainMemory* mm) {
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
@@ -321,10 +315,7 @@ ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
             }
         }
     }
-    fdescr entry;
-    mm->readMemory(_header->e_entry, &entry, sizeof(entry));
-    info.tocBase = entry.tocBase;
-    info.primaryEntryPoint = entry.va;
+    info.entryPointDescriptorVa = _header->e_entry;
     return info;
 }
 

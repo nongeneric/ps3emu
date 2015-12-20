@@ -247,11 +247,13 @@ public:
     }
     
     virtual bool isHighlighted(uint64_t row, int col) override {
+        if (!_thread)
+            return false;
         return row == _thread->getNIP();
     }
     
     virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) {
-        if (!_thread->mm()->isAllocated(row))
+        if (!_thread || !_thread->mm()->isAllocated(row))
             return false;
         uint32_t instr;
         _thread->mm()->readMemory(row, &instr, sizeof instr);
@@ -309,21 +311,40 @@ void DebuggerModel::stepIn(bool updateUI) {
 void DebuggerModel::stepOver() {}
 
 void DebuggerModel::run() {
-    auto ev = _proc->run();
-    switch (ev.event) {
-        case ProcessEvent::Failure:
-            emit message("failure");
-            break;
-        case ProcessEvent::InvalidInstruction:
-            emit message(QString("invalid instruction at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
-            break;
-        case ProcessEvent::MemoryAccessError:
-            emit message(QString("memory access error at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
-            break;
-        case ProcessEvent::ProcessFinished:
-            emit message("process finished");
-            break;
-        default: break;
+    bool cont = true;
+    while (cont) {
+        auto ev = _proc->run();
+        switch (ev.event) {
+            case ProcessEvent::Failure:
+                emit message("failure");
+                cont = false;
+                break;
+            case ProcessEvent::InvalidInstruction:
+                emit message(QString("invalid instruction at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
+                cont = false;
+                break;
+            case ProcessEvent::MemoryAccessError:
+                emit message(QString("memory access error at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
+                cont = false;
+                break;
+            case ProcessEvent::ProcessFinished:
+                emit message("process finished");
+                cont = false;
+                break;
+            case ProcessEvent::ThreadCreated:
+                emit message("thread created");
+                break;
+            case ProcessEvent::ThreadFinished:
+                emit message("thread finished");
+                break;
+            case ProcessEvent::Breakpoint:
+                emit message("breakpoint");
+                _activeThread = ev.thread;
+                clearSoftBreak(ev.thread->getNIP());
+                cont = false;
+                break;
+            default: break;
+        }
     }
     updateUI();
 }
@@ -357,6 +378,9 @@ void DebuggerModel::exec(QString command) {
             } else if (name == "traceto") {
                 traceTo(va);
                 updateUI();
+                return;
+            } else if (name == "bp") {
+                setSoftBreak(va);
                 return;
             }
         } catch (...) {
@@ -426,9 +450,26 @@ void DebuggerModel::updateUI() {
 }
 
 void DebuggerModel::runto(ps3_uintptr_t va) {
-    uint32_t bytes = _proc->mm()->load<4>(va);
-    _proc->mm()->store<4>(va, 0x7fe00088);
+    setSoftBreak(va);
     _proc->run();
-    _proc->mm()->store<4>(va, bytes);
+    clearSoftBreak(va);
     updateUI();
+}
+
+void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
+    auto bytes = _proc->mm()->load<4>(va);
+    _proc->mm()->store<4>(va, 0x7fe00088);
+    _softBreaks.push_back({va, bytes});
+}
+
+void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {
+    auto it = std::find_if(begin(_softBreaks), end(_softBreaks), [=](auto b) { 
+       return b.va == va;
+    });
+    if (it == end(_softBreaks)) {
+        BOOST_LOG_TRIVIAL(error) << ssnprintf("there is no breakpoint at %x", va);
+        return;
+    }
+    _softBreaks.erase(it);
+    _proc->mm()->store<4>(va, it->bytes);
 }

@@ -5,6 +5,12 @@
 #include <QString>
 #include <string>
 #include <memory>
+#include <vector>
+
+struct SoftBreakInfo {
+    ps3_uintptr_t va;
+    uint32_t bytes;
+};
 
 class GPRModel;
 class DasmModel;
@@ -16,11 +22,14 @@ class DebuggerModel : public QWidget {
     std::unique_ptr<GPRModel> _gprModel;
     std::unique_ptr<DasmModel> _dasmModel;
     std::unique_ptr<Process> _proc;
+    std::vector<SoftBreakInfo> _softBreaks;
     bool _elfLoaded = false;
     void log(std::string str);
     void printMemory(uint64_t va);
     void traceTo(ps3_uintptr_t va);
     void updateUI();
+    void setSoftBreak(ps3_uintptr_t va);
+    void clearSoftBreak(ps3_uintptr_t va);
 public:
     DebuggerModel();
     ~DebuggerModel();

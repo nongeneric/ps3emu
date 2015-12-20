@@ -281,3 +281,24 @@ TEST_CASE("basic_large_cmdbuf") {
         "success\n"
     );
 }
+
+TEST_CASE("ppu_threads") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == "exitstatus: 3; i: 4000\n" );
+}
+
+TEST_CASE("ppu_threads_tls") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_tls/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "exitstatus: 125055; i: 4000\n"
+        "primary thread tls_int: 500\n"
+    );
+}

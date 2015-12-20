@@ -63,18 +63,23 @@ typedef struct
     boost::endian::big_uint64_t   st_size;                /* Symbol size */
 } Elf64_be_Sym;
 
+struct fdescr {
+    boost::endian::big_uint32_t va;
+    boost::endian::big_uint32_t tocBase;
+};
+
+static_assert(sizeof(fdescr) == 8, "");
 static_assert(sizeof(Elf64_be_Ehdr) == sizeof(Elf64_Ehdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Shdr) == sizeof(Elf64_Shdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Sym) == sizeof(Elf64_Sym), "big endian struct mismatch");
 
 struct ThreadInitInfo {
-    ps3_uintptr_t tocBase;
     void* tlsBase;
     uint32_t tlsFileSize;
     uint32_t tlsMemSize;
     uint32_t primaryStackSize;
-    uint32_t primaryEntryPoint;
+    ps3_uintptr_t entryPointDescriptorVa;
 };
 
 class ELFLoader {

@@ -362,3 +362,35 @@ int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
         return CELL_OK;
     return CELL_EBUSY;
 }
+
+int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
+                              ps3_uintptr_t entry,
+                              uint64_t arg,
+                              uint32_t prio,
+                              uint32_t stacksize,
+                              uint64_t flags,
+                              const char *threadname,
+                              Process* proc)
+{
+    assert(flags == 1); // joinable
+    *thread_id = proc->createThread(stacksize, entry, arg);
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc) {
+    auto thread = proc->getThread(thread_id);
+    *exit_code = thread->join();
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread) {
+    throw ThreadFinishedException(code);
+}
+
+emu_void_t sys_process_exit(PPUThread* thread) {
+    throw ProcessFinishedException();
+}
+
+emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread) {
+    return emu_void;
+}

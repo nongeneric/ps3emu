@@ -14,12 +14,21 @@ enum class PPUThreadEvent {
     Started,
     Finished,
     ProcessFinished,
+    Joined,
     InvalidInstruction,
     MemoryAccessError,
     Failure
 };
 
-class ProcessFinishedException : public std::exception { };
+class ProcessFinishedException : public virtual std::exception { };
+class ThreadFinishedException : public virtual std::exception {
+    uint64_t _errorCode;
+public:
+    ThreadFinishedException(uint64_t errorCode) : _errorCode(errorCode) { }
+    inline uint64_t errorCode() {
+        return _errorCode;
+    }
+};
 
 union CR_t {
     struct {
@@ -110,8 +119,11 @@ class PPUThread {
     bool _init;
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
+    bool _isStackInfoSet;
     uint32_t _stackBase;
     uint32_t _stackSize;
+    uint64_t _exitCode;
+    bool _threadFinishedGracefully;
     
     uint64_t _NIP;
     uint64_t _LR = 0;
@@ -141,7 +153,8 @@ class PPUThread {
 public:
     PPUThread(MainMemory* mm);
     PPUThread(Process* proc,
-              std::function<void(PPUThread*, PPUThreadEvent)> eventHandler);
+              std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
+              bool primaryThread);
     void setStackInfo(uint32_t base, uint32_t size);
     uint32_t getStackBase();
     uint32_t getStackSize();
@@ -151,7 +164,6 @@ public:
     void run();
     MainMemory* mm();
     Process* proc();
-    void exit(uint64_t code);
     uint64_t join();
     
     template <typename V>
