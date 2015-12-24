@@ -1,6 +1,7 @@
 #include "MainMemory.h"
 
 #include "rsx/Rsx.h"
+#include <boost/log/trivial.hpp>
 
 using namespace boost::endian;
 
@@ -10,13 +11,27 @@ bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
 
 static constexpr auto PagePtrMask = ~uintptr_t() - 1;
 
+bool MainMemory::storeMemoryWithReservation(void* dest, 
+                                            const void* source, 
+                                            uint size, 
+                                            bool reservationOnly,
+                                            ps3_uintptr_t reservationAddress) {
+    auto reservationThread = _reservationThread == boost::this_thread::get_id();
+    if (!reservationOnly && !reservationThread) {
+        _storeLock.wait();
+    }
+    memcpy(dest, source, size);
+    if (reservationOnly && reservationThread) {
+        _storeLock.unlock();
+    }
+    return true;
+}
+
 template <bool Read>
-void copy(ps3_uintptr_t va, 
+void MainMemory::copy(ps3_uintptr_t va, 
           const void* buf, 
           uint len, 
-          bool allocate, 
-          MemoryPage* pages,
-          std::function<void(uint32_t, uint32_t)>& memoryWriteHandler) {
+          bool allocate) {
     assert(va != 0 || len == 0);
     char* chars = (char*)buf;
     for (auto curVa = va; curVa != va + len;) {
@@ -24,21 +39,25 @@ void copy(ps3_uintptr_t va,
         unsigned pageIndex = split.page.u();
         ps3_uintptr_t pageEnd = (pageIndex + 1) * DefaultMainMemoryPageSize;
         auto end = std::min(pageEnd, va + len);
-        auto& page = pages[pageIndex];
+        auto& page = _pages[pageIndex];
         if (!Read) {
             auto ptr = page.ptr.fetch_and(PagePtrMask);
             if (ptr & 1) {
-                memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize, 
+                _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize, 
                                    DefaultMainMemoryPageSize);
             }
         }
         if (!page.ptr) {
-            if (allocate) {
-                page.alloc();
-            } else {
-                throw MemoryAccessException();
+            boost::unique_lock<boost::mutex> lock(_pageMutex);
+            if (!page.ptr) {
+                if (allocate) {
+                    page.alloc();
+                } else {
+                    throw MemoryAccessException();
+                }
             }
         }
+        
         auto offset = split.offset.u();
         auto source = chars + (curVa - va);
         auto dest = (uint8_t*)((page.ptr & PagePtrMask) + offset);
@@ -46,7 +65,7 @@ void copy(ps3_uintptr_t va,
         if (Read) {
             memcpy(source, dest, size);
         } else {
-            memcpy(dest, source, size);
+            storeMemoryWithReservation(dest, source, size, false, 0);
         }
         curVa = end;
     }
@@ -72,7 +91,7 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool a
         return;
     }
     
-    copy<false>(va, buf, len, allocate, _pages.get(), _memoryWriteHandler);
+    copy<false>(va, buf, len, allocate);
 }
 
 void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
@@ -98,7 +117,7 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
         throw std::runtime_error("reading rsx registers not implemented");
     }
 
-    copy<true>(va, buf, len, allocate, _pages.get(), _memoryWriteHandler);
+    copy<true>(va, buf, len, allocate);
 }
 
 bool MainMemory::isAllocated(ps3_uintptr_t va) {
@@ -254,4 +273,19 @@ void MainMemory::allocPage(void** ptr, ps3_uintptr_t* va) {
 
 MainMemory::MainMemory() {
     reset();
+}
+
+uint32_t MainMemory::loadReserve4(ps3_uintptr_t va) {
+    _storeLock.lock();
+    _reservationThread = boost::this_thread::get_id();
+    return load<4>(va);
+}
+
+bool MainMemory::storeCond4(ps3_uintptr_t va, uint32_t val) {
+    if (!_storeLock.is_locked())
+        throw std::runtime_error("");
+    auto dest = getMemoryPointer(va, 4);
+    native_to_big_inplace(val);
+    storeMemoryWithReservation(dest, &val, 4, true, va);
+    return true;
 }

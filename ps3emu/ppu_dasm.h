@@ -2342,11 +2342,41 @@ EMU(MTFSF, XFLForm) {
         update_CRFSign<1>(r, TH);
 }
 
+PRINT(LWARX, XForm_1) {
+    *result = format_nnn("lwarx", i->RT, i->RA, i->RB);
+}
+
+EMU(LWARX, XForm_1) {
+    auto ra = getB(i->RA, TH);
+    auto ea = ra + TH->getGPR(i->RB);
+    auto val = MM->loadReserve4(ea);
+    TH->setGPR(i->RT, val);
+}
+
+PRINT(STWCX, XForm_8) {
+    *result = format_nnn("stwcx", i->RS, i->RA, i->RB);
+}
+
+EMU(STWCX, XForm_8) {
+    auto ra = getB(i->RA, TH);
+    auto ea = ra + TH->getGPR(i->RB);
+    auto stored = MM->storeCond4(ea, TH->getGPR(i->RS));
+    TH->setCRF_sign(0, stored);
+}
+
 PRINT(SYNC, XForm_24) {
     *result = format_n("sync", i->L);
 }
 
 EMU(SYNC, XForm_24) {
+    __sync_synchronize();
+}
+
+PRINT(ISYNC, XLForm_1) {
+    *result = "sync";
+}
+
+EMU(ISYNC, XLForm_1) {
     __sync_synchronize();
 }
 
@@ -2901,6 +2931,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 129: invoke(CRANDC);
                 case 417: invoke(CRORC);
                 case 0: invoke(MCRF);
+                case 150: invoke(ISYNC);
                 default: throw IllegalInstructionException();
             }
             break;
@@ -3023,6 +3054,8 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 68: invoke(TD);
                 case 10: invoke(ADDC);
                 case 8: invoke(SUBFC);
+                case 20: invoke(LWARX);
+                case 150: invoke(STWCX);
                 default: throw IllegalInstructionException();
             }
             break;

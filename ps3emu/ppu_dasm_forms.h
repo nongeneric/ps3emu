@@ -2,29 +2,29 @@
 
 #include "BitField.h"
 
-typedef BitField<16, 30, BitFieldType::Signed, 2> BD_t;
-typedef BitField<6, 9, BitFieldType::CR> BF_t;
-typedef BitField<11, 13, BitFieldType::CR> BFA_t;
-typedef BitField<16, 32, BitFieldType::Signed> D_t;
-typedef BitField<16, 30, BitFieldType::Signed, 2> DS_t;
-typedef BitField<6, 30, BitFieldType::Signed, 2> LI_t;
-typedef BitField<11, 16, BitFieldType::GPR> RA_t;
-typedef BitField<16, 21, BitFieldType::GPR> RB_t;
-typedef BitField<6, 11, BitFieldType::GPR> RS_t;
-typedef BitField<6, 11, BitFieldType::GPR> RT_t;
-typedef BitField<16, 32, BitFieldType::Signed> SI_t;
-typedef BitField<16, 32, BitFieldType::Unsigned> UI_t;
-typedef BitField<6, 11> BO_t;
-typedef BitField<11, 16> BI_t;
-typedef BitField<12, 20> FXM_t;
-typedef BitField<11, 16, BitFieldType::FPR> FRA_t;
-typedef BitField<16, 21, BitFieldType::FPR> FRB_t;
-typedef BitField<21, 26, BitFieldType::FPR> FRC_t;
-typedef BitField<6, 11, BitFieldType::FPR> FRS_t;
-typedef BitField<6, 11, BitFieldType::FPR> FRT_t;
-typedef BitField<31, 32> Rc_t;
-typedef BitField<7, 15> FLM_t;
-typedef BitField<7, 15> FLM_t;
+using BD_t = BitField<16, 30, BitFieldType::Signed, 2>;
+using BF_t = BitField<6, 9, BitFieldType::CR>;
+using BFA_t = BitField<11, 13, BitFieldType::CR>;
+using D_t = BitField<16, 32, BitFieldType::Signed>;
+using DS_t = BitField<16, 30, BitFieldType::Signed, 2>;
+using LI_t = BitField<6, 30, BitFieldType::Signed, 2>;
+using RA_t = BitField<11, 16, BitFieldType::GPR>;
+using RB_t = BitField<16, 21, BitFieldType::GPR>;
+using RS_t = BitField<6, 11, BitFieldType::GPR>;
+using RT_t = BitField<6, 11, BitFieldType::GPR>;
+using SI_t = BitField<16, 32, BitFieldType::Signed>;
+using UI_t = BitField<16, 32, BitFieldType::Unsigned>;
+using BO_t = BitField<6, 11>;
+using BI_t = BitField<11, 16>;
+using FXM_t = BitField<12, 20>;
+using FRA_t = BitField<11, 16, BitFieldType::FPR>;
+using FRB_t = BitField<16, 21, BitFieldType::FPR>;
+using FRC_t = BitField<21, 26, BitFieldType::FPR>;
+using FRS_t = BitField<6, 11, BitFieldType::FPR>;
+using FRT_t = BitField<6, 11, BitFieldType::FPR>;
+using Rc_t = BitField<31, 32>;
+using FLM_t = BitField<7, 15>;
+using FLM_t = BitField<7, 15>;
 
 union IForm {
     BitField<0, 6> OPCD;

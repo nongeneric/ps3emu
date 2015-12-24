@@ -5,6 +5,8 @@
 #include "utils.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/chrono.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 #include <functional>
 #include <bitset>
 #include <memory>
@@ -71,6 +73,20 @@ class MainMemory {
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     boost::chrono::high_resolution_clock::time_point _systemStart;
     Rsx* _rsx;
+    boost::mutex _pageMutex;
+    spinlock _storeLock;
+    boost::thread::id _reservationThread;
+    
+    template <bool Read>
+    void copy(ps3_uintptr_t va, 
+        const void* buf, 
+        uint len, 
+        bool allocate);
+    bool storeMemoryWithReservation(void* dest, 
+                                    const void* buf, 
+                                    uint len, 
+                                    bool reservationOnly,
+                                    ps3_uintptr_t reservationAddress);
 public:
     MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
@@ -89,6 +105,8 @@ public:
     void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
     void memoryBreak(uint32_t va, uint32_t size);
     void setRsx(Rsx* rsx);
+    uint32_t loadReserve4(ps3_uintptr_t va);
+    bool storeCond4(ps3_uintptr_t va, uint32_t val);
     
     void store16(uint64_t va, unsigned __int128 value) {
         uint8_t *bytes = (uint8_t*)&value;

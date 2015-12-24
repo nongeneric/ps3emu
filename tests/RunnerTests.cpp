@@ -302,3 +302,22 @@ TEST_CASE("ppu_threads_tls") {
         "primary thread tls_int: 500\n"
     );
 }
+
+TEST_CASE("ppu_threads_atomic_inc") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_atomic_inc/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == "exitstatus: 1; i: 80000\n" );
+}
+
+TEST_CASE("ppu_threads_atomic_single_lwarx") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_atomic_single_lwarx/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == "5, 3\n" );
+}
+
