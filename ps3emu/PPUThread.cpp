@@ -116,10 +116,12 @@ uint32_t PPUThread::getStackSize() {
     return _stackSize;
 }
 
-uint64_t PPUThread::join() {
+uint64_t PPUThread::join(bool unique) {
     _thread.join();
     _eventHandler(this, PPUThreadEvent::Joined);
     if (_threadFinishedGracefully)
         return _exitCode;
-    throw std::runtime_error("joining failed thread");
+    if (unique)
+        throw std::runtime_error("joining failed thread");
+    return 0;
 }

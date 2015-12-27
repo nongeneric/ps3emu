@@ -5,6 +5,7 @@
 #include "../libs/Sysutil.h"
 #include "../libs/graphics/gcm.h"
 #include "../libs/fs.h"
+#include "../libs/cellGame.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -193,10 +194,10 @@ uint32_t sys_fs_open_proxy(uint32_t path,
     return sys_fs_open_impl(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
 }
 
-CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, PPUThread* thread) {
+CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, Process* proc) {
     std::string pathStr;
-    readString(thread->mm(), path, pathStr);
-    return cellFsStat(pathStr.c_str(), sb, thread);
+    readString(proc->mm(), path, pathStr);
+    return cellFsStat(pathStr.c_str(), sb, proc);
 }
 
 CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path, 
@@ -204,11 +205,11 @@ CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path,
                              big_int32_t* fd,
                              uint64_t arg, 
                              uint64_t size, 
-                             PPUThread* thread)
+                             Process* proc)
 {
     std::string pathStr;
-    readString(thread->mm(), path, pathStr);
-    return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, thread);
+    readString(proc->mm(), path, pathStr);
+    return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, proc);
 }
 
 int32_t sys_ppu_thread_create_proxy(
@@ -289,6 +290,7 @@ STUB_4(_sys_heap_create_heap);
 STUB_1(cellSysmoduleLoadModule);
 STUB_1(cellSysmoduleUnloadModule);
 STUB_1(cellSysmoduleIsLoaded);
+STUB_0(cellSysmoduleInitialize);
 STUB_3(cellFsStat_proxy);
 STUB_6(cellFsOpen_proxy);
 STUB_4(cellFsLseek);
@@ -306,6 +308,10 @@ STUB_3(sys_ppu_thread_join);
 STUB_2(sys_ppu_thread_exit);
 STUB_4(sys_initialize_tls);
 STUB_1(sys_process_exit);
+STUB_4(cellGameBootCheck);
+STUB_2(cellGamePatchCheck);
+STUB_3(cellGameContentPermit);
+STUB_4(cellGameGetParamString);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -359,6 +365,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellSysmoduleLoadModule),
     ENTRY(cellSysmoduleUnloadModule),
     ENTRY(cellSysmoduleIsLoaded),
+    ENTRY(cellSysmoduleInitialize),
     { "cellFsStat", calcFnid("cellFsStat"), nstub_cellFsStat_proxy },
     { "cellFsOpen", calcFnid("cellFsOpen"), nstub_cellFsOpen_proxy },
     ENTRY(cellFsLseek),
@@ -367,6 +374,10 @@ NCallEntry ncallTable[] {
     { "sys_ppu_thread_create", calcFnid("sys_ppu_thread_create"), nstub_sys_ppu_thread_create_proxy },
     ENTRY(sys_ppu_thread_join),
     ENTRY(sys_ppu_thread_exit),
+    ENTRY(cellGameBootCheck),
+    ENTRY(cellGamePatchCheck),
+    ENTRY(cellGameContentPermit),
+    ENTRY(cellGameGetParamString),
 };
 
 void PPUThread::ncall(uint32_t index) {

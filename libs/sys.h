@@ -122,6 +122,7 @@ typedef struct {
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUThread* thread);
 
 uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);
+uint32_t cellSysmoduleInitialize();
 uint32_t cellSysmoduleLoadModule(uint16_t id);
 uint32_t cellSysmoduleUnloadModule(uint16_t id);
 uint32_t cellSysmoduleIsLoaded(uint16_t id);

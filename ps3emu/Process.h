@@ -4,6 +4,7 @@
 #include "ELFLoader.h"
 #include "MainMemory.h"
 #include "PPUThread.h"
+#include "ContentManager.h"
 #include "MemoryBlockManager.h"
 #include "IDMap.h"
 
@@ -47,6 +48,7 @@ class Process {
     Rsx _rsx;
     ELFLoader _elf;
     MainMemory _mainMemory;
+    ContentManager _contentManager;
     std::vector<std::unique_ptr<PPUThread>> _threads;
     IDMap<uint64_t, PPUThread*> _threadIds;
     bool _firstRun = true;
@@ -60,8 +62,8 @@ public:
     Rsx* rsx();
     ELFLoader* elfLoader();
     MainMemory* mm();
+    ContentManager* contentManager();
     void init(std::string elfPath, std::vector<std::string> args);
-    void terminate();
     ProcessEventInfo run();
     uint64_t createThread(uint32_t stackSize, ps3_uintptr_t entryPointDescriptorVa, uint64_t arg);
     PPUThread* getThread(uint64_t id);

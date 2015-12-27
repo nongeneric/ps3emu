@@ -286,7 +286,6 @@ constexpr uint16_t CELL_SYSMODULE_FS = 0x000e;
 
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    assert(id == CELL_SYSMODULE_FS);
     return CELL_OK;
 }
 
@@ -296,6 +295,10 @@ uint32_t cellSysmoduleUnloadModule(uint16_t id) {
 }
 
 uint32_t cellSysmoduleIsLoaded(uint16_t id) {
+    return CELL_OK;
+}
+
+uint32_t cellSysmoduleInitialize() {
     return CELL_OK;
 }
 

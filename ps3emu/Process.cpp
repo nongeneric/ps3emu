@@ -22,6 +22,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf.load(elfPath);
     _elf.map(&_mainMemory);
     _elf.link(&_mainMemory);
+    _contentManager.setElfPath(elfPath);
     _threadInitInfo = _elf.getThreadInitInfo(&_mainMemory);
     auto thread = _threads.back().get();
     initNewThread(thread,
@@ -31,10 +32,6 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     thread->setGPR(3, args.size());
     thread->setGPR(4, vaArgs);
     _threadIds.create(std::move(thread));
-}
-
-void Process::terminate() {
-    
 }
 
 ProcessEventInfo Process::run() {
@@ -56,7 +53,11 @@ ProcessEventInfo Process::run() {
         case PPUThreadEvent::Started: return { ProcessEvent::ThreadCreated, ev.thread };
         case PPUThreadEvent::ProcessFinished:
         case PPUThreadEvent::Finished: {
-            if (_threads.size() == 1 || ev.event == PPUThreadEvent::ProcessFinished) {
+            if (ev.event == PPUThreadEvent::ProcessFinished) {
+                lock.unlock();
+                for (auto& t : _threads) {
+                    t->join();
+                }
                 _rsx.shutdown();
                 return { ProcessEvent::ProcessFinished, ev.thread };
             }
@@ -156,4 +157,8 @@ ps3_uintptr_t Process::storeArgs(std::vector<std::string> const& args) {
 PPUThread* Process::getThread(uint64_t id) {
     boost::unique_lock<boost::mutex> _(_threadMutex);
     return _threadIds.get(id);
+}
+
+ContentManager* Process::contentManager() {
+    return &_contentManager;
 }

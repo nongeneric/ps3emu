@@ -321,3 +321,17 @@ TEST_CASE("ppu_threads_atomic_single_lwarx") {
     REQUIRE( output == "5, 3\n" );
 }
 
+TEST_CASE("ppu_cellgame") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_cellgame/USRDIR/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "title: GameUpdate Utility Sample\n"
+        "gamedir: EMUGAME\n"
+        "contentdir: /dev_hdd0/\n"
+        "usrdir: /dev_hdd0/USRDIR/\n"
+        "filesize: 4\n"
+    );
+}

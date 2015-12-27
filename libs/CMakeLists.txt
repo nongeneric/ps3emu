@@ -8,6 +8,7 @@ set(SRC
     ConcurrentQueue.cpp
     Controller.cpp
     Sysutil.cpp
+    cellGame.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp

@@ -10,46 +10,7 @@
 #include <boost/log/trivial.hpp>
 #include <sys/stat.h>
 #include <stdio.h>
-#include <boost/filesystem.hpp>
 
-enum class MountPoint {
-    GameData,
-    SystemCache,
-    MemoryStick,
-    Usb,
-    Bluray,
-    HostHome,
-    HostAbsolute
-};
-
-MountPoint splitPathImpl(const char* path, const char** point, const char** relative) {
-#define check(str, type) \
-    if (memcmp(str, path, strlen(str)) == 0) { \
-        *point = str; \
-        *relative = path + strlen(str) + 1; \
-        return type; \
-    }
-    check("/dev_hdd0", MountPoint::GameData);
-    check("/dev_hdd1", MountPoint::SystemCache);
-    check("/dev_ms", MountPoint::MemoryStick);
-    check("/dev_usb", MountPoint::Usb);
-    check("/dev_bdvd", MountPoint::Bluray);
-    check("/app_home", MountPoint::HostHome);
-    check("/host_root", MountPoint::HostAbsolute);
-#undef check
-    throw std::runtime_error("illegal mount point");
-}
-
-std::string toHostPath(const char* path, const char* exePath) {
-    const char* point;
-    const char* relative;
-    auto type = splitPathImpl(path, &point, &relative);
-    if (type == MountPoint::HostAbsolute) {
-        relative += 3;
-    }
-    boost::filesystem::path exe(exePath);
-    return absolute(exe.parent_path() / point / relative).string();
-}
 
 CellFsErrno sys_fs_open_impl(const char* path,
                              uint32_t flags,
@@ -74,8 +35,8 @@ CellFsErrno toCellErrno(int err) {
     return CELL_FS_SUCCEEDED;
 }
 
-CellFsErrno cellFsStat(const char* path, CellFsStat* sb, PPUThread* thread) {
-    auto hostPath = toHostPath(path, thread->proc()->elfLoader()->loadedFilePath().c_str());
+CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc) {
+    auto hostPath = proc->contentManager()->toHost(path);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsStat(%s (%s), ...)", path, hostPath);
     struct stat st;
     auto err = stat(hostPath.c_str(), &st);
@@ -146,9 +107,9 @@ public:
 
 static FileMap fileMap;
 
-CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, PPUThread* thread) {
+CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, Process* proc) {
     const char* mode = flagsToMode(flags);
-    auto hostPath = toHostPath(path, thread->proc()->elfLoader()->loadedFilePath().c_str());
+    auto hostPath = proc->contentManager()->toHost(path);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
     auto f = fopen(hostPath.c_str(), mode);
     if (!f) {

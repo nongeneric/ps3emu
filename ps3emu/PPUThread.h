@@ -164,7 +164,7 @@ public:
     void run();
     MainMemory* mm();
     Process* proc();
-    uint64_t join();
+    uint64_t join(bool unique = true);
     
     template <typename V>
     inline void setGPR(V i, uint64_t value) {
