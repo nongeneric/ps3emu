@@ -1,8 +1,6 @@
 #pragma once
 
 #include "sys_defs.h"
-#include "../ps3emu/constants.h"
-#include <stdint.h>
 
 class MainMemory;
 

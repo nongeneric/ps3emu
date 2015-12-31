@@ -1,7 +1,6 @@
 #pragma once
 
 #include <boost/endian/arithmetic.hpp>
-#include <atomic>
 #include <string>
 #include <stdio.h>
 #include <inttypes.h>
@@ -66,25 +65,4 @@ private:
 };
 
 void ums_sleep(uint64_t microseconds);
-
-class spinlock {
-    std::atomic<int> _m;
-public:
-    inline spinlock() : _m(0) { }
-
-    inline void lock() {
-        while (_m.exchange(1) == 1) ;
-    }
-    
-    inline void unlock() {
-        _m.store(0);
-    }
-    
-    inline void wait() const {
-        while (_m.load() == 1) ;
-    }
-    
-    inline bool is_locked() const {
-        return _m.load();
-    }
-};
+std::string print_hex(const void* buf, int len);

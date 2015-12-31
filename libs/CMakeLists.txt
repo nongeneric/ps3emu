@@ -9,6 +9,8 @@ set(SRC
     Controller.cpp
     libsysutil.cpp
     cellGame.cpp
+    sceNp2.cpp
+    sceNp.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp

@@ -264,15 +264,6 @@ optional<key_info_t> search_self_key(std::vector<key_info_t>& keys,
         return none;
     return *it;
 }
-    
-std::string print_hex(const void* buf, int len) {
-    std::string res;
-    auto typed = reinterpret_cast<const uint8_t*>(buf);
-    for (auto it = typed; it != typed + len; ++it) {
-        res += ssnprintf("%02X ", *it);
-    }
-    return res;
-}
 
 #define SCE_HEADER_TYPE_SELF 1
     

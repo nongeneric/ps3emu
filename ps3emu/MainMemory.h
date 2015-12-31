@@ -2,6 +2,7 @@
 
 #include "BitField.h"
 #include "constants.h"
+#include "spinlock.h"
 #include "utils.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/chrono.hpp>
@@ -10,7 +11,6 @@
 #include <functional>
 #include <bitset>
 #include <memory>
-#include <atomic>
 
 class PPUThread;
 class Process;

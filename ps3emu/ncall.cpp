@@ -6,6 +6,8 @@
 #include "../libs/graphics/gcm.h"
 #include "../libs/fs.h"
 #include "../libs/cellGame.h"
+#include "../libs/sceNp2.h"
+#include "../libs/sceNp.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -88,7 +90,7 @@ struct get_arg<ArgN, MainMemory*> {
 
 template <int ArgN, class T>
 struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type> {
-    typedef typename boost::remove_pointer<T>::type elem_type;
+    typedef typename boost::remove_const< typename boost::remove_pointer<T>::type >::type elem_type;
     elem_type _t;
     uint64_t _va;
     PPUThread* _thread;
@@ -101,7 +103,7 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
         return &_t; 
     }
     inline ~get_arg() {
-        if (_va == 0)
+        if (_va == 0 || boost::is_const<T>::value)
             return;
         _thread->mm()->writeMemory(_va, &_t, sizeof(elem_type));
     }
@@ -227,6 +229,12 @@ int32_t sys_ppu_thread_create_proxy(
     return sys_ppu_thread_create(thread_id, entry, arg, prio, stacksize, flags, namestr.c_str(), proc);
 }
 
+int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t path, MainMemory* mm) {
+    std::string str;
+    readString(mm, path, str);
+    return sceNpDrmIsAvailable2(k_licensee, str.c_str());
+}
+
 STUB_2(defaultContextCallback);
 STUB_2(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
@@ -314,6 +322,13 @@ STUB_3(cellGameContentPermit);
 STUB_4(cellGameGetParamString);
 STUB_2(cellSysutilGetSystemParamInt);
 STUB_4(cellSysutilGetSystemParamString);
+STUB_2(sceNp2Init);
+STUB_0(sceNp2Term);
+STUB_3(sceNpBasicSetPresence);
+STUB_2(sceNpManagerGetContentRatingFlag);
+STUB_3(sceNpBasicRegisterHandler);
+STUB_3(sceNpDrmIsAvailable2_proxy);
+STUB_1(sceNpManagerGetNpId);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -382,6 +397,13 @@ NCallEntry ncallTable[] {
     ENTRY(cellGameGetParamString),
     ENTRY(cellSysutilGetSystemParamInt),
     ENTRY(cellSysutilGetSystemParamString),
+    ENTRY(sceNp2Init),
+    ENTRY(sceNp2Term),
+    ENTRY(sceNpBasicSetPresence),
+    ENTRY(sceNpManagerGetContentRatingFlag),
+    ENTRY(sceNpBasicRegisterHandler),
+    { "sceNpDrmIsAvailable2", calcFnid("sceNpDrmIsAvailable2"), nstub_sceNpDrmIsAvailable2_proxy },
+    ENTRY(sceNpManagerGetNpId),
 };
 
 void PPUThread::ncall(uint32_t index) {

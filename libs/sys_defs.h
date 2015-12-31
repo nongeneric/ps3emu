@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+#include "../ps3emu/constants.h"
 #include <boost/endian/arithmetic.hpp>
 using namespace boost::endian;
 
