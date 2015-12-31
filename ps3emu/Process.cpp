@@ -33,10 +33,11 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     thread->setGPR(4, vaArgs);
     _threadIds.create(std::move(thread));
 }
-
+// TODO: find a way to erase joined threads
 ProcessEventInfo Process::run() {
     boost::unique_lock<boost::mutex> lock(_cvm);
     if (_threadEvents.empty()) {
+        boost::unique_lock<boost::mutex> _(_threadMutex);
         if (_firstRun) {
             _firstRun = false;
             _threads.back()->run();
@@ -45,6 +46,7 @@ ProcessEventInfo Process::run() {
                 t->dbgPause(false);
             }
         }
+        _.unlock();
         _cv.wait(lock, [=] { return !_threadEvents.empty(); });
     }
     auto ev = _threadEvents.front();
@@ -72,16 +74,6 @@ ProcessEventInfo Process::run() {
 }
 
 void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
-    if (event == PPUThreadEvent::Joined) {
-        boost::unique_lock<boost::mutex> _(_threadMutex);
-        auto it = std::find_if(begin(_threads), end(_threads), [=] (auto& t) {
-            return t.get() == thread;
-        });
-        assert(it != end(_threads));
-        _threads.erase(it);
-        // TODO: destroy id
-        return;
-    }
     {
         boost::unique_lock<boost::mutex> _(_threadMutex);
         for (auto& t : _threads) {

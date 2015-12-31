@@ -29,8 +29,8 @@ int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize,
     }
     assert(entry->id != (uint32_t)-1);
     auto data = boost::get<std::string>(entry->data);
-    assert(bufsize > data.size());
-    proc->mm()->writeMemory(buf, data.c_str(), data.size() + 1);
+    assert(bufsize >= data.size());
+    proc->mm()->writeMemory(buf, data.c_str(), data.size());
     return CELL_OK;
 }
 

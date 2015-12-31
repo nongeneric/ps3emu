@@ -7,7 +7,7 @@ set(SRC
     fs.cpp
     ConcurrentQueue.cpp
     Controller.cpp
-    Sysutil.cpp
+    libsysutil.cpp
     cellGame.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp

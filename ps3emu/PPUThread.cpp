@@ -62,7 +62,8 @@ void PPUThread::loop() {
             _exitCode = e.errorCode();
             _threadFinishedGracefully = true;
             break;
-        } catch (...) {
+        } catch (std::exception& e) {
+            BOOST_LOG_TRIVIAL(fatal) << ssnprintf("thread exception: %s", e.what());
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Failure);
             break;
@@ -118,7 +119,6 @@ uint32_t PPUThread::getStackSize() {
 
 uint64_t PPUThread::join(bool unique) {
     _thread.join();
-    _eventHandler(this, PPUThreadEvent::Joined);
     if (_threadFinishedGracefully)
         return _exitCode;
     if (unique)

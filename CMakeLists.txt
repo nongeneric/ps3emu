@@ -17,6 +17,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 include_directories(SYSTEM libs/graphics/GL/include)
 
 #-fsanitize=undefined
+#-fsanitize=thread
 add_definitions(-DDEBUG)
 set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
 #add_definitions(-DNDEBUG)

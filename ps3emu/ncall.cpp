@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "../libs/sys.h"
 #include "../libs/Controller.h"
-#include "../libs/Sysutil.h"
+#include "../libs/libsysutil.h"
 #include "../libs/graphics/gcm.h"
 #include "../libs/fs.h"
 #include "../libs/cellGame.h"
@@ -312,6 +312,8 @@ STUB_4(cellGameBootCheck);
 STUB_2(cellGamePatchCheck);
 STUB_3(cellGameContentPermit);
 STUB_4(cellGameGetParamString);
+STUB_2(cellSysutilGetSystemParamInt);
+STUB_4(cellSysutilGetSystemParamString);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -378,11 +380,13 @@ NCallEntry ncallTable[] {
     ENTRY(cellGamePatchCheck),
     ENTRY(cellGameContentPermit),
     ENTRY(cellGameGetParamString),
+    ENTRY(cellSysutilGetSystemParamInt),
+    ENTRY(cellSysutilGetSystemParamString),
 };
 
 void PPUThread::ncall(uint32_t index) {
     if (index >= sizeof(ncallTable) / sizeof(NCallEntry))
-        throw std::runtime_error(ssnprintf("unknown ncall index %d", index));
+        throw std::runtime_error(ssnprintf("unknown ncall index %x", index));
     ncallTable[index].stub(this);
     setNIP(getLR());
 }
