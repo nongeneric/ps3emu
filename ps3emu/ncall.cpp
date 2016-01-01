@@ -8,6 +8,9 @@
 #include "../libs/cellGame.h"
 #include "../libs/sceNp2.h"
 #include "../libs/sceNp.h"
+#include "../libs/sync/lwmutex.h"
+#include "../libs/sync/mutex.h"
+#include "../libs/sync/lwcond.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -236,9 +239,15 @@ int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t 
 }
 
 STUB_2(defaultContextCallback);
+STUB_3(sys_lwcond_create);
+STUB_1(sys_lwcond_destroy);
+STUB_2(sys_lwcond_wait);
+STUB_1(sys_lwcond_signal);
+STUB_1(sys_lwcond_signal_all);
 STUB_2(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
 STUB_2(sys_lwmutex_lock);
+STUB_1(sys_lwmutex_trylock);
 STUB_1(sys_lwmutex_unlock);
 STUB_1(sys_time_get_system_time);
 STUB_0(_sys_process_atexitspawn);
@@ -338,7 +347,13 @@ NCallEntry ncallTable[] {
     ENTRY(sys_lwmutex_create),
     ENTRY(sys_lwmutex_destroy),
     ENTRY(sys_lwmutex_lock),
+    ENTRY(sys_lwmutex_trylock),
     ENTRY(sys_lwmutex_unlock),
+    ENTRY(sys_lwcond_create),
+    ENTRY(sys_lwcond_destroy),
+    ENTRY(sys_lwcond_wait),
+    ENTRY(sys_lwcond_signal),
+    ENTRY(sys_lwcond_signal_all),
     ENTRY(sys_time_get_system_time),
     ENTRY(_sys_process_atexitspawn),
     ENTRY(_sys_process_at_Exitspawn),

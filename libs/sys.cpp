@@ -19,22 +19,6 @@ void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
 }
 
-int sys_lwmutex_create(sys_lwmutex_t* mutex_id, sys_lwmutex_attribute_t* attr) {
-    return CELL_OK;
-}
-
-int sys_lwmutex_destroy(sys_lwmutex_t* lwmutex_id) {
-    return CELL_OK;
-}
-
-int sys_lwmutex_lock(sys_lwmutex_t* lwmutex_id, usecond_t timeout) {
-    return CELL_OK;
-}
-
-int sys_lwmutex_unlock(sys_lwmutex_t* lwmutex_id) {
-    return CELL_OK;
-}
-
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     mem_info->total_user_memory = 221249536;
@@ -235,44 +219,6 @@ int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUTh
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     info->pst_addr = thread->getStackBase();
     info->pst_size = thread->getStackSize();
-    return CELL_OK;
-}
-
-// mutex
-
-IDMap<sys_mutex_t, std::unique_ptr<boost::timed_mutex>> mutexes;
-
-int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    auto mutex = std::make_unique<boost::timed_mutex>();
-    *mutex_id = mutexes.create(std::move(mutex));
-    return CELL_OK;
-}
-
-int sys_mutex_destroy(sys_mutex_t mutex_id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    mutexes.destroy(mutex_id);
-    return CELL_OK;
-}
-
-int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    if (timeout == 0)
-        mutexes.get(mutex_id)->lock();
-    else
-        mutexes.get(mutex_id)->try_lock_for( boost::chrono::microseconds(timeout) );
-    return CELL_OK;
-}
-
-int sys_mutex_trylock(sys_mutex_t mutex_id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    bool locked = mutexes.get(mutex_id)->try_lock();
-    return locked ? CELL_OK : CELL_EBUSY;
-}
-
-int sys_mutex_unlock(sys_mutex_t mutex_id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    mutexes.get(mutex_id)->unlock();
     return CELL_OK;
 }
 

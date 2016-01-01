@@ -11,6 +11,9 @@ set(SRC
     cellGame.cpp
     sceNp2.cpp
     sceNp.cpp
+    sync/lwmutex.cpp
+    sync/mutex.cpp
+    sync/lwcond.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp

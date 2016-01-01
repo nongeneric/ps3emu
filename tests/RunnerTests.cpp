@@ -364,3 +364,16 @@ TEST_CASE("ppu_cellSysutil") {
         "CELL_SYSUTIL_SYSTEMPARAM_ID_CURRENT_USERNAME = PS3-EMU\n"
     );
 }
+
+TEST_CASE("ppu_threads_lwmutex_lwcond") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_lwmutex_lwcond/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "test_lwmutex: 0; i: 4000\n"
+        "test_lwmutex_recursive: 0; i: 4000\n"
+        "test_lwcond: 5015; i: 0\n"
+    );
+}
