@@ -377,3 +377,15 @@ TEST_CASE("ppu_threads_lwmutex_lwcond") {
         "test_lwcond: 5015; i: 0\n"
     );
 }
+
+TEST_CASE("ppu_threads_rwlock") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_rwlock/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "test_rwlock_w: 0; i: 4000\n"
+        "test_lwmutex: 40; i: 10\n"
+    );
+}

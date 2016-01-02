@@ -11,6 +11,7 @@
 #include "../libs/sync/lwmutex.h"
 #include "../libs/sync/mutex.h"
 #include "../libs/sync/lwcond.h"
+#include "../libs/sync/rwlock.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -338,6 +339,14 @@ STUB_2(sceNpManagerGetContentRatingFlag);
 STUB_3(sceNpBasicRegisterHandler);
 STUB_3(sceNpDrmIsAvailable2_proxy);
 STUB_1(sceNpManagerGetNpId);
+STUB_2(sys_rwlock_create);
+STUB_1(sys_rwlock_destroy);
+STUB_2(sys_rwlock_rlock);
+STUB_1(sys_rwlock_tryrlock);
+STUB_1(sys_rwlock_runlock);
+STUB_2(sys_rwlock_wlock);
+STUB_1(sys_rwlock_trywlock);
+STUB_1(sys_rwlock_wunlock);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -456,6 +465,15 @@ void PPUThread::scall() {
         case 94: nstub_sys_semaphore_post(this); break;
         case 41: nstub_sys_ppu_thread_exit(this); break;
         case 44: nstub_sys_ppu_thread_join(this); break;
+        case 120: nstub_sys_rwlock_create(this); break;
+        case 121: nstub_sys_rwlock_destroy(this); break;
+        case 122: nstub_sys_rwlock_rlock(this); break;
+        case 123: nstub_sys_rwlock_tryrlock(this); break;
+        case 124: nstub_sys_rwlock_runlock(this); break;
+        case 125: nstub_sys_rwlock_wlock(this); break;
+        case 148: // duplicate
+        case 126: nstub_sys_rwlock_trywlock(this); break;
+        case 127: nstub_sys_rwlock_wunlock(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

@@ -14,6 +14,7 @@ set(SRC
     sync/lwmutex.cpp
     sync/mutex.cpp
     sync/lwcond.cpp
+    sync/rwlock.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp
