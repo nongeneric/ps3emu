@@ -389,3 +389,18 @@ TEST_CASE("ppu_threads_rwlock") {
         "test_lwmutex: 40; i: 10\n"
     );
 }
+
+TEST_CASE("ppu_threads_lwcond_init") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_lwcond_init/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "sys_lwmutex_t.recursive_count 0\n"
+        "sys_lwmutex_t.attribute 22\n"
+        "sys_lwmutex_t.lock_var.all_info 0\n"
+        "SYS_SYNC_PRIORITY | SYS_SYNC_NOT_RECURSIVE 22\n"
+        "&mutex == cv.lwmutex 1\n"
+    );
+}

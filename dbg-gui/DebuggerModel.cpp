@@ -451,8 +451,7 @@ void DebuggerModel::updateUI() {
 
 void DebuggerModel::runto(ps3_uintptr_t va) {
     setSoftBreak(va);
-    _proc->run();
-    clearSoftBreak(va);
+    run();
     updateUI();
 }
 

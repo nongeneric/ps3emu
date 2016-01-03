@@ -2,8 +2,10 @@
 
 #include <map>
 #include <memory>
+#include "../../ps3emu/utils.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/log/trivial.hpp>
 #include <assert.h>
 
 namespace {
@@ -39,7 +41,12 @@ mutex_map_t::const_iterator find_mutex_iter(ps3_uintptr_t mutex_id) {
     return it;
 }
 
-int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr) {
+int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr, MainMemory* mm) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_lwmutex_create(%x, ...)", mutex_id);
+    sys_lwmutex_t type = { 0 };
+    type.sleep_queue = 0x11223344;
+    type.attribute = attr->attr_protocol | attr->attr_recursive;
+    mm->writeMemory(mutex_id, &type, sizeof(type));
     std::unique_ptr<IMutex> mutex;
     assert(attr->attr_recursive == SYS_SYNC_RECURSIVE ||
            attr->attr_recursive == SYS_SYNC_NOT_RECURSIVE);
@@ -54,6 +61,7 @@ int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr) {
 }
 
 int sys_lwmutex_destroy(ps3_uintptr_t lwmutex_id) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_lwmutex_destroy(%x)", lwmutex_id);
     boost::unique_lock<boost::mutex> lock(map_mutex);
     mutexes.erase(find_mutex_iter(lwmutex_id));
     return CELL_OK;

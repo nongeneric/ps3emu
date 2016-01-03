@@ -2023,6 +2023,78 @@ EMU(FNABS, XForm_27) {
         update_CRFSign<1>(res, TH);
 }
 
+PRINT(FSQRT, AForm_4) {
+    *result = format_nn(i->Rc.u() ? "fsqrt." : "fsqrt", i->FRT, i->FRB);
+}
+
+EMU(FSQRT, AForm_4) {
+    auto rb = TH->getFPRd(i->FRB);
+    auto res = sqrt(rb);
+    TH->setFPRd(i->FRT, res);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, TH);
+}
+
+PRINT(FSQRTS, AForm_4) {
+    *result = format_nn(i->Rc.u() ? "fsqrts." : "fsqrts", i->FRT, i->FRB);
+}
+
+EMU(FSQRTS, AForm_4) {
+    float rb = TH->getFPRd(i->FRB);
+    auto res = sqrt(rb);
+    TH->setFPRd(i->FRT, res);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, TH);
+}
+
+PRINT(FRE, AForm_4) {
+    *result = format_nn(i->Rc.u() ? "fre." : "fre", i->FRT, i->FRB);
+}
+
+EMU(FRE, AForm_4) {
+    auto rb = TH->getFPRd(i->FRB);
+    auto res = 1. / rb;
+    TH->setFPRd(i->FRT, res);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, TH);
+}
+
+PRINT(FRES, AForm_4) {
+    *result = format_nn(i->Rc.u() ? "fres." : "fres", i->FRT, i->FRB);
+}
+
+EMU(FRES, AForm_4) {
+    float rb = TH->getFPRd(i->FRB);
+    auto res = 1.f / rb;
+    TH->setFPRd(i->FRT, res);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, TH);
+}
+
+PRINT(FRSQRTE, AForm_4) {
+    *result = format_nn(i->Rc.u() ? "frsqrte." : "frsqrte", i->FRT, i->FRB);
+}
+
+EMU(FRSQRTE, AForm_4) {
+    auto rb = TH->getFPRd(i->FRB);
+    auto res = 1. / sqrt(rb);
+    TH->setFPRd(i->FRT, res);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, TH);
+}
+
+PRINT(FRSQRTES, AForm_4) {
+    *result = format_nn(i->Rc.u() ? "frsqrtes." : "frsqrtes", i->FRT, i->FRB);
+}
+
+EMU(FRSQRTES, AForm_4) {
+    float rb = TH->getFPRd(i->FRB);
+    auto res = 1.f / sqrt(rb);
+    TH->setFPRd(i->FRT, res);
+    if (i->Rc.u())
+        update_CRFSign<1>(res, TH);
+}
+
 namespace FPRF {
     enum t {
         QNAN = 17,
@@ -2217,6 +2289,21 @@ EMU(FMADDS, AForm_1) {
     completeFPInstr(a, b, c, r, i->Rc, TH);
 }
 
+PRINT(FMSUB, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fsub." : "fmsub", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FMSUB, AForm_1) {
+    double a = TH->getFPRd(i->FRA);
+    double b = TH->getFPRd(i->FRB);
+    double c = TH->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = a * c - b;
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
+}
+
+
 PRINT(FMSUBS, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fsubs." : "fmsubs", i->FRT, i->FRA, i->FRC, i->FRB);
 }
@@ -2227,6 +2314,63 @@ EMU(FMSUBS, AForm_1) {
     float c = TH->getFPRd(i->FRC);
     std::feclearexcept(FE_ALL_EXCEPT);
     auto r = a * c - b;
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
+}
+
+PRINT(FNMADD, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fnmadd." : "fnmadd", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FNMADD, AForm_1) {
+    auto a = TH->getFPRd(i->FRA);
+    auto b = TH->getFPRd(i->FRB);
+    auto c = TH->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = -(a * c + b);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
+}
+
+PRINT(FNMADDS, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fnmadds." : "fnmadds", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FNMADDS, AForm_1) {
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRB);
+    float c = TH->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = -(a * c + b);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
+}
+
+PRINT(FNMSUB, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fnsub." : "fnmsub", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FNMSUB, AForm_1) {
+    double a = TH->getFPRd(i->FRA);
+    double b = TH->getFPRd(i->FRB);
+    double c = TH->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = -(a * c - b);
+    TH->setFPRd(i->FRT, r);
+    completeFPInstr(a, b, c, r, i->Rc, TH);
+}
+
+
+PRINT(FNMSUBS, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fnsubs." : "fnmsubs", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+EMU(FNMSUBS, AForm_1) {
+    float a = TH->getFPRd(i->FRA);
+    float b = TH->getFPRd(i->FRB);
+    float c = TH->getFPRd(i->FRC);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    auto r = -(a * c - b);
     TH->setFPRd(i->FRT, r);
     completeFPInstr(a, b, c, r, i->Rc, TH);
 }
@@ -3100,6 +3244,11 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 28: invoke(FMSUBS);
                 case 29: invoke(FMADDS);
                 case 20: invoke(FSUBS);
+                case 31: invoke(FNMADDS);
+                case 30: invoke(FNMSUB);
+                case 22: invoke(FSQRTS);
+                case 24: invoke(FRES);
+                case 26: invoke(FRSQRTES);
                 default: throw IllegalInstructionException();
             }
             break;
@@ -3124,8 +3273,20 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 invoke(FDIV);
             } else if (aform->XO.u() == 29) {
                 invoke(FMADD);
+            } else if (aform->XO.u() == 28) {
+                invoke(FMSUB);
             } else if (aform->XO.u() == 20) {
                 invoke(FSUB);
+            } else if (aform->XO.u() == 31) {
+                invoke(FNMADD);
+            } else if (aform->XO.u() == 30) {
+                invoke(FNMSUB);
+            } else if (aform->XO.u() == 22) {
+                invoke(FSQRT);
+            } else if (aform->XO.u() == 24) {
+                invoke(FRE);
+            } else if (aform->XO.u() == 26) {
+                invoke(FRSQRTE);
             } else
             switch (xform->XO.u()) {
                 case 72: invoke(FMR);

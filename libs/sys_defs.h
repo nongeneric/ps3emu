@@ -17,6 +17,7 @@ using namespace boost::endian;
 typedef big_int64_t cell_time_t;
 typedef big_int64_t cell_system_time_t;
 typedef big_uint32_t _sys_sleep_queue_t;
+typedef big_uint32_t _sys_lwcond_queue_t;
 typedef big_uint32_t sys_protocol_t;
 typedef big_uint32_t sys_recursive_t;
 typedef big_uint32_t sys_process_shared_t;

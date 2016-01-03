@@ -2,6 +2,7 @@
 
 #include "lwmutex.h"
 #include <boost/thread/condition_variable.hpp>
+#include <boost/log/trivial.hpp>
 
 namespace {
     struct cv_info_t {
@@ -21,7 +22,15 @@ cv_map_t::const_iterator find_cv_iter(ps3_uintptr_t mutex_id) {
     return it;
 }
 
-int32_t sys_lwcond_create(ps3_uintptr_t lwcond, ps3_uintptr_t lwmutex, const sys_lwcond_attribute_t* attr) {
+int32_t sys_lwcond_create(ps3_uintptr_t lwcond,
+                          ps3_uintptr_t lwmutex,
+                          const sys_lwcond_attribute_t* attr,
+                          MainMemory* mm) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_lwcond_create(%x, %x, ...)", lwcond, lwmutex);
+    sys_lwcond_t type = { 0 };
+    type.lwmutex = lwmutex;
+    type.lwcond_queue = 0xaabbccdd;
+    mm->writeMemory(lwcond, &type, sizeof(type));
     auto info = std::make_unique<cv_info_t>();
     info->m = find_mutex(lwmutex);
     boost::unique_lock<boost::mutex> lock(map_mutex);
@@ -30,6 +39,7 @@ int32_t sys_lwcond_create(ps3_uintptr_t lwcond, ps3_uintptr_t lwmutex, const sys
 }
 
 int32_t sys_lwcond_destroy(ps3_uintptr_t lwcond) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_lwcond_destroy(%x)", lwcond);
     boost::unique_lock<boost::mutex> lock(map_mutex);
     cvs.erase(find_cv_iter(lwcond));
     return CELL_OK;

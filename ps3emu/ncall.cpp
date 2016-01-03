@@ -240,12 +240,12 @@ int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t 
 }
 
 STUB_2(defaultContextCallback);
-STUB_3(sys_lwcond_create);
+STUB_4(sys_lwcond_create);
 STUB_1(sys_lwcond_destroy);
 STUB_2(sys_lwcond_wait);
 STUB_1(sys_lwcond_signal);
 STUB_1(sys_lwcond_signal_all);
-STUB_2(sys_lwmutex_create);
+STUB_3(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
 STUB_2(sys_lwmutex_lock);
 STUB_1(sys_lwmutex_trylock);
