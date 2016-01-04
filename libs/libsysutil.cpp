@@ -81,3 +81,23 @@ int32_t cellSysutilGetSystemParamString(int32_t id, ps3_uintptr_t buf, uint32_t 
     }
     return CELL_OK;
 }
+
+#define CELL_SYSCACHE_RET_OK_CLEARED            (0)
+#define CELL_SYSCACHE_RET_OK_RELAYED            (1)
+
+int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellSysCacheMount(id = %s)", param->cacheId);
+    auto cacheDir = proc->contentManager()->cacheDir();
+    auto hostCacheDir = proc->contentManager()->toHost(cacheDir.c_str());
+    system(ssnprintf("mkdir -p \"%s\"", hostCacheDir).c_str());
+    strcpy(param->getCachePath, cacheDir.c_str());
+    cellSysCacheClear(proc);
+    return CELL_SYSCACHE_RET_OK_CLEARED;
+}
+
+int32_t cellSysCacheClear(Process* proc) {
+    auto cacheDir = proc->contentManager()->cacheDir();
+    auto hostCacheDir = proc->contentManager()->toHost(cacheDir.c_str());
+    system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());
+    return CELL_OK;
+}

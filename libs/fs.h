@@ -2,6 +2,7 @@
 
 #include "sys_defs.h"
 #include "../ps3emu/constants.h"
+#include "../ps3emu/MainMemory.h"
 
 typedef big_int32_t CellFsMode;
 typedef int32_t CellFsErrno;
@@ -17,6 +18,9 @@ constexpr CellFsErrno CELL_FS_ENAMETOOLONG = -2147418060;
 constexpr CellFsErrno CELL_FS_EFSSPECIFIC = -2147418056;
 constexpr CellFsErrno CELL_FS_EFAULT = -2147418099;
 constexpr CellFsErrno CELL_FS_EACCES = -2147418071;
+constexpr CellFsErrno CELL_FS_EEXIST = -2147418092;
+
+#define CELL_FS_MAX_FS_FILE_NAME_LENGTH (255)
 
 struct CellFsStat {
     CellFsMode st_mode;
@@ -29,8 +33,17 @@ struct CellFsStat {
     big_uint64_t st_blksize;
 };
 
-class Process;
-class PPUThread;
+struct CellFsDirent {
+    uint8_t d_type;
+    uint8_t d_namlen;
+    char d_name[CELL_FS_MAX_FS_FILE_NAME_LENGTH + 1];
+};
+
+struct CellFsDirectoryEntry {
+    CellFsStat attribute;
+    CellFsDirent entry_name;
+};
+
 CellFsErrno sys_fs_open_impl(const char *path,
                              uint32_t flags,
                              big_uint32_t *fd,
@@ -38,6 +51,7 @@ CellFsErrno sys_fs_open_impl(const char *path,
                              const void *arg,
                              uint64_t size);
 CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc);
+CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc);
 CellFsErrno cellFsOpen(const char *path,
                        int32_t flags,
                        big_int32_t *fd,
@@ -46,4 +60,19 @@ CellFsErrno cellFsOpen(const char *path,
                        Process* proc);
 CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t *pos);
 CellFsErrno cellFsClose(int32_t fd);
-CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nread, PPUThread* thread);
+CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nread, MainMemory* mm);
+CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nwrite, MainMemory* mm);
+CellFsErrno cellFsMkdir(const char* path, uint32_t mode, Process* proc);
+CellFsErrno cellFsGetFreeSize(const char* directory_path,
+                              big_uint32_t* block_size,
+                              big_uint64_t* free_block_count,
+                              Process* proc);
+CellFsErrno cellFsFsync(int32_t fd);
+CellFsErrno cellFsUnlink(const char* path, Process* proc);
+CellFsErrno cellFsOpendir(const char *path, big_int32_t *fd, Process* proc);
+CellFsErrno cellFsReaddir(int32_t fd, CellFsDirent *dir, big_uint64_t *nread);
+CellFsErrno cellFsClosedir(int32_t fd);
+CellFsErrno cellFsGetDirectoryEntries(int32_t fd,
+                                      CellFsDirectoryEntry *entries,
+                                      uint32_t entries_size,
+                                      uint32_t *data_count);

@@ -122,13 +122,9 @@ void MainWindow::setupStatusBar() {
        _model.exec(line);
     });
     
-    auto label = new QLabel("Ready");
-    label->setAlignment(Qt::AlignRight);    
     statusBar()->addWidget(_command, 1);
-    statusBar()->addWidget(label, 1);
     statusBar()->setSizeGripEnabled(false);
     connect(&_model, &DebuggerModel::message, this, [=](QString text){
-        label->setText(text);
         _log->append(text);
     });
 }

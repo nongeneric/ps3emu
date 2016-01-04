@@ -36,15 +36,22 @@ MountPoint splitPathImpl(const char* path, const char** point, const char** rela
 }
 
 void ContentManager::setElfPath(std::string path) {
-    _elfPath = path;
+    _elfPath = absolute(path).string();
 }
 
 std::string ContentManager::usrDir() {
-    return "/dev_hdd0/USRDIR/";
+    return "/dev_hdd0/USRDIR";
 }
 
 std::string ContentManager::contentDir() {
-    return "/dev_hdd0/";
+    return "/dev_hdd0";
+}
+
+std::string ContentManager::cacheDir() {
+    auto dir = "/dev_hdd1";
+    assert(!_elfPath.empty());
+    create_directories(toHost(dir) / dir);
+    return dir;
 }
 
 std::string ContentManager::toHost(const char* path) {
@@ -55,10 +62,15 @@ std::string ContentManager::toHost(const char* path) {
         relative += 3;
     }
     boost::filesystem::path exe(_elfPath);
-    if (type == MountPoint::GameData) { // redirect to the host root
-        point = "..";
+    auto elfdir = exe.parent_path();
+    auto approot = elfdir.parent_path();
+    switch (type) {
+        case MountPoint::HostHome: return absolute(elfdir / "app_home" / relative).string();
+        case MountPoint::HostAbsolute: return absolute(elfdir / "host_root" / relative).string();
+        case MountPoint::GameData: return absolute(approot / relative).string();
+        case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
+        default: throw std::runtime_error("unknown mount point");
     }
-    return absolute(exe.parent_path() / point / relative).string();
 }
 
 struct sfo_header {

@@ -76,6 +76,7 @@ class MainMemory {
     boost::mutex _pageMutex;
     spinlock _storeLock;
     boost::thread::id _reservationThread;
+    ps3_uintptr_t _reservationInstr;
     
     template <bool Read>
     void copy(ps3_uintptr_t va, 
@@ -84,9 +85,8 @@ class MainMemory {
         bool allocate);
     bool storeMemoryWithReservation(void* dest, 
                                     const void* buf, 
-                                    uint len, 
-                                    bool reservationOnly,
-                                    ps3_uintptr_t reservationAddress);
+                                    uint len,
+                                    bool cond);
 public:
     MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
@@ -155,6 +155,21 @@ public:
     double loadd(ps3_uintptr_t va) {
         auto f = (uint64_t)load<sizeof(double)>(va);
         return union_cast<uint64_t, double>(f);
+    }
+    
+    template <int N>
+    typename BytesToBEType<N>::type loadReserve(ps3_uintptr_t va, ps3_uintptr_t cia) {
+        boost::unique_lock<spinlock> lock(_storeLock);
+        _reservationThread = boost::this_thread::get_id();
+        _reservationInstr = cia;
+        return load<N>(va);
+    }
+
+    template <int N>
+    bool storeCond(ps3_uintptr_t va, typename BytesToBEType<N>::type val) {
+        auto dest = getMemoryPointer(va, N);
+        boost::endian::native_to_big_inplace(val);
+        return storeMemoryWithReservation(dest, &val, N, true);
     }
 };
 

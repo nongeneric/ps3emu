@@ -343,3 +343,8 @@ emu_void_t sys_process_exit(PPUThread* thread) {
 emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread) {
     return emu_void;
 }
+
+int32_t sys_process_is_stack(ps3_uintptr_t p) {
+    return StackArea <= p && p < StackArea + StackAreaSize;
+}
+

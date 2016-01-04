@@ -330,8 +330,8 @@ TEST_CASE("ppu_cellgame") {
     REQUIRE( output == 
         "title: GameUpdate Utility Sample\n"
         "gamedir: EMUGAME\n"
-        "contentdir: /dev_hdd0/\n"
-        "usrdir: /dev_hdd0/USRDIR/\n"
+        "contentdir: /dev_hdd0\n"
+        "usrdir: /dev_hdd0/USRDIR\n"
         "filesize: 4\n"
     );
 }
@@ -402,5 +402,75 @@ TEST_CASE("ppu_threads_lwcond_init") {
         "sys_lwmutex_t.lock_var.all_info 0\n"
         "SYS_SYNC_PRIORITY | SYS_SYNC_NOT_RECURSIVE 22\n"
         "&mutex == cv.lwmutex 1\n"
+    );
+}
+
+TEST_CASE("ppu_syscache") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_syscache/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "cellSysCacheMount() : 0x0  sysCachePath:[/dev_hdd1]\n"
+        "cellSysCacheClear Ok\n"
+        "Save sample data\n"
+        "Check sample data\n"
+        "    file /dev_hdd1/GAME-DATA1 check OK\n"
+        "    file /dev_hdd1/GAME-DATA2 check OK\n"
+        "Check OK\n"
+    );
+}
+
+TEST_CASE("ppu_threads_is_stack") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_threads_is_stack/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "main thread: 1100\n"
+        "other thread: 1100\n"
+    );
+}
+
+TEST_CASE("ppu_fs_readdir") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_fs_readdir/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "type: 1, namelen: 1, name: .\n"
+        "type: 1, namelen: 2, name: ..\n"
+        "type: 2, namelen: 5, name: file1\n"
+        "type: 2, namelen: 5, name: file2\n"
+        "type: 2, namelen: 5, name: file3\n"
+        "type: 1, namelen: 6, name: subdir\n"
+        "size 4096, block size 512, name .\n"
+        "size 4096, block size 512, name ..\n"
+        "size 3, block size 512, name file1\n"
+        "size 6, block size 512, name file2\n"
+        "size 3, block size 512, name file3\n"
+        "size 0, block size 512, name subdir\n"
+    );
+}
+
+TEST_CASE("ppu_fios") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/ppu_fios/USRDIR/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "FiosSimple build date : Jan  4 2016 09:39:06\n"
+        "FiosSimple start.\n"
+        "SysCache : /dev_hdd1\n"
+        "GameData : /dev_hdd0/USRDIR\n"
+        "main 242 : Following files are found in \"/test.psarc\".\n"
+        "main 386 : prefetchedSize = 1234567\n"
+        "It took _ to read \"pattern5.dat\" from cache.\n"
+        "It took _ to read \"pattern5.dat\" without cache.\n"
+        "FiosSimple finished.\n"
     );
 }

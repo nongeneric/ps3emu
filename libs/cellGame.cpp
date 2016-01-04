@@ -1,8 +1,18 @@
 #include "cellGame.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/log/trivial.hpp>
 
 using namespace boost::filesystem;
+
+namespace {
+    void init(CellGameContentSize* size) {
+        auto gb2 = 2 * 1024 * 1024;
+        size->hddFreeSizeKB = gb2;
+        size->sizeKB = gb2;
+        size->sysSizeKB = gb2;
+    }
+}
 
 int32_t cellGamePatchCheck(CellGameContentSize *size, uint64_t reserved) {
     assert(false && "should never be called");
@@ -39,13 +49,19 @@ int32_t cellGameBootCheck(big_uint32_t* type,
                           CellGameContentSize* size,
                           cell_game_dirname_t* dirName)
 {
-    auto gb2 = 2 * 1024 * 1024;
-    size->hddFreeSizeKB = gb2;
-    size->sizeKB = gb2;
-    size->sysSizeKB = gb2;
+    init(size);
     *type = CELL_GAME_GAMETYPE_HDD;
     *attributes = 0;
     auto str = "EMUGAME";
     memcpy(dirName, str, strlen(str) + 1);
+    return CELL_OK;
+}
+
+int32_t cellGameDataCheck(uint32_t type, 
+                          const cell_game_dirname_t* dirName, 
+                          CellGameContentSize* size)
+{
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellGameDataCheck(%d, %s, ...)", type, dirName);
+    init(size);
     return CELL_OK;
 }

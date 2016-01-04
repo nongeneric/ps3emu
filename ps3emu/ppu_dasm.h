@@ -2493,18 +2493,40 @@ PRINT(LWARX, XForm_1) {
 EMU(LWARX, XForm_1) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
-    auto val = MM->loadReserve4(ea);
+    auto val = MM->loadReserve<4>(ea, cia);
     TH->setGPR(i->RT, val);
 }
 
 PRINT(STWCX, XForm_8) {
-    *result = format_nnn("stwcx", i->RS, i->RA, i->RB);
+    *result = format_nnn("stwcx.", i->RS, i->RA, i->RB);
 }
 
 EMU(STWCX, XForm_8) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
-    auto stored = MM->storeCond4(ea, TH->getGPR(i->RS));
+    auto stored = MM->storeCond<4>(ea, TH->getGPR(i->RS));
+    TH->setCRF_sign(0, stored);
+}
+
+PRINT(LDARX, XForm_1) {
+    *result = format_nnn("ldarx", i->RT, i->RA, i->RB);
+}
+
+EMU(LDARX, XForm_1) {
+    auto ra = getB(i->RA, TH);
+    auto ea = ra + TH->getGPR(i->RB);
+    auto val = MM->loadReserve<8>(ea, cia);
+    TH->setGPR(i->RT, val);
+}
+
+PRINT(STDCX, XForm_8) {
+    *result = format_nnn("stdcx.", i->RS, i->RA, i->RB);
+}
+
+EMU(STDCX, XForm_8) {
+    auto ra = getB(i->RA, TH);
+    auto ea = ra + TH->getGPR(i->RB);
+    auto stored = MM->storeCond<8>(ea, TH->getGPR(i->RS));
     TH->setCRF_sign(0, stored);
 }
 
@@ -2534,8 +2556,18 @@ EMU(TD, XForm_25) {
     throw IllegalInstructionException();
 }
 
+PRINT(TW, XForm_25) {
+    *result = format_nnn("tw", i->TO, i->RA, i->RB);
+}
+
+EMU(TW, XForm_25) {
+    if (i->TO.u() == 31 && i->RA.u() == i->RB.u())
+        throw BreakpointException();
+    throw IllegalInstructionException();
+}
+
 PRINT(MFTB, XFXForm_2) {
-    *result = format_n("mftb", i->tbr);
+    *result = format_nn("mftb", i->RT, i->tbr);
 }
 
 EMU(MFTB, XFXForm_2) {
@@ -3196,10 +3228,13 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 11: invoke(MULHWU);
                 case 38: invoke(LVSR);
                 case 68: invoke(TD);
+                case 4: invoke(TW);
                 case 10: invoke(ADDC);
                 case 8: invoke(SUBFC);
                 case 20: invoke(LWARX);
+                case 84: invoke(LDARX);
                 case 150: invoke(STWCX);
+                case 214: invoke(STDCX);
                 default: throw IllegalInstructionException();
             }
             break;

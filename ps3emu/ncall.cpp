@@ -218,6 +218,39 @@ CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path,
     return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, proc);
 }
 
+CellFsErrno cellFsMkdir_proxy(ps3_uintptr_t path,
+                              uint32_t mode,
+                              Process* proc)
+{
+    std::string pathStr;
+    readString(proc->mm(), path, pathStr);
+    return cellFsMkdir(pathStr.c_str(), mode, proc);
+}
+
+CellFsErrno cellFsUnlink_proxy(ps3_uintptr_t path,
+                               Process* proc)
+{
+    std::string pathStr;
+    readString(proc->mm(), path, pathStr);
+    return cellFsUnlink(pathStr.c_str(), proc);
+}
+
+CellFsErrno cellFsGetFreeSize_proxy(ps3_uintptr_t directory_path,
+                              big_uint32_t* block_size,
+                              big_uint64_t* free_block_count,
+                              Process* proc)
+{
+    std::string pathStr;
+    readString(proc->mm(), directory_path, pathStr);
+    return cellFsGetFreeSize(pathStr.c_str(), block_size, free_block_count, proc);
+}
+
+CellFsErrno cellFsOpendir_proxy(ps3_uintptr_t path, big_int32_t *fd, Process* proc) {
+    std::string pathStr;
+    readString(proc->mm(), path, pathStr);
+    return cellFsOpendir(pathStr.c_str(), fd, proc);
+}
+
 int32_t sys_ppu_thread_create_proxy(
     sys_ppu_thread_t* thread_id,
     ps3_uintptr_t entry,
@@ -313,7 +346,9 @@ STUB_3(cellFsStat_proxy);
 STUB_6(cellFsOpen_proxy);
 STUB_4(cellFsLseek);
 STUB_1(cellFsClose);
+STUB_3(cellFsFstat);
 STUB_5(cellFsRead);
+STUB_5(cellFsWrite);
 STUB_2(sys_time_get_current_time);
 STUB_2(sys_time_get_timezone);
 STUB_4(sys_semaphore_create);
@@ -327,6 +362,7 @@ STUB_2(sys_ppu_thread_exit);
 STUB_4(sys_initialize_tls);
 STUB_1(sys_process_exit);
 STUB_4(cellGameBootCheck);
+STUB_3(cellGameDataCheck);
 STUB_2(cellGamePatchCheck);
 STUB_3(cellGameContentPermit);
 STUB_4(cellGameGetParamString);
@@ -347,6 +383,17 @@ STUB_1(sys_rwlock_runlock);
 STUB_2(sys_rwlock_wlock);
 STUB_1(sys_rwlock_trywlock);
 STUB_1(sys_rwlock_wunlock);
+STUB_2(cellSysCacheMount);
+STUB_1(cellSysCacheClear);
+STUB_1(sys_process_is_stack);
+STUB_3(cellFsMkdir_proxy);
+STUB_4(cellFsGetFreeSize_proxy);
+STUB_1(cellFsFsync);
+STUB_2(cellFsUnlink_proxy);
+STUB_3(cellFsOpendir_proxy);
+STUB_3(cellFsReaddir);
+STUB_1(cellFsClosedir);
+STUB_4(cellFsGetDirectoryEntries);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -409,13 +456,20 @@ NCallEntry ncallTable[] {
     ENTRY(cellSysmoduleInitialize),
     { "cellFsStat", calcFnid("cellFsStat"), nstub_cellFsStat_proxy },
     { "cellFsOpen", calcFnid("cellFsOpen"), nstub_cellFsOpen_proxy },
+    { "cellFsMkdir", calcFnid("cellFsMkdir"), nstub_cellFsMkdir_proxy },
+    { "cellFsGetFreeSize", calcFnid("cellFsGetFreeSize"), nstub_cellFsGetFreeSize_proxy },
+    { "cellFsUnlink", calcFnid("cellFsUnlink"), nstub_cellFsUnlink_proxy },
+    { "cellFsOpendir", calcFnid("cellFsOpendir"), nstub_cellFsOpendir_proxy },
     ENTRY(cellFsLseek),
     ENTRY(cellFsClose),
+    ENTRY(cellFsFstat),
     ENTRY(cellFsRead),
+    ENTRY(cellFsWrite),
     { "sys_ppu_thread_create", calcFnid("sys_ppu_thread_create"), nstub_sys_ppu_thread_create_proxy },
     ENTRY(sys_ppu_thread_join),
     ENTRY(sys_ppu_thread_exit),
     ENTRY(cellGameBootCheck),
+    ENTRY(cellGameDataCheck),
     ENTRY(cellGamePatchCheck),
     ENTRY(cellGameContentPermit),
     ENTRY(cellGameGetParamString),
@@ -428,6 +482,13 @@ NCallEntry ncallTable[] {
     ENTRY(sceNpBasicRegisterHandler),
     { "sceNpDrmIsAvailable2", calcFnid("sceNpDrmIsAvailable2"), nstub_sceNpDrmIsAvailable2_proxy },
     ENTRY(sceNpManagerGetNpId),
+    ENTRY(cellSysCacheMount),
+    ENTRY(cellSysCacheClear),
+    ENTRY(sys_process_is_stack),
+    ENTRY(cellFsFsync),
+    ENTRY(cellFsReaddir),
+    ENTRY(cellFsClosedir),
+    ENTRY(cellFsGetDirectoryEntries),
 };
 
 void PPUThread::ncall(uint32_t index) {

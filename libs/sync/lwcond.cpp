@@ -46,6 +46,7 @@ int32_t sys_lwcond_destroy(ps3_uintptr_t lwcond) {
 }
 
 int32_t sys_lwcond_wait(ps3_uintptr_t lwcond, usecond_t timeout) {
+    assert(timeout == 0);
     boost::unique_lock<boost::mutex> lock(map_mutex);
     auto info = find_cv_iter(lwcond)->second.get();
     lock.unlock();

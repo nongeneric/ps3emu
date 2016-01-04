@@ -13,18 +13,16 @@ static constexpr auto PagePtrMask = ~uintptr_t() - 1;
 
 bool MainMemory::storeMemoryWithReservation(void* dest, 
                                             const void* source, 
-                                            uint size, 
-                                            bool reservationOnly,
-                                            ps3_uintptr_t reservationAddress) {
-    auto reservationThread = _reservationThread == boost::this_thread::get_id();
-    if (!reservationOnly && !reservationThread) {
-        _storeLock.wait();
+                                            uint size,
+                                            bool cond) {
+    
+    boost::unique_lock<spinlock> lock(_storeLock);
+    if (!cond || (_reservationThread == boost::this_thread::get_id())) {
+        memcpy(dest, source, size);
+        _reservationThread = boost::thread::id();
+        return true;
     }
-    memcpy(dest, source, size);
-    if (reservationOnly && reservationThread) {
-        _storeLock.unlock();
-    }
-    return true;
+    return false;
 }
 
 template <bool Read>
@@ -65,7 +63,7 @@ void MainMemory::copy(ps3_uintptr_t va,
         if (Read) {
             memcpy(source, dest, size);
         } else {
-            storeMemoryWithReservation(dest, source, size, false, 0);
+            storeMemoryWithReservation(dest, source, size, false);
         }
         curVa = end;
     }
@@ -242,7 +240,7 @@ uint64_t MainMemory::getTimeBase() {
     auto now = boost::chrono::high_resolution_clock::now();
     auto diff = now - _systemStart;
     auto us = boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
-    return 1000000 * us.count() * getFrequency();
+    return (us * getFrequency() / 1000000).count();
 }
 
 void MainMemory::memoryBreak(uint32_t va, uint32_t size) {
@@ -273,19 +271,4 @@ void MainMemory::allocPage(void** ptr, ps3_uintptr_t* va) {
 
 MainMemory::MainMemory() {
     reset();
-}
-
-uint32_t MainMemory::loadReserve4(ps3_uintptr_t va) {
-    _storeLock.lock();
-    _reservationThread = boost::this_thread::get_id();
-    return load<4>(va);
-}
-
-bool MainMemory::storeCond4(ps3_uintptr_t va, uint32_t val) {
-    if (!_storeLock.is_locked())
-        throw std::runtime_error("");
-    auto dest = getMemoryPointer(va, 4);
-    native_to_big_inplace(val);
-    storeMemoryWithReservation(dest, &val, 4, true, va);
-    return true;
 }

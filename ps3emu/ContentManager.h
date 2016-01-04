@@ -47,5 +47,6 @@ public:
     std::string usrDir();
     std::string contentDir();
     std::string toHost(const char* path);
+    std::string cacheDir();
     std::vector<SFOEntry> sfo();
 };

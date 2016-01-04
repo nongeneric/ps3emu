@@ -1,7 +1,6 @@
 #include "DebuggerModel.h"
 #include "../ps3emu/rsx/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
-#include <boost/log/trivial.hpp>
 #include <QStringList>
 #include "stdio.h"
 
@@ -392,13 +391,25 @@ void DebuggerModel::exec(QString command) {
 }
 
 void DebuggerModel::printMemory(uint64_t va) {
-    auto s = QString("%1    ").arg(va, 8, 16, QChar('0'));
-    uint8_t buf[16];
-    _proc->mm()->readMemory(va, buf, sizeof buf);
-    for (auto i = 0u; i < sizeof buf; ++i) {
-        s += QString("%1 ").arg(buf[i], 2, 16, QChar('0'));
+    for (int i = 0; i < 10; ++i) {
+        auto s = QString("%1    ").arg(va, 8, 16, QChar('0'));
+        uint8_t buf[16];
+        _proc->mm()->readMemory(va, buf, sizeof buf);
+        for (auto i = 0u; i < sizeof buf; ++i) {
+            s += QString("%1 ").arg(buf[i], 2, 16, QChar('0'));
+        }
+        s += "  ";
+        for (auto i = 0u; i < sizeof buf; ++i) {
+            auto c = (char)buf[i];
+            if (0 < c && c <= 126 && c != '\r' && c != '\n') {
+                s += (char)buf[i];
+            } else {
+                s += ".";
+            }
+        }
+        emit message(s);
+        va += 16;
     }
-    emit message(s);
 }
 
 void DebuggerModel::runToLR() {
@@ -466,7 +477,7 @@ void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {
        return b.va == va;
     });
     if (it == end(_softBreaks)) {
-        BOOST_LOG_TRIVIAL(error) << ssnprintf("there is no breakpoint at %x", va);
+        emit message(QString::fromStdString(ssnprintf("there is no breakpoint at %x", va)));
         return;
     }
     _softBreaks.erase(it);
