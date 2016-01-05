@@ -8,7 +8,7 @@ class MemoryBlockManager {
     std::bitset<Size / BlockSize> _blocks;
 public:
     ps3_uintptr_t alloc(uint32_t size) {
-        assert(size < BlockSize);
+        assert(size <= BlockSize);
         for (auto i = 0u; i < _blocks.size(); ++i) {
             if (!_blocks[i]) {
                 _blocks[i] = true;

@@ -6,10 +6,12 @@
 using namespace boost::filesystem;
 
 namespace {
-    void init(CellGameContentSize* size) {
+    void init(CellGameContentSize* size, Process* proc) {
         auto gb2 = 2 * 1024 * 1024;
-        size->hddFreeSizeKB = gb2;
-        size->sizeKB = gb2;
+        auto cm = proc->contentManager();
+        auto host = cm->toHost(cm->contentDir().c_str());
+        size->hddFreeSizeKB = space(host).available / 1024;
+        size->sizeKB = -1; // not calculated
         size->sysSizeKB = gb2;
     }
 }
@@ -20,6 +22,7 @@ int32_t cellGamePatchCheck(CellGameContentSize *size, uint64_t reserved) {
 }
 
 int32_t cellGameContentPermit(cell_game_path_t* contentPath, cell_game_path_t* usrdirPath, Process* proc) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     auto usrDir = proc->contentManager()->usrDir();
     auto contentDir = proc->contentManager()->contentDir();
     std::copy(begin(usrDir), end(usrDir), begin(*usrdirPath));
@@ -28,6 +31,7 @@ int32_t cellGameContentPermit(cell_game_path_t* contentPath, cell_game_path_t* u
 }
 
 int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize, Process* proc) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     auto sfo = proc->contentManager()->sfo();
     auto entry = std::find_if(begin(sfo), end(sfo), [=] (auto& entry) {
         return entry.id == id;
@@ -47,9 +51,11 @@ int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize,
 int32_t cellGameBootCheck(big_uint32_t* type,
                           big_uint32_t* attributes,
                           CellGameContentSize* size,
-                          cell_game_dirname_t* dirName)
+                          cell_game_dirname_t* dirName,
+                          Process* proc)
 {
-    init(size);
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    init(size, proc);
     *type = CELL_GAME_GAMETYPE_HDD;
     *attributes = 0;
     auto str = "EMUGAME";
@@ -59,9 +65,10 @@ int32_t cellGameBootCheck(big_uint32_t* type,
 
 int32_t cellGameDataCheck(uint32_t type, 
                           const cell_game_dirname_t* dirName, 
-                          CellGameContentSize* size)
+                          CellGameContentSize* size,
+                          Process* proc)
 {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellGameDataCheck(%d, %s, ...)", type, dirName);
-    init(size);
+    init(size, proc);
     return CELL_OK;
 }

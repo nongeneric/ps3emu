@@ -13,7 +13,9 @@
 #include <memory>
 #include <map>
 
-void init_sys_lib() { }
+void init_sys_lib() {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+}
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
@@ -22,7 +24,7 @@ void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     mem_info->total_user_memory = 221249536;
-    mem_info->available_user_memory = mem_info->total_user_memory / 2; // TODO: handle alloc/dealloc
+    mem_info->available_user_memory = 0.9 * mem_info->total_user_memory; // TODO: handle alloc/dealloc
     return CELL_OK;
 }
 
@@ -118,7 +120,7 @@ constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_allocate(%d,...)", size);
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
     *alloc_addr = thread->mm()->malloc(size);

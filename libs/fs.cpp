@@ -16,14 +16,14 @@
 
 using namespace boost::filesystem;
 
-CellFsErrno sys_fs_open_impl(const char* path,
-                             uint32_t flags,
-                             big_uint32_t* fd,
-                             uint64_t mode,
-                             const void* arg,
-                             uint64_t size)
+CellFsErrno sys_fs_open(const char* path,
+                        uint32_t flags,
+                        big_uint32_t* fd,
+                        uint64_t mode,
+                        const void* arg,
+                        uint64_t size)
 {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_fs_open(%s, ...)", path);
     return 1;
 }
 

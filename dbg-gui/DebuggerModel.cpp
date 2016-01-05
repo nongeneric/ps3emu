@@ -1,8 +1,10 @@
 #include "DebuggerModel.h"
+#include "DebugExpr.h"
 #include "../ps3emu/rsx/Rsx.h"
 #include "../ps3emu/ppu_dasm.h"
 #include <QStringList>
 #include "stdio.h"
+#include <boost/regex.hpp>
 
 class GridModelChangeTracker {
     MonospaceGridModel* _model;
@@ -353,41 +355,63 @@ void DebuggerModel::log(std::string str) {
 }
 
 void DebuggerModel::exec(QString command) {
-    auto s = command.split(' ', QString::QString::SkipEmptyParts);
-    if (s.size() < 1) {
-        emit message(QString("command \"%1\" parsing error").arg(command));
+    auto name = command.section(':', 0, 0).trimmed();
+    auto expr = command.section(':', 1, 1);
+    if (name.isEmpty() || expr.isEmpty()) {
+        emit message("incorrect command format");
+        return;
     }
-    auto name = s[0];
-    if (s.size() > 1) {
-        bool ok;
-        auto va = s[1].toULongLong(&ok, 16);
-        if (!ok) {
-            emit message("bad argument");
-        }
-        try {
-            if (name == "go") {
-                _dasmModel->navigate(va);
-                return;
-            } else if (name == "runto") {
-                runto(va);
-                return;
-            } else if (name == "mem") {
-                printMemory(va);
-                return;
-            } else if (name == "traceto") {
-                traceTo(va);
-                updateUI();
-                return;
-            } else if (name == "bp") {
-                setSoftBreak(va);
+    
+    uint64_t exprVal;
+    try {
+        exprVal = evalExpr(expr.toStdString(), _activeThread);
+    } catch (std::exception& e) {
+        emit message(QString("expr eval failed: ") + e.what());
+        return;
+    }
+    
+    try {
+        if (name == "go") {
+            _dasmModel->navigate(exprVal);
+            return;
+        } else if (name == "runto") {
+            runto(exprVal);
+            return;
+        } else if (name == "mem") {
+            printMemory(exprVal);
+            return;
+        } else if (name == "traceto") {
+            traceTo(exprVal);
+            updateUI();
+            return;
+        } else if (name == "bp") {
+            setSoftBreak(exprVal);
+            return;
+        } else if (name == "p") {
+            message(QString(" : #%1").arg(exprVal, 0, 16));
+            return;
+        } else if (name == "put") {
+            auto id = command.section(':', 2, 2).trimmed().toStdString();
+            boost::regex rxgpr("gpr([0-9]+)");
+            boost::smatch m;
+            if (boost::regex_match(id, m, rxgpr)) {
+                auto n = std::stoul(m[1]);
+                if (n <= 31) {
+                    _activeThread->setGPR(n, exprVal);
+                }
+            } else if (id == "nip") {
+                _activeThread->setNIP(exprVal);
+            } else {
+                emit message("unknown id");
                 return;
             }
-        } catch (...) {
-            emit message("command failed");
+            updateUI();
             return;
         }
+    } catch (...) {
+        emit message("command failed");
+        return;
     }
-    emit message("unknown command");
 }
 
 void DebuggerModel::printMemory(uint64_t va) {

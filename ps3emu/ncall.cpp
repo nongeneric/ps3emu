@@ -197,7 +197,7 @@ uint32_t sys_fs_open_proxy(uint32_t path,
     } else {
         argVec[0] = 0;
     }
-    return sys_fs_open_impl(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
+    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
 }
 
 CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, Process* proc) {
@@ -361,8 +361,8 @@ STUB_3(sys_ppu_thread_join);
 STUB_2(sys_ppu_thread_exit);
 STUB_4(sys_initialize_tls);
 STUB_1(sys_process_exit);
-STUB_4(cellGameBootCheck);
-STUB_3(cellGameDataCheck);
+STUB_5(cellGameBootCheck);
+STUB_4(cellGameDataCheck);
 STUB_2(cellGamePatchCheck);
 STUB_3(cellGameContentPermit);
 STUB_4(cellGameGetParamString);

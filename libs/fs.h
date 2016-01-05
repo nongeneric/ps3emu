@@ -9,16 +9,16 @@ typedef int32_t CellFsErrno;
 
 constexpr CellFsErrno CELL_FS_OK = CELL_OK;
 constexpr CellFsErrno CELL_FS_SUCCEEDED = CELL_FS_OK;
-constexpr CellFsErrno CELL_FS_ENOTMOUNTED = -2147418054;
-constexpr CellFsErrno CELL_FS_ENOENT = -2147418106;
-constexpr CellFsErrno CELL_FS_EIO = -2147418069;
-constexpr CellFsErrno CELL_FS_ENOMEM = -2147418108;
-constexpr CellFsErrno CELL_FS_ENOTDIR = -2147418066;
-constexpr CellFsErrno CELL_FS_ENAMETOOLONG = -2147418060;
-constexpr CellFsErrno CELL_FS_EFSSPECIFIC = -2147418056;
-constexpr CellFsErrno CELL_FS_EFAULT = -2147418099;
-constexpr CellFsErrno CELL_FS_EACCES = -2147418071;
-constexpr CellFsErrno CELL_FS_EEXIST = -2147418092;
+constexpr CellFsErrno CELL_FS_ENOTMOUNTED = 0x8001003a;
+constexpr CellFsErrno CELL_FS_ENOENT = 0x80010006;
+constexpr CellFsErrno CELL_FS_EIO = 0x8001002b;
+constexpr CellFsErrno CELL_FS_ENOMEM = 0x80010004;
+constexpr CellFsErrno CELL_FS_ENOTDIR = 0x8001002e;
+constexpr CellFsErrno CELL_FS_ENAMETOOLONG = 0x80010034;
+constexpr CellFsErrno CELL_FS_EFSSPECIFIC = 0x80010038;
+constexpr CellFsErrno CELL_FS_EFAULT = 0x8001000d;
+constexpr CellFsErrno CELL_FS_EACCES = 0x80010029;
+constexpr CellFsErrno CELL_FS_EEXIST = 0x80010014;
 
 #define CELL_FS_MAX_FS_FILE_NAME_LENGTH (255)
 
@@ -44,12 +44,12 @@ struct CellFsDirectoryEntry {
     CellFsDirent entry_name;
 };
 
-CellFsErrno sys_fs_open_impl(const char *path,
-                             uint32_t flags,
-                             big_uint32_t *fd,
-                             uint64_t mode,
-                             const void *arg,
-                             uint64_t size);
+CellFsErrno sys_fs_open(const char *path,
+                        uint32_t flags,
+                        big_uint32_t *fd,
+                        uint64_t mode,
+                        const void *arg,
+                        uint64_t size);
 CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc);
 CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc);
 CellFsErrno cellFsOpen(const char *path,
