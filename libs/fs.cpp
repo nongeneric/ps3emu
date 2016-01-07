@@ -213,6 +213,7 @@ CellFsErrno cellFsMkdir(const char* path, uint32_t mode, Process* proc) {
         return CELL_FS_EEXIST;
     auto res = create_directory(proc->contentManager()->toHost(path));
     assert(res);
+    (void)res;
     return CELL_FS_SUCCEEDED;
 }
 
@@ -223,6 +224,9 @@ CellFsErrno cellFsGetFreeSize(const char* directory_path,
 {
     *block_size = 4096;
     auto host = proc->contentManager()->toHost(directory_path);
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsGetFreeSize(%s (%s), ...)", 
+                                          directory_path,
+                                          host);
     auto s = space(host);
     *free_block_count = s.available / *block_size;
     return CELL_FS_SUCCEEDED;

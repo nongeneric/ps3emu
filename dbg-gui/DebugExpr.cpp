@@ -143,7 +143,7 @@ public:
     std::string name;
     
     uint64_t eval(PPUThread* th) override {
-        regex rxgpr("gpr([0-9]+)");
+        regex rxgpr("r([0-9]+)");
         smatch m;
         if (regex_match(name, m, rxgpr)) {
             auto n = std::stoul(m[1]);

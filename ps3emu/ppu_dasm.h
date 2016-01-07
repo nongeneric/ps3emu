@@ -2660,55 +2660,34 @@ EMU(VSPLTISW, SIMDForm) {
     TH->setV(i->vD, (uint8_t*)be);
 }
 
-inline void endian_reverse_v(void* vbe) {
-    auto ui = (uint32_t*)vbe;
-    for (int i = 0; i < 4; ++i) {
-        endian_reverse_inplace(ui[i]);
-    }
-}
-
 PRINT(VMADDFP, SIMDForm) {
     *result = format_nnnn("vmaddfp", i->vD, i->vA, i->vC, i->vB);
 }
 
 EMU(VMADDFP, SIMDForm) {
-    float abe[4];
-    float bbe[4];
-    float cbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    TH->getV(i->vC, (uint8_t*)cbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    endian_reverse_v(cbe);
-    float dbe[4];
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    auto c = TH->getVf(i->vC);
+    std::array<float, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = abe[i] * cbe[i] + bbe[i];
+        d[i] = a[i] * c[i] + b[i];
     }
-    endian_reverse_v(dbe);
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVf(i->vD, d);
 }
 
-PRINT(VNMSUBFP, SIMDForm) { // TODO: test
-    *result = format_nnnn("vnmsubfp", i->vD, i->vA, i->vB, i->vC);
+PRINT(VNMSUBFP, SIMDForm) {
+    *result = format_nnnn("vnmsubfp", i->vD, i->vA, i->vC, i->vB);
 }
 
 EMU(VNMSUBFP, SIMDForm) {
-    float abe[4];
-    float bbe[4];
-    float cbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    TH->getV(i->vC, (uint8_t*)cbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    endian_reverse_v(cbe);
-    float dbe[4];
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    auto c = TH->getVf(i->vC);
+    std::array<float, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = -(abe[i] * cbe[i] - bbe[i]);
+        d[i] = -(a[i] * c[i] - b[i]);
     }
-    endian_reverse_v(dbe);
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVf(i->vD, d);
 }
 
 PRINT(VXOR, SIMDForm) {
@@ -2717,6 +2696,24 @@ PRINT(VXOR, SIMDForm) {
 
 EMU(VXOR, SIMDForm) {
     auto d = TH->getV(i->vA) ^ TH->getV(i->vB);
+    TH->setV(i->vD, d);
+}
+
+PRINT(VNOR, SIMDForm) {
+    *result = format_nnn("vnor", i->vD, i->vA, i->vB);
+}
+
+EMU(VNOR, SIMDForm) {
+    auto d = ~(TH->getV(i->vA) | TH->getV(i->vB));
+    TH->setV(i->vD, d);
+}
+
+PRINT(VOR, SIMDForm) {
+    *result = format_nnn("vor", i->vD, i->vA, i->vB);
+}
+
+EMU(VOR, SIMDForm) {
+    auto d = TH->getV(i->vA) | TH->getV(i->vB);
     TH->setV(i->vD, d);
 }
 
@@ -2729,7 +2726,7 @@ EMU(VAND, SIMDForm) {
     TH->setV(i->vD, d);
 }
 
-PRINT(VSEL, SIMDForm) { // TODO: test
+PRINT(VSEL, SIMDForm) {
     *result = format_nnnn("vsel", i->vD, i->vA, i->vB, i->vC);
 }
 
@@ -2746,18 +2743,13 @@ PRINT(VADDFP, SIMDForm) {
 }
 
 EMU(VADDFP, SIMDForm) {
-    float abe[4];
-    float bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    float dbe[4];
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    std::array<float, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = abe[i] + bbe[i];
+        d[i] = a[i] + b[i];
     }
-    endian_reverse_v(dbe);
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVf(i->vD, d);
 }
 
 PRINT(VSUBFP, SIMDForm) {
@@ -2765,18 +2757,13 @@ PRINT(VSUBFP, SIMDForm) {
 }
 
 EMU(VSUBFP, SIMDForm) {
-    float abe[4];
-    float bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    float dbe[4];
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    std::array<float, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = abe[i] - bbe[i];
+        d[i] = a[i] - b[i];
     }
-    endian_reverse_v(dbe);
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVf(i->vD, d);
 }
 
 PRINT(VRSQRTEFP, SIMDForm) {
@@ -2784,91 +2771,152 @@ PRINT(VRSQRTEFP, SIMDForm) {
 }
 
 EMU(VRSQRTEFP, SIMDForm) {
-    float bbe[4];
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(bbe);
-    float dbe[4];
+    auto b = TH->getVf(i->vB);
+    std::array<float, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = 1.f / sqrt(bbe[i]);
+        d[i] = 1.f / sqrt(b[i]);
     }
-    endian_reverse_v(dbe);
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVf(i->vD, d);
 }
 
-PRINT(VCTSXS, SIMDForm) { // TODO: test, set sat
+PRINT(VCTSXS, SIMDForm) {
     *result = format_nnn("vctsxs", i->vD, i->vB, i->UIMM);
 }
 
 EMU(VCTSXS, SIMDForm) {
-    float bbe[4];
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(bbe);
-    unsigned __int128 mult = 1;
-    mult <<= i->UIMM.u();
-    big_uint32_t dbe[4];
+    auto b = TH->getVf(i->vB);
+    std::array<uint32_t, 4> d;
+    auto m = 1u << i->UIMM.u();
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = bbe[i] * mult;
+        d[i] = b[i] * m;
     }
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVuw(i->vD, d);
 }
 
-PRINT(VCFSX, SIMDForm) { // TODO: test, set sat
+PRINT(VCFSX, SIMDForm) {
     *result = format_nnn("vcfsx", i->vD, i->vB, i->UIMM);
 }
 
 EMU(VCFSX, SIMDForm) {
-    big_int32_t bbe[4];
-    TH->getV(i->vB, (uint8_t*)bbe);
-    float div = 1u << i->UIMM.u();
-    float dbe[4];
+    auto b = TH->getVw(i->vB);
+    auto div = 1u << i->UIMM.u();
+    std::array<float, 4> d;
     for (int n = 0; n < 4; ++n) {
-        dbe[n] = bbe[n];
-        dbe[n] /= div;
+        d[n] = b[n];
+        d[n] /= div;
     }
-    endian_reverse_v(dbe);
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVf(i->vD, d);
 }
 
-PRINT(VADDUWM, SIMDForm) { // TODO: test
+PRINT(VADDUWM, SIMDForm) {
     *result = format_nnn("vadduwm", i->vD, i->vA, i->vB);
 }
 
 EMU(VADDUWM, SIMDForm) {
-    uint32_t abe[4];
-    uint32_t bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    big_uint32_t dbe[4];
+    auto a = TH->getVuw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    std::array<uint32_t, 4> d;
     for (int n = 0; n < 4; ++n) {
-        dbe[n] = abe[n] + bbe[n];
+        d[n] = a[n] + b[n];
     }
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVuw(i->vD, d);
 }
 
-PRINT(VCMPEQUW, SIMDForm) { // TODO: test
+PRINT(VSUBUWM, SIMDForm) {
+    *result = format_nnn("vsubuwm", i->vD, i->vA, i->vB);
+}
+
+EMU(VSUBUWM, SIMDForm) {
+    auto a = TH->getVuw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    std::array<uint32_t, 4> d;
+    for (int n = 0; n < 4; ++n) {
+        d[n] = a[n] - b[n];
+    }
+    TH->setVuw(i->vD, d);
+}
+
+PRINT(VCMPEQUW, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpequw." : "vcmpequw", i->vD, i->vA, i->vB);
 }
 
 EMU(VCMPEQUW, SIMDForm) {
-    uint32_t abe[4];
-    uint32_t bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    big_uint32_t dbe[4];
+    auto a = TH->getVuw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    std::array<uint32_t, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = abe[i] == bbe[i] ? ~0u : 0u;
+        d[i] = a[i] == b[i] ? 0xffffffff : 0;
     }
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
-        auto ui = *(unsigned __int128*)dbe;
-        auto t = ui + 1 == 0;
-        auto f = ui == 0;
+        auto d128 = TH->getV(i->vD);
+        auto t = d128 == ~make128(0, 0);
+        auto f = d128 == 0;
         auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);   
+        TH->setCRF(6, c);  
+    }
+}
+
+PRINT(VCMPGTFP, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpgtfp." : "vcmpgtfp", i->vD, i->vA, i->vB);
+}
+
+EMU(VCMPGTFP, SIMDForm) {
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    std::array<uint32_t, 4> d;
+    for (int i = 0; i < 4; ++i) {
+        d[i] = a[i] > b[i] ? 0xffffffff : 0;
+    }
+    TH->setVuw(i->vD, d);
+    if (i->Rc.u()) {
+        auto d128 = TH->getV(i->vD);
+        auto t = d128 == ~make128(0, 0);
+        auto f = d128 == 0;
+        auto c = t << 3 | f << 1;
+        TH->setCRF(6, c);
+    }
+}
+
+PRINT(VCMPGTUW, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpgtuw." : "vcmpgtuw", i->vD, i->vA, i->vB);
+}
+
+EMU(VCMPGTUW, SIMDForm) {
+    auto a = TH->getVuw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    std::array<uint32_t, 4> d;
+    for (int i = 0; i < 4; ++i) {
+        d[i] = a[i] > b[i] ? 0xffffffff : 0;
+    }
+    TH->setVuw(i->vD, d);
+    if (i->Rc.u()) {
+        auto d128 = TH->getV(i->vD);
+        auto t = d128 == ~make128(0, 0);
+        auto f = d128 == 0;
+        auto c = t << 3 | f << 1;
+        TH->setCRF(6, c);
+    }
+}
+
+PRINT(VCMPGTSW, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpgtsw." : "vcmpgtsw", i->vD, i->vA, i->vB);
+}
+
+EMU(VCMPGTSW, SIMDForm) {
+    auto a = TH->getVw(i->vA);
+    auto b = TH->getVw(i->vB);
+    std::array<uint32_t, 4> d;
+    for (int i = 0; i < 4; ++i) {
+        d[i] = a[i] > b[i] ? 0xffffffff : 0;
+    }
+    TH->setVuw(i->vD, d);
+    if (i->Rc.u()) {
+        auto d128 = TH->getV(i->vD);
+        auto t = d128 == ~make128(0, 0);
+        auto f = d128 == 0;
+        auto c = t << 3 | f << 1;
+        TH->setCRF(6, c);
     }
 }
 
@@ -2877,49 +2925,51 @@ PRINT(VCMPEQFP, SIMDForm) { // TODO: test
 }
 
 EMU(VCMPEQFP, SIMDForm) {
-    float abe[4];
-    float bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    union {
-        float f[4];
-        unsigned __int128 i128;
-    } dbe;
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    std::array<uint32_t, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe.f[i] = abe[i] == bbe[i] ? ~0u : 0u;
+        d[i] = a[i] == b[i] ? 0xffffffff : 0;
     }
-    TH->setV(i->vD, (uint8_t*)dbe.f);
+    TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
-        auto ui = dbe.i128;
-        auto t = ui + 1 == 0;
-        auto f = ui == 0;
+        auto d128 = TH->getV(i->vD);
+        auto t = d128 == ~make128(0, 0);
+        auto f = d128 == 0;
         auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);   
+        TH->setCRF(6, c);
     }
 }
 
+PRINT(VSRW, SIMDForm) {
+    *result = format_nnn("vsrw", i->vD, i->vA, i->vB);
+}
 
-PRINT(VSLW, SIMDForm) { // TODO: test
+EMU(VSRW, SIMDForm) {
+    auto a = TH->getVuw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    std::array<uint32_t, 4> d;
+    for (int i = 0; i < 4; ++i) {
+        d[i] = a[i] >> (b[i] & 31);
+    }
+    TH->setVuw(i->vD, d);
+}
+
+PRINT(VSLW, SIMDForm) {
     *result = format_nnn("vslw", i->vD, i->vA, i->vB);
 }
 
 EMU(VSLW, SIMDForm) {
-    uint32_t abe[4];
-    uint32_t bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    endian_reverse_v(abe);
-    endian_reverse_v(bbe);
-    big_uint32_t dbe[4];
+    auto a = TH->getVuw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    std::array<uint32_t, 4> d;
     for (int i = 0; i < 4; ++i) {
-        dbe[i] = abe[i] << (bbe[i] & 31);
+        d[i] = a[i] << (b[i] & 31);
     }
-    TH->setV(i->vD, (uint8_t*)dbe);
+    TH->setVuw(i->vD, d);
 }
 
-PRINT(VMRGHW, SIMDForm) { // TODO: test
+PRINT(VMRGHW, SIMDForm) {
     *result = format_nnn("vmrghw", i->vD, i->vA, i->vB);
 }
 
@@ -2971,12 +3021,6 @@ EMU(VPERM, SIMDForm) {
     TH->setV(i->vD, dbe);
 }
 
-inline unsigned __int128 make128(uint64_t low, uint64_t high) {
-    unsigned __int128 i = low;
-    i <<= 64;
-    return i | high;
-}
-
 PRINT(LVSR, SIMDForm) { // TODO: test
     *result = format_nnn("lvsr", i->vD, i->rA, i->rB);
 }
@@ -3007,6 +3051,36 @@ EMU(LVSR, SIMDForm) {
     TH->setV(i->vD, vd);
 }
 
+PRINT(LVSL, SIMDForm) {
+    *result = format_nnn("lvsl", i->vD, i->rA, i->rB);
+}
+
+EMU(LVSL, SIMDForm) {
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
+    auto sh = ea & 15;
+    unsigned __int128 vd;
+    switch (sh) {
+        case 0: vd = make128(0x0001020304050607ull, 0x08090A0B0C0D0E0Full); break;
+        case 1: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break;
+        case 2: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break;
+        case 3: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break;
+        case 4: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break;
+        case 5: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break;
+        case 6: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break;
+        case 7: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break;
+        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break;
+        case 9: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break;
+        case 10: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break;
+        case 11: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break;
+        case 12: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break;
+        case 13: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break;
+        case 14: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break;
+        case 15: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break;
+    }
+    TH->setV(i->vD, vd);
+}
+
 PRINT(VANDC, SIMDForm) { // TODO: test
     *result = format_nnn("vandc", i->vD, i->vA, i->vB);
 }
@@ -3016,6 +3090,127 @@ EMU(VANDC, SIMDForm) {
     auto b = TH->getV(i->vB);
     auto d = a & ~b;
     TH->setV(i->vD, d);
+}
+
+PRINT(VREFP, SIMDForm) {
+    *result = format_nn("vrefp", i->vD, i->vB);
+}
+
+EMU(VREFP, SIMDForm) {
+    std::array<float, 4> d;
+    auto b = TH->getVf(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        d[i] = 1.f / b[i];
+    }
+    TH->setVf(i->vD, d);
+}
+
+PRINT(VSRAW, SIMDForm) {
+    *result = format_nnn("vsraw", i->vD, i->vA, i->vB);
+}
+
+EMU(VSRAW, SIMDForm) {
+    std::array<int32_t, 4> d;
+    auto a = TH->getVw(i->vA);
+    auto b = TH->getVuw(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        auto sh = b[i] & 31;
+        d[i] = a[i] >> sh;
+    }
+    TH->setVw(i->vD, d);
+}
+
+PRINT(VRFIP, SIMDForm) {
+    *result = format_nn("vrfip", i->vD, i->vB);
+}
+
+EMU(VRFIP, SIMDForm) {
+    std::array<float, 4> d;
+    auto b = TH->getVf(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        d[i] = std::ceil(b[i]);
+    }
+    TH->setVf(i->vD, d);
+}
+
+PRINT(VRFIM, SIMDForm) {
+    *result = format_nn("vrfim", i->vD, i->vB);
+}
+
+EMU(VRFIM, SIMDForm) {
+    std::array<float, 4> d;
+    auto b = TH->getVf(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        d[i] = std::floor(b[i]);
+    }
+    TH->setVf(i->vD, d);
+}
+
+PRINT(VRFIZ, SIMDForm) {
+    *result = format_nn("vrfiz", i->vD, i->vB);
+}
+
+EMU(VRFIZ, SIMDForm) {
+    std::array<float, 4> d;
+    auto b = TH->getVf(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        d[i] = std::trunc(b[i]);
+    }
+    TH->setVf(i->vD, d);
+}
+
+PRINT(VMAXFP, SIMDForm) {
+    *result = format_nnn("vmaxfp", i->vD, i->vA, i->vB);
+}
+
+EMU(VMAXFP, SIMDForm) {
+    std::array<float, 4> d;
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        d[i] = std::max(a[i], b[i]);
+    }
+    TH->setVf(i->vD, d);
+}
+
+PRINT(VMINFP, SIMDForm) {
+    *result = format_nnn("vminfp", i->vD, i->vA, i->vB);
+}
+
+EMU(VMINFP, SIMDForm) {
+    std::array<float, 4> d;
+    auto a = TH->getVf(i->vA);
+    auto b = TH->getVf(i->vB);
+    for (int i = 0; i < 4; ++i) {
+        d[i] = std::min(a[i], b[i]);
+    }
+    TH->setVf(i->vD, d);
+}
+
+PRINT(VCTUXS, SIMDForm) {
+    *result = format_nnn("vctuxs", i->vD, i->vB, i->UIMM);
+}
+
+EMU(VCTUXS, SIMDForm) { // TODO: SAT
+    std::array<uint32_t, 4> d;
+    auto b = TH->getVf(i->vB);
+    auto scale = 1 << i->UIMM.u();
+    for (int i = 0; i < 4; ++i) {
+        d[i] = b[i] * scale;
+    }
+    TH->setVuw(i->vD, d);
+}
+
+PRINT(STVEWX, SIMDForm) {
+    *result = format_nnn("stvewx", i->vS, i->rA, i->rB);
+}
+
+EMU(STVEWX, SIMDForm) { // TODO: SAT
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
+    auto s = TH->getVuw(i->vS);
+    auto eb = ea & 3;
+    MM->store<4>(ea, s[eb]);
 }
 
 enum class DasmMode {
@@ -3059,6 +3254,9 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 default:
                     switch (simd->VXR_XO.u()) {
                         case 198: invoke(VCMPEQFP);
+                        case 646: invoke(VCMPGTUW);
+                        case 710: invoke(VCMPGTFP);
+                        case 902: invoke(VCMPGTSW);
                         default:
                             switch (simd->VX_XO.u()) {
                                 case 1220: invoke(VXOR);
@@ -3068,14 +3266,26 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                                 case 74: invoke(VSUBFP);
                                 case 970: invoke(VCTSXS);
                                 case 1028: invoke(VAND);
+                                case 1284: invoke(VNOR);
+                                case 1156: invoke(VOR);
                                 case 128: invoke(VADDUWM);
+                                case 1152: invoke(VSUBUWM);
                                 case 134: invoke(VCMPEQUW);
                                 case 388: invoke(VSLW);
+                                case 644: invoke(VSRW);
                                 case 842: invoke(VCFSX);
                                 case 140: invoke(VMRGHW);
                                 case 396: invoke(VMRGLW);
                                 case 330: invoke(VRSQRTEFP);
                                 case 1092: invoke(VANDC);
+                                case 266: invoke(VREFP);
+                                case 900: invoke(VSRAW);
+                                case 650: invoke(VRFIP);
+                                case 714: invoke(VRFIM);
+                                case 1034: invoke(VMAXFP);
+                                case 1098: invoke(VMINFP);
+                                case 586: invoke(VRFIZ);
+                                case 906: invoke(VCTUXS);
                                 default: throw IllegalInstructionException();
                             }
                     }
@@ -3227,6 +3437,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 71: invoke(LVEWX);
                 case 11: invoke(MULHWU);
                 case 38: invoke(LVSR);
+                case 6: invoke(LVSL);
                 case 68: invoke(TD);
                 case 4: invoke(TW);
                 case 10: invoke(ADDC);
@@ -3235,6 +3446,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 84: invoke(LDARX);
                 case 150: invoke(STWCX);
                 case 214: invoke(STDCX);
+                case 199: invoke(STVEWX);
                 default: throw IllegalInstructionException();
             }
             break;

@@ -134,8 +134,8 @@ public:
         }
         if (col == 2) {
             switch (_view) {
-                case 0: return QString("FPR%1").arg(row);
-                case 1: return QString("GPR%1").arg(row);
+                case 0: return QString("F%1").arg(row);
+                case 1: return QString("R%1").arg(row);
                 case 2: return QString("V%1").arg(row);
                 case 3: return QString("Vf%1").arg(row);
             }
@@ -205,7 +205,7 @@ public:
         if (!_thread)
             return "";
         if (col == 0) {
-            return QString("%1").arg(row, 16, 16, QChar('0'));
+            return QString("%1").arg(row, 8, 16, QChar('0'));
         }
         if (!_thread->mm()->isAllocated(row) || col == 2)
             return "";
@@ -392,7 +392,7 @@ void DebuggerModel::exec(QString command) {
             return;
         } else if (name == "put") {
             auto id = command.section(':', 2, 2).trimmed().toStdString();
-            boost::regex rxgpr("gpr([0-9]+)");
+            boost::regex rxgpr("r([0-9]+)");
             boost::smatch m;
             if (boost::regex_match(id, m, rxgpr)) {
                 auto n = std::stoul(m[1]);

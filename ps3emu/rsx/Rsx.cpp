@@ -680,7 +680,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->pipeline.bind();
     _window.SwapBuffers();
    
-#if DEBUG
+#if TESTS
     static int framenum = 0;
     
     if (framenum < 3) {

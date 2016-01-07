@@ -47,7 +47,7 @@ void MainWindow::setupDocks() {
     
     auto dasmGrid = new MonospaceGrid();
     dasmGrid->setModel(_model.getDasmModel());
-    dasmGrid->setColumnWidth(0, 17);
+    dasmGrid->setColumnWidth(0, 9);
     dasmGrid->setColumnWidth(1, 12);
     dasmGrid->setColumnWidth(2, 12);
     dasmGrid->setColumnWidth(3, 30);

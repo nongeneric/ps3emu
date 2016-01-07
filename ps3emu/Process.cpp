@@ -113,7 +113,7 @@ void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, 
     mm->readMemory(entryDescriptorVa, &entryDescr, sizeof(fdescr));
     
     mm->setMemory(stack, 0, stackSize, true);
-    thread->setGPR(1, stack + stackSize - sizeof(uint64_t));
+    thread->setGPR(1, stack + stackSize - 2 * sizeof(uint64_t));
     thread->setGPR(2, entryDescr.tocBase);
     
     // undocumented:
