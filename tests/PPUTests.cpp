@@ -1,5 +1,6 @@
 #include "../ps3emu/MainMemory.h"
 #include "../ps3emu/ppu_dasm.h"
+#include "../ps3emu/PPUThread.h"
 #include <vector>
 #include <catch.hpp>
 
