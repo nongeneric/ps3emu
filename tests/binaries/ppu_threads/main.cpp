@@ -12,7 +12,7 @@ sys_mutex_t mutex;
 void thread_entry(uint64_t arg) {
 	int* i = (int*)arg;
 	for (int n = 0; n < 1000; ++n) {
-		sys_mutex_lock(mutex, 10000);
+		sys_mutex_lock(mutex, 10000000);
 		int tmp = *i;
 		sys_timer_usleep(10);
 		*i = tmp + 1;

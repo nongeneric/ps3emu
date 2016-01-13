@@ -10,7 +10,7 @@ namespace {
         IMutex* m;
     };
     
-    using cv_map_t = std::map<ps3_uintptr_t, std::unique_ptr<cv_info_t>>;
+    using cv_map_t = std::map<ps3_uintptr_t, std::shared_ptr<cv_info_t>>;
     cv_map_t cvs;
     boost::mutex map_mutex;
 }
@@ -31,8 +31,8 @@ int32_t sys_lwcond_create(ps3_uintptr_t lwcond,
     type.lwmutex = lwmutex;
     type.lwcond_queue = 0xaabbccdd;
     mm->writeMemory(lwcond, &type, sizeof(type));
-    auto info = std::make_unique<cv_info_t>();
-    info->m = find_mutex(lwmutex);
+    auto info = std::make_shared<cv_info_t>();
+    info->m = find_lwmutex(lwmutex).get();
     boost::unique_lock<boost::mutex> lock(map_mutex);
      cvs.emplace(lwcond, std::move(info));
     return CELL_OK;
@@ -48,7 +48,7 @@ int32_t sys_lwcond_destroy(ps3_uintptr_t lwcond) {
 int32_t sys_lwcond_wait(ps3_uintptr_t lwcond, usecond_t timeout) {
     assert(timeout == 0);
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    auto info = find_cv_iter(lwcond)->second.get();
+    auto info = find_cv_iter(lwcond)->second;
     lock.unlock();
     info->cv.wait(*info->m);
     return CELL_OK;
@@ -56,7 +56,7 @@ int32_t sys_lwcond_wait(ps3_uintptr_t lwcond, usecond_t timeout) {
 
 int32_t sys_lwcond_signal(ps3_uintptr_t lwcond) {
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    auto info = find_cv_iter(lwcond)->second.get();
+    auto info = find_cv_iter(lwcond)->second;
     lock.unlock();
     info->cv.notify_one();
     return CELL_OK;
@@ -64,7 +64,7 @@ int32_t sys_lwcond_signal(ps3_uintptr_t lwcond) {
 
 int32_t sys_lwcond_signal_all(ps3_uintptr_t lwcond) {
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    auto info = find_cv_iter(lwcond)->second.get();
+    auto info = find_cv_iter(lwcond)->second;
     lock.unlock();
     info->cv.notify_all();
     return CELL_OK;

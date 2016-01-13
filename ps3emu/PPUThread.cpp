@@ -13,7 +13,8 @@ PPUThread::PPUThread(Process* proc,
       _dbgPaused(false),
       _singleStep(false),
       _isStackInfoSet(false),
-      _threadFinishedGracefully(primaryThread)
+      _threadFinishedGracefully(primaryThread),
+      _priority(1000)
 {
     for (auto& r : _GPR)
         r = 0;
@@ -124,4 +125,12 @@ uint64_t PPUThread::join(bool unique) {
     if (unique)
         throw std::runtime_error("joining failed thread");
     return 0;
+}
+
+void PPUThread::setPriority(int priority) {
+    _priority = priority;
+}
+
+int PPUThread::priority() {
+    return _priority;
 }

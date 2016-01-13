@@ -19,6 +19,8 @@ set(SRC
     PPUThread.cpp
     ContentManager.h
     ContentManager.cpp
+    SPUThread.cpp
+    SPUDasm.cpp
     shaders/shader_dasm.h
     shaders/shader_dasm.cpp
     shaders/ShaderRewriter.h

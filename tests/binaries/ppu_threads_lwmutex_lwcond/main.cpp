@@ -13,7 +13,7 @@ sys_lwcond_t cv;
 void test_lwmutex_entry(uint64_t arg) {
 	int* i = (int*)arg;
 	for (int n = 0; n < 1000; ++n) {
-		sys_lwmutex_lock(&mutex, 10000);
+		sys_lwmutex_lock(&mutex, 10000000);
 		int tmp = *i;
 		sys_timer_usleep(10);
 		*i = tmp + 1;
@@ -21,7 +21,6 @@ void test_lwmutex_entry(uint64_t arg) {
 	}
 	sys_ppu_thread_exit(0);
 }
-
 void test_lwmutex_entry2(uint64_t arg) {
 	int* i = (int*)arg;
 	for (int n = 0; n < 1000; ++n) {
@@ -64,10 +63,10 @@ void test_lwmutex() {
 void test_lwmutex_recursive_entry(uint64_t arg) {
 	int* i = (int*)arg;
 	for (int n = 0; n < 1000; ++n) {
-		sys_lwmutex_lock(&mutex, 10000);
-		sys_lwmutex_lock(&mutex, 10000);
-		sys_lwmutex_lock(&mutex, 10000);
-		sys_lwmutex_lock(&mutex, 10000);
+		sys_lwmutex_lock(&mutex, 10000000);
+		sys_lwmutex_lock(&mutex, 10000000);
+		sys_lwmutex_lock(&mutex, 10000000);
+		sys_lwmutex_lock(&mutex, 10000000);
 		(*i)++;
 		sys_lwmutex_unlock(&mutex);
 		sys_lwmutex_unlock(&mutex);

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "../sys_defs.h"
+#include "mutex.h"
 #include "../../ps3emu/MainMemory.h"
+#include <memory>
 
 struct sys_lwmutex_lock_info_t {
     volatile big_uint32_t owner;
@@ -31,13 +33,6 @@ struct sys_lwmutex_attribute_t {
 
 static_assert(sizeof(sys_lwmutex_attribute_t) == 16, "");
 
-class IMutex {
-public:
-    virtual void lock(usecond_t timeout = 0) = 0;
-    virtual void unlock() = 0;
-    virtual bool try_lock() = 0;
-};
-
 int sys_lwmutex_create(ps3_uintptr_t mutex_id,
                        sys_lwmutex_attribute_t * attr,
                        MainMemory* mm);
@@ -45,4 +40,4 @@ int sys_lwmutex_destroy(ps3_uintptr_t lwmutex_id);
 int sys_lwmutex_lock(ps3_uintptr_t lwmutex_id, usecond_t timeout);
 int sys_lwmutex_trylock(ps3_uintptr_t lwmutex_id);
 int sys_lwmutex_unlock(ps3_uintptr_t lwmutex_id);
-IMutex* find_mutex(ps3_uintptr_t);
+std::shared_ptr<IMutex> find_lwmutex(ps3_uintptr_t id);

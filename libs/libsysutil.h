@@ -2,6 +2,7 @@
 
 #include "sys_defs.h"
 #include "../ps3emu/Process.h"
+#include "../ps3emu/ELFLoader.h"
 
 class MainMemory;
 
@@ -25,3 +26,6 @@ struct CellSysCacheParam {
 
 int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc);
 int32_t cellSysCacheClear(Process* proc);
+emu_void_t sys_ppu_thread_once(big_int32_t* once_ctrl, const fdescr* init, PPUThread* th);
+int32_t _sys_spu_printf_initialize();
+int32_t _sys_spu_printf_finalize();

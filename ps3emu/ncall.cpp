@@ -11,7 +11,9 @@
 #include "../libs/sync/lwmutex.h"
 #include "../libs/sync/mutex.h"
 #include "../libs/sync/lwcond.h"
+#include "../libs/sync/cond.h"
 #include "../libs/sync/rwlock.h"
+#include "../libs/sync/queue.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -278,6 +280,11 @@ STUB_1(sys_lwcond_destroy);
 STUB_2(sys_lwcond_wait);
 STUB_1(sys_lwcond_signal);
 STUB_1(sys_lwcond_signal_all);
+STUB_3(sys_cond_create);
+STUB_1(sys_cond_destroy);
+STUB_2(sys_cond_wait);
+STUB_1(sys_cond_signal);
+STUB_1(sys_cond_signal_all);
 STUB_3(sys_lwmutex_create);
 STUB_1(sys_lwmutex_destroy);
 STUB_2(sys_lwmutex_lock);
@@ -318,6 +325,11 @@ STUB_4(cellGcmMapMainMemory);
 STUB_4(sys_event_queue_create);
 STUB_3(sys_event_port_create);
 STUB_2(sys_event_port_connect_local);
+STUB_2(sys_event_queue_destroy);
+STUB_4(sys_event_queue_receive);
+STUB_5(sys_event_queue_tryreceive);
+STUB_4(sys_event_port_send);
+STUB_1(sys_event_queue_drain);
 STUB_1(cellGcmSetFlipHandler);
 STUB_1(cellPadInit);
 STUB_1(cellKbInit);
@@ -394,6 +406,9 @@ STUB_3(cellFsOpendir_proxy);
 STUB_3(cellFsReaddir);
 STUB_1(cellFsClosedir);
 STUB_4(cellFsGetDirectoryEntries);
+STUB_3(sys_ppu_thread_once);
+STUB_0(_sys_spu_printf_initialize);
+STUB_0(_sys_spu_printf_finalize);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -489,13 +504,16 @@ NCallEntry ncallTable[] {
     ENTRY(cellFsReaddir),
     ENTRY(cellFsClosedir),
     ENTRY(cellFsGetDirectoryEntries),
+    ENTRY(sys_ppu_thread_once),
+    ENTRY(_sys_spu_printf_initialize),
+    ENTRY(_sys_spu_printf_finalize),
 };
 
 void PPUThread::ncall(uint32_t index) {
     if (index >= sizeof(ncallTable) / sizeof(NCallEntry))
         throw std::runtime_error(ssnprintf("unknown ncall index %x", index));
-    ncallTable[index].stub(this);
     setNIP(getLR());
+    ncallTable[index].stub(this);
 }
 
 void PPUThread::scall() {
@@ -508,8 +526,13 @@ void PPUThread::scall() {
         case 141: nstub_sys_timer_usleep(this); break;
         case 801: nstub_sys_fs_open_proxy(this); break;
         case 128: nstub_sys_event_queue_create(this); break;
+        case 129: nstub_sys_event_queue_destroy(this); break;
+        case 130: nstub_sys_event_queue_receive(this); break;
+        case 131: nstub_sys_event_queue_tryreceive(this); break;
+        case 133: nstub_sys_event_queue_drain(this); break;
         case 134: nstub_sys_event_port_create(this); break;
         case 136: nstub_sys_event_port_connect_local(this); break;
+        case 138: nstub_sys_event_port_send(this); break;
         case 147: nstub_sys_time_get_timebase_frequency(this); break;
         case 49: nstub_sys_ppu_thread_get_stack_information(this); break;
         case 100: nstub_sys_mutex_create(this); break;
@@ -535,6 +558,11 @@ void PPUThread::scall() {
         case 148: // duplicate
         case 126: nstub_sys_rwlock_trywlock(this); break;
         case 127: nstub_sys_rwlock_wunlock(this); break;
+        case 105: nstub_sys_cond_create(this); break;
+        case 106: nstub_sys_cond_destroy(this); break;
+        case 107: nstub_sys_cond_wait(this); break;
+        case 108: nstub_sys_cond_signal(this); break;
+        case 109: nstub_sys_cond_signal_all(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

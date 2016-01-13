@@ -38,16 +38,15 @@ public:
     }
     
     T receive(unsigned priority) {
-        auto id = boost::thread::get_id();
+        auto id = boost::this_thread::get_id();
         boost::unique_lock<boost::mutex> lock(_mutex);
-        _waiting.emplace_back(id, priority);
+        _waiting.push_back({id, priority});
         for (;;) {
-            _cv.wait(lock);
-            if (_queue.empty())
-                continue;
+            while (_queue.empty())
+                _cv.wait(lock);
             auto thisThread = std::find_if(begin(_waiting), end(_waiting), [=](auto& t) {
                 return t.id == id;
-            })
+            });
             assert(thisThread != end(_waiting));
             bool handled = false;
             if (_order == QueueReceivingOrder::Fifo) {
@@ -91,7 +90,7 @@ public:
             return;
         }
         size = std::min(size, _queue.size());
-        for (int i = 0; i < size; ++i) {
+        for (auto i = 0u; i < size; ++i) {
             *arr = _queue.front();
             arr++;
             _queue.pop();

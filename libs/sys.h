@@ -40,34 +40,6 @@ typedef big_uint32_t sys_addr_t;
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPUThread* thread);
 int sys_timer_usleep(usecond_t sleep_time);
 
-typedef struct sys_event_queue_attr {
-    sys_protocol_t attr_protocol;
-    big_uint32_t type;
-    char name[SYS_SYNC_NAME_SIZE];
-} sys_event_queue_attribute_t;
-
-typedef struct sys_event {
-    big_uint64_t source;
-    big_uint64_t data1;
-    big_uint64_t data2;
-    big_uint64_t data3;
-} sys_event_t;
-
-typedef big_uint32_t sys_event_queue_t;
-typedef big_uint32_t sys_event_port_t;
-typedef big_uint32_t sys_event_type_t;
-
-int sys_event_queue_create(sys_event_queue_t* equeue_id,
-                           sys_event_queue_attribute_t* attr,
-                           sys_ipc_key_t event_queue_key,
-                           uint32_t size);
-
-int sys_event_port_create(sys_event_port_t* eport_id,
-                          int port_type, uint64_t name);
-
-int sys_event_port_connect_local(sys_event_port_t event_port_id,
-                                 sys_event_queue_t event_queue_id);
-
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread);
 uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec);
 uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime);

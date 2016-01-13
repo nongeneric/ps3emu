@@ -1,6 +1,7 @@
 #include "ppu_dasm.h"
 
 #include "../ps3emu/Process.h"
+#include "dasm_utils.h"
 #include "ppu_dasm_forms.h"
 #include "utils.h"
 
@@ -22,79 +23,6 @@ using namespace boost::endian;
 #define TH thread
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPUThread* thread)
-
-inline std::string format_u(const char* mnemonic, uint64_t u) {
-    return ssnprintf("%s %" PRIx64, mnemonic, u);
-}
-
-template <typename OP1>
-inline std::string format_n(const char* mnemonic, OP1 op1) {
-    return ssnprintf("%s %s%d", mnemonic, op1.prefix(), op1.native());
-}
-
-template <typename OP1, typename OP2>
-inline std::string format_nn(const char* mnemonic, OP1 op1, OP2 op2) {
-    return ssnprintf("%s %s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native());
-}
-
-template <typename OP1, typename OP2, typename OP3>
-inline std::string format_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
-    return ssnprintf("%s %s%d,%s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native(),
-                     op3.prefix(), op3.native()
-                    );
-}
-
-template <typename OP1, typename OP2>
-inline std::string format_nnu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u) {
-    return ssnprintf("%s %s%d,%s%d,%" PRId64, mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native(),
-                     u
-    );
-}
-
-template <typename OP1, typename OP2>
-inline std::string format_nnuu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u1, uint64_t u2) {
-    return ssnprintf("%s %s%d,%s%d,%" PRId64 ",%" PRId64, mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native(),
-                     u1, u2
-    );
-}
-
-template <typename OP1, typename OP2, typename OP3>
-inline std::string format_br_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
-    return ssnprintf("%s %s%d,%s%d(%s%d)", mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native(),
-                     op3.prefix(), op3.native()
-    );
-}
-
-template <typename OP1, typename OP2, typename OP3, typename OP4>
-inline std::string format_nnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4) {
-    return ssnprintf("%s %s%d,%s%d,%s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native(),
-                     op3.prefix(), op3.native(),
-                     op4.prefix(), op4.native()
-    );
-}
-
-template <typename OP1, typename OP2, typename OP3, typename OP4, typename OP5>
-inline std::string format_nnnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4, OP5 op5) {
-    return ssnprintf("%s %s%d,%s%d,%s%d,%s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     op2.prefix(), op2.native(),
-                     op3.prefix(), op3.native(),
-                     op4.prefix(), op4.native(),
-                     op5.prefix(), op5.native()
-    );
-}
 
 // Branch I-form, p24
 
@@ -1176,7 +1104,7 @@ PRINT(RLDICL, MDForm_1) {
 EMU(RLDICL, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);
-    auto r = rol(TH->getGPR(i->RS), n);
+    auto r = rol<64>(TH->getGPR(i->RS), n);
     auto m = mask<64>(b, 63);
     auto res = r & m;
     TH->setGPR(i->RA, res);
@@ -1201,7 +1129,7 @@ PRINT(RLDICR, MDForm_2) {
 EMU(RLDICR, MDForm_2) {
     auto n = getNBE(i->sh04, i->sh5);
     auto e = getNBE(i->me04, i->me5);
-    auto r = rol(TH->getGPR(i->RS), n);
+    auto r = rol<64>(TH->getGPR(i->RS), n);
     auto m = mask<64>(0, e);
     auto res = r & m;
     TH->setGPR(i->RA, res);
@@ -1222,7 +1150,7 @@ PRINT(RLDIMI, MDForm_1) {
 EMU(RLDIMI, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);
-    auto r = rol(TH->getGPR(i->RS), n);
+    auto r = rol<64>(TH->getGPR(i->RS), n);
     auto m = mask<64>(b, ~n & 63);
     auto res = (r & m) | (TH->getGPR(i->RA) & (~m));
     TH->setGPR(i->RA, res);
@@ -1240,7 +1168,7 @@ PRINT(RLDCL, MDSForm_1) {
     
 EMU(RLDCL, MDSForm_1) {
     auto n = TH->getGPR(i->RB) & 127;
-    auto r = rol(TH->getGPR(i->RS), n);
+    auto r = rol<64>(TH->getGPR(i->RS), n);
     auto b = i->mb.u();
     auto m = mask<64>(b, 63);
     auto res = r & m;
@@ -1255,7 +1183,7 @@ PRINT(RLDCR, MDSForm_2) {
 
 EMU(RLDCR, MDSForm_2) {
     auto n = TH->getGPR(i->RB) & 127;
-    auto r = rol(TH->getGPR(i->RS), n);
+    auto r = rol<64>(TH->getGPR(i->RS), n);
     auto e = i->me.u();
     auto m = mask<64>(0, e);
     auto res = r & m;
@@ -1277,7 +1205,7 @@ PRINT(RLDIC, MDForm_1) {
 EMU(RLDIC, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
     auto b = getNBE(i->mb04, i->mb5);    
-    auto r = rol(TH->getGPR(i->RS), n);
+    auto r = rol<64>(TH->getGPR(i->RS), n);
     auto m = mask<64>(b, ~n & 63);
     auto res = r & m;
     TH->setGPR(i->RA, res);
@@ -1316,7 +1244,7 @@ PRINT(RLWINM, MForm_2) {
 
 EMU(RLWINM, MForm_2) {
     auto n = i->SH.u();
-    auto r = rol32(TH->getGPR(i->RS), n);
+    auto r = rol<32>(TH->getGPR(i->RS), n);
     auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
     auto res = r & m;
     TH->setGPR(i->RA, res);
@@ -1334,7 +1262,7 @@ PRINT(RLWNM, MForm_1) {
 
 EMU(RLWNM, MForm_1) {
     auto n = TH->getGPR(i->RB) & 31;
-    auto r = rol32(TH->getGPR(i->RS), n);
+    auto r = rol<32>(TH->getGPR(i->RS), n);
     auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
     auto res = r & m;
     TH->setGPR(i->RA, res);
@@ -1357,7 +1285,7 @@ PRINT(RLWIMI, MForm_2) {
 
 EMU(RLWIMI, MForm_2) {
     auto n = i->SH.u();
-    auto r = rol32(TH->getGPR(i->RS), n);
+    auto r = rol<32>(TH->getGPR(i->RS), n);
     auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
     auto res = (r & m) | (TH->getGPR(i->RA) & ~m);
     TH->setGPR(i->RA, res);
@@ -3186,19 +3114,6 @@ EMU(STVEWX, SIMDForm) { // TODO: SAT
     auto s = TH->getVuw(i->vS);
     auto eb = ea & 3;
     MM->store<4>(ea, s[eb]);
-}
-
-template <DasmMode M, typename P, typename E, typename S>
-void invoke_impl(const char* name, P* phandler, E* ehandler, void* instr, uint64_t cia, S* s) {
-    typedef typename boost::function_traits<P>::arg1_type F;
-    typedef typename boost::function_traits<P>::arg3_type PS;
-    typedef typename boost::function_traits<E>::arg3_type ES;
-    if (M == DasmMode::Print)
-        phandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<PS>(s));
-    if (M == DasmMode::Emulate)
-        ehandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<ES>(s));
-    if (M == DasmMode::Name)
-        *reinterpret_cast<std::string*>(s) = name;
 }
 
 struct PPUDasmInstruction {

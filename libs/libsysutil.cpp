@@ -96,8 +96,28 @@ int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
 }
 
 int32_t cellSysCacheClear(Process* proc) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellSysCacheClear(id = %s)");
     auto cacheDir = proc->contentManager()->cacheDir();
     auto hostCacheDir = proc->contentManager()->toHost(cacheDir.c_str());
     system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());
     return CELL_OK;
 }
+
+emu_void_t sys_ppu_thread_once(big_int32_t* once_ctrl, const fdescr* init, PPUThread* th) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_ppu_thread_once(%d, %x)", *once_ctrl, init);
+    if (*once_ctrl == 0) {
+        th->setNIP(init->va);
+        th->setGPR(2, init->tocBase);
+    }
+    *once_ctrl = 1;
+    return emu_void;
+}
+
+int32_t _sys_spu_printf_initialize() {
+    return CELL_OK;
+}
+
+int32_t _sys_spu_printf_finalize() {
+    return CELL_OK;
+}
+

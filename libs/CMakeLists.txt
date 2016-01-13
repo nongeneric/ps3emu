@@ -11,10 +11,13 @@ set(SRC
     cellGame.cpp
     sceNp2.cpp
     sceNp.cpp
+    cellSpurs.cpp
     sync/lwmutex.cpp
     sync/mutex.cpp
+    sync/cond.cpp
     sync/lwcond.cpp
     sync/rwlock.cpp
+    sync/queue.cpp
     graphics/gcm.cpp
     graphics/gcm_buffers.cpp
     graphics/sysutil_sysparam.cpp

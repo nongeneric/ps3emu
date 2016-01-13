@@ -125,6 +125,7 @@ class PPUThread {
     uint32_t _stackSize;
     uint64_t _exitCode;
     bool _threadFinishedGracefully;
+    int _priority;
     
     uint64_t _NIP;
     uint64_t _LR = 0;
@@ -157,8 +158,10 @@ public:
               std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
               bool primaryThread);
     void setStackInfo(uint32_t base, uint32_t size);
+    void setPriority(int priority);
     uint32_t getStackBase();
     uint32_t getStackSize();
+    int priority();
     
     void singleStepBreakpoint();
     void dbgPause(bool val);

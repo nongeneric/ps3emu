@@ -1379,8 +1379,8 @@ TEST_CASE("shifts") {
 }
 
 TEST_CASE("rolls") {
-    REQUIRE( rol(0x8000000000000001, 1) == 3 );
-    REQUIRE( rol32(0x40000001, 2) == 5 );
+    REQUIRE( rol<64>(0x8000000000000001ull, 1) == 3 );
+    REQUIRE( rol<32>(0x40000001, 2) == 5 );
 }
 
 TEST_CASE("fixed mulls") {
