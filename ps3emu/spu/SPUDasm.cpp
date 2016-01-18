@@ -1,8 +1,8 @@
 #include "SPUDasm.h"
 
 #include "SPUThread.h"
-#include "BitField.h"
-#include "dasm_utils.h"
+#include "../BitField.h"
+#include "../dasm_utils.h"
 #include <boost/endian/conversion.hpp>
 #include <bitset>
 
@@ -2467,7 +2467,7 @@ EMU(dsync) {
 }
 
 template <DasmMode M, typename S>
-void SPUDasm(void* instr, uint64_t cia, S* state) {
+void SPUDasm(void* instr, uint32_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
     auto i = reinterpret_cast<SPUForm*>(&x);
     switch (i->OP11.u()) {
@@ -2675,11 +2675,11 @@ void SPUDasm(void* instr, uint64_t cia, S* state) {
     throw IllegalInstructionException();
 }
 
-template void  SPUDasm<DasmMode::Print, std::string>(
-    void* instr, uint64_t cia, std::string* state);
+template void SPUDasm<DasmMode::Print, std::string>(
+    void* instr, uint32_t cia, std::string* state);
 
-template void  SPUDasm<DasmMode::Emulate, PPUThread>(
-    void* instr, uint64_t cia, PPUThread* th);
+template void SPUDasm<DasmMode::Emulate, SPUThread>(
+    void* instr, uint32_t cia, SPUThread* th);
 
-template void  SPUDasm<DasmMode::Name, std::string>(
-    void* instr, uint64_t cia, std::string* name);
+template void SPUDasm<DasmMode::Name, std::string>(
+    void* instr, uint32_t cia, std::string* name);

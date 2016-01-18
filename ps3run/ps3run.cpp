@@ -10,16 +10,13 @@ void emulate(const char* path, std::vector<std::string> args) {
     Process proc;
     proc.init(path, args);
     for (;;) {
-        auto evInfo = proc.run();
-        switch (evInfo.event) {
-            case ProcessEvent::InvalidInstruction:
-            case ProcessEvent::Breakpoint:
-                BOOST_LOG_TRIVIAL(error) << 
-                    ssnprintf("invalid instruction at %x", evInfo.thread->getNIP());
-                return;
-            case ProcessEvent::ProcessFinished:
-                return;
-            default: ;
+        auto untyped = proc.run();
+        if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
+            BOOST_LOG_TRIVIAL(error)
+                << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
+            return;
+        } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
+            return;
         }
     }
 }

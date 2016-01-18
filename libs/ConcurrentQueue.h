@@ -27,9 +27,7 @@ class ConcurrentQueue {
     std::vector<WaitingThread> _waiting;
     ConcurrentQueue(ConcurrentQueue&) = delete;
 public:
-    ConcurrentQueue(QueueReceivingOrder order, int capacity) {
-        assert(1 <= capacity && capacity < 128);
-    }
+    ConcurrentQueue(QueueReceivingOrder order) : _order(order) {}
     
     void send(T const& t) {
         boost::lock_guard<boost::mutex> lock(_mutex);
@@ -59,7 +57,7 @@ public:
                 auto worthyThread = std::find_if(begin(_waiting), end(_waiting), [=](auto& t) {
                     return t.priority > priority;
                 });
-                if (worthyThread != end(_waiting)) {
+                if (worthyThread == end(_waiting)) {
                     handled = true;
                 }
                 // there are threads with the higher priority
@@ -72,7 +70,7 @@ public:
                 if (!_waiting.empty()) {
                     // other threads could have already taken their turn
                     // and decided to skip it because of this thread having
-                    // the higher priority, so other threads need to try again
+                    // higher priority, so other threads need to try again
                     _cv.notify_all();
                 }
                 return res;

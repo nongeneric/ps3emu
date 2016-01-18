@@ -292,8 +292,7 @@ void DebuggerModel::loadFile(QString path, QStringList args) {
     }
     _proc->init(str, argsVec);
     auto ev = _proc->run();
-    assert(ev.event == ProcessEvent::ThreadCreated);
-    _activeThread = ev.thread;
+    _activeThread = boost::get<PPUThreadStartedEvent>(ev).thread;
     updateUI();
     _elfLoaded = true;
     emit message(QString("Loaded %1").arg(path));
@@ -314,37 +313,30 @@ void DebuggerModel::stepOver() {}
 void DebuggerModel::run() {
     bool cont = true;
     while (cont) {
-        auto ev = _proc->run();
-        switch (ev.event) {
-            case ProcessEvent::Failure:
-                emit message("failure");
-                cont = false;
-                break;
-            case ProcessEvent::InvalidInstruction:
-                emit message(QString("invalid instruction at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
-                cont = false;
-                break;
-            case ProcessEvent::MemoryAccessError:
-                emit message(QString("memory access error at %1").arg(ev.thread->getNIP(), 8, 16, QChar('0')));
-                cont = false;
-                break;
-            case ProcessEvent::ProcessFinished:
-                emit message("process finished");
-                cont = false;
-                break;
-            case ProcessEvent::ThreadCreated:
-                emit message("thread created");
-                break;
-            case ProcessEvent::ThreadFinished:
-                emit message("thread finished");
-                break;
-            case ProcessEvent::Breakpoint:
-                emit message("breakpoint");
-                _activeThread = ev.thread;
-                clearSoftBreak(ev.thread->getNIP());
-                cont = false;
-                break;
-            default: break;
+        auto untyped = _proc->run();
+        if (boost::get<PPUThreadFailureEvent>(&untyped)) {
+            emit message("failure");
+            cont = false;
+        } else if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
+            emit message(QString("invalid instruction at %1")
+                             .arg(ev->thread->getNIP(), 8, 16, QChar('0')));
+            cont = false;
+        } else if (auto ev = boost::get<MemoryAccessErrorEvent>(&untyped)) {
+            emit message(QString("memory access error at %1")
+                             .arg(ev->thread->getNIP(), 8, 16, QChar('0')));
+            cont = false;
+        } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
+            emit message("process finished");
+            cont = false;
+        } else if (boost::get<PPUThreadStartedEvent>(&untyped)) {
+            emit message("thread created");
+        } else if (boost::get<PPUThreadFinishedEvent>(&untyped)) {
+            emit message("thread finished");
+        } else if (boost::get<PPUBreakpointEvent>(&untyped)) {
+            emit message("breakpoint");
+            _activeThread = ev->thread;
+            clearSoftBreak(ev->thread->getNIP());
+            cont = false;
         }
     }
     updateUI();

@@ -1,18 +1,24 @@
 #include "cellSpurs.h"
 
+#include "../ps3emu/utils.h"
+#include <boost/log/trivial.hpp>
+
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
-                                        const char* name,
+                                        spurs_name_t* name,
                                         uint32_t size)
 {
-    strncpy(attr->prefix, name, std::min<uint32_t>(size, 15));
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellSpursAttributeSetNamePrefix(\"%s\")", name);
+    strncpy(attr->prefix, name->data(), std::min<uint32_t>(size, 15));
     return CELL_OK;
 }
 
 int32_t cellSpursAttributeEnableSpuPrintfIfAvailable(CellSpursAttribute* attr) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
 int32_t cellSpursAttributeSetSpuThreadGroupType(CellSpursAttribute* attr, int32_t type) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     attr->spuThreadGroupType = type;
     return CELL_OK;
 }
@@ -20,6 +26,7 @@ int32_t cellSpursAttributeSetSpuThreadGroupType(CellSpursAttribute* attr, int32_
 int32_t cellSpursJobChainAttributeSetName(CellSpursJobChainAttribute* attr,
                                           ps3_uintptr_t name)
 {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     attr->name = name;
     return CELL_OK;
 }
@@ -32,6 +39,7 @@ int32_t _cellSpursAttributeInitialize(CellSpursAttribute* attr,
                                       int32_t ppuPriority,
                                       bool exitIfNoWork)
 {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     attr->revision = revision;
     attr->sdkVersion = sdkVersion;
     attr->nSpus = nSpus;
@@ -41,7 +49,13 @@ int32_t _cellSpursAttributeInitialize(CellSpursAttribute* attr,
     return CELL_OK;
 }
 
+int32_t cellSpursFinalize(CellSpurs2* spurs) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
 int32_t cellSpursInitializeWithAttribute2(CellSpurs2*, const CellSpursAttribute* attr) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -51,7 +65,7 @@ int32_t _cellSpursJobChainAttributeInitialize(uint32_t jmRevision,
                                               ps3_uintptr_t jobChainEntry,
                                               uint16_t sizeJobDescriptor,
                                               uint16_t maxGrabdedJob,
-                                              const uint8_t priorityTable[8],
+                                              const spurs_priority_table_t* priorityTable,
                                               uint32_t maxContention,
                                               bool autoRequestSpuCount,
                                               uint32_t tag1,
@@ -65,7 +79,7 @@ int32_t _cellSpursJobChainAttributeInitialize(uint32_t jmRevision,
     attr->jobChainEntry = jobChainEntry;
     attr->sizeJobDescriptor = sizeJobDescriptor;
     attr->maxGrabdedJob = maxGrabdedJob;
-    memcpy(attr->priorityTable, priorityTable, 8);
+    attr->priorityTable = *priorityTable;
     attr->maxContention = maxContention;
     attr->autoRequestSpuCount = autoRequestSpuCount;
     attr->tag1 = tag1;
@@ -73,5 +87,23 @@ int32_t _cellSpursJobChainAttributeInitialize(uint32_t jmRevision,
     attr->isFixedMemAlloc = isFixedMemAlloc;
     attr->maxSizeJobDescriptor = maxSizeJobDescriptor;
     attr->initialRequestSpuCount = initialRequestSpuCount;
+    return CELL_OK;
+}
+
+int32_t cellSpursCreateJobChainWithAttribute(CellSpurs2 *spurs,
+                                             CellSpursJobChain *jobChain,
+                                             const CellSpursJobChainAttribute *attr)
+{
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
+int32_t cellSpursJoinJobChain(CellSpursJobChain *jobChain) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;    
+}
+
+int32_t cellSpursRunJobChain(const CellSpursJobChain* jobChain) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }

@@ -1,12 +1,16 @@
 #pragma once
 
 #include "sys_defs.h"
+#include <array>
 
 #define CELL_SPURS_ATTRIBUTE_SIZE 512
 #define CELL_SPURS_JOBCHAIN_ATTRIBUTE_SIZE 512
 #define CELL_SPURS_SIZE 4096
 #define CELL_SPURS_SIZE2 8192
 #define CELL_SPURS_JOBCHAIN_SIZE 272
+
+using spurs_name_t = std::array<char, 15>;
+using spurs_priority_table_t = std::array<uint8_t, 8>;
 
 struct CellSpursAttribute {
     char prefix[15];
@@ -26,7 +30,7 @@ struct CellSpursJobChainAttribute {
     ps3_uintptr_t jobChainEntry;
     uint16_t sizeJobDescriptor;
     uint16_t maxGrabdedJob;
-    uint8_t priorityTable[8];
+    spurs_priority_table_t priorityTable;
     uint32_t maxContention;
     bool autoRequestSpuCount;
     uint32_t tag1;
@@ -50,7 +54,7 @@ static_assert(sizeof(CellSpurs2) <= CELL_SPURS_SIZE2, "");
 static_assert(sizeof(CellSpursJobChain) <= CELL_SPURS_JOBCHAIN_SIZE, "");
 
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
-                                        const char* name,
+                                        spurs_name_t* name,
                                         uint32_t size);
 int32_t cellSpursAttributeEnableSpuPrintfIfAvailable(CellSpursAttribute* attr);
 int32_t cellSpursAttributeSetSpuThreadGroupType(CellSpursAttribute* attr, int32_t type);
@@ -75,7 +79,7 @@ int32_t _cellSpursJobChainAttributeInitialize(uint32_t jmRevision,
                                               ps3_uintptr_t jobChainEntry,
                                               uint16_t sizeJobDescriptor,
                                               uint16_t maxGrabdedJob,
-                                              const uint8_t priorityTable[8],
+                                              const spurs_priority_table_t* priorityTable,
                                               uint32_t maxContention,
                                               bool autoRequestSpuCount,
                                               uint32_t tag1,

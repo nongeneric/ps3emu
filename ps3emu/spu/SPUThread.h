@@ -1,18 +1,31 @@
 #pragma once
 
-#include "constants.h"
-#include "BitField.h"
+#include "../constants.h"
+#include "../BitField.h"
+#include <boost/thread.hpp>
+#include <atomic>
 #include <assert.h>
 #include <algorithm>
 #include <stdexcept>
+#include <string.h>
+#include <functional>
 
 static constexpr uint32_t LSLR = 0x3ffff;
+static constexpr uint32_t LocalStorageSize = 256 * 1024;
 
 class StopSignalException : public virtual std::runtime_error {
 public:
     StopSignalException() : std::runtime_error("stop signal") { }
 };
 
+enum class SPUThreadEvent {
+    Breakpoint,
+    Started,
+    Finished,
+    Joined,
+    InvalidInstruction,
+    Failure
+};
 
 class R128 {
     uint8_t _bs[16];
@@ -23,7 +36,7 @@ public:
         return _bs[15 - N];
     }
     
-    uint8_t& b(int n) {
+    inline uint8_t& b(int n) {
         assert(0 <= n && n < 16);
         return _bs[15 - n];
     }
@@ -34,7 +47,7 @@ public:
         return ((int16_t*)_bs)[7 - N];
     }
     
-    int16_t& hw(int n) {
+    inline int16_t& hw(int n) {
         assert(0 <= n && n < 8);
         return ((int16_t*)_bs)[7 - n];
     }
@@ -45,7 +58,7 @@ public:
         return ((int32_t*)_bs)[3 - N];
     }
     
-    int32_t& w(int n) {
+    inline int32_t& w(int n) {
         assert(0 <= n && n < 4);
         return ((int32_t*)_bs)[3 - n];
     }
@@ -56,7 +69,7 @@ public:
         return ((int64_t*)_bs)[1 - N];
     }
     
-    int64_t& dw(int n) {
+    inline int64_t& dw(int n) {
         assert(0 <= n && n < 2);
         return ((int64_t*)_bs)[1 - n];
     }
@@ -78,7 +91,7 @@ public:
         return ((double*)_bs)[1 - N];
     }
     
-    double& fd(int n) {
+    inline double& fd(int n) {
         assert(0 <= n && n < 2);
         return ((double*)_bs)[1 - n];
     }
@@ -92,12 +105,29 @@ public:
     }
 };
 
+class Process;
+
 class SPUThread {
     uint32_t _nip;
     R128 _rs[128];
-    uint8_t _ls[256 * 1024];
+    uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
+    uint32_t _spu;
+    std::string _name;
+    boost::thread _thread;
+    Process* _proc;
+    std::function<void(SPUThread*, SPUThreadEvent)> _eventHandler;
+    std::atomic<bool> _dbgPaused;
+    std::atomic<bool> _singleStep;
+    bool _threadFinishedGracefully;
+    uint64_t _exitCode;
+    void loop();
+    
 public:
+    SPUThread(Process* proc,
+              std::string name,
+              std::function<void(SPUThread*, SPUThreadEvent)> eventHandler);
+    
     template <typename V>
     inline R128& r(V i) {
         return _rs[getUValue(i)];
@@ -113,6 +143,10 @@ public:
         _nip = nip;
     }
     
+    inline uint32_t getNip() {
+        return _nip;
+    }
+    
     inline uint32_t getSrr0() {
         return _srr0;
     }
@@ -121,4 +155,13 @@ public:
         assert(val < LSLR);
         _srr0 = val;
     }
+    
+    inline void setSpu(uint32_t num) {
+        assert(num <= 255);
+        _spu = num;
+    }
+    
+    void singleStepBreakpoint();
+    void dbgPause(bool val);
+    void run();
 };

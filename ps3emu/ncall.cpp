@@ -8,12 +8,14 @@
 #include "../libs/cellGame.h"
 #include "../libs/sceNp2.h"
 #include "../libs/sceNp.h"
+#include "../libs/sysSpu.h"
 #include "../libs/sync/lwmutex.h"
 #include "../libs/sync/mutex.h"
 #include "../libs/sync/lwcond.h"
 #include "../libs/sync/cond.h"
 #include "../libs/sync/rwlock.h"
 #include "../libs/sync/queue.h"
+#include "../libs/cellSpurs.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -43,7 +45,28 @@ namespace boost {
             typedef T11 arg11_type;
             typedef T12 arg12_type;
         };
-            
+        template<typename R, typename T1, typename T2, typename T3, typename T4,
+                 typename T5, typename T6, typename T7, typename T8, typename T9,
+                 typename T10, typename T11, typename T12, typename T13, typename T14>
+        struct function_traits_helper<R (*)(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14)>
+        {
+            BOOST_STATIC_CONSTANT(unsigned, arity = 14);
+            typedef R result_type;
+            typedef T1 arg1_type;
+            typedef T2 arg2_type;
+            typedef T3 arg3_type;
+            typedef T4 arg4_type;
+            typedef T5 arg5_type;
+            typedef T6 arg6_type;
+            typedef T7 arg7_type;
+            typedef T8 arg8_type;
+            typedef T9 arg9_type;
+            typedef T10 arg10_type;
+            typedef T11 arg11_type;
+            typedef T12 arg12_type;
+            typedef T13 arg13_type;
+            typedef T14 arg14_type;
+        };
     }
 }
 
@@ -121,6 +144,13 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
             .value(thread)
 
 #define ARG_VOID_PTR(n, lenArg, f) get_arg<n - 1, void*>().value(thread, lenArg)
+
+#define STUB_14(f) void nstub_##f(PPUThread* thread) { \
+    thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), \
+                     ARG(5, f), ARG(6, f), ARG(7, f), ARG(8, f), \
+                     ARG(9, f), ARG(10, f), ARG(11, f), ARG(12, f), \
+                     ARG(13, f), ARG(14, f))); \
+}
 
 #define STUB_12(f) void nstub_##f(PPUThread* thread) { \
     thread->setGPR(3, f(ARG(1, f), ARG(2, f), ARG(3, f), ARG(4, f), \
@@ -409,6 +439,23 @@ STUB_4(cellFsGetDirectoryEntries);
 STUB_3(sys_ppu_thread_once);
 STUB_0(_sys_spu_printf_initialize);
 STUB_0(_sys_spu_printf_finalize);
+STUB_3(cellSpursAttributeSetNamePrefix);
+STUB_1(cellSpursAttributeEnableSpuPrintfIfAvailable);
+STUB_2(cellSpursAttributeSetSpuThreadGroupType);
+STUB_2(cellSpursInitializeWithAttribute2);
+STUB_7(_cellSpursAttributeInitialize);
+STUB_1(cellSpursFinalize);
+STUB_2(cellSpursJobChainAttributeSetName);
+STUB_3(cellSpursCreateJobChainWithAttribute);
+STUB_14(_cellSpursJobChainAttributeInitialize);
+STUB_1(cellSpursJoinJobChain);
+STUB_1(cellSpursRunJobChain);
+STUB_4(sys_spu_thread_read_ls);
+STUB_2(sys_spu_initialize);
+STUB_4(sys_spu_image_import);
+STUB_1(sys_spu_image_close);
+STUB_5(sys_spu_thread_group_create);
+STUB_7(sys_spu_thread_initialize);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -507,6 +554,19 @@ NCallEntry ncallTable[] {
     ENTRY(sys_ppu_thread_once),
     ENTRY(_sys_spu_printf_initialize),
     ENTRY(_sys_spu_printf_finalize),
+    ENTRY(cellSpursAttributeSetNamePrefix),
+    ENTRY(cellSpursAttributeEnableSpuPrintfIfAvailable),
+    ENTRY(cellSpursAttributeSetSpuThreadGroupType),
+    ENTRY(cellSpursInitializeWithAttribute2),
+    ENTRY(_cellSpursAttributeInitialize),
+    ENTRY(cellSpursFinalize),
+    ENTRY(cellSpursJobChainAttributeSetName),
+    ENTRY(cellSpursCreateJobChainWithAttribute),
+    ENTRY(_cellSpursJobChainAttributeInitialize),
+    ENTRY(cellSpursJoinJobChain),
+    ENTRY(cellSpursRunJobChain),
+    ENTRY(sys_spu_image_import),
+    ENTRY(sys_spu_image_close),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -563,6 +623,10 @@ void PPUThread::scall() {
         case 107: nstub_sys_cond_wait(this); break;
         case 108: nstub_sys_cond_signal(this); break;
         case 109: nstub_sys_cond_signal_all(this); break;
+        case 182: nstub_sys_spu_thread_read_ls(this); break;
+        case 169: nstub_sys_spu_initialize(this); break;
+        case 170: nstub_sys_spu_thread_group_create(this); break;
+        case 172: nstub_sys_spu_thread_initialize(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }
@@ -577,3 +641,6 @@ const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index) {
     }
     return nullptr;
 }
+
+
+

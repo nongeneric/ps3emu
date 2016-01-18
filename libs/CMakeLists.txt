@@ -12,6 +12,7 @@ set(SRC
     sceNp2.cpp
     sceNp.cpp
     cellSpurs.cpp
+    sysSpu.cpp
     sync/lwmutex.cpp
     sync/mutex.cpp
     sync/cond.cpp

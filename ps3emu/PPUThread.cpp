@@ -14,13 +14,13 @@ PPUThread::PPUThread(Process* proc,
       _singleStep(false),
       _isStackInfoSet(false),
       _threadFinishedGracefully(primaryThread),
-      _priority(1000)
-{
-    for (auto& r : _GPR)
+      _priority(1000) {
+
+    for(auto& r : _GPR)
         r = 0;
-    for (auto& r : _FPR)
+    for(auto& r : _FPR)
         r = 0;
-    for (auto& r : _V)
+    for(auto& r : _V)
         r = 0;
 }
 
@@ -89,7 +89,7 @@ Process* PPUThread::proc() {
     return _proc;
 }
 
-PPUThread::PPUThread(MainMemory* mm) : _mm(mm) { }
+PPUThread::PPUThread(MainMemory* mm) : _mm(mm) {}
 
 void PPUThread::singleStepBreakpoint() {
     _singleStep = true;
@@ -124,6 +124,7 @@ uint64_t PPUThread::join(bool unique) {
         return _exitCode;
     if (unique)
         throw std::runtime_error("joining failed thread");
+    _eventHandler(this, PPUThreadEvent::Joined);
     return 0;
 }
 

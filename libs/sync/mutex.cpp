@@ -9,8 +9,7 @@
 #include <assert.h>
 
 namespace {
-    IDMap<sys_mutex_t, std::shared_ptr<IMutex>> mutexes;
-    boost::mutex map_mutex;
+    ThreadSafeIDMap<sys_mutex_t, IMutex> mutexes;
 }
 
 int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
@@ -22,7 +21,6 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     } else {
         mutex.reset(new Mutex<boost::recursive_timed_mutex>());
     }
-    boost::unique_lock<boost::mutex> lock(map_mutex);
     *mutex_id = mutexes.create(std::move(mutex));
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_mutex_create(%x, ...)", *mutex_id);
     return CELL_OK;
@@ -30,15 +28,12 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
-    boost::unique_lock<boost::mutex> lock(map_mutex);
     mutexes.destroy(mutex_id);
     return CELL_OK;
 }
 
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
-    boost::unique_lock<boost::mutex> lock(map_mutex);
     auto mutex = mutexes.get(mutex_id);
-    lock.unlock();
     if (timeout == 0) {
         mutex->lock();
         return CELL_OK;
@@ -48,15 +43,12 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
 }
 
 int sys_mutex_trylock(sys_mutex_t mutex_id) {
-    boost::unique_lock<boost::mutex> lock(map_mutex);
     auto mutex =  mutexes.get(mutex_id);
-    lock.unlock();
     bool locked = mutex->try_lock(0);
     return locked ? CELL_OK : CELL_EBUSY;
 }
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
-    boost::unique_lock<boost::mutex> lock(map_mutex);
     mutexes.get(mutex_id)->unlock();
     return CELL_OK;
 }
