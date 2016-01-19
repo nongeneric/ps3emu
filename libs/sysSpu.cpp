@@ -3,6 +3,7 @@
 #include "../ps3emu/ELFLoader.h"
 #include "../ps3emu/IDMap.h"
 #include "../ps3emu/spu/SPUThread.h"
+#include "../ps3emu/utils.h"
 #include <boost/log/trivial.hpp>
 #include <array>
 #include <vector>
@@ -77,9 +78,10 @@ class SpuImage {
     std::array<uint8_t, LocalStorageSize> _ls;
     std::string _desc;
     uint32_t _ep;
+    uint32_t _src;
 
 public:
-    SpuImage(MainMemory* mm, ps3_uintptr_t src) {
+    SpuImage(MainMemory* mm, ps3_uintptr_t src) : _src(src) {
         Elf32_be_Ehdr header;
         mm->readMemory(src, &header, sizeof(header));
 
@@ -122,23 +124,16 @@ public:
     uint32_t entryPoint() {
         return _ep;
     }
+    
+    uint32_t source() {
+        return _src;
+    }
 };
 
-class ThreadGroup {
-    std::vector<SPUThread*> _threads;
-    std::string _name;
-public:
-    ThreadGroup(std::string name) : _name(name) {}
-    
-    void attachThread(SPUThread* thread) {
-        _threads.push_back(thread);
-    }
-    
-    void start() {
-        for (auto& th : _threads) {
-            th->run();
-        }
-    }
+struct ThreadGroup {
+    std::vector<SPUThread*> threads;
+    std::string name;
+    std::map<SPUThread*, int32_t> errorCodes;
 };
 
 namespace {
@@ -180,10 +175,9 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     MainMemory* mm) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     assert(attr->type == SYS_SPU_THREAD_GROUP_TYPE_NORMAL);
-    std::string name;
-    name.resize(attr->nsize);
-    mm->readMemory(attr->name, &name[0], attr->nsize);
-    auto group = std::make_shared<ThreadGroup>(name);
+    auto group = std::make_shared<ThreadGroup>();
+    group->name.resize(attr->nsize);
+    mm->readMemory(attr->name, &group->name[0], attr->nsize);
     *id = groups.create(group);
     return CELL_OK;
 }
@@ -195,7 +189,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
                                   const sys_spu_thread_attribute_t* attr,
                                   const sys_spu_thread_argument_t* arg,
                                   Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_spu_thread_initialize() source=%x", img->elf->source());
     auto group = groups.get(group_id);
     std::string name;
     name.resize(attr->nsize);
@@ -210,12 +204,63 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     thread->r(5).dw<0>() = arg->arg3;
     thread->r(6).dw<0>() = arg->arg4;
     thread->setNip(img->elf->entryPoint());
-    group->attachThread(thread);
+    thread->setElfSource(img->elf->source());
+    group->threads.push_back(thread);
     return CELL_OK;
 }
 
 int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id) {
     auto group = groups.get(id);
-    group->start();
+    for (auto th : group->threads) {
+        th->run();
+    }
+    return CELL_OK;
+}
+
+#define SYS_SPU_THREAD_GROUP_JOIN_GROUP_EXIT            0x0001
+#define SYS_SPU_THREAD_GROUP_JOIN_ALL_THREADS_EXIT      0x0002
+#define SYS_SPU_THREAD_GROUP_JOIN_TERMINATED            0x0004
+
+int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
+                                  big_int32_t* cause,
+                                  big_int32_t* status)
+{
+    auto group = groups.get(gid);
+    bool groupExit = false;
+    bool threadExit = true;
+    bool groupTerminate = false;
+    int32_t terminateStatus;
+    int32_t groupExitStatus;
+    for (auto th : group->threads) {
+        auto info = th->join();
+        groupExit |= info.cause == SPUThreadExitCause::GroupExit;
+        groupTerminate |= info.cause == SPUThreadExitCause::GroupTerminate;
+        threadExit &= info.cause == SPUThreadExitCause::Exit;
+        if (groupTerminate) {
+            terminateStatus = info.status;
+        }
+        if (groupExit) {
+            groupExitStatus = info.status;
+        }
+        group->errorCodes[th] = info.status;
+    }
+    if (groupTerminate) {
+        *cause = SYS_SPU_THREAD_GROUP_JOIN_TERMINATED;
+        *status = terminateStatus;
+    } else if (groupExit) {
+        *cause = SYS_SPU_THREAD_GROUP_JOIN_GROUP_EXIT;
+        *status = groupExitStatus;
+    } else if (groupExit) {
+        *cause = SYS_SPU_THREAD_GROUP_JOIN_ALL_THREADS_EXIT;
+    }
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc) {
+    auto group = groups.get(id);
+    for (auto th : group->threads) {
+        proc->destroySpuThread(th);
+    }
+    groups.destroy(id);
     return CELL_OK;
 }

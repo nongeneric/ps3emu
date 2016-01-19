@@ -120,7 +120,7 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
 
 bool MainMemory::isAllocated(ps3_uintptr_t va) {
     VirtualAddress split { va };
-    return (bool)_pages[split.page.u()].ptr;
+    return va && (bool)_pages[split.page.u()].ptr;
 }
 
 int MainMemory::allocatedPages() {

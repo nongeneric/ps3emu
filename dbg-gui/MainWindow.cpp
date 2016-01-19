@@ -29,7 +29,8 @@ void MainWindow::setupDocks() {
     gprGrid->setColumnWidth(1, 17);
     gprGrid->setColumnWidth(2, 7);
     gprGrid->setColumnWidth(3, 16);
-    gprGrid->setMinimumWidth(380);
+    gprGrid->setScrollable(true);
+    gprGrid->setMinimumWidth(530);
     
     auto gprDock = new QDockWidget(this);
     gprDock->setFeatures(QDockWidget::NoDockWidgetFeatures);
@@ -42,8 +43,19 @@ void MainWindow::setupDocks() {
     _log->setReadOnly(true);
     _log->setFont(QFont("monospace", 10));
     bottomDock->setWidget(_log);
-    
     addDockWidget(Qt::BottomDockWidgetArea, bottomDock);
+    
+    auto memoryGrid = new MonospaceGrid();
+    memoryGrid->setModel(_model.getMemoryDumpModel());
+    memoryGrid->setColumnWidth(0, 9);
+    memoryGrid->setColumnWidth(1, 48);
+    memoryGrid->setColumnWidth(2, 17);
+    memoryGrid->setScrollable(true);
+    memoryGrid->setMinimumWidth(260);
+    
+    auto memoryDock = new QDockWidget(this);
+    memoryDock->setWidget(memoryGrid);
+    addDockWidget(Qt::BottomDockWidgetArea, memoryDock);
     
     auto dasmGrid = new MonospaceGrid();
     dasmGrid->setModel(_model.getDasmModel());

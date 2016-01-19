@@ -17,7 +17,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <queue>
 
 class SPUThread;
 
@@ -40,7 +39,7 @@ struct PPUBreakpointEvent {
 struct PPUInvalidInstructionEvent {
     PPUThread* thread;
 };
-
+    
 struct SPUThreadStartedEvent {
     SPUThread* thread;
 };
@@ -128,4 +127,7 @@ public:
     PPUThread* getThread(uint64_t id);
     uint32_t createSpuThread(std::string name);
     SPUThread* getSpuThread(uint32_t id);
+    void destroySpuThread(SPUThread* thread);
+    std::vector<PPUThread*> dbgPPUThreads();
+    std::vector<SPUThread*> dbgSPUThreads();
 };

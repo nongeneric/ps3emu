@@ -11,12 +11,13 @@ void SPUThread::run() {
 void SPUThread::loop() {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
+    _dbgPaused = true;
     
     for (;;) {
         if (_singleStep) {
             _eventHandler(this, SPUThreadEvent::Breakpoint);
-            _dbgPaused = true;
             _singleStep = false;
+            _dbgPaused = true;
         }
         while (_dbgPaused) {
             ums_sleep(100);
@@ -24,21 +25,20 @@ void SPUThread::loop() {
         
         uint32_t cia;
         try {
-            uint32_t instr;
             cia = getNip();
-            _proc->mm()->readMemory(cia, &instr, sizeof instr);
-            setNip(cia + sizeof instr);
-            SPUDasm<DasmMode::Emulate>(&instr, cia, this);
+            setNip(cia + 4);
+            SPUDasm<DasmMode::Emulate>(ptr(cia), cia, this);
         } catch (BreakpointException& e) {
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Breakpoint);
+            _dbgPaused = true;
         } catch (IllegalInstructionException& e) {
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::InvalidInstruction);
             break;
-        } catch (ThreadFinishedException& e) {
+        } catch (SPUThreadFinishedException& e) {
             _exitCode = e.errorCode();
-            _threadFinishedGracefully = true;
+            _cause = e.cause();
             break;
         } catch (std::exception& e) {
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("spu thread exception: %s", e.what());
@@ -48,9 +48,7 @@ void SPUThread::loop() {
         }
     }
     
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop finished (%s)", 
-        _threadFinishedGracefully ? "gracefully" : "with a failure"
-    );
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread loop finished");
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 
@@ -68,9 +66,21 @@ SPUThread::SPUThread(Process* proc,
     : _name(name),
       _proc(proc),
       _eventHandler(eventHandler),
-      _dbgPaused(false),
+      _dbgPaused(true),
       _singleStep(false),
-      _threadFinishedGracefully(false),
       _exitCode(0) {
     memset(_rs, 0, sizeof(_rs));
+}
+
+SPUThreadExitInfo SPUThread::join() {
+    _thread.join();
+    return SPUThreadExitInfo{_cause, _exitCode};
+}
+
+uint32_t SPUThread::getElfSource() {
+    return _elfSource;
+}
+
+void SPUThread::setElfSource(uint32_t src) {
+    _elfSource = src;
 }

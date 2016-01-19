@@ -74,3 +74,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread,
                                   const sys_spu_thread_argument_t* arg,
                                   Process* mm);
 int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id);
+int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
+                                  big_int32_t* cause,
+                                  big_int32_t* status);
+int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc);

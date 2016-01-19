@@ -18,11 +18,33 @@ public:
     StopSignalException() : std::runtime_error("stop signal") { }
 };
 
+enum class SPUThreadExitCause {
+    Exit,
+    GroupExit,
+    GroupTerminate
+};
+
+class SPUThreadFinishedException : public virtual std::exception {
+    int32_t _errorCode;
+    SPUThreadExitCause _cause;
+
+public:
+    inline SPUThreadFinishedException(int32_t errorCode, SPUThreadExitCause cause)
+        : _errorCode(errorCode), _cause(cause) {}
+
+    inline int32_t errorCode() {
+        return _errorCode;
+    }
+
+    inline SPUThreadExitCause cause() {
+        return _cause;
+    }
+};
+
 enum class SPUThreadEvent {
     Breakpoint,
     Started,
     Finished,
-    Joined,
     InvalidInstruction,
     Failure
 };
@@ -107,6 +129,11 @@ public:
 
 class Process;
 
+struct SPUThreadExitInfo {
+    SPUThreadExitCause cause;
+    int32_t status;
+};
+
 class SPUThread {
     uint32_t _nip;
     R128 _rs[128];
@@ -119,8 +146,9 @@ class SPUThread {
     std::function<void(SPUThread*, SPUThreadEvent)> _eventHandler;
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
-    bool _threadFinishedGracefully;
-    uint64_t _exitCode;
+    int32_t _exitCode;
+    SPUThreadExitCause _cause;
+    uint32_t _elfSource;
     void loop();
     
 public:
@@ -164,4 +192,7 @@ public:
     void singleStepBreakpoint();
     void dbgPause(bool val);
     void run();
+    SPUThreadExitInfo join();
+    void setElfSource(uint32_t src);
+    uint32_t getElfSource();
 };

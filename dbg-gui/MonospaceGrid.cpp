@@ -87,12 +87,11 @@ void MonospaceGrid::navigate(uint64_t row) {
 void MonospaceGrid::wheelEvent(QWheelEvent* event) {
     if (!_scrollable)
         return;
-    auto d = event->delta() / 10.;
+    auto d = event->delta() / 20.;
     auto newRow = (__int128)_curRow - (__int128)d;
     if (newRow > (__int128)~0ull || newRow < 0)
         return;
-    _curRow -= d;
-    _curRow -= _curRow % _model->getRowStep();
+    _curRow -= d * _model->getRowStep();
     update();
 }
 

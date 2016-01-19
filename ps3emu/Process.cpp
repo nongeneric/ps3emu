@@ -40,6 +40,9 @@ void Process::dbgPause(bool pause) {
     for (auto& t : _threads) {
         t->dbgPause(pause);
     }
+    for (auto& t : _spuThreads) {
+        t->dbgPause(pause);
+    }
 #endif
 }
 
@@ -49,8 +52,13 @@ Event Process::run() {
         _threads.back()->run();
     }
 
-    dbgPause(false);
-    auto threadEvent = _eventQueue.receive(0);
+    ThreadEvent threadEvent;
+    size_t num;
+    _eventQueue.tryReceive(&threadEvent, 1, &num);
+    if (!num) {
+        dbgPause(false);
+        threadEvent = _eventQueue.receive(0);
+    }
     dbgPause(true);
 
     if (auto ev = boost::get<PPUThreadEventInfo>(&threadEvent)) {
@@ -88,15 +96,6 @@ Event Process::run() {
             case SPUThreadEvent::Breakpoint: return SPUBreakpointEvent{ev->thread};
             case SPUThreadEvent::Started: return SPUThreadStartedEvent{ev->thread};
             case SPUThreadEvent::Finished: return SPUThreadFinishedEvent{ev->thread};
-            case SPUThreadEvent::Joined: {
-                boost::unique_lock<boost::mutex> _(_spuThreadMutex);
-                auto it =
-                    std::find_if(begin(_spuThreads),
-                                 end(_spuThreads),
-                                 [=](auto& th) { return th.get() == ev->thread; });
-                assert(it != end(_spuThreads));
-                _spuThreads.erase(it);
-            }
             case SPUThreadEvent::InvalidInstruction:
                 return SPUInvalidInstructionEvent{ev->thread};
             case SPUThreadEvent::Failure: return SPUThreadFailureEvent{ev->thread};
@@ -177,16 +176,15 @@ ContentManager* Process::contentManager() {
 
 uint32_t Process::createSpuThread(std::string name) {
     boost::unique_lock<boost::mutex> _(_spuThreadMutex);
-    _spuThreads.emplace_back(std::make_unique<SPUThread>(
-        this,
-        name,
-        [=](auto t, auto e) {
-            _eventQueue.send(SPUThreadEventInfo{e, t});
-        }));
+    _spuThreads.emplace_back(
+        std::make_unique<SPUThread>(this,
+                                    name,
+                                    [=](auto t, auto e) {
+                                        _eventQueue.send(SPUThreadEventInfo{e, t});
+                                    }));
     auto t = _spuThreads.back().get();
     auto id = _spuThreadIds.create(std::move(t));
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread %d created", id);
-    t->run();
     return id;
 }
 
@@ -199,4 +197,27 @@ Process::Process() : _eventQueue(QueueReceivingOrder::Fifo) {}
 
 void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
     _eventQueue.send(PPUThreadEventInfo{event, thread});
+}
+
+void Process::destroySpuThread(SPUThread* thread) {
+    boost::unique_lock<boost::mutex> lock(_spuThreadMutex);
+    auto it = std::find_if(begin(_spuThreads),
+                           end(_spuThreads),
+                           [=](auto& th) { return th.get() == thread; });
+    assert(it != end(_spuThreads));
+    _spuThreads.erase(it);
+}
+
+std::vector<PPUThread*> Process::dbgPPUThreads() {
+    std::vector<PPUThread*> vec;
+    for (auto& th : _threads)
+        vec.push_back(th.get());
+    return vec;
+}
+
+std::vector<SPUThread*> Process::dbgSPUThreads() {
+    std::vector<SPUThread*> vec;
+    for (auto& th : _spuThreads)
+        vec.push_back(th.get());
+    return vec;
 }

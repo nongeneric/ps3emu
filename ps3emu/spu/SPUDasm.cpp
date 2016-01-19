@@ -8,7 +8,7 @@
 
 using namespace boost::endian;
 
-struct SPUForm {
+union SPUForm {
     BitField<0, 4> OP4;
     BitField<0, 7> OP7;
     BitField<0, 8> OP8;
