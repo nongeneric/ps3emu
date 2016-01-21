@@ -76,6 +76,7 @@ Event Process::run() {
                 return PPUThreadFinishedEvent{ev->thread};
             }
             case PPUThreadEvent::Breakpoint: return PPUBreakpointEvent{ev->thread};
+            case PPUThreadEvent::SingleStepBreakpoint: return PPUSingleStepBreakpointEvent{ev->thread};
             case PPUThreadEvent::InvalidInstruction:
                 return PPUInvalidInstructionEvent{ev->thread};
             case PPUThreadEvent::MemoryAccessError:
@@ -192,8 +193,6 @@ SPUThread* Process::getSpuThread(uint32_t id) {
     boost::unique_lock<boost::mutex> _(_spuThreadMutex);
     return _spuThreadIds.get(id);
 }
-
-Process::Process() : _eventQueue(QueueReceivingOrder::Fifo) {}
 
 void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
     _eventQueue.send(PPUThreadEventInfo{event, thread});

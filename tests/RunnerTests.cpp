@@ -410,8 +410,8 @@ TEST_CASE("ppu_threads_queue") {
     proc.waitForFinished();
     auto output = QString(proc.readAll()).toStdString();
     REQUIRE( output == 
-        "test_correctness(1): 0; i: 80200\n"
-        "test_correctness(0): 0; i: 80200\n"
+        "test_correctness(1): 0; i: 481200\n"
+        "test_correctness(0): 0; i: 481200\n"
     );
 }
 

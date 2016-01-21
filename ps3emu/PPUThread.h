@@ -12,6 +12,7 @@
 
 enum class PPUThreadEvent {
     Breakpoint,
+    SingleStepBreakpoint,
     Started,
     Finished,
     ProcessFinished,

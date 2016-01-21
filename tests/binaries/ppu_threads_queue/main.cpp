@@ -15,7 +15,7 @@ void entry_1(uint64_t arg) {
 	int* i = (int*)arg;
 	int j = 0;
 	for (;;) {
-		if (j % 3) {
+		if (j++ % 3) {
 			sys_event_t ev;
 			sys_event_queue_receive(queue, &ev, 0);
 			if (ev.data3 == 7)
@@ -31,6 +31,7 @@ void entry_1(uint64_t arg) {
 			for (int n = 0; n < num; ++n) {
 				if (evs[n].data3 == 7)
 					sys_ppu_thread_exit(0);
+				__sync_fetch_and_add(i, evs[n].source);
 				__sync_fetch_and_add(i, evs[n].data1);
 				__sync_fetch_and_add(i, evs[n].data2);
 				__sync_fetch_and_add(i, evs[n].data3);
@@ -51,6 +52,8 @@ void test_correctness(bool priority) {
 	sys_event_port_create(&port, SYS_EVENT_PORT_LOCAL, portname);
 	sys_event_port_connect_local(port, queue);
 	
+	// this relies on the events being processed in fifo order
+	// (unrelated to the priority/fifo distinction of the serving of waiting threads)
 	for (int i = 0; i < 100; ++i) {
 		sys_event_port_send(port, 0, 1, 1);
 	}

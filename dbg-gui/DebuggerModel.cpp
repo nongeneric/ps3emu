@@ -454,7 +454,7 @@ void DebuggerModel::stepIn(bool updateUI) {
     } else if (_activeSPUThread) {
         _activeSPUThread->singleStepBreakpoint();
     }
-    _proc->run();
+    run();
     if (updateUI) {
         this->updateUI();
     }
@@ -484,11 +484,13 @@ void DebuggerModel::run() {
             emit message("thread created");
         } else if (boost::get<PPUThreadFinishedEvent>(&untyped)) {
             emit message("thread finished");
-        } else if (boost::get<PPUBreakpointEvent>(&untyped)) {
+        } else if (auto ev = boost::get<PPUBreakpointEvent>(&untyped)) {
             emit message("breakpoint");
             _activeThread = ev->thread;
             _activeSPUThread = nullptr;
             clearSoftBreak(ev->thread->getNIP());
+            cont = false;
+        } else if (boost::get<PPUSingleStepBreakpointEvent>(&untyped)) {
             cont = false;
         } else if (auto ev = boost::get<SPUInvalidInstructionEvent>(&untyped)) {
             emit message(QString("invalid spu instruction at %1")

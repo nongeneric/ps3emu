@@ -36,6 +36,10 @@ struct PPUBreakpointEvent {
     PPUThread* thread;
 };
 
+struct PPUSingleStepBreakpointEvent {
+    PPUThread* thread;
+};
+
 struct PPUInvalidInstructionEvent {
     PPUThread* thread;
 };
@@ -72,6 +76,7 @@ using Event = boost::variant<ProcessFinishedEvent,
                              PPUThreadStartedEvent,
                              PPUThreadFinishedEvent,
                              PPUBreakpointEvent,
+                             PPUSingleStepBreakpointEvent,
                              PPUInvalidInstructionEvent,
                              SPUThreadStartedEvent,
                              SPUThreadFinishedEvent,
@@ -94,7 +99,7 @@ struct SPUThreadEventInfo {
 using ThreadEvent = boost::variant<PPUThreadEventInfo, SPUThreadEventInfo>;
 
 class Process {
-    ConcurrentQueue<ThreadEvent> _eventQueue;
+    ConcurrentFifoQueue<ThreadEvent> _eventQueue;
     ThreadInitInfo _threadInitInfo;
     MemoryBlockManager<StackArea, StackAreaSize, 1 * 1024 * 1024> _stackBlocks;
     MemoryBlockManager<TLSArea, TLSAreaSize, 1 * 1024 * 1024> _tlsBlocks;
@@ -116,7 +121,7 @@ class Process {
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
 public:
-    Process();
+    Process() = default;
     Rsx* rsx();
     ELFLoader* elfLoader();
     MainMemory* mm();

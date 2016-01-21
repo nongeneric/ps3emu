@@ -9,16 +9,18 @@ typedef struct sys_event_queue_attr {
     char name[SYS_SYNC_NAME_SIZE];
 } sys_event_queue_attribute_t;
 
-typedef struct sys_event {
+struct sys_event_t {
     big_uint64_t source;
     big_uint64_t data1;
     big_uint64_t data2;
     big_uint64_t data3;
-} sys_event_t;
+};
 
 typedef big_uint32_t sys_event_queue_t;
 typedef big_uint32_t sys_event_port_t;
 typedef big_uint32_t sys_event_type_t;
+
+static_assert(sizeof(sys_event_t) == 32, "");
 
 int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                sys_event_queue_attribute_t* attr,
@@ -28,7 +30,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
 int32_t sys_event_queue_destroy(sys_event_queue_t equeue_id, int32_t mode);
 
 int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
-                                sys_event_t* event,
+                                uint32_t unused,
                                 usecond_t timeout,
                                 PPUThread* th);
 

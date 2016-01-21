@@ -27,10 +27,11 @@ PPUThread::PPUThread(Process* proc,
 void PPUThread::loop() {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
     _eventHandler(this, PPUThreadEvent::Started);
+    _dbgPaused = true;
     
     for (;;) {
         if (_singleStep) {
-            _eventHandler(this, PPUThreadEvent::Breakpoint);
+            _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
             _dbgPaused = true;
             _singleStep = false;
         }
@@ -48,6 +49,7 @@ void PPUThread::loop() {
         } catch (BreakpointException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Breakpoint);
+            _dbgPaused = true;
         } catch (IllegalInstructionException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::InvalidInstruction);

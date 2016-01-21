@@ -5,7 +5,6 @@ project(libs)
 set(SRC
     sys.cpp
     fs.cpp
-    ConcurrentQueue.cpp
     Controller.cpp
     libsysutil.cpp
     cellGame.cpp

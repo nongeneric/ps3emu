@@ -9,95 +9,74 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 
-enum class QueueReceivingOrder {
-    Fifo, Priority
-};
-
-template <typename T>
+template <template<class> class Q, typename T>
 class ConcurrentQueue {
+    
     struct WaitingThread {
         boost::thread::id id;
         unsigned priority;
+        bool operator<(WaitingThread const& other) const {
+            return priority < other.priority;
+        }
     };
     
-    std::queue<T> _queue;
-    QueueReceivingOrder _order;
+    std::queue<T> _values;
     boost::mutex _mutex;
     boost::condition_variable _cv;
-    std::vector<WaitingThread> _waiting;
+    Q<WaitingThread> _waiting;
     ConcurrentQueue(ConcurrentQueue&) = delete;
+    
 public:
-    ConcurrentQueue(QueueReceivingOrder order) : _order(order) {}
+    ConcurrentQueue() = default;
     
     void send(T const& t) {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        _queue.push(t);
+        _values.push(t);
         _cv.notify_all();
     }
     
     T receive(unsigned priority) {
         auto id = boost::this_thread::get_id();
         boost::unique_lock<boost::mutex> lock(_mutex);
-        _waiting.push_back({id, priority});
-        for (;;) {
-            while (_queue.empty())
-                _cv.wait(lock);
-            auto thisThread = std::find_if(begin(_waiting), end(_waiting), [=](auto& t) {
-                return t.id == id;
-            });
-            assert(thisThread != end(_waiting));
-            bool handled = false;
-            if (_order == QueueReceivingOrder::Fifo) {
-                if (thisThread == begin(_waiting)) {
-                    handled = true;
-                }
-                // there are threads that have been waiting longer
-                // skip this turn
-            } else { // priority
-                auto worthyThread = std::find_if(begin(_waiting), end(_waiting), [=](auto& t) {
-                    return t.priority > priority;
-                });
-                if (worthyThread == end(_waiting)) {
-                    handled = true;
-                }
-                // there are threads with the higher priority
-                // skip this turn
-            }
-            if (handled) {
-                auto res = _queue.front();
-                _queue.pop();
-                _waiting.erase(thisThread);
-                if (!_waiting.empty()) {
-                    // other threads could have already taken their turn
-                    // and decided to skip it because of this thread having
-                    // higher priority, so other threads need to try again
-                    _cv.notify_all();
-                }
-                return res;
-            }
-        }
+        _waiting.push({id, priority});
+        while (_values.empty() || _waiting.top().id != id)
+            _cv.wait(lock);
+        _waiting.pop();
+        auto val = _values.front();
+        _values.pop();
+        _cv.notify_all();
+        return val;
     }
     
     void tryReceive(T* arr, size_t size, size_t* number) {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        if (!_waiting.empty()) {
-            // after all the waiting threads have finished,
-            // it is possible the queue will still have items
-            // in that case returning zero should be safe
-            *number = 0;
-            return;
+        *number = std::min(size, _values.size());
+        for (auto i = 0u; i < *number; ++i) {
+            *arr++ = _values.front();
+            _values.pop();
         }
-        size = std::min(size, _queue.size());
-        for (auto i = 0u; i < size; ++i) {
-            *arr = _queue.front();
-            arr++;
-            _queue.pop();
-        }
-        *number = size;
     }
     
     void drain() {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        while (!_queue.empty()) _queue.pop();
+        while (!_values.empty())
+            _values.pop();
     }
 };
+
+template <typename T>
+using PriorityQueue = std::priority_queue<T, std::vector<T>, std::less<T>>;
+
+template <typename T>
+class Queue : public std::queue<T, std::deque<T>> {
+public:
+    T const& top() {
+        return std::queue<T, std::deque<T>>::front();
+    }
+};
+
+template <typename T>
+using ConcurrentPriorityQueue = ConcurrentQueue<PriorityQueue, T>;
+
+template <typename T>
+using ConcurrentFifoQueue = ConcurrentQueue<Queue, T>;

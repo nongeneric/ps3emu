@@ -52,6 +52,7 @@ enum class SPUThreadEvent {
 class R128 {
     uint8_t _bs[16];
 public:
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
     template <int N>
     uint8_t& b() {
         static_assert(0 <= N && N < 16, "");
@@ -125,6 +126,7 @@ public:
     inline void store(uint8_t* ptr) {
         std::reverse_copy(_bs, _bs + 16, ptr);
     }
+#pragma GCC diagnostic pop
 };
 
 class Process;
