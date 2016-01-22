@@ -1,9 +1,12 @@
 #include "DebugExpr.h"
 
+#include "../ps3emu/PPUThread.h"
+#include "../ps3emu/spu/SPUThread.h"
 #include "../ps3emu/MainMemory.h"
 #include "../ps3emu/utils.h"
 #include <memory>
 #include <boost/regex.hpp>
+#include <boost/endian/arithmetic.hpp>
 
 using namespace boost;
 
@@ -113,20 +116,16 @@ std::vector<Token> tokenize(std::string const& text) {
 class Expr {
 public:
     virtual uint64_t eval(PPUThread* th) = 0;
+    virtual uint64_t eval(SPUThread* th) = 0;
     ~Expr() { }
 };
 
 class BinaryOpExpr : public Expr {
-public:
-    BinaryOpExpr(TokenType type, Expr* left, Expr* right)
-        : type(type), left(left), right(right) { }
     TokenType type;
     Expr* left;
     Expr* right;
     
-    uint64_t eval(PPUThread* th) override {
-        auto l = left->eval(th);
-        auto r = right->eval(th);
+    uint64_t evalType(uint64_t l, uint64_t r) {
         switch (type) {
             case TokenType::Plus: return l + r;
             case TokenType::Minus: return l - r;
@@ -134,6 +133,22 @@ public:
             case TokenType::Div: return l / r;
             default: throw std::runtime_error("");
         }
+    }
+    
+public:
+    BinaryOpExpr(TokenType type, Expr* left, Expr* right)
+        : type(type), left(left), right(right) { }
+    
+    uint64_t eval(PPUThread* th) override {
+        auto l = left->eval(th);
+        auto r = right->eval(th);
+        return evalType(l, r);
+    }
+    
+    uint64_t eval(SPUThread* th) override {
+        auto l = left->eval(th);
+        auto r = right->eval(th);
+        return evalType(l, r);
     }
 };
 
@@ -159,6 +174,30 @@ public:
         }
         throw std::runtime_error("");
     }
+    
+    uint64_t eval(SPUThread* th) override {
+        regex rxgpr("r([0-9]+)(b|h|w|d)([0-9]+)");
+        smatch m;
+        if (regex_match(name, m, rxgpr)) {
+            auto n = std::stoul(m[1]);
+            auto type = m[2];
+            auto part = std::stoul(m[3]);
+            if (n <= 127) {
+                if (type == "b" && part <= 16)
+                    return th->r(n).b(part);
+                if (type == "h" && part <= 8)
+                    return th->r(n).hw(part);
+                if (type == "w" && part <= 4)
+                    return th->r(n).w(part);
+                if (type == "d" && part <= 2)
+                    return th->r(n).dw(part);
+            }
+        }
+        if (name == "nip") {
+            return th->getNip();
+        }
+        throw std::runtime_error("");
+    }
 };
 
 class NumExpr : public Expr {
@@ -166,6 +205,10 @@ public:
     NumExpr(int n) : n(n) { }
     int n;
     uint64_t eval(PPUThread* th) override {
+        return n;
+    }
+    
+    uint64_t eval(SPUThread* th) override {
         return n;
     }
 };
@@ -176,6 +219,10 @@ public:
     Expr* expr;
     uint64_t eval(PPUThread* th) override {
         return th->mm()->load<4>(expr->eval(th));
+    }
+    
+    uint64_t eval(SPUThread* th) override {
+        return *(boost::endian::big_uint32_t*)th->ptr(expr->eval(th));
     }
 };
 
@@ -325,9 +372,13 @@ public:
     }
 };
 
-uint64_t evalExpr(std::string const& text, PPUThread* th) {
+template <typename TH>
+uint64_t evalExpr(std::string const& text, TH* th) {
     auto tokens = tokenize(text);
     Parser parser(&tokens, &text);
     auto expr = parser.parse();
     return expr->eval(th);
 }
+
+template uint64_t evalExpr<PPUThread>(std::string const& text, PPUThread* th);
+template uint64_t evalExpr<SPUThread>(std::string const& text, SPUThread* th);

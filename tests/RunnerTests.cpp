@@ -618,3 +618,21 @@ TEST_CASE("ppu_simd_math") {
         "Vector3(31): 1.000, -1.200, 1.400\n"
     );
 }
+
+TEST_CASE("spu_getting_argp") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/spu_getting_argp/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "SUCCESS: fromSpu is the same as toSpu\n"
+        "## libdma : sample_dma_getting_argp SUCCEEDED ##\n"
+    );
+}

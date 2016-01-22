@@ -8,6 +8,8 @@
 
 using namespace boost::endian;
 
+using I16_t = BitField<9, 25, BitFieldType::Signed>;
+
 union SPUForm {
     BitField<0, 4> OP4;
     BitField<0, 7> OP7;
@@ -19,10 +21,12 @@ union SPUForm {
     BitField<18, 25, BitFieldType::GPR> RA;
     BitField<25, 32, BitFieldType::GPR> RC;
     BitField<25, 32, BitFieldType::GPR> RT;
+    BitField<4, 11, BitFieldType::GPR> RT_ABC;
+    BitField<18, 25, BitFieldType::Channel> CA;
     BitField<11, 18, BitFieldType::Signed> I7;
     BitField<10, 18, BitFieldType::Signed> I8;
     BitField<8, 18, BitFieldType::Signed> I10;
-    BitField<9, 25, BitFieldType::Signed> I16;
+    I16_t I16;
     BitField<7, 25, BitFieldType::Signed> I18;
 };
 
@@ -48,26 +52,34 @@ EMU(lqx) {
     th->r(i->RT).load(th->ptr(lsa));
 }
 
+inline uint32_t abs_lsa(I16_t i16) {
+    return (i16 << 2) & LSLR & 0xfffffff0;
+}
+
+inline uint32_t cia_lsa(I16_t i16, uint32_t cia) {
+    return ((i16 << 2) + cia) & LSLR & 0xfffffff0;
+}
+
 PRINT(lqa) {
-    *result = format_nn("lqa", i->RT, i->I16);
+    *result = format_nu("lqa", i->RT, abs_lsa(i->I16));
 }
 
 EMU(lqa) {
-    auto lsa = i->I16 << 2;
+    auto lsa = abs_lsa(i->I16);
     th->r(i->RT).load(th->ptr(lsa));
 }
 
 PRINT(lqr) {
-    *result = format_nn("lqr", i->RT, i->I16);
+    *result = format_nu("lqr", i->RT, cia_lsa(i->I16, cia));
 }
 
 EMU(lqr) {
-    auto lsa = (i->I16 << 2) + cia;
+    auto lsa = cia_lsa(i->I16, cia);
     th->r(i->RT).load(th->ptr(lsa));
 }
 
 PRINT(stqd) {
-    *result = format_nnn("lqr", i->I10, i->RA, i->RT);
+    *result = format_br_nnn("stqd", i->RT, i->I10, i->RA);
 }
 
 EMU(stqd) {
@@ -85,20 +97,20 @@ EMU(stqx) {
 }
 
 PRINT(stqa) {
-    *result = format_nn("stqa", i->RT, i->I16);
+    *result = format_nu("stqa", i->RT, abs_lsa(i->I16));
 }
 
 EMU(stqa) {
-    auto lsa = i->I16 << 2;
+    auto lsa = abs_lsa(i->I16);
     th->r(i->RT).store(th->ptr(lsa));
 }
 
 PRINT(stqr) {
-    *result = format_nn("stqr", i->RT, i->I16);
+    *result = format_nu("stqr", i->RT, cia_lsa(i->I16, cia));
 }
 
 EMU(stqr) {
-    auto lsa = (i->I16 << 2) + cia;
+    auto lsa = cia_lsa(i->I16, cia);
     th->r(i->RT).store(th->ptr(lsa));
 }
 
@@ -151,7 +163,7 @@ EMU(chx) {
 }
 
 PRINT(cwd) {
-    *result = format_nnn("cwd", i->RT, i->I7, i->RA);
+    *result = format_br_nnn("cwd", i->RT, i->I7, i->RA);
 }
 
 EMU(cwd) {
@@ -175,7 +187,7 @@ EMU(cwx) {
 }
 
 PRINT(cdd) {
-    *result = format_nnn("cdd", i->RT, i->I7, i->RA);
+    *result = format_br_nnn("cdd", i->RT, i->I7, i->RA);
 }
 
 EMU(cdd) {
@@ -235,7 +247,7 @@ EMU(il) {
 }
 
 PRINT(ila) {
-    *result = format_nn("ila", i->RT, i->I18);
+    *result = format_nu("ila", i->RT, i->I18.u());
 }
 
 EMU(ila) {
@@ -247,7 +259,7 @@ EMU(ila) {
 }
 
 PRINT(iohl) {
-    *result = format_nn("iohl", i->RT, i->I16);
+    *result = format_nu("iohl", i->RT, i->I16.u());
 }
 
 EMU(iohl) {
@@ -259,14 +271,14 @@ EMU(iohl) {
 }
 
 PRINT(fsmbi) {
-    *result = format_nn("fsmbi", i->RT, i->I16);
+    *result = format_nu("fsmbi", i->RT, i->I16.u());
 }
 
 EMU(fsmbi) {
     auto& rt = th->r(i->RT);
     std::bitset<16> bits(i->I16.u());
     for (int i = 0; i < 16; ++i) {
-        rt.b(i) = bits[i] ? 0xff : 0;
+        rt.b(i) = bits[15 - i] ? 0xff : 0;
     }
 }
 
@@ -510,14 +522,14 @@ EMU(mpyui) {
 }
 
 PRINT(mpya) {
-    *result = format_nnnn("mpya", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("mpya", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(mpya) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
         int32_t t = (int16_t)ra.w(i);
         t *= (int16_t)rb.w(i);
@@ -644,7 +656,7 @@ EMU(fsmb) {
     auto& rt = th->r(i->RT);
     std::bitset<16> bits(ra.w<0>());
     for (int i = 0; i < 16; ++i) {
-        rt.b(i) = bits[i] ? 0xff : 0;
+        rt.b(i) = bits[15 - i] ? 0xff : 0;
     }
 }
 
@@ -657,7 +669,7 @@ EMU(fsmh) {
     auto& rt = th->r(i->RT);
     std::bitset<8> bits(ra.w<0>());
     for (int i = 0; i < 8; ++i) {
-        rt.hw(i) = bits[i] ? 0xffff : 0;
+        rt.hw(i) = bits[7 - i] ? 0xffff : 0;
     }
 }
 
@@ -670,7 +682,7 @@ EMU(fsm) {
     auto& rt = th->r(i->RT);
     std::bitset<4> bits(ra.w<0>());
     for (int i = 0; i < 4; ++i) {
-        rt.hw(i) = bits[i] ? 0xffffffff : 0;
+        rt.hw(i) = bits[3 - i] ? 0xffffffff : 0;
     }
 }
 
@@ -683,7 +695,7 @@ EMU(gbb) {
     auto& rt = th->r(i->RT);
     std::bitset<16> bits;
     for (int i = 0; i < 16; ++i) {
-        bits[i] = ra.b(i) & 1;
+        bits[15 - i] = ra.b(i) & 1;
     }
     rt.w<0>() = bits.to_ulong();
     rt.w<1>() = 0;
@@ -700,7 +712,7 @@ EMU(gbh) {
     auto& rt = th->r(i->RT);
     std::bitset<8> bits;
     for (int i = 0; i < 8; ++i) {
-        bits[i] = ra.hw(i) & 1;
+        bits[7 - i] = ra.hw(i) & 1;
     }
     rt.w<0>() = bits.to_ulong();
     rt.w<1>() = 0;
@@ -717,7 +729,7 @@ EMU(gb) {
     auto& rt = th->r(i->RT);
     std::bitset<4> bits;
     for (int i = 0; i < 4; ++i) {
-        bits[i] = ra.w(i) & 1;
+        bits[3 - i] = ra.w(i) & 1;
     }
     rt.w<0>() = bits.to_ulong();
     rt.w<1>() = 0;
@@ -1045,35 +1057,35 @@ EMU(eqv) {
 }
 
 PRINT(selb) {
-    *result = format_nnnn("selb", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("selb", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(selb) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = (rc.dw(i) & rb.dw(i)) | (~rc.dw(i) & ra.dw(i));
     }
 }
 
 PRINT(shufb) {
-    *result = format_nnnn("shufb", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("shufb", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(shufb) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 16; ++i) {
         auto c = rc.b(i);
         auto idx = c & 0b11111;
-        rt.b(i) = c >> 6 == 0b10 ? 0
-                : c >> 5 == 0b110 ? 0xff
-                : c >> 5 == 0b111 ? 0x80
-                : (idx < 16 ? rb.b(idx) : ra.b(idx % 16));
+        rt.b(i) = (c & 0b11000000) == 0b10000000 ? 0
+                : (c & 0b11100000) == 0b11000000 ? 0xff
+                : (c & 0b11100000) == 0b11100000 ? 0x80
+                : (idx < 16 ? ra.b(idx) : rb.b(idx % 16));
     }
 }
 
@@ -1139,7 +1151,7 @@ EMU(shlqbi) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 <<= (uint32_t)rb.w<0>() & 0b111;
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
@@ -1152,7 +1164,7 @@ PRINT(shlqbii) {
 EMU(shlqbii) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 <<= i->I7.u() & 0b111;
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
@@ -1166,7 +1178,7 @@ EMU(shlqby) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b11111;
     u128 = sh > 15 ? 0 : u128 << sh * 8;
     rt.dw<0>() = u128 >> 64;
@@ -1180,7 +1192,7 @@ PRINT(shlqbyi) {
 EMU(shlqbyi) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b11111;
     u128 = sh > 15 ? 0 : u128 << sh * 8;
     rt.dw<0>() = u128 >> 64;
@@ -1195,7 +1207,7 @@ EMU(shlqbybi) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
     u128 = sh > 15 ? 0 : u128 << sh * 8;
     rt.dw<0>() = u128 >> 64;
@@ -1264,7 +1276,7 @@ EMU(rotqby) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b1111;
     u128 = rol<128, uint128_t>(u128, sh * 8);
     rt.dw<0>() = u128 >> 64;
@@ -1278,7 +1290,7 @@ PRINT(rotqbyi) {
 EMU(rotqbyi) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b1111;
     u128 = rol<128, uint128_t>(u128, sh * 8);
     rt.dw<0>() = u128 >> 64;
@@ -1293,7 +1305,7 @@ EMU(rotqbybi) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
     u128 = rol<128, uint128_t>(u128, sh * 8);
     rt.dw<0>() = u128 >> 64;
@@ -1308,7 +1320,7 @@ EMU(rotqbi) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b111;
     u128 = rol<128, uint128_t>(u128, sh);
     rt.dw<0>() = u128 >> 64;
@@ -1322,7 +1334,7 @@ PRINT(rotqbii) {
 EMU(rotqbii) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b111;
     u128 = rol<128, uint128_t>(u128, sh);
     rt.dw<0>() = u128 >> 64;
@@ -1391,7 +1403,7 @@ EMU(rotqmby) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = -rb.w<0>() & 0x1f;
     u128 = sh > 15 ? 0 : u128 >> sh * 8;
     rt.dw<0>() = u128 >> 64;
@@ -1405,7 +1417,7 @@ PRINT(rotqmbyi) {
 EMU(rotqmbyi) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = -i->I7.s() & 0x1f;
     u128 = sh > 15 ? 0 : u128 >> sh * 8;
     rt.dw<0>() = u128 >> 64;
@@ -1420,7 +1432,7 @@ EMU(rotqmbybi) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
     u128 = sh > 15 ? 0 : u128 >> sh * 8;
     rt.dw<0>() = u128 >> 64;
@@ -1435,7 +1447,7 @@ EMU(rotqmbi) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 >>= -rb.w<0>() & 7;
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
@@ -1448,7 +1460,7 @@ PRINT(rotqmbii) {
 EMU(rotqmbii) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    auto u128 = make128(ra.dw<1>(), ra.dw<0>());
+    auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 >>= -i->I7.s() & 7;
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
@@ -1882,45 +1894,45 @@ EMU(bisl) {
 }
 
 PRINT(brnz) {
-    *result = format_nn("brnz", i->RT, i->I16);
+    *result = format_nu("brnz", i->RT, cia_lsa(i->I16, cia) + 4);
 }
 
 EMU(brnz) {
     if (th->r(i->RT).w<0>() != 0) {
-        auto address = signed_lshift32(i->I16.s(), 2) & LSLR & 0xfffffffc;
+        auto address = cia_lsa(i->I16, cia) + 4;
         th->setNip(address);
     }
 }
 
 PRINT(brz) {
-    *result = format_nn("brz", i->RT, i->I16);
+    *result = format_nu("brz", i->RT, cia_lsa(i->I16, cia) + 4);
 }
 
 EMU(brz) {
     if (th->r(i->RT).w<0>() == 0) {
-        auto address = signed_lshift32(i->I16.s(), 2) & LSLR & 0xfffffffc;
+        auto address = cia_lsa(i->I16, cia) + 4;
         th->setNip(address);
     }
 }
 
 PRINT(brhnz) {
-    *result = format_nn("brhnz", i->RT, i->I16);
+    *result = format_nu("brhnz", i->RT, cia_lsa(i->I16, cia) + 4);
 }
 
 EMU(brhnz) {
     if (th->r(i->RT).hw<0>() != 0) {
-        auto address = signed_lshift32(i->I16.s(), 2) & LSLR & 0xfffffffc;
+        auto address = cia_lsa(i->I16, cia) + 4;
         th->setNip(address);
     }
 }
 
 PRINT(brhz) {
-    *result = format_nn("brhz", i->RT, i->I16);
+    *result = format_nu("brhz", i->RT, cia_lsa(i->I16, cia) + 4);
 }
 
 EMU(brhz) {
     if (th->r(i->RT).hw<0>() == 0) {
-        auto address = signed_lshift32(i->I16.s(), 2) & LSLR & 0xfffffffc;
+        auto address = cia_lsa(i->I16, cia) + 4;
         th->setNip(address);
     }
 }
@@ -2066,84 +2078,84 @@ EMU(dfm) {
 }
 
 PRINT(fma) {
-    *result = format_nnnn("fma", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("fma", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(fma) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = ra.fs(i) * rb.fs(i) + rc.fs(i);
     }
 }
 
 PRINT(dfma) {
-    *result = format_nnnn("dfma", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("dfma", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(dfma) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = ra.fd(i) * rb.fd(i) + rc.fd(i);
     }
 }
 
 PRINT(fnms) {
-    *result = format_nnnn("fnms", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("fnms", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(fnms) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = rc.fs(i) - ra.fs(i) * rb.fs(i);
     }
 }
 
 PRINT(dfnms) {
-    *result = format_nnnn("dfnms", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("dfnms", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(dfnms) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = rc.fd(i) - ra.fd(i) * rb.fd(i);
     }
 }
 
 PRINT(fms) {
-    *result = format_nnnn("fms", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("fms", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(fms) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = ra.fs(i) * rb.fs(i) - rc.fs(i);
     }
 }
 
 PRINT(dfms) {
-    *result = format_nnnn("dfms", i->RT, i->RA, i->RB, i->RC);
+    *result = format_nnnn("dfms", i->RT_ABC, i->RA, i->RB, i->RC);
 }
 
 EMU(dfms) {
     auto& ra = th->r(i->RA);
     auto& rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT);
+    auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = ra.fd(i) * rb.fd(i) - rc.fd(i);
     }
@@ -2466,6 +2478,54 @@ EMU(dsync) {
     __sync_synchronize();
 }
 
+PRINT(rdch) {
+    *result = format_nn("rdch", i->RT, i->CA);
+}
+
+EMU(rdch) {
+    auto ch = i->CA.u();
+    if (ch == MFC_RdTagStat) {
+        // as every MFC request completes immediately
+        // it is possible to just always return the mask set last
+        ch = MFC_WrTagMask;
+    }
+    auto& ca = th->ch(ch);
+    auto& rt = th->r(i->RT); 
+    rt.dw<0>() = ca.dw<0>();
+    rt.dw<1>() = ca.dw<1>();
+}
+
+PRINT(rchcnt) {
+    *result = format_nn("rchcnt", i->RT, i->CA);
+}
+
+EMU(rchcnt) {
+    auto ch = i->CA.u();
+    auto& rt = th->r(i->RT);
+    if (ch == MFC_RdTagStat) {
+        rt.w<0>() = 1;
+        rt.w<1>() = 0;
+        rt.dw<1>() = 0;
+        return;
+    }
+    throw std::runtime_error("rchcnt of unknown channel");
+}
+
+PRINT(wrch) {
+    *result = format_nn("wrch", i->RT, i->CA);
+}
+
+EMU(wrch) {
+    auto& ca = th->ch(i->CA);
+    auto& rt = th->r(i->RT); 
+    if (i->CA.u() == MFC_Cmd) {
+        th->command(rt.w<0>());
+    } else {
+        ca.dw<0>() = rt.dw<0>();
+        ca.dw<1>() = rt.dw<1>();   
+    }
+}
+
 template <DasmMode M, typename S>
 void SPUDasm(void* instr, uint32_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
@@ -2602,6 +2662,9 @@ void SPUDasm(void* instr, uint32_t cia, S* state) {
         case 0b01000000001: INVOKE(nop);
         case 0b00000000010: INVOKE(sync);
         case 0b00000000011: INVOKE(dsync);
+        case 0b00000001101: INVOKE(rdch);
+        case 0b00000001111: INVOKE(rchcnt);
+        case 0b00100001101: INVOKE(wrch);
     }
     switch (i->OP10.u()) {
         case 0b0111011010: INVOKE(csflt);

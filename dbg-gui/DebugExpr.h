@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
-#include "../ps3emu/PPUThread.h"
 
-uint64_t evalExpr(std::string const& expr, PPUThread* th);
+class PPUThread;
+class SPUThread;
+
+template <typename TH>
+uint64_t evalExpr(std::string const& text, TH* th);

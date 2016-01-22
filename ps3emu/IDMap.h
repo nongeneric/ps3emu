@@ -28,6 +28,10 @@ public:
         assert(it != end(_map));
         return it->second;
     }
+    
+    std::map<ID, T>& map() {
+        return _map;
+    }
 };
 
 template <typename ID, typename T>
@@ -48,5 +52,9 @@ public:
     std::shared_ptr<T> get(ID id) {
         boost::lock_guard<boost::mutex> lock(_m);
         return _map.get(id);
+    }
+    
+    std::map<ID, std::shared_ptr<T>>& map() {
+        return _map.map();
     }
 };

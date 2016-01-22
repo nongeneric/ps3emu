@@ -43,6 +43,7 @@ public:
 
 enum class SPUThreadEvent {
     Breakpoint,
+    SingleStepBreakpoint,
     Started,
     Finished,
     InvalidInstruction,
@@ -129,6 +130,37 @@ public:
 #pragma GCC diagnostic pop
 };
 
+#define SPU_RdEventStat          0
+#define SPU_WrEventMask          1
+#define SPU_WrEventAck           2
+#define SPU_RdSigNotify1         3
+#define SPU_RdSigNotify2         4
+#define SPU_WrDec                7
+#define SPU_RdDec                8
+#define SPU_RdEventStatMask     11
+#define SPU_RdEventMask         11
+#define SPU_RdMachStat          13
+#define SPU_WrSRR0              14
+#define SPU_RdSRR0              15
+#define SPU_WrOutMbox           28 
+#define SPU_RdInMbox            29 
+#define SPU_WrOutIntrMbox       30 
+
+#define MFC_WrMSSyncReq          9
+#define MFC_RdTagMask           12
+#define MFC_LSA                 16 
+#define MFC_EAH                 17 
+#define MFC_EAL                 18 
+#define MFC_Size                19 
+#define MFC_TagID               20 
+#define MFC_Cmd                 21 
+#define MFC_WrTagMask           22 
+#define MFC_WrTagUpdate         23 
+#define MFC_RdTagStat           24 
+#define MFC_RdListStallStat     25 
+#define MFC_WrListStallAck      26 
+#define MFC_RdAtomicStat        27 
+
 class Process;
 
 struct SPUThreadExitInfo {
@@ -139,6 +171,7 @@ struct SPUThreadExitInfo {
 class SPUThread {
     uint32_t _nip;
     R128 _rs[128];
+    R128 _ch[28];
     uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
     uint32_t _spu;
@@ -161,6 +194,11 @@ public:
     template <typename V>
     inline R128& r(V i) {
         return _rs[getUValue(i)];
+    }
+    
+    template <typename V>
+    inline R128& ch(V i) {
+        return _ch[getUValue(i)];
     }
     
     inline uint8_t* ptr(uint32_t lsa) {
@@ -191,10 +229,15 @@ public:
         _spu = num;
     }
     
+    inline Process* proc() {
+        return _proc;
+    }
+    
     void singleStepBreakpoint();
     void dbgPause(bool val);
     void run();
     SPUThreadExitInfo join();
     void setElfSource(uint32_t src);
     uint32_t getElfSource();
+    void command(uint32_t word);
 };

@@ -95,6 +95,8 @@ Event Process::run() {
     } else if (auto ev = boost::get<SPUThreadEventInfo>(&threadEvent)) {
         switch (ev->event) {
             case SPUThreadEvent::Breakpoint: return SPUBreakpointEvent{ev->thread};
+            case SPUThreadEvent::SingleStepBreakpoint:
+                return SPUSingleStepBreakpointEvent{ev->thread};
             case SPUThreadEvent::Started: return SPUThreadStartedEvent{ev->thread};
             case SPUThreadEvent::Finished: return SPUThreadFinishedEvent{ev->thread};
             case SPUThreadEvent::InvalidInstruction:

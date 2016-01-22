@@ -131,9 +131,9 @@ public:
 };
 
 struct ThreadGroup {
-    std::vector<SPUThread*> threads;
+    std::vector<uint32_t> threads;
     std::string name;
-    std::map<SPUThread*, int32_t> errorCodes;
+    std::map<uint32_t, int32_t> errorCodes;
 };
 
 namespace {
@@ -205,13 +205,14 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     thread->r(6).dw<0>() = arg->arg4;
     thread->setNip(img->elf->entryPoint());
     thread->setElfSource(img->elf->source());
-    group->threads.push_back(thread);
+    group->threads.push_back(*thread_id);
     return CELL_OK;
 }
 
-int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id) {
+int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id, Process* proc) {
     auto group = groups.get(id);
-    for (auto th : group->threads) {
+    for (auto id : group->threads) {
+        auto th = proc->getSpuThread(id);
         th->run();
     }
     return CELL_OK;
@@ -223,7 +224,8 @@ int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id) {
 
 int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
                                   big_int32_t* cause,
-                                  big_int32_t* status)
+                                  big_int32_t* status,
+                                  Process* proc)
 {
     auto group = groups.get(gid);
     bool groupExit = false;
@@ -231,7 +233,8 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
     bool groupTerminate = false;
     int32_t terminateStatus;
     int32_t groupExitStatus;
-    for (auto th : group->threads) {
+    for (auto id : group->threads) {
+        auto th = proc->getSpuThread(id);
         auto info = th->join();
         groupExit |= info.cause == SPUThreadExitCause::GroupExit;
         groupTerminate |= info.cause == SPUThreadExitCause::GroupTerminate;
@@ -242,7 +245,7 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
         if (groupExit) {
             groupExitStatus = info.status;
         }
-        group->errorCodes[th] = info.status;
+        group->errorCodes[id] = info.status;
     }
     if (groupTerminate) {
         *cause = SYS_SPU_THREAD_GROUP_JOIN_TERMINATED;
@@ -250,7 +253,7 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
     } else if (groupExit) {
         *cause = SYS_SPU_THREAD_GROUP_JOIN_GROUP_EXIT;
         *status = groupExitStatus;
-    } else if (groupExit) {
+    } else if (threadExit) {
         *cause = SYS_SPU_THREAD_GROUP_JOIN_ALL_THREADS_EXIT;
     }
     return CELL_OK;
@@ -258,9 +261,24 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
 
 int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc) {
     auto group = groups.get(id);
-    for (auto th : group->threads) {
+    for (auto id : group->threads) {
+        auto th = proc->getSpuThread(id);
         proc->destroySpuThread(th);
     }
     groups.destroy(id);
     return CELL_OK;
+}
+
+int32_t sys_spu_thread_get_exit_status(sys_spu_thread_t id,
+                                       big_int32_t* status,
+                                       Process* proc) {
+    for (auto& groupPair : groups.map()) {
+        for (auto& threadPair : groupPair.second->errorCodes) {
+            if (threadPair.first == id) {
+                *status = threadPair.second;
+                return CELL_OK;
+            }
+        }
+    }
+    throw std::runtime_error("requesting error code of unknown spu thread");
 }

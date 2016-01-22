@@ -60,6 +60,10 @@ struct SPUBreakpointEvent {
     SPUThread* thread;
 };
 
+struct SPUSingleStepBreakpointEvent {
+    SPUThread* thread;
+};
+
 struct MemoryAccessErrorEvent {
     PPUThread* thread;
 };
@@ -82,6 +86,7 @@ using Event = boost::variant<ProcessFinishedEvent,
                              SPUThreadFinishedEvent,
                              SPUInvalidInstructionEvent,
                              SPUBreakpointEvent,
+                             SPUSingleStepBreakpointEvent,
                              MemoryAccessErrorEvent,
                              PPUThreadFailureEvent,
                              SPUThreadFailureEvent>;

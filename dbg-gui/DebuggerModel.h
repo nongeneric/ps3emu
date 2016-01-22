@@ -55,7 +55,7 @@ public:
     void toggleFPR();
     void loadFile(QString path, QStringList args);
     void exec(QString command);
-    void stepIn(bool updateUI = true);
+    void stepIn();
     void stepOver();
     void run();
     void runto(ps3_uintptr_t va);

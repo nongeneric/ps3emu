@@ -3569,11 +3569,11 @@ uint64_t getTargetAddress(void* branchInstr, uint64_t cia) {
     throw std::runtime_error("not absolute branch");
 }
 
-template void  ppu_dasm<DasmMode::Print, std::string>(
+template void ppu_dasm<DasmMode::Print, std::string>(
     void* instr, uint64_t cia, std::string* state);
 
-template void  ppu_dasm<DasmMode::Emulate, PPUThread>(
+template void ppu_dasm<DasmMode::Emulate, PPUThread>(
     void* instr, uint64_t cia, PPUThread* th);
 
-template void  ppu_dasm<DasmMode::Name, std::string>(
+template void ppu_dasm<DasmMode::Name, std::string>(
     void* instr, uint64_t cia, std::string* name);

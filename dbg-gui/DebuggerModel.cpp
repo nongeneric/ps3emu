@@ -448,16 +448,13 @@ void DebuggerModel::loadFile(QString path, QStringList args) {
     emit message(QString("Loaded %1").arg(path));
 }
 
-void DebuggerModel::stepIn(bool updateUI) {
+void DebuggerModel::stepIn() {
     if (_activeThread) {
         _activeThread->singleStepBreakpoint();
     } else if (_activeSPUThread) {
         _activeSPUThread->singleStepBreakpoint();
     }
     run();
-    if (updateUI) {
-        this->updateUI();
-    }
 }
 
 void DebuggerModel::stepOver() {}
@@ -502,6 +499,8 @@ void DebuggerModel::run() {
             emit message("spu breakpoint");
             clearSPUSoftBreak(ev->thread->getNip());
             cont = false;
+        } else if (boost::get<SPUSingleStepBreakpointEvent>(&untyped)) {
+            cont = false;
         } else if (boost::get<SPUThreadStartedEvent>(&untyped)) {
             trySetPendingSPUBreaks();
         }
@@ -523,7 +522,11 @@ void DebuggerModel::exec(QString command) {
     
     uint64_t exprVal;
     try {
-        exprVal = evalExpr(expr.toStdString(), _activeThread);
+        exprVal = _activeThread
+                      ? evalExpr(expr.toStdString(), _activeThread)
+                      : _activeSPUThread
+                            ? evalExpr(expr.toStdString(), _activeSPUThread)
+                            : 0;
     } catch (std::exception& e) {
         emit message(QString("expr eval failed: ") + e.what());
         return;
@@ -604,7 +607,8 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
         counts[name]++;
         fprintf(f, "%08x  %s\n", nip, str.c_str());
-        stepIn(false);
+        _activeThread->singleStepBreakpoint();
+        _proc->run();
     }
     fprintf(f, "\ninstruction frequencies:\n");
     std::vector<std::pair<std::string, int>> sorted;

@@ -456,9 +456,10 @@ STUB_4(sys_spu_image_import);
 STUB_1(sys_spu_image_close);
 STUB_5(sys_spu_thread_group_create);
 STUB_7(sys_spu_thread_initialize);
-STUB_1(sys_spu_thread_group_start);
-STUB_3(sys_spu_thread_group_join);
+STUB_2(sys_spu_thread_group_start);
+STUB_4(sys_spu_thread_group_join);
 STUB_2(sys_spu_thread_group_destroy);
+STUB_3(sys_spu_thread_get_exit_status);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -633,6 +634,7 @@ void PPUThread::scall() {
         case 172: nstub_sys_spu_thread_initialize(this); break;
         case 173: nstub_sys_spu_thread_group_start(this); break;
         case 178: nstub_sys_spu_thread_group_join(this); break;
+        case 165: nstub_sys_spu_thread_get_exit_status(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }
