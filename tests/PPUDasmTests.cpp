@@ -1,4 +1,4 @@
-#include "../ps3emu/ppu_dasm.h"
+#include "../ps3emu/ppu/ppu_dasm.h"
 #include "../ps3emu/BitField.h"
 #include <catch.hpp>
 

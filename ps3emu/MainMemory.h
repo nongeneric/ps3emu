@@ -73,6 +73,7 @@ class MainMemory {
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     boost::chrono::high_resolution_clock::time_point _systemStart;
     Rsx* _rsx;
+    Process* _proc;
     boost::mutex _pageMutex;
     spinlock _storeLock;
     boost::thread::id _reservationThread;
@@ -87,12 +88,16 @@ class MainMemory {
                                     const void* buf, 
                                     uint len,
                                     bool cond);
+    void writeSpuAddress(ps3_uintptr_t va, uint32_t val);
+    uint32_t readSpuAddress(ps3_uintptr_t va);
+        
 public:
     MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
     void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
     ps3_uintptr_t malloc(ps3_uintptr_t size);
+    void free(ps3_uintptr_t addr);
     void allocPage(void** ptr, ps3_uintptr_t* va);
     void reset();
     int allocatedPages();
@@ -105,6 +110,7 @@ public:
     void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
     void memoryBreak(uint32_t va, uint32_t size);
     void setRsx(Rsx* rsx);
+    void setProc(Process* proc);
     uint32_t loadReserve4(ps3_uintptr_t va);
     bool storeCond4(ps3_uintptr_t va, uint32_t val);
     

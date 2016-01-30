@@ -59,7 +59,9 @@ int32_t cellGameBootCheck(big_uint32_t* type,
     *type = CELL_GAME_GAMETYPE_HDD;
     *attributes = 0;
     auto str = "EMUGAME";
-    memcpy(dirName, str, strlen(str) + 1);
+    if (dirName) {
+        memcpy(dirName, str, strlen(str) + 1);
+    }
     return CELL_OK;
 }
 

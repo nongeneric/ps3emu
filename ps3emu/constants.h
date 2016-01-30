@@ -8,15 +8,20 @@ typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
 static constexpr emu_void_t emu_void = 0;
 
+static constexpr ps3_uintptr_t HeapArea = 0x30000000;
+static constexpr uint32_t HeapAreaSize = 0x10000000;
+
 static constexpr ps3_uintptr_t GcmControlRegisters = 0x40100040;
 static constexpr ps3_uintptr_t GcmLabelBaseOffset = 0x40300000;
 static constexpr ps3_uintptr_t RsxFbBaseAddr = 0xc0000000;
+
+static constexpr ps3_uintptr_t RawSpuBaseAddr = 0xe0000000;
+static constexpr ps3_uintptr_t RawSpuProblemOffset = 0x00040000;
+static constexpr ps3_uintptr_t RawSpuOffset = 0x00100000;
+
 static constexpr uint32_t GcmLocalMemorySize = 0xf900000;
 static constexpr uint32_t RsxMemoryFrequency = 650000000;
 static constexpr uint32_t RsxCoreFrequency = 500000000;
-
-static constexpr ps3_uintptr_t HeapArea = 0xb0000000;
-static constexpr uint32_t HeapAreaSize = 0x10000000;
 
 static constexpr ps3_uintptr_t StackArea = 0xd0000000u;
 static constexpr uint32_t StackAreaSize = 0x8000000u;

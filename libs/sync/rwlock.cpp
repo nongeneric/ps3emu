@@ -6,7 +6,7 @@
 #include <assert.h>
 
 namespace {
-    ThreadSafeIDMap<sys_rwlock_t, boost::shared_mutex> mutexes;
+    ThreadSafeIDMap<sys_rwlock_t, std::shared_ptr<boost::shared_mutex>> mutexes;
 }
 
 int32_t sys_rwlock_create(sys_rwlock_t* rw_lock_id, const sys_rwlock_attribute_t* attr) {

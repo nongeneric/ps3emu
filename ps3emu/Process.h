@@ -3,7 +3,7 @@
 #include "rsx/Rsx.h"
 #include "ELFLoader.h"
 #include "MainMemory.h"
-#include "PPUThread.h"
+#include "ppu/PPUThread.h"
 #include "spu/SPUThread.h"
 #include "ContentManager.h"
 #include "MemoryBlockManager.h"
@@ -125,6 +125,7 @@ class Process {
     void dbgPause(bool pause);
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
+    
 public:
     Process() = default;
     Rsx* rsx();
@@ -133,7 +134,12 @@ public:
     ContentManager* contentManager();
     void init(std::string elfPath, std::vector<std::string> args);
     Event run();
-    uint64_t createThread(uint32_t stackSize, ps3_uintptr_t entryPointDescriptorVa, uint64_t arg);
+    uint64_t createThread(uint32_t stackSize,
+                          ps3_uintptr_t entryPointDescriptorVa,
+                          uint64_t arg);
+    uint64_t createInterruptThread(uint32_t stackSize,
+                                   ps3_uintptr_t entryPointDescriptorVa,
+                                   uint64_t arg);
     PPUThread* getThread(uint64_t id);
     uint32_t createSpuThread(std::string name);
     SPUThread* getSpuThread(uint32_t id);

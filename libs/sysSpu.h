@@ -7,6 +7,9 @@ class SpuImage;
 using sys_spu_thread_t = big_uint32_t;
 using sys_spu_thread_group_t = big_uint32_t;
 using sys_memory_container_t = big_uint32_t;
+using sys_raw_spu_t = big_uint32_t;
+using sys_interrupt_tag_t = big_uint32_t;
+using sys_interrupt_thread_handle_t = big_uint32_t;
 
 struct sys_spu_segment_t {
     big_int32_t type;
@@ -51,6 +54,27 @@ struct sys_spu_thread_argument_t {
     big_uint64_t arg4;
 };
 
+enum class TagClassId : uint32_t {
+    _MFC_LSA = 0x3004U,
+    _MFC_EAH = 0x3008U,
+    _MFC_EAL = 0x300CU,
+    MFC_Size_Tag = 0x3010U,
+    MFC_Class_CMD = 0x3014U,
+    MFC_CMDStatus = 0x3014U,
+    MFC_QStatus = 0x3104U,
+    Prxy_QueryType = 0x3204U,
+    Prxy_QueryMask = 0x321CU,
+    Prxy_TagStatus = 0x322CU,
+    SPU_Out_MBox = 0x4004U,
+    SPU_In_MBox = 0x400CU,
+    SPU_MBox_Status = 0x4014U,
+    SPU_RunCntl = 0x401CU,
+    SPU_Status = 0x4024U,
+    SPU_NPC = 0x4034U,
+    SPU_Sig_Notify_1 = 0x1400CU,
+    SPU_Sig_Notify_2 = 0x1C00CU
+};
+
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu);
 int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
@@ -60,6 +84,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
                              uint32_t type,
                              MainMemory* mm);
+int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc);
 int32_t sys_spu_image_close(sys_spu_image_t* img);
 int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     uint32_t num,
@@ -80,3 +105,29 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
                                   Process* proc);
 int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc);
 int32_t sys_spu_thread_get_exit_status(sys_spu_thread_t id, big_int32_t* status, Process* proc);
+int32_t sys_raw_spu_create(sys_raw_spu_t* id, uint32_t unused, Process* proc);
+int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc);
+int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img);
+int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
+                                         TagClassId class_id,
+                                         uint32_t unused,
+                                         sys_interrupt_tag_t* intrtag);
+int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
+                                       sys_interrupt_tag_t intrtag,
+                                       uint32_t intrthread,
+                                       uint64_t arg,
+                                       Process* proc);
+int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id, uint32_t class_id, uint64_t mask);
+int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
+                               TagClassId classId,
+                               uint32_t value,
+                               Process* proc);
+uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc);
+int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
+                                 uint32_t class_id,
+                                 big_uint64_t* stat);
+int32_t sys_raw_spu_read_puint_mb(sys_raw_spu_t id, big_uint32_t* value);
+int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t stat);
+emu_void_t sys_interrupt_thread_eoi();
+
+SPUThread* findRawSpuThread(sys_raw_spu_t id);

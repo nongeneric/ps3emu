@@ -1,5 +1,6 @@
 #include "MainMemory.h"
 
+#include "../libs/sysSpu.h"
 #include "rsx/Rsx.h"
 #include <boost/log/trivial.hpp>
 
@@ -70,6 +71,11 @@ void MainMemory::copy(ps3_uintptr_t va,
 }
 
 void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
+    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
+        assert(len == 4);
+        writeSpuAddress(va, *(big_uint32_t*)buf);
+        return;
+    }
     if (coversRsxRegsRange(va, len)) {
         if (!_rsx) {
             throw std::runtime_error("rsx not set");
@@ -105,6 +111,12 @@ struct IForm {
 
 void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
     assert(buf);
+    
+    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
+        assert(len == 4);
+        *(big_uint32_t*)buf = readSpuAddress(va);
+        return;
+    }
     
     if (coversRsxRegsRange(va, len)) {
         assert(len == 4);        
@@ -147,11 +159,11 @@ void MainMemory::reset() {
 }
 
 ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
-    VirtualAddress split { HeapArea };
-    VirtualAddress maxSplit { HeapArea + HeapAreaSize };
+    VirtualAddress split{HeapArea};
+    VirtualAddress maxSplit{HeapArea + HeapAreaSize};
     ps3_uintptr_t va = HeapArea;
     for (uint32_t i = split.page.u(); i != maxSplit.page.u(); ++i) {
-        auto& p =_pages[i];
+        auto& p = _pages[i];
         if (p.ptr) {
             va = std::max(va, i * DefaultMainMemoryPageSize);
         }
@@ -163,26 +175,30 @@ ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
     return va;
 }
 
+void MainMemory::free(ps3_uintptr_t addr) {
+    BOOST_LOG_TRIVIAL(trace) << "free() not implemented";
+}
+
 void MainMemory::setRsx(Rsx* rsx) {
     _rsx = rsx;
 }
 
-
 struct alignas(2) page_byte { uint8_t v; };
 
 void MemoryPage::alloc() {
-    if (ptr)
-        return;
-    ptr = (uintptr_t)new page_byte[DefaultMainMemoryPageSize];
-    assert((ptr & 1) == 0);
-    memset((void*)ptr.load(), 0, DefaultMainMemoryPageSize);
+    auto mem = new page_byte[DefaultMainMemoryPageSize];
+    memset(mem, 0, DefaultMainMemoryPageSize);
+    uintptr_t e = 0;
+    if (!ptr.compare_exchange_strong(e, (uintptr_t)mem))
+        delete [] mem;
+    assert((ptr & 1) == 0);    
 }
 
 void MemoryPage::dealloc() {
-    if (ptr) {
-        delete [] (page_byte*)ptr.load();
+    auto mem = ptr.exchange(0);
+    if (mem) {
+        delete [] (page_byte*)mem;
     }
-    ptr = 0;
 }
 
 void MainMemory::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
@@ -271,4 +287,34 @@ void MainMemory::allocPage(void** ptr, ps3_uintptr_t* va) {
 
 MainMemory::MainMemory() {
     reset();
+}
+
+void MainMemory::setProc(Process* proc) {
+    _proc = proc;
+}
+
+void splitSpuRegisterAddress(uint32_t va, uint32_t& id, uint32_t& offset) {
+    offset = va & 0x3ffff;
+    id = ((va - offset - RawSpuBaseAddr) & ~RawSpuProblemOffset) / RawSpuOffset;
+}
+
+void MainMemory::writeSpuAddress(ps3_uintptr_t va, uint32_t val) {
+    uint32_t id, offset;
+    splitSpuRegisterAddress(va, id, offset);
+    if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
+        sys_raw_spu_mmio_write(id, (TagClassId)offset, val, _proc);
+        return;
+    }
+    auto th = findRawSpuThread(id);
+    *(big_uint32_t*)th->ptr(offset) = val;
+}
+
+uint32_t MainMemory::readSpuAddress(ps3_uintptr_t va) {
+    uint32_t id, offset;
+    splitSpuRegisterAddress(va, id, offset);
+    if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
+        return sys_raw_spu_mmio_read(id, (TagClassId)offset, _proc);
+    }
+    auto th = findRawSpuThread(id);
+    return *(big_uint32_t*)th->ptr(offset);
 }

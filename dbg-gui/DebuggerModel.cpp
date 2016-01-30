@@ -1,7 +1,7 @@
 #include "DebuggerModel.h"
 #include "DebugExpr.h"
 #include "../ps3emu/rsx/Rsx.h"
-#include "../ps3emu/ppu_dasm.h"
+#include "../ps3emu/ppu/ppu_dasm.h"
 #include "../ps3emu/spu/SPUDasm.h"
 #include <QStringList>
 #include "stdio.h"

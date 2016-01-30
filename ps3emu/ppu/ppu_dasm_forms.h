@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BitField.h"
+#include "../BitField.h"
 
 using BD_t = BitField<16, 30, BitFieldType::Signed, 2>;
 using BF_t = BitField<6, 9, BitFieldType::CR>;

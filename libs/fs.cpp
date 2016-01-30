@@ -2,6 +2,7 @@
 
 #include "../ps3emu/utils.h"
 #include "../ps3emu/Process.h"
+#include "../ps3emu/IDMap.h"
 #include <stdexcept>
 #include "string.h"
 #include <string>
@@ -39,50 +40,17 @@ CellFsErrno toCellErrno(int err) {
     return CELL_FS_SUCCEEDED;
 }
 
-template <typename T>
-class FileMap {
-    std::array<T, 255 - 3> _files;
-    boost::mutex _m;
-public:
-    FileMap() {
-        for (auto& f : _files)
-            f = T();
-    }
-    
-    int addFile(T file) {
-        boost::unique_lock<boost::mutex> lock(_m);
-        auto it = std::find(begin(_files), end(_files), T());
-        if (it == end(_files))
-            return -1;
-        *it = file;
-        return std::distance(begin(_files), it) + 3;
-    }
-
-    T& getFile(int descriptor) {
-        boost::unique_lock<boost::mutex> lock(_m);
-        assert(3 <= descriptor && descriptor <= 255);
-        return _files[descriptor - 3];
-    }
-
-    void removeFile(T file) {
-        boost::unique_lock<boost::mutex> lock(_m);
-        auto it = std::find(begin(_files), end(_files), T());
-        assert(it != end(_files));
-        *it = T();
-    }
-};
-
-struct DirInfo {
-    DIR* dir;
-    std::string path;
-    bool operator==(DirInfo const& other) {
-        return dir == other.dir;
-    }
-};
-
 namespace {
-    FileMap<FILE*> fileMap;
-    FileMap<DirInfo> dirMap;
+    struct DirInfo {
+        DIR* dir;
+        std::string path;
+        bool operator==(DirInfo const& other) {
+            return dir == other.dir;
+        }
+    };
+
+    ThreadSafeIDMap<int32_t, FILE*> fileMap;
+    ThreadSafeIDMap<int32_t, std::shared_ptr<DirInfo>> dirMap;
 }
 
 void copy(CellFsStat& sb, struct stat& st) {
@@ -110,7 +78,7 @@ CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc) {
 CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsStat(%d, ...)", fd);
     struct stat st;
-    auto err = fstat(fileno(fileMap.getFile(fd)), &st);
+    auto err = fstat(fileno(fileMap.get(fd)), &st);
     if (err)
         return toCellErrno(errno);
     copy(*sb, st);
@@ -155,7 +123,7 @@ CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_
     if (!f) {
         return toCellErrno(errno);
     }
-    *fd = fileMap.addFile(f);
+    *fd = fileMap.create(f);
     return CELL_OK;
 }
 
@@ -175,7 +143,7 @@ int toStdWhence(int cellWhence) {
 CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t* pos) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsLseek(%d, %x, %d, ...)", fd, offset, whence);
     auto stdWhence = toStdWhence(whence);
-    auto file = fileMap.getFile(fd);
+    auto file = fileMap.get(fd);
     *pos = ftell(file);
     if (fseek(file, offset, stdWhence))
         return toCellErrno(errno);
@@ -184,23 +152,23 @@ CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t
 
 CellFsErrno cellFsClose(int32_t fd) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsClose(%d)", fd);
-    auto file = fileMap.getFile(fd);
+    auto file = fileMap.get(fd);
     if (fclose(file))
         return toCellErrno(errno);
-    fileMap.removeFile(file);
+    fileMap.destroy(fd);
     return CELL_FS_SUCCEEDED;
 }
 
 CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t* nread, MainMemory* mm) {
     std::vector<char> localBuf(nbytes);
-    auto file = fileMap.getFile(fd);
+    auto file = fileMap.get(fd);
     *nread = fread(&localBuf[0], 1, nbytes, file);
     mm->writeMemory(buf, &localBuf[0], *nread);
     return CELL_FS_SUCCEEDED;
 }
 
 CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t* nwrite, MainMemory* mm) {
-    auto file = fileMap.getFile(fd);
+    auto file = fileMap.get(fd);
     std::vector<char> localBuf(nbytes);
     mm->readMemory(buf, &localBuf[0], nbytes);
     *nwrite = fwrite(&localBuf[0], 1, nbytes, file);
@@ -234,7 +202,7 @@ CellFsErrno cellFsGetFreeSize(const char* directory_path,
 
 CellFsErrno cellFsFsync(int32_t fd) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsFsync(%d, ...)", fd);
-    auto file = fileMap.getFile(fd);
+    auto file = fileMap.get(fd);
     syncfs(fileno(file));
     return CELL_FS_SUCCEEDED;
 }
@@ -256,14 +224,15 @@ CellFsErrno cellFsOpendir(const char* path, big_int32_t* fd, Process* proc) {
     auto dir = opendir(host.c_str());
     if (!dir)
         return toCellErrno(errno);
-    *fd = dirMap.addFile({ dir, host });
+    auto dirInfo = std::shared_ptr<DirInfo>(new DirInfo{dir, host});
+    *fd = dirMap.create(dirInfo);
     return CELL_FS_SUCCEEDED;
 }
 
 CellFsErrno cellFsReaddir(int32_t fd, CellFsDirent* dirent, big_uint64_t* nread) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsReaddir(%d, ...)", fd);
-    auto& info = dirMap.getFile(fd);
-    auto entry = readdir(info.dir);
+    auto info = dirMap.get(fd);
+    auto entry = readdir(info->dir);
     if (entry) {
         dirent->d_type = entry->d_type == DT_REG ? CELL_FS_TYPE_REGULAR : CELL_FS_TYPE_DIRECTORY;
         dirent->d_namlen = strlen(entry->d_name);
@@ -277,7 +246,7 @@ CellFsErrno cellFsReaddir(int32_t fd, CellFsDirent* dirent, big_uint64_t* nread)
 
 CellFsErrno cellFsClosedir(int32_t fd) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsClosedir(%d, ...)", fd);
-    dirMap.removeFile(dirMap.getFile(fd));
+    dirMap.destroy(fd);
     return CELL_FS_SUCCEEDED;
 }
 
@@ -287,8 +256,8 @@ CellFsErrno cellFsGetDirectoryEntries(int32_t fd,
                                       uint32_t* data_count)
 {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsGetDirectoryEntries(%d, ...)", fd);
-    auto& info = dirMap.getFile(fd);
-    auto entry = readdir(info.dir);
+    auto info = dirMap.get(fd);
+    auto entry = readdir(info->dir);
     if (entry) {
         entries->entry_name.d_type = 
             entry->d_type == DT_REG ? CELL_FS_TYPE_REGULAR : CELL_FS_TYPE_DIRECTORY;
@@ -296,7 +265,7 @@ CellFsErrno cellFsGetDirectoryEntries(int32_t fd,
         strcpy(entries->entry_name.d_name, entry->d_name);
         
         struct stat st;
-        auto err = stat((info.path + "/" + std::string(entry->d_name)).c_str(), &st);
+        auto err = stat((info->path + "/" + std::string(entry->d_name)).c_str(), &st);
         if (err)
             return toCellErrno(errno);
         copy(entries->attribute, st);

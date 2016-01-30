@@ -38,6 +38,7 @@ typedef big_uint32_t sys_addr_t;
 #define SYS_MEMORY_GRANULARITY_MASK      0x0000000000000f00ULL
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPUThread* thread);
+int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread);
 int sys_timer_usleep(usecond_t sleep_time);
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread);
@@ -95,6 +96,7 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
                               Process* proc);
 int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc);
 int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread);
+int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc);
 
 emu_void_t sys_process_exit(PPUThread* thread);
 emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread);

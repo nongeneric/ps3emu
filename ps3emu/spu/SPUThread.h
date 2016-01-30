@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../libs/ConcurrentQueue.h"
 #include "../constants.h"
 #include "../BitField.h"
 #include <boost/thread.hpp>
@@ -40,6 +41,8 @@ public:
         return _cause;
     }
 };
+
+class SPUThreadInterruptException : public virtual std::exception {};
 
 enum class SPUThreadEvent {
     Breakpoint,
@@ -171,7 +174,7 @@ struct SPUThreadExitInfo {
 class SPUThread {
     uint32_t _nip;
     R128 _rs[128];
-    R128 _ch[28];
+    uint32_t _ch[28];
     uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
     uint32_t _spu;
@@ -184,6 +187,11 @@ class SPUThread {
     int32_t _exitCode;
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
+    std::function<void()> _interruptHandler;
+    ConcurrentFifoQueue<uint32_t> _toSpuMailbox;
+    ConcurrentFifoQueue<uint32_t> _fromSpuMailbox;
+    ConcurrentFifoQueue<uint32_t> _fromSpuInterruptMailbox;
+    std::atomic<uint32_t> _status;
     void loop();
     
 public:
@@ -197,7 +205,7 @@ public:
     }
     
     template <typename V>
-    inline R128& ch(V i) {
+    inline uint32_t& ch(V i) {
         return _ch[getUValue(i)];
     }
     
@@ -240,4 +248,9 @@ public:
     void setElfSource(uint32_t src);
     uint32_t getElfSource();
     void command(uint32_t word);
+    void setInterruptHandler(std::function<void()> interruptHandler);
+    ConcurrentFifoQueue<uint32_t>& getFromSpuMailbox();
+    ConcurrentFifoQueue<uint32_t>& getFromSpuInterruptMailbox();
+    ConcurrentFifoQueue<uint32_t>& getToSpuMailbox();
+    std::atomic<uint32_t>& getStatus();
 };

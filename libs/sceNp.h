@@ -23,7 +23,9 @@ struct SceNpDrmKey {
 };
 static_assert(sizeof(SceNpDrmKey) == 16, "");
 
+int32_t sceNpDrmIsAvailable(const SceNpDrmKey *k_licensee, const char *path);
 int32_t sceNpDrmIsAvailable2(const SceNpDrmKey *k_licensee, const char *path);
+int32_t sceNpInit(uint32_t poolsize, ps3_uintptr_t poolptr);
 
 struct SceNpOnlineId {
     char data[16];
@@ -38,3 +40,4 @@ struct SceNpId {
 };
 
 int32_t sceNpManagerGetNpId(SceNpId *npId);
+int32_t sceNpDrmVerifyUpgradeLicense2(cstring_ptr_t content_id);

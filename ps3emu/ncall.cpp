@@ -89,6 +89,18 @@ uint32_t calcFnid(const char* name) {
     return md.u32[0];
 }
 
+void readString(MainMemory* mm, uint32_t va, std::string& str) {
+    constexpr size_t chunk = 16;
+    str.resize(0);
+    auto pos = 0u;
+    do {
+        str.resize(str.size() + chunk);
+        mm->readMemory(va + pos, &str[0] + pos, chunk);
+        pos += chunk;
+    } while (std::find(begin(str), end(str), 0) == end(str));
+    str = str.c_str();
+}
+
 template <int ArgN, class T, class Enable = void>
 struct get_arg {
     inline T value(PPUThread* thread) {
@@ -114,6 +126,15 @@ template <int ArgN>
 struct get_arg<ArgN, MainMemory*> {
     inline MainMemory* value(PPUThread* thread) {
         return thread->mm();
+    }
+};
+
+template <int ArgN>
+struct get_arg<ArgN, cstring_ptr_t> {
+    inline cstring_ptr_t value(PPUThread* thread) {
+        cstring_ptr_t cstr;
+        readString(thread->mm(), thread->getGPR(3 + ArgN), cstr.str);
+        return cstr;
     }
 };
 
@@ -202,17 +223,6 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
     thread->setGPR(3, f(ARG(1, f), buf.get(), len, ARG(4, f))); \
 }
 
-void readString(MainMemory* mm, uint32_t va, std::string& str) {
-    constexpr size_t chunk = 16;
-    str.resize(0);
-    auto pos = 0u;
-    do {
-        str.resize(str.size() + chunk);
-        mm->readMemory(va + pos, &str[0] + pos, chunk);
-        pos += chunk;
-    } while (std::find(begin(str), end(str), 0) == end(str));
-}
-
 uint32_t sys_fs_open_proxy(uint32_t path,
                            uint32_t flags,
                            big_uint32_t *fd,
@@ -298,6 +308,12 @@ int32_t sys_ppu_thread_create_proxy(
     return sys_ppu_thread_create(thread_id, entry, arg, prio, stacksize, flags, namestr.c_str(), proc);
 }
 
+int32_t sceNpDrmIsAvailable_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t path, MainMemory* mm) {
+    std::string str;
+    readString(mm, path, str);
+    return sceNpDrmIsAvailable(k_licensee, str.c_str());
+}
+
 int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t path, MainMemory* mm) {
     std::string str;
     readString(mm, path, str);
@@ -329,6 +345,7 @@ STUB_2(sys_dbg_set_mask_to_ppu_exception_handler);
 STUB_sys_tty_write(sys_tty_write);
 STUB_1(sys_prx_exitspawn_with_level);
 STUB_4(sys_memory_allocate);
+STUB_2(sys_memory_free);
 STUB_4(cellVideoOutConfigure);
 STUB_3(cellVideoOutGetState);
 STUB_2(cellVideoOutGetResolution);
@@ -401,6 +418,7 @@ STUB_2(sys_semaphore_post);
 STUB_8(sys_ppu_thread_create_proxy);
 STUB_3(sys_ppu_thread_join);
 STUB_2(sys_ppu_thread_exit);
+STUB_3(sys_ppu_thread_set_priority);
 STUB_4(sys_initialize_tls);
 STUB_1(sys_process_exit);
 STUB_5(cellGameBootCheck);
@@ -411,11 +429,13 @@ STUB_4(cellGameGetParamString);
 STUB_2(cellSysutilGetSystemParamInt);
 STUB_4(cellSysutilGetSystemParamString);
 STUB_2(sceNp2Init);
+STUB_2(sceNpInit);
 STUB_0(sceNp2Term);
 STUB_3(sceNpBasicSetPresence);
 STUB_2(sceNpManagerGetContentRatingFlag);
 STUB_3(sceNpBasicRegisterHandler);
 STUB_3(sceNpDrmIsAvailable2_proxy);
+STUB_3(sceNpDrmIsAvailable_proxy);
 STUB_1(sceNpManagerGetNpId);
 STUB_2(sys_rwlock_create);
 STUB_1(sys_rwlock_destroy);
@@ -460,6 +480,18 @@ STUB_2(sys_spu_thread_group_start);
 STUB_4(sys_spu_thread_group_join);
 STUB_2(sys_spu_thread_group_destroy);
 STUB_3(sys_spu_thread_get_exit_status);
+STUB_1(sceNpDrmVerifyUpgradeLicense2);
+STUB_3(sys_raw_spu_create);
+STUB_3(sys_spu_image_open);
+STUB_2(sys_raw_spu_image_load);
+STUB_4(sys_raw_spu_create_interrupt_tag);
+STUB_5(sys_interrupt_thread_establish);
+STUB_3(sys_raw_spu_set_int_mask);
+STUB_3(sys_raw_spu_get_int_stat);
+STUB_2(sys_raw_spu_read_puint_mb);
+STUB_3(sys_raw_spu_set_int_stat);
+STUB_0(sys_interrupt_thread_eoi);
+STUB_2(sys_raw_spu_destroy);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -542,11 +574,14 @@ NCallEntry ncallTable[] {
     ENTRY(cellSysutilGetSystemParamInt),
     ENTRY(cellSysutilGetSystemParamString),
     ENTRY(sceNp2Init),
+    ENTRY(sceNpInit),
     ENTRY(sceNp2Term),
     ENTRY(sceNpBasicSetPresence),
     ENTRY(sceNpManagerGetContentRatingFlag),
     ENTRY(sceNpBasicRegisterHandler),
     { "sceNpDrmIsAvailable2", calcFnid("sceNpDrmIsAvailable2"), nstub_sceNpDrmIsAvailable2_proxy },
+    { "sceNpDrmIsAvailable", calcFnid("sceNpDrmIsAvailable"), nstub_sceNpDrmIsAvailable_proxy },
+    ENTRY(sceNpDrmVerifyUpgradeLicense2),
     ENTRY(sceNpManagerGetNpId),
     ENTRY(cellSysCacheMount),
     ENTRY(cellSysCacheClear),
@@ -571,6 +606,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellSpursRunJobChain),
     ENTRY(sys_spu_image_import),
     ENTRY(sys_spu_image_close),
+    ENTRY(sys_raw_spu_image_load),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -587,6 +623,7 @@ void PPUThread::scall() {
         case 403: nstub_sys_tty_write(this); break;
         case 988: nstub_sys_dbg_set_mask_to_ppu_exception_handler(this); break;
         case 348: nstub_sys_memory_allocate(this); break;
+        case 349: nstub_sys_memory_free(this); break;
         case 141: nstub_sys_timer_usleep(this); break;
         case 801: nstub_sys_fs_open_proxy(this); break;
         case 128: nstub_sys_event_queue_create(this); break;
@@ -613,6 +650,7 @@ void PPUThread::scall() {
         case 94: nstub_sys_semaphore_post(this); break;
         case 41: nstub_sys_ppu_thread_exit(this); break;
         case 44: nstub_sys_ppu_thread_join(this); break;
+        case 47: nstub_sys_ppu_thread_set_priority(this); break;
         case 120: nstub_sys_rwlock_create(this); break;
         case 121: nstub_sys_rwlock_destroy(this); break;
         case 122: nstub_sys_rwlock_rlock(this); break;
@@ -635,6 +673,16 @@ void PPUThread::scall() {
         case 173: nstub_sys_spu_thread_group_start(this); break;
         case 178: nstub_sys_spu_thread_group_join(this); break;
         case 165: nstub_sys_spu_thread_get_exit_status(this); break;
+        case 160: nstub_sys_raw_spu_create(this); break;
+        case 156: nstub_sys_spu_image_open(this); break;
+        case 150: nstub_sys_raw_spu_create_interrupt_tag(this); break;
+        case 151: nstub_sys_raw_spu_set_int_mask(this); break;
+        case 84: nstub_sys_interrupt_thread_establish(this); break;
+        case 154: nstub_sys_raw_spu_get_int_stat(this); break;
+        case 163: nstub_sys_raw_spu_read_puint_mb(this); break;
+        case 153: nstub_sys_raw_spu_set_int_stat(this); break;
+        case 88: nstub_sys_interrupt_thread_eoi(this); break;
+        case 161: nstub_sys_raw_spu_destroy(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

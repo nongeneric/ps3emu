@@ -1,5 +1,6 @@
 #include "Process.h"
 
+#include "ppu/InterruptPPUThread.h"
 #include <boost/thread/locks.hpp>
 #include <boost/log/trivial.hpp>
 
@@ -19,6 +20,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threads.emplace_back(std::make_unique<PPUThread>(
         this, [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
     _mainMemory.setRsx(&_rsx);
+    _mainMemory.setProc(this);
     _elf.load(elfPath);
     _elf.map(&_mainMemory);
     _elf.link(&_mainMemory);
@@ -119,6 +121,22 @@ uint64_t Process::createThread(uint32_t stackSize,
     auto id = _threadIds.create(std::move(t));
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread %d created", id);
     t->run();
+    return id;
+}
+
+uint64_t Process::createInterruptThread(uint32_t stackSize,
+                                        ps3_uintptr_t entryPointDescriptorVa,
+                                        uint64_t arg) {
+    boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
+    auto t = new InterruptPPUThread(
+        this, [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); });
+    t->setArg(arg);
+    t->setEntry(entryPointDescriptorVa);
+    initNewThread(t, entryPointDescriptorVa, stackSize);
+    auto id = _threadIds.create(std::move(t));
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("interrupt thread %d created", id);
+    t->run();
+    _threads.emplace_back(std::unique_ptr<PPUThread>(t));
     return id;
 }
 

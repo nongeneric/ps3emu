@@ -1,7 +1,7 @@
 #pragma once
 
-#include "utils.h"
-#include "BitField.h"
+#include "../utils.h"
+#include "../BitField.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread.hpp>
@@ -153,6 +153,8 @@ class PPUThread {
     }
     
     void loop();
+protected:
+    virtual void innerLoop();
 public:
     PPUThread(MainMemory* mm);
     PPUThread(Process* proc,
@@ -374,4 +376,6 @@ public:
     
     void ncall(uint32_t index);
     void scall();
+    virtual void setArg(uint64_t arg);
+    ~PPUThread() = default;
 };

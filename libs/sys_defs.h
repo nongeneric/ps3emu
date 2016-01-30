@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
 #include "../ps3emu/constants.h"
 #include <boost/endian/arithmetic.hpp>
 using namespace boost::endian;
@@ -27,3 +28,7 @@ typedef big_uint64_t sys_ipc_key_t;
 
 static constexpr uint32_t CELL_EBUSY = 0x8001000A;
 static constexpr uint32_t CELL_ETIMEDOUT = 0x8001000B;
+
+struct cstring_ptr_t {
+    std::string str;
+};

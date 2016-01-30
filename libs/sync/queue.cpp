@@ -33,15 +33,14 @@ namespace {
         }
     };
     
-    ThreadSafeIDMap<sys_event_queue_t, IQueue> queues;
-    
     struct queue_port_t {
         uint64_t name;
         int32_t type;
         IQueue* queue = nullptr;
     };
 
-    ThreadSafeIDMap<sys_event_port_t, queue_port_t> ports;
+    ThreadSafeIDMap<sys_event_queue_t, std::shared_ptr<IQueue>> queues;
+    ThreadSafeIDMap<sys_event_port_t, std::shared_ptr<queue_port_t>> ports;
 }
 
 #define   SYS_SYNC_FIFO                     0x00001

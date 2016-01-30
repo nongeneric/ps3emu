@@ -103,6 +103,12 @@ int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned i
         BOOST_LOG_TRIVIAL(trace) << "stderr: " << std::string(asChar, asChar + len);
         return CELL_OK;
     }
+    if (ch == SYS_TTYP_SPU_STDOUT) {
+        fwrite(buf, 1, len, stdout);
+        fflush(stdout);
+        BOOST_LOG_TRIVIAL(trace) << "spu: " << std::string(asChar, asChar + len);
+        return CELL_OK;
+    }
     throw std::runtime_error(ssnprintf("unknown channel %d", ch));
 }
 
@@ -120,10 +126,16 @@ constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_allocate(%d,...)", size);
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_allocate(%x,...)", size);
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
     *alloc_addr = thread->mm()->malloc(size);
+    return CELL_OK;
+}
+
+int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_free(%x)", start_addr);
+    thread->mm()->free(start_addr);
     return CELL_OK;
 }
 
@@ -249,6 +261,9 @@ int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
     return CELL_EBUSY;
 }
 
+#define SYS_PPU_THREAD_CREATE_JOINABLE 0x0000000000000001
+#define SYS_PPU_THREAD_CREATE_INTERRUPT 0x0000000000000002
+
 int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
                               ps3_uintptr_t entry,
                               uint64_t arg,
@@ -258,14 +273,24 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
                               const char *threadname,
                               Process* proc)
 {
-    assert(flags == 1); // joinable
-    *thread_id = proc->createThread(stacksize, entry, arg);
+    assert(flags == SYS_PPU_THREAD_CREATE_JOINABLE ||
+           flags == SYS_PPU_THREAD_CREATE_INTERRUPT);
+    if (flags == SYS_PPU_THREAD_CREATE_JOINABLE) {
+        *thread_id = proc->createThread(stacksize, entry, arg);
+    } else {
+        *thread_id = proc->createInterruptThread(stacksize, entry, arg);
+    }
     return CELL_OK;
 }
 
 int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc) {
     auto thread = proc->getThread(thread_id);
     *exit_code = thread->join();
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_ppu_thread_set_priority: not implemented");
     return CELL_OK;
 }
 

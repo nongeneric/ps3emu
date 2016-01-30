@@ -1,9 +1,9 @@
 #include "ppu_dasm.h"
 
-#include "../ps3emu/Process.h"
-#include "dasm_utils.h"
+#include "../Process.h"
+#include "../dasm_utils.h"
 #include "ppu_dasm_forms.h"
-#include "utils.h"
+#include "../utils.h"
 
 #include <boost/type_traits.hpp>
 #include <boost/endian/conversion.hpp>
@@ -2449,6 +2449,14 @@ EMU(ISYNC, XLForm_1) {
     __sync_synchronize();
 }
 
+PRINT(EIEIO, XForm_24) {
+    *result = "eieio";
+}
+
+EMU(EIEIO, XForm_24) {
+    __sync_synchronize();
+}
+
 PRINT(TD, XForm_25) {
     *result = format_nnn("td", i->TO, i->RA, i->RB);
 }
@@ -3333,6 +3341,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 150: invoke(STWCX);
                 case 214: invoke(STDCX);
                 case 199: invoke(STVEWX);
+                case 854: invoke(EIEIO);
                 default: throw IllegalInstructionException();
             }
             break;

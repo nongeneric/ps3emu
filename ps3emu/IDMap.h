@@ -6,9 +6,9 @@
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/mutex.hpp>
 
-template <typename ID, typename T>
+template <typename ID, typename T, int InitialID = 1>
 class IDMap {
-    ID _maxId = 1;
+    ID _maxId = InitialID;
     std::map<ID, T> _map;
 public:
     ID create(T&& t) {
@@ -34,12 +34,12 @@ public:
     }
 };
 
-template <typename ID, typename T>
+template <typename ID, typename T, int InitialID = 1>
 class ThreadSafeIDMap {
-    IDMap<ID, std::shared_ptr<T>> _map;
+    IDMap<ID, T, InitialID> _map;
     boost::mutex _m;
 public:
-    ID create(std::shared_ptr<T> t) {
+    ID create(T t) {
         boost::lock_guard<boost::mutex> lock(_m);
         return _map.create(std::move(t));
     }
@@ -49,12 +49,12 @@ public:
         return _map.destroy(id);
     }
     
-    std::shared_ptr<T> get(ID id) {
+    T get(ID id) {
         boost::lock_guard<boost::mutex> lock(_m);
         return _map.get(id);
     }
     
-    std::map<ID, std::shared_ptr<T>>& map() {
+    std::map<ID, T>& map() {
         return _map.map();
     }
 };

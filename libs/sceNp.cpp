@@ -26,6 +26,11 @@ int32_t sceNpBasicRegisterHandler(const SceNpCommunicationId* context,
     return CELL_OK;
 }
 
+int32_t sceNpDrmIsAvailable(const SceNpDrmKey* k_licensee, const char* path) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
 // this function is equivalent to sceNpDrmIsAvailable, because the emu completes the check immediately
 int32_t sceNpDrmIsAvailable2(const SceNpDrmKey* k_licensee, const char* path) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("sceNpDrmIsAvailable2(..., %s)", path);
@@ -35,4 +40,14 @@ int32_t sceNpDrmIsAvailable2(const SceNpDrmKey* k_licensee, const char* path) {
 int32_t sceNpManagerGetNpId(SceNpId* npId) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return SCE_NP_ERROR_OFFLINE;
+}
+
+int32_t sceNpInit(uint32_t poolsize, ps3_uintptr_t poolptr) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
+int32_t sceNpDrmVerifyUpgradeLicense2(cstring_ptr_t content_id) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sceNpDrmVerifyUpgradeLicense2(%s)", content_id);
+    return CELL_OK;
 }

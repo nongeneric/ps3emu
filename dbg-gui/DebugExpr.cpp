@@ -1,6 +1,6 @@
 #include "DebugExpr.h"
 
-#include "../ps3emu/PPUThread.h"
+#include "../ps3emu/ppu/PPUThread.h"
 #include "../ps3emu/spu/SPUThread.h"
 #include "../ps3emu/MainMemory.h"
 #include "../ps3emu/utils.h"

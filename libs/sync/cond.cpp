@@ -11,7 +11,7 @@ namespace {
         IMutex* m;
     };
     
-    ThreadSafeIDMap<sys_cond_t, cv_info_t> cvs;
+    ThreadSafeIDMap<sys_cond_t, std::shared_ptr<cv_info_t>> cvs;
 }
 
 int32_t sys_cond_create(sys_cond_t* cond_id, 

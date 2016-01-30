@@ -5,9 +5,9 @@ project(ps3emu)
 set(SRC
     ELFLoader.cpp
     ELFLoader.h
-    ppu_dasm.cpp
-    ppu_dasm.h
-    ppu_dasm_forms.h
+    ppu/ppu_dasm.cpp
+    ppu/ppu_dasm.h
+    ppu/ppu_dasm_forms.h
     ncall.cpp
     utils.h
     utils.cpp
@@ -15,8 +15,10 @@ set(SRC
     MainMemory.cpp
     Process.h
     Process.cpp
-    PPUThread.h
-    PPUThread.cpp
+    ppu/PPUThread.h
+    ppu/PPUThread.cpp
+    ppu/InterruptPPUThread.h
+    ppu/InterruptPPUThread.cpp
     ContentManager.h
     ContentManager.cpp
     spu/SPUThread.cpp

@@ -2484,15 +2484,20 @@ PRINT(rdch) {
 
 EMU(rdch) {
     auto ch = i->CA.u();
+    auto& rt = th->r(i->RT); 
+    rt.w<1>() = 0;
+    rt.dw<1>() = 0;
+    if (ch == SPU_RdInMbox) {
+        rt.w<0>() = th->getToSpuMailbox().receive(0);
+        return;
+    }
     if (ch == MFC_RdTagStat) {
         // as every MFC request completes immediately
         // it is possible to just always return the mask set last
         ch = MFC_WrTagMask;
     }
     auto& ca = th->ch(ch);
-    auto& rt = th->r(i->RT); 
-    rt.dw<0>() = ca.dw<0>();
-    rt.dw<1>() = ca.dw<1>();
+    rt.w<0>() = ca;
 }
 
 PRINT(rchcnt) {
@@ -2502,10 +2507,14 @@ PRINT(rchcnt) {
 EMU(rchcnt) {
     auto ch = i->CA.u();
     auto& rt = th->r(i->RT);
+    rt.w<1>() = 0;
+    rt.dw<1>() = 0;
+    if (ch == SPU_RdInMbox) {
+        rt.w<0>() = 0;
+        return;
+    }
     if (ch == MFC_RdTagStat) {
         rt.w<0>() = 1;
-        rt.w<1>() = 0;
-        rt.dw<1>() = 0;
         return;
     }
     throw std::runtime_error("rchcnt of unknown channel");
@@ -2516,14 +2525,24 @@ PRINT(wrch) {
 }
 
 EMU(wrch) {
-    auto& ca = th->ch(i->CA);
-    auto& rt = th->r(i->RT); 
+    auto ch = i->CA.u();
+    auto& rt = th->r(i->RT);
+    if (ch == SPU_WrOutIntrMbox) {
+        th->getFromSpuInterruptMailbox().send(rt.w<0>());
+        th->getStatus() |= 1;
+        throw SPUThreadInterruptException();
+    }
+    if (ch == SPU_WrOutMbox) {
+        th->getFromSpuMailbox().send(rt.w<0>());
+        th->getStatus() |= 1;
+        return;
+    }
+    auto& ca = th->ch(ch);
     if (i->CA.u() == MFC_Cmd) {
         th->command(rt.w<0>());
-    } else {
-        ca.dw<0>() = rt.dw<0>();
-        ca.dw<1>() = rt.dw<1>();   
+        return;
     }
+    ca = rt.w<0>();
 }
 
 template <DasmMode M, typename S>

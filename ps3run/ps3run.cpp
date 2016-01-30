@@ -1,5 +1,5 @@
 #include "../ps3emu/Process.h"
-#include "../ps3emu/ppu_dasm.h"
+#include "../ps3emu/ppu/ppu_dasm.h"
 #include "stdio.h"
 #include <boost/log/utility/setup/file.hpp>
 #include <boost/log/trivial.hpp>

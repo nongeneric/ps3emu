@@ -636,3 +636,18 @@ TEST_CASE("spu_getting_argp") {
         "## libdma : sample_dma_getting_argp SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("raw_spu_printf") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/raw_spu_printf/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "Initializing SPUs\n"
+        "sys_raw_spu_create succeeded. raw_spu number is 0\n"
+        "Hello, World 1\n"
+        "Hello, World 2\n"
+        "a, 12, 20, 0x1e, 0X28,   50, \"test\"\n"
+    );
+}

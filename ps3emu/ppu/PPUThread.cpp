@@ -1,5 +1,5 @@
 #include "PPUThread.h"
-#include "Process.h"
+#include "../Process.h"
 #include "ppu_dasm.h"
 #include <boost/log/trivial.hpp>
 
@@ -24,11 +24,7 @@ PPUThread::PPUThread(Process* proc,
         r = 0;
 }
 
-void PPUThread::loop() {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
-    _eventHandler(this, PPUThreadEvent::Started);
-    _dbgPaused = true;
-    
+void PPUThread::innerLoop() {
     for (;;) {
         if (_singleStep) {
             _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
@@ -72,6 +68,14 @@ void PPUThread::loop() {
             break;
         }
     }
+}
+
+void PPUThread::loop() {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
+    _eventHandler(this, PPUThreadEvent::Started);
+    _dbgPaused = true;
+    
+    innerLoop();
     
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop finished (%s)", 
         _threadFinishedGracefully ? "gracefully" : "with a failure"
@@ -137,3 +141,5 @@ void PPUThread::setPriority(int priority) {
 int PPUThread::priority() {
     return _priority;
 }
+
+void PPUThread::setArg(uint64_t arg) { }

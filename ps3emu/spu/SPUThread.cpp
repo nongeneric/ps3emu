@@ -40,6 +40,11 @@ void SPUThread::loop() {
             _exitCode = e.errorCode();
             _cause = e.cause();
             break;
+        } catch (StopSignalException& e) {
+            _status |= 0b10;
+            break;
+        } catch (SPUThreadInterruptException& e) {
+            _interruptHandler();
         } catch (std::exception& e) {
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("spu thread exception: %s", e.what());
             setNip(cia);
@@ -70,6 +75,7 @@ SPUThread::SPUThread(Process* proc,
       _singleStep(false),
       _exitCode(0) {
     memset(_rs, 0, sizeof(_rs));
+    _status = 0b11000; // BTHSM
 }
 
 SPUThreadExitInfo SPUThread::join() {
@@ -120,21 +126,41 @@ void SPUThread::command(uint32_t word) {
     } cmd = { word };
     switch (cmd.opcode.u()) {
         case MFC_GET_CMD: {
-            auto ea = ch(MFC_EAL).w<0>();
-            auto ls = ptr(ch(MFC_LSA).w<0>());
-            auto size = ch(MFC_Size).w<0>();
+            auto ea = ch(MFC_EAL);
+            auto ls = ptr(ch(MFC_LSA));
+            auto size = ch(MFC_Size);
             _proc->mm()->readMemory(ea, ls, size);
             __sync_synchronize();
             break;
         }
         case MFC_PUT_CMD: {
-            auto ea = ch(MFC_EAL).w<0>();
-            auto ls = ptr(ch(MFC_LSA).w<0>());
-            auto size = ch(MFC_Size).w<0>();
+            auto ea = ch(MFC_EAL);
+            auto ls = ptr(ch(MFC_LSA));
+            auto size = ch(MFC_Size);
             _proc->mm()->writeMemory(ea, ls, size);
             __sync_synchronize();
             break;
         }
         default: throw std::runtime_error("unknown mfc command");
     }
+}
+
+void SPUThread::setInterruptHandler(std::function<void()> interruptHandler) {
+    _interruptHandler = interruptHandler;
+}
+
+std::atomic<uint32_t>& SPUThread::getStatus() {
+    return _status;
+}
+
+ConcurrentFifoQueue<uint32_t>& SPUThread::getFromSpuMailbox() {
+    return _fromSpuMailbox;
+}
+
+ConcurrentFifoQueue<uint32_t>& SPUThread::getFromSpuInterruptMailbox() {
+    return _fromSpuInterruptMailbox;
+}
+
+ConcurrentFifoQueue<uint32_t>& SPUThread::getToSpuMailbox() {
+    return _toSpuMailbox;
 }

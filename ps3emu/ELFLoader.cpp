@@ -1,5 +1,5 @@
 #include "ELFLoader.h"
-#include "PPUThread.h"
+#include "ppu/PPUThread.h"
 #include "utils.h"
 #include <assert.h>
 #include <stdio.h>

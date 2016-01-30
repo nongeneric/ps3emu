@@ -1,7 +1,7 @@
 #pragma once
 
 #include "utils.h"
-#include "ppu_dasm.h"
+#include "ppu/ppu_dasm.h"
 #include <boost/type_traits.hpp>
 #include <string>
 
