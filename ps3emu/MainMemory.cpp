@@ -72,8 +72,7 @@ void MainMemory::copy(ps3_uintptr_t va,
 
 void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
     if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        assert(len == 4);
-        writeSpuAddress(va, *(big_uint32_t*)buf);
+        writeSpuAddress(va, *(big_uint32_t*)buf, len);
         return;
     }
     if (coversRsxRegsRange(va, len)) {
@@ -298,15 +297,20 @@ void splitSpuRegisterAddress(uint32_t va, uint32_t& id, uint32_t& offset) {
     id = ((va - offset - RawSpuBaseAddr) & ~RawSpuProblemOffset) / RawSpuOffset;
 }
 
-void MainMemory::writeSpuAddress(ps3_uintptr_t va, uint32_t val) {
+void MainMemory::writeSpuAddress(ps3_uintptr_t va, uint64_t val, uint32_t len) {
     uint32_t id, offset;
     splitSpuRegisterAddress(va, id, offset);
     if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
+        assert(len == 4);
         sys_raw_spu_mmio_write(id, (TagClassId)offset, val, _proc);
         return;
     }
     auto th = findRawSpuThread(id);
-    *(big_uint32_t*)th->ptr(offset) = val;
+    if (len == 4) {
+        *(big_uint32_t*)th->ptr(offset) = val;
+    } else if (len == 8) {
+        *(big_uint64_t*)th->ptr(offset) = val;
+    }
 }
 
 uint32_t MainMemory::readSpuAddress(ps3_uintptr_t va) {

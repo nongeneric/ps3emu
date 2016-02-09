@@ -267,5 +267,10 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     return CELL_OK;
 }
 
+emu_void_t cellGcmSetGraphicsHandler(uint32_t handler) {
+    // assume no gcm errors are ever encountered
+    return emu_void;
+}
+
 }}
 

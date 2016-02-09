@@ -63,11 +63,10 @@ class TextureIterator : std::iterator<std::forward_iterator_tag, glm::vec4> {
     uint8_t* _ptr;
     unsigned _pos = 0;
     unsigned _pitch;
-    unsigned _width;
     unsigned _size;
     TextureIterator(TextureIterator const&) = delete;
 public:
-    TextureIterator(uint8_t* buf, unsigned pitch, unsigned width, unsigned size);
+    TextureIterator(uint8_t* buf, unsigned pitch, unsigned size);
     TextureIterator& operator++();
     bool operator==(TextureIterator const& other);
     uint8_t* operator*();

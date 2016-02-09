@@ -20,7 +20,6 @@ public:
     
     void release(ps3_uintptr_t va, uint32_t size) {
         assert(Base <= va && va < Base + Size);
-        auto firstBlock = (va - Base) / BlockSize;
         auto blockCount = ((va - Base) + BlockSize - 1) / BlockSize;
         for (auto i = 0u; i < blockCount; ++i) {
             _blocks[i] = false;

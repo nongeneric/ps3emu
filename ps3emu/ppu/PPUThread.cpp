@@ -143,3 +143,7 @@ int PPUThread::priority() {
 }
 
 void PPUThread::setArg(uint64_t arg) { }
+
+void PPUThread::yield() {
+    boost::this_thread::yield();
+}

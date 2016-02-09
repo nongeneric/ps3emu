@@ -308,7 +308,7 @@ void GLTexture::update(MainMemory* mm) {
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     
     TextureReader reader(texelFormat, _info);
-    TextureIterator it(&buf[0], _info.pitch, _info.width, getTexelSize(texelFormat));
+    TextureIterator it(&buf[0], _info.pitch, getTexelSize(texelFormat));
     for (auto i = 0; i < _info.width * _info.height; ++i) {
         reader.read(*it, conv[i]);
         ++it;
@@ -418,8 +418,8 @@ void TextureReader::read(uint8_t* ptr, vec4& tex) {
     tex = _read(ptr);
 }
 
-TextureIterator::TextureIterator(uint8_t* buf, unsigned int pitch, unsigned width, unsigned size)
-    : _ptr(buf), _pitch(pitch), _width(width), _size(size) { }
+TextureIterator::TextureIterator(uint8_t* buf, unsigned int pitch, unsigned size)
+    : _ptr(buf), _pitch(pitch), _size(size) { }
     
 TextureIterator& TextureIterator::operator++() {
     _pos += _size;

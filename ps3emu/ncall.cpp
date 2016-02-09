@@ -492,6 +492,8 @@ STUB_2(sys_raw_spu_read_puint_mb);
 STUB_3(sys_raw_spu_set_int_stat);
 STUB_0(sys_interrupt_thread_eoi);
 STUB_2(sys_raw_spu_destroy);
+STUB_1(sys_ppu_thread_yield);
+STUB_1(cellGcmSetGraphicsHandler);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -607,6 +609,7 @@ NCallEntry ncallTable[] {
     ENTRY(sys_spu_image_import),
     ENTRY(sys_spu_image_close),
     ENTRY(sys_raw_spu_image_load),
+    ENTRY(cellGcmSetGraphicsHandler),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -683,6 +686,7 @@ void PPUThread::scall() {
         case 153: nstub_sys_raw_spu_set_int_stat(this); break;
         case 88: nstub_sys_interrupt_thread_eoi(this); break;
         case 161: nstub_sys_raw_spu_destroy(this); break;
+        case 43: nstub_sys_ppu_thread_yield(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

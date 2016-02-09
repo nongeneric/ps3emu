@@ -682,7 +682,7 @@ EMU(fsm) {
     auto& rt = th->r(i->RT);
     std::bitset<4> bits(ra.w<0>());
     for (int i = 0; i < 4; ++i) {
-        rt.hw(i) = bits[3 - i] ? 0xffffffff : 0;
+        rt.hw(i) = bits[3 - i] ? -1 : 0;
     }
 }
 
@@ -2375,7 +2375,7 @@ EMU(fceq) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = ra.fs(i) == rb.fs(i) ? ~0ul : 0;
+        rt.w(i) = ra.fs(i) == rb.fs(i) ? -1 : 0;
     }
 }
 
@@ -2388,7 +2388,7 @@ EMU(fcmeq) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = std::abs(ra.fs(i)) == std::abs(rb.fs(i)) ? ~0ul : 0;
+        rt.w(i) = std::abs(ra.fs(i)) == std::abs(rb.fs(i)) ? -1 : 0;
     }
 }
 
@@ -2401,7 +2401,7 @@ EMU(fcgt) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = ra.fs(i) > rb.fs(i) ? ~0ul : 0;
+        rt.w(i) = ra.fs(i) > rb.fs(i) ? -1 : 0;
     }
 }
 
@@ -2414,7 +2414,7 @@ EMU(fcmgt) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = std::abs(ra.fs(i)) > std::abs(rb.fs(i)) ? ~0ul : 0;
+        rt.w(i) = std::abs(ra.fs(i)) > std::abs(rb.fs(i)) ? -1 : 0;
     }
 }
 

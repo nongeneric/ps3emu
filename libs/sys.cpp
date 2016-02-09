@@ -310,3 +310,7 @@ int32_t sys_process_is_stack(ps3_uintptr_t p) {
     return StackArea <= p && p < StackArea + StackAreaSize;
 }
 
+emu_void_t sys_ppu_thread_yield(PPUThread* thread) {
+    thread->yield();
+    return emu_void;
+}

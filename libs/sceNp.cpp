@@ -48,6 +48,6 @@ int32_t sceNpInit(uint32_t poolsize, ps3_uintptr_t poolptr) {
 }
 
 int32_t sceNpDrmVerifyUpgradeLicense2(cstring_ptr_t content_id) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sceNpDrmVerifyUpgradeLicense2(%s)", content_id);
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sceNpDrmVerifyUpgradeLicense2(%s)", content_id.str);
     return CELL_OK;
 }

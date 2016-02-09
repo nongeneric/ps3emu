@@ -735,7 +735,7 @@ namespace ShaderRewriter {
             auto ref = apply_visitor(VertexRefVisitor(), x.ref);
             auto refExpr = new Variable("v_out", ref);
             return new ComponentMask(refExpr,
-                { x.mask & 8, x.mask & 4, x.mask & 2, x.mask & 1 }
+                { bool(x.mask & 8), bool(x.mask & 4), bool(x.mask & 2), bool(x.mask & 1) }
             );
         }
         
@@ -763,7 +763,7 @@ namespace ShaderRewriter {
             auto expr = convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle);
             if (x.mask != 0xf) {
                 expr = new ComponentMask(expr, 
-                    { x.mask & 8, x.mask & 4, x.mask & 2, x.mask & 1 });
+                    { bool(x.mask & 8), bool(x.mask & 4), bool(x.mask & 2), bool(x.mask & 1) });
             }
             return expr;
         }
@@ -774,7 +774,7 @@ namespace ShaderRewriter {
         }
         
         Expression* operator()(vertex_arg_cond_reg_ref_t x) const {
-            auto mask = dest_mask_t { x.mask & 8, x.mask & 4, x.mask & 2, x.mask & 1 };
+            auto mask = dest_mask_t { bool(x.mask & 8), bool(x.mask & 4), bool(x.mask & 2), bool(x.mask & 1) };
             auto index = new IntegerLiteral(x.c);
             return new ComponentMask(new Variable("c", index), mask);
         }

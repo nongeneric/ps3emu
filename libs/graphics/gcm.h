@@ -72,5 +72,6 @@ int32_t cellGcmMapMainMemory(ps3_uintptr_t address,
                              Process* proc);
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler);
 emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc);
+emu_void_t cellGcmSetGraphicsHandler(uint32_t handler);
 
 }}

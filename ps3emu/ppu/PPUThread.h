@@ -376,6 +376,7 @@ public:
     
     void ncall(uint32_t index);
     void scall();
+    void yield();
     virtual void setArg(uint64_t arg);
     ~PPUThread() = default;
 };

@@ -399,19 +399,60 @@ int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
         rawSpu->thread->getToSpuMailbox().send(value);
         return CELL_OK;
     }
+    if (classId == TagClassId::_MFC_LSA) {
+        rawSpu->thread->ch(MFC_LSA) = value;
+        return CELL_OK;
+    }
+    if (classId == TagClassId::_MFC_EAH) {
+        rawSpu->thread->ch(MFC_EAH) = value;
+        return CELL_OK;
+    }
+    if (classId == TagClassId::_MFC_EAL) {
+        rawSpu->thread->ch(MFC_EAL) = value;
+        return CELL_OK;
+    }
+    if (classId == TagClassId::MFC_Size_Tag) {
+        rawSpu->thread->ch(MFC_Size) = value >> 16;
+        rawSpu->thread->ch(MFC_TagID) = value & 0xff;
+        return CELL_OK;
+    }
+    if (classId == TagClassId::MFC_Class_CMD) {
+        rawSpu->thread->command(value);
+        return CELL_OK;
+    }
+    if (classId == TagClassId::Prxy_QueryMask) {
+        rawSpu->thread->ch(MFC_WrTagMask) = value;
+        return CELL_OK;
+    }
+    if (classId == TagClassId::Prxy_QueryType) {
+        // do nothing, every request is completed immediately and
+        // as such there is no difference between any (01) and all (10) tag groups
+        // also disabling completion (00) notifications makes no sense
+        return CELL_OK;
+    }
+    if (classId == TagClassId::SPU_NPC) {
+        rawSpu->thread->setNip(value);
+        return CELL_OK;
+    }
     throw std::runtime_error("unknown mmio offset");
 }
 
 uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc) {
-    if (classId == TagClassId::SPU_Status) {
-        auto rawSpu = rawSpus.get(id);
-        return rawSpu->thread->getStatus();
+    auto rawSpu = rawSpus.get(id);
+    switch (classId) {
+        case TagClassId::SPU_Status: return rawSpu->thread->getStatus();
+        case TagClassId::SPU_Out_MBox:
+            return rawSpu->thread->getFromSpuMailbox().receive(0);
+        case TagClassId::MFC_Class_CMD: return rawSpu->thread->ch(MFC_Cmd);
+        case TagClassId::MFC_QStatus:
+            return 0x8000ffff; // all mfc requests complete immediately
+        // mailbox queues are implemented as blocking so there is no need for PPU to
+        // busy-wait on them
+        // 0x010101 means OutIntrMbox and OutMbox contain a single item; InMbox has
+        // at least one empty slot
+        case TagClassId::SPU_MBox_Status: return 0x010101;
+        default: throw std::runtime_error("unknown mmio offset");
     }
-    if (classId == TagClassId::SPU_Out_MBox) {
-        auto rawSpu = rawSpus.get(id);
-        return rawSpu->thread->getFromSpuMailbox().receive(0);
-    }
-    throw std::runtime_error("unknown mmio offset");
 }
 
 int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,

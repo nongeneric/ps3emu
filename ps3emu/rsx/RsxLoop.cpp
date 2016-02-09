@@ -678,7 +678,7 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001d88: {
             //name = "CELL_GCM_NV4097_SET_SHADER_WINDOW";
             auto arg = readarg(1);
-            ShaderWindow(arg & 0xfff, (arg >> 12) & 0xf, (arg >> 16) && 0xffff);
+            ShaderWindow(arg & 0xfff, (arg >> 12) & 0xf, (arg >> 16) & 0xffff);
             break;
         }
         case 0x00001d8c:
