@@ -53,11 +53,11 @@ std::array<float, 4> parseColor(uint32_t raw) {
 }
 
 int64_t Rsx::interpret(uint32_t get) {
-    MethodHeader header { _mm->load<4>(RsxFbBaseAddr + get) };
+    MethodHeader header { _mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get)) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
         assert(n != 0);\
-        return _mm->load<4>(RsxFbBaseAddr + get + 4 * n);\
+        return _mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get) + 4 * n);\
     })(x)
     if (header.val == 0) {
         BOOST_LOG_TRIVIAL(trace) << "rsx nop";
@@ -867,7 +867,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_SOURCE";
             break;
         case 0x00006188:
-            name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_DESTIN";
+            //name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_DESTIN";
+            ContextDmaImageDestin(readarg(1));
             break;
         case 0x00006300: {
             //name = "CELL_GCM_NV3062_SET_COLOR_FORMAT";

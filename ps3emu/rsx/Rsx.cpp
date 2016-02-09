@@ -169,6 +169,7 @@ struct TransferInfo {
     uint16_t outSizeY; 
     uint16_t inSizeX;
     uint16_t inSizeY;
+    MemoryLocation destLocation = MemoryLocation::Local;
 };
 
 struct BufferCacheKey {
@@ -444,7 +445,7 @@ void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
 void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", size);
     auto bytes = size * 4;
-    auto src = _mm->getMemoryPointer(RsxFbBaseAddr + locationOffset, bytes);
+    auto src = _mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, locationOffset), bytes);
     memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], src, bytes);
     _context->vertexShaderDirty = true;
     _context->vertexLoadOffset += bytes;
@@ -461,9 +462,11 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
 void Rsx::ShaderProgram(uint32_t locationOffset) {
     // loads fragment program byte code from locationOffset-1 up to the last command
     // (with the "#last command" bit)
+    locationOffset -= CELL_GCM_LOCATION_MAIN;
+    auto ea = rsxOffsetToEa(MemoryLocation::Local, locationOffset);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _mm->load<4>(locationOffset - 1 + RsxFbBaseAddr));
-    _context->fragmentVa = RsxFbBaseAddr + locationOffset - 1;
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _mm->load<4>(ea));
+    _context->fragmentVa = ea;
     _context->fragmentShaderDirty = true;
 }
 
@@ -975,7 +978,7 @@ void Rsx::updateTextures() {
             auto textureUnit = i + VertexTextureUnit;
             auto& info = sampler.texture;
             TextureCacheKey key { 
-                addressToMainMemory(info.location, info.offset),
+                rsxOffsetToEa(info.location, info.offset),
                 info.width,
                 info.height,
                 info.format
@@ -1019,14 +1022,14 @@ void Rsx::updateTextures() {
     for (auto& sampler : _context->fragmentTextureSamplers) {
         if (sampler.enable) {
             auto textureUnit = i + FragmentTextureUnit;
-            auto va = addressToMainMemory(sampler.texture.location, sampler.texture.offset);
+            auto va = rsxOffsetToEa(sampler.texture.location, sampler.texture.offset);
             auto surfaceTex = _context->framebuffer->findTexture(va);
             if (surfaceTex) {
                 glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
             } else {
                 auto& info = sampler.texture;
                 TextureCacheKey key { 
-                    addressToMainMemory(info.location, info.offset),
+                    rsxOffsetToEa(info.location, info.offset),
                     info.width,
                     info.height,
                     info.format
@@ -1394,9 +1397,6 @@ void Rsx::initGcm() {
     _context->localMemory.reset(new uint8_t[GcmLocalMemorySize]);
     _mm->provideMemory(RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemory.get());
     
-    // remap io to point to the buffer as well
-    _mm->map(_gcmIoAddress, RsxFbBaseAddr, _gcmIoSize);
-    
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
     _context->vertexConstBuffer = GLBuffer(GLBufferType::Dynamic, constBufferSize);
     
@@ -1439,7 +1439,7 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
         if (!input.enabled)
             continue;
    
-        auto va = addressToMainMemory(MemoryLocation::Local, format.offset);
+        auto va = rsxOffsetToEa(MemoryLocation::Local, format.offset);
         auto bufferVa = va + first * format.stride;
         auto bufferSize = count * format.stride;
         
@@ -1512,7 +1512,9 @@ void Rsx::Color(std::vector<uint32_t> const& vec) {
     // TODO: calc image
     auto pos = _context->transfer.pointX * 4;
     for (auto v : vec) {
-        _mm->store<4>(_context->transfer.offsetDestin + RsxFbBaseAddr + pos, v);
+        auto ea = rsxOffsetToEa(_context->transfer.destLocation,
+                                _context->transfer.offsetDestin + pos);
+        _mm->store<4>(ea, v);
         pos += 4;
     }
 }
@@ -1536,4 +1538,12 @@ void Rsx::watchCaches() {
     _context->bufferCache.watch(setMemoryBreak);
     _context->textureCache.watch(setMemoryBreak);
     _context->fragmentShaderCache.watch(setMemoryBreak);
+}
+
+void Rsx::ContextDmaImageDestin(uint32_t location) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaImageDestin(%x)", location);
+    location -= CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER;
+    _context->transfer.destLocation = location == CELL_GCM_LOCATION_LOCAL
+                                          ? MemoryLocation::Local
+                                          : MemoryLocation::Main;
 }

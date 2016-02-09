@@ -399,7 +399,7 @@ public:
         return false;
     }
     
-    virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) {
+    virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) override {
         if (!_thread || !_thread->mm()->isAllocated(row))
             return false;
         uint32_t instr;

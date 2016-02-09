@@ -98,3 +98,22 @@ inline void split128(uint128_t i, float* fs) {
 
 void ums_sleep(uint64_t microseconds);
 std::string print_hex(const void* buf, int len);
+
+template <typename T, typename Iter, typename IsEmptyPred>
+Iter findGap(Iter begin, Iter end, unsigned width, IsEmptyPred isEmpty) {
+    auto current = begin;
+    auto count = 0u;
+    while (begin != end) {
+        if (isEmpty(*current)) {
+            count++;
+        } else {
+            current = begin;
+            count = 0;
+        }
+        if (count == width)
+            break;
+        ++begin;
+    }
+    assert(count == width);
+    return current;
+}

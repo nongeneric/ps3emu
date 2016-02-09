@@ -1,6 +1,7 @@
 #include "../ps3emu/MainMemory.h"
 #include "../ps3emu/ppu/ppu_dasm.h"
 #include "../ps3emu/ppu/PPUThread.h"
+#include "../ps3emu/InternalMemoryManager.h"
 #include <vector>
 #include <catch.hpp>
 
@@ -53,6 +54,21 @@ TEST_CASE("provide memory") {
     buf[2] = 0xcc;
     buf[3] = 0xdd;
     REQUIRE( mm.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0xaabbccdd );
+}
+
+TEST_CASE("internal alloc") {
+    MainMemory mm;
+    InternalMemoryManager internal;
+    internal.setMainMemory(&mm);
+    uint32_t ea;
+    auto pair = internal.internalAlloc<128, std::pair<uint32_t, uint32_t>>(&ea, 10, 20);
+    REQUIRE( pair->first == 10 );
+    REQUIRE( pair->second == 20 );
+    
+    pair->first = 0xaaaaaaaa;
+    pair->second = 0xbbbbbbbb;
+    REQUIRE( mm.load<sizeof(int)>(ea) == 0xaaaaaaaa );
+    REQUIRE( mm.load<sizeof(int)>(ea + sizeof(int)) == 0xbbbbbbbb );
 }
 
 TEST_CASE("fixed loads") {

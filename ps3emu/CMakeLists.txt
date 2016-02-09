@@ -21,6 +21,8 @@ set(SRC
     ppu/InterruptPPUThread.cpp
     ContentManager.h
     ContentManager.cpp
+    InternalMemoryManager.h
+    InternalMemoryManager.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
     shaders/shader_dasm.h

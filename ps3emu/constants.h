@@ -8,6 +8,9 @@ typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
 static constexpr emu_void_t emu_void = 0;
 
+static constexpr ps3_uintptr_t EmuInternalArea = 0x100000;
+static constexpr ps3_uintptr_t EmuInternalAreaSize = 0x1000000;
+
 static constexpr ps3_uintptr_t HeapArea = 0x30000000;
 static constexpr uint32_t HeapAreaSize = 0x10000000;
 
@@ -31,9 +34,7 @@ static constexpr uint32_t TLSAreaSize = 0x7000000u;
 
 static constexpr uint32_t DefaultStackSize = 0x10000u;
 
-static constexpr ps3_uintptr_t DefaultGcmBufferOverflowCallback = 0x7f000000;
-static constexpr ps3_uintptr_t DefaultGcmDefaultContextData = DefaultGcmBufferOverflowCallback + 8;
-static constexpr ps3_uintptr_t FunctionDescriptorsVa = DefaultGcmDefaultContextData + 16;
+static constexpr ps3_uintptr_t FunctionDescriptorsVa = 0x7f000000;
 
 static constexpr uint32_t DefaultMainMemoryPageBits = 12;
 static constexpr ps3_uintptr_t MaxMainMemoryAddress = 0xffffffff;

@@ -40,7 +40,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, ViewPortInfo const& view
     for (int i = 0; i < 4; ++i) {
         GLuint texHandle = 0;
         if (info.colorTarget[i]) {
-            auto offset = addressToMainMemory(info.colorLocation[i], info.colorOffset[i]);
+            auto offset = rsxOffsetToEa(info.colorLocation[i], info.colorOffset[i]);
             auto tex = searchCache(GL_RGBA32F, offset, viewPort.width, viewPort.height);
             texHandle = tex->handle();
         }
@@ -50,7 +50,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, ViewPortInfo const& view
                    texHandle,
                    0));
     }
-    auto offset = addressToMainMemory(info.depthLocation, info.depthOffset);
+    auto offset = rsxOffsetToEa(info.depthLocation, info.depthOffset);
     auto format = info.depthFormat == SurfaceDepthFormat::z16 ?
                   GL_DEPTH_COMPONENT16 : GL_DEPTH24_STENCIL8;
     auto tex = searchCache(format, offset, viewPort.width, viewPort.height);
@@ -74,11 +74,11 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, ViewPortInfo const& view
 void GLFramebuffer::dumpTextures() {
     for (int i = 0; i < 4; ++i) {
         if (_info.colorTarget[i]) {
-            auto offset = addressToMainMemory(_info.colorLocation[i], _info.colorOffset[i]);
+            auto offset = rsxOffsetToEa(_info.colorLocation[i], _info.colorOffset[i]);
             dumpTexture(_cache[offset].get(), offset);
         }
     }
-    auto offset = addressToMainMemory(_info.depthLocation, _info.depthOffset);
+    auto offset = rsxOffsetToEa(_info.depthLocation, _info.depthOffset);
     dumpTexture(_cache[offset].get(), offset);
 }
 

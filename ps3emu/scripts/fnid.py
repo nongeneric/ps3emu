@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # fnid.py --makedb /ppu/lib
 # fnid.py --patch /tmp/log
 # fnid.py --find 12345

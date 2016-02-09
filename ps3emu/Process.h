@@ -7,6 +7,7 @@
 #include "spu/SPUThread.h"
 #include "ContentManager.h"
 #include "MemoryBlockManager.h"
+#include "InternalMemoryManager.h"
 #include "IDMap.h"
 #include "../libs/ConcurrentQueue.h"
 
@@ -112,6 +113,7 @@ class Process {
     ELFLoader _elf;
     MainMemory _mainMemory;
     ContentManager _contentManager;
+    InternalMemoryManager _internalMemoryManager;
     std::vector<std::unique_ptr<PPUThread>> _threads;
     boost::mutex _ppuThreadMutex;
     std::vector<std::unique_ptr<SPUThread>> _spuThreads;
@@ -132,6 +134,7 @@ public:
     ELFLoader* elfLoader();
     MainMemory* mm();
     ContentManager* contentManager();
+    InternalMemoryManager* internalMemoryManager();
     void init(std::string elfPath, std::vector<std::string> args);
     Event run();
     uint64_t createThread(uint32_t stackSize,

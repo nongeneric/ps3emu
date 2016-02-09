@@ -298,7 +298,7 @@ GLTexture::GLTexture(MainMemory* mm, const RsxTextureInfo& info): _info(info) {
 void GLTexture::update(MainMemory* mm) {
     auto size = _info.pitch * _info.height;
     std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
-    auto va = addressToMainMemory(_info.location, _info.offset);
+    auto va = rsxOffsetToEa(_info.location, _info.offset);
     mm->readMemory(va, buf.get(), size);
     
     std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
@@ -463,11 +463,4 @@ unsigned GLSimpleTexture::height() {
 
 GLuint GLSimpleTexture::format() {
     return _format;
-}
-
-ps3_uintptr_t addressToMainMemory(MemoryLocation location, ps3_uintptr_t address) {
-    if (RsxFbBaseAddr <= address && address < GcmLocalMemorySize)
-        return address;
-    return address + RsxFbBaseAddr;
-    //return address + (location == MemoryLocation::Local ? GcmLocalMemoryBase : 0);
 }

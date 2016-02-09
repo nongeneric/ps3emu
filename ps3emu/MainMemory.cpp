@@ -160,16 +160,12 @@ void MainMemory::reset() {
 ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
     VirtualAddress split{HeapArea};
     VirtualAddress maxSplit{HeapArea + HeapAreaSize};
-    ps3_uintptr_t va = HeapArea;
-    for (uint32_t i = split.page.u(); i != maxSplit.page.u(); ++i) {
-        auto& p = _pages[i];
-        if (p.ptr) {
-            va = std::max(va, i * DefaultMainMemoryPageSize);
-        }
-    }
-    va += DefaultMainMemoryPageSize;
-    if (va + size > HeapArea + HeapAreaSize)
-        throw std::runtime_error("not enough memory");
+    
+    auto gap = findGap<MemoryPage>(&_pages[split.page.u()],
+                                   &_pages[maxSplit.page.u()],
+                                   size / DefaultMainMemoryPageSize,
+                                   [](auto& page) { return !page.ptr; });
+    auto va = std::distance(_pages.get(), gap) * DefaultMainMemoryPageSize;
     setMemory(va, 0, size, true);
     return va;
 }
@@ -225,7 +221,7 @@ uint8_t* MainMemory::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
         throw std::runtime_error("getting memory pointer for not allocated memory");
     auto offset = split.offset.u();
     if (offset + len > DefaultMainMemoryPageSize)
-        throw std::runtime_error("getting memory pointer acress page boundaries");
+        throw std::runtime_error("getting memory pointer across page boundaries");
     return (uint8_t*)((page.ptr & PagePtrMask) + offset);
 }
 
@@ -275,13 +271,6 @@ void MainMemory::memoryBreakHandler(std::function<void(uint32_t, uint32_t)> hand
 void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
     uint32_t ncall = (1 << 26) | index;
     mm->store<4>(va, ncall);
-}
-
-void MainMemory::allocPage(void** ptr, ps3_uintptr_t* va) {
-    *va = malloc(DefaultMainMemoryPageSize);
-    VirtualAddress split { *va };
-    assert(split.offset.u() == 0);
-    *ptr = (void*)(_pages[split.page.u()].ptr.load() & PagePtrMask);
 }
 
 MainMemory::MainMemory() {

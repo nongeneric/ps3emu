@@ -5,12 +5,9 @@
 #include "GLBuffer.h"
 #include "../MainMemory.h"
 #include "../constants.h"
+#include "../../libs/graphics/gcm.h"
 #include <stdint.h>
 #include <functional>
-
-enum class MemoryLocation {
-    Main, Local
-};
 
 struct RsxTextureInfo {
     uint32_t pitch;
@@ -85,5 +82,3 @@ public:
     unsigned height();
     GLuint format();
 };
-
-ps3_uintptr_t addressToMainMemory(MemoryLocation location, ps3_uintptr_t address);

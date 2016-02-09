@@ -199,6 +199,8 @@ class Rsx {
                uint16_t inSizeX, 
                uint16_t inSizeY);
     void Color(std::vector<uint32_t> const& vec);
+    void ContextDmaImageDestin(uint32_t location);
+    
 public:
     Rsx();
     ~Rsx();

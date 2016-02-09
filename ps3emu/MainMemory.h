@@ -98,7 +98,6 @@ public:
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
     ps3_uintptr_t malloc(ps3_uintptr_t size);
     void free(ps3_uintptr_t addr);
-    void allocPage(void** ptr, ps3_uintptr_t* va);
     void reset();
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);

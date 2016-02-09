@@ -251,12 +251,11 @@ public:
 class Parser {
     ParsingContext _context;
     const std::vector<Token>* _tokens;
-    const std::string* _text;
     int _pos;
     
 public:
     Parser(const std::vector<Token>* tokens, const std::string* text)
-        : _tokens(tokens), _text(text), _pos(0) { }
+        : _tokens(tokens), _pos(0) { }
     
     Token const& cur() {
         return (*_tokens)[_pos];

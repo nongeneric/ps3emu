@@ -368,7 +368,7 @@ STUB_4(_cellGcmSetFlipWithWaitLabel);
 STUB_1(cellGcmBindTile);
 STUB_1(cellGcmUnbindTile);
 STUB_12(cellGcmBindZcull);
-STUB_4(cellGcmMapMainMemory);
+STUB_3(cellGcmMapMainMemory);
 STUB_4(sys_event_queue_create);
 STUB_3(sys_event_port_create);
 STUB_2(sys_event_port_connect_local);
@@ -494,6 +494,12 @@ STUB_0(sys_interrupt_thread_eoi);
 STUB_2(sys_raw_spu_destroy);
 STUB_1(sys_ppu_thread_yield);
 STUB_1(cellGcmSetGraphicsHandler);
+STUB_0(cellGcmGetMaxIoMapSize);
+STUB_1(cellGcmGetOffsetTable);
+STUB_3(cellGcmMapEaIoAddress);
+STUB_4(cellGcmMapEaIoAddressWithFlags);
+STUB_1(cellGcmUnmapEaIoAddress);
+STUB_1(cellGcmUnmapIoAddress);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -610,6 +616,12 @@ NCallEntry ncallTable[] {
     ENTRY(sys_spu_image_close),
     ENTRY(sys_raw_spu_image_load),
     ENTRY(cellGcmSetGraphicsHandler),
+    ENTRY(cellGcmGetMaxIoMapSize),
+    ENTRY(cellGcmGetOffsetTable),
+    ENTRY(cellGcmMapEaIoAddress),
+    ENTRY(cellGcmMapEaIoAddressWithFlags),
+    ENTRY(cellGcmUnmapEaIoAddress),
+    ENTRY(cellGcmUnmapIoAddress),
 };
 
 void PPUThread::ncall(uint32_t index) {

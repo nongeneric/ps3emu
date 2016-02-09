@@ -24,6 +24,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf.load(elfPath);
     _elf.map(&_mainMemory);
     _elf.link(&_mainMemory);
+    _internalMemoryManager.setMainMemory(&_mainMemory);
     _contentManager.setElfPath(elfPath);
     _threadInitInfo = _elf.getThreadInitInfo(&_mainMemory);
     auto thread = _threads.back().get();
@@ -171,7 +172,8 @@ void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, 
 }
 
 ps3_uintptr_t Process::storeArgs(std::vector<std::string> const& args) {
-    auto vaArgs = _mainMemory.malloc(1 * 1024 * 1024);
+    uint32_t vaArgs;
+    _internalMemoryManager.allocInternalMemory(&vaArgs, 10 * 1024, 128);
     std::vector<big_uint64_t> arr;
     _mainMemory.setMemory(vaArgs, 0, (args.size() + 1) * 8, true);
     auto len = 0;
@@ -239,4 +241,8 @@ std::vector<SPUThread*> Process::dbgSPUThreads() {
     for (auto& th : _spuThreads)
         vec.push_back(th.get());
     return vec;
+}
+
+InternalMemoryManager* Process::internalMemoryManager() {
+    return &_internalMemoryManager;
 }
