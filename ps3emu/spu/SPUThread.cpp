@@ -1,6 +1,7 @@
 #include "SPUThread.h"
 
 #include "../Process.h"
+#include "../MainMemory.h"
 #include "SPUDasm.h"
 #include <boost/log/trivial.hpp>
 

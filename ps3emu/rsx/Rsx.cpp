@@ -4,7 +4,10 @@
 #include "Cache.h"
 #include "GLFramebuffer.h"
 #include "GLTexture.h"
+#include "../Process.h"
+#include "../ppu/CallbackThread.h"
 #include "../MainMemory.h"
+#include "../ELFLoader.h"
 #include "../shaders/ShaderGenerator.h"
 #include "../shaders/shader_dasm.h"
 #include "../utils.h"
@@ -260,6 +263,7 @@ public:
     Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
+    uint32_t vBlankHandlerDescr = 0;
 };
 
 Rsx::Rsx() = default;
@@ -682,6 +686,13 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->textureRenderer->render(tex);
     _context->pipeline.bind();
     _window.SwapBuffers();
+    
+    if (_context->vBlankHandlerDescr) {
+        fdescr descr;
+        _mm->readMemory(_context->vBlankHandlerDescr, &descr, sizeof(descr));
+        auto future = _proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
+        future.get();
+    }
    
 #if TESTS
     static int framenum = 0;
@@ -1070,8 +1081,9 @@ void Rsx::updateTextures() {
     _context->fragmentSamplersBuffer.unmap();
 }
 
-void Rsx::init(MainMemory* mm) {
-    _mm = mm;
+void Rsx::init(Process* proc) {
+    _proc = proc;
+    _mm = proc->mm();
     
     BOOST_LOG_TRIVIAL(trace) << "waiting for rsx loop to initialize";
     
@@ -1235,7 +1247,7 @@ void Rsx::SurfaceFormat(uint8_t colorFormat,
     } else {
         assert(false);
     }
-    assert(antialias == CELL_GCM_SURFACE_CENTER_1);
+    //assert(antialias == CELL_GCM_SURFACE_CENTER_1);
     assert(type == CELL_GCM_SURFACE_PITCH);
     _context->surface.width = 1 << (width + 1);
     _context->surface.height = 1 << (height + 1);
@@ -1546,4 +1558,8 @@ void Rsx::ContextDmaImageDestin(uint32_t location) {
     _context->transfer.destLocation = location == CELL_GCM_LOCATION_LOCAL
                                           ? MemoryLocation::Local
                                           : MemoryLocation::Main;
+}
+
+void Rsx::setVBlankHandler(uint32_t descrEa) {
+    _context->vBlankHandlerDescr = descrEa;
 }

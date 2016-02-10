@@ -23,6 +23,8 @@ constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 
 class RsxContext;
 class MainMemory;
+class Process;
+
 class Rsx {
     uint32_t _get = 0;
     uint32_t _put = 0;
@@ -31,6 +33,7 @@ class Rsx {
     bool _shutdown = false;
     bool _initialized = false;
     MainMemory* _mm;
+    Process* _proc;
     mutable boost::mutex _mutex;
     boost::condition_variable _cv;
     mutable boost::mutex _initMutex;
@@ -220,6 +223,7 @@ public:
                           uint32_t pitch,
                           uint32_t width,
                           uint32_t height);
-    void init(MainMemory* mm);
+    void init(Process* proc);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
+    void setVBlankHandler(uint32_t descrEa);
 };

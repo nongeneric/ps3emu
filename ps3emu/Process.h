@@ -1,13 +1,9 @@
 #pragma once
 
 #include "rsx/Rsx.h"
-#include "ELFLoader.h"
-#include "MainMemory.h"
 #include "ppu/PPUThread.h"
 #include "spu/SPUThread.h"
-#include "ContentManager.h"
 #include "MemoryBlockManager.h"
-#include "InternalMemoryManager.h"
 #include "IDMap.h"
 #include "../libs/ConcurrentQueue.h"
 
@@ -104,16 +100,25 @@ struct SPUThreadEventInfo {
 
 using ThreadEvent = boost::variant<PPUThreadEventInfo, SPUThreadEventInfo>;
 
+struct ThreadInitInfo;
+class Rsx;
+class ELFLoader;
+class MainMemory;
+class ContentManager;
+class InternalMemoryManager;
+class CallbackThread;
+
 class Process {
     ConcurrentFifoQueue<ThreadEvent> _eventQueue;
-    ThreadInitInfo _threadInitInfo;
+    std::unique_ptr<ThreadInitInfo> _threadInitInfo;
     MemoryBlockManager<StackArea, StackAreaSize, 1 * 1024 * 1024> _stackBlocks;
     MemoryBlockManager<TLSArea, TLSAreaSize, 1 * 1024 * 1024> _tlsBlocks;
-    Rsx _rsx;
-    ELFLoader _elf;
-    MainMemory _mainMemory;
-    ContentManager _contentManager;
-    InternalMemoryManager _internalMemoryManager;
+    std::unique_ptr<Rsx> _rsx;
+    std::unique_ptr<ELFLoader> _elf;
+    std::unique_ptr<MainMemory> _mainMemory;
+    std::unique_ptr<ContentManager> _contentManager;
+    std::unique_ptr<InternalMemoryManager> _internalMemoryManager;
+    std::unique_ptr<CallbackThread> _callbackThread;
     std::vector<std::unique_ptr<PPUThread>> _threads;
     boost::mutex _ppuThreadMutex;
     std::vector<std::unique_ptr<SPUThread>> _spuThreads;
@@ -129,7 +134,8 @@ class Process {
     Process& operator=(Process&) = delete;
     
 public:
-    Process() = default;
+    Process();
+    ~Process();
     Rsx* rsx();
     ELFLoader* elfLoader();
     MainMemory* mm();
@@ -146,6 +152,7 @@ public:
     PPUThread* getThread(uint64_t id);
     uint32_t createSpuThread(std::string name);
     SPUThread* getSpuThread(uint32_t id);
+    CallbackThread* getCallbackThread();
     void destroySpuThread(SPUThread* thread);
     std::vector<PPUThread*> dbgPPUThreads();
     std::vector<SPUThread*> dbgSPUThreads();

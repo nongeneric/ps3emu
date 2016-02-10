@@ -1,5 +1,6 @@
 #include "PPUThread.h"
 #include "../Process.h"
+#include "../MainMemory.h"
 #include "ppu_dasm.h"
 #include <boost/log/trivial.hpp>
 

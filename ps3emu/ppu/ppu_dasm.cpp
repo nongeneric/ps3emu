@@ -1,6 +1,7 @@
 #include "ppu_dasm.h"
 
 #include "../Process.h"
+#include "../MainMemory.h"
 #include "../dasm_utils.h"
 #include "ppu_dasm_forms.h"
 #include "../utils.h"

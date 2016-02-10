@@ -88,6 +88,8 @@ int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big
 int32_t cellGcmUnmapEaIoAddress(uint32_t ea);
 int32_t cellGcmUnmapIoAddress(uint32_t io);
 
+emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
+
 }}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset);

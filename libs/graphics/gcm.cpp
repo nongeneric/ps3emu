@@ -5,6 +5,7 @@
 #include "../../ps3emu/Process.h"
 #include "../../ps3emu/rsx/Rsx.h"
 #include "../../ps3emu/ELFLoader.h"
+#include "../../ps3emu/InternalMemoryManager.h"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -124,7 +125,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     emuGcmState.ioSize = ioSize;
     
     proc->rsx()->setGcmContext(ioSize, ioAddress);
-    proc->rsx()->init(proc->mm());
+    proc->rsx()->init(proc);
     proc->mm()->setMemory(GcmLabelBaseOffset, 0, 1, true);
     
     emuGcmState.context =
@@ -378,6 +379,11 @@ int32_t cellGcmUnmapIoAddress(uint32_t io) {
     assert(!(io & 0xfffff));
     emuGcmState.offsetTable->unmapOffset(io);
     return CELL_OK;
+}
+
+emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc) {
+    proc->rsx()->setVBlankHandler(handler);
+    return emu_void;
 }
 
 }}

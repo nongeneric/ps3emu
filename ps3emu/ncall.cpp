@@ -16,6 +16,7 @@
 #include "../libs/sync/rwlock.h"
 #include "../libs/sync/queue.h"
 #include "../libs/cellSpurs.h"
+#include "ppu/CallbackThread.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -500,6 +501,8 @@ STUB_3(cellGcmMapEaIoAddress);
 STUB_4(cellGcmMapEaIoAddressWithFlags);
 STUB_1(cellGcmUnmapEaIoAddress);
 STUB_1(cellGcmUnmapIoAddress);
+STUB_2(callbackThreadQueueWait);
+STUB_2(cellGcmSetVBlankHandler);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -622,6 +625,8 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmMapEaIoAddressWithFlags),
     ENTRY(cellGcmUnmapEaIoAddress),
     ENTRY(cellGcmUnmapIoAddress),
+    ENTRY(callbackThreadQueueWait),
+    ENTRY(cellGcmSetVBlankHandler),
 };
 
 void PPUThread::ncall(uint32_t index) {

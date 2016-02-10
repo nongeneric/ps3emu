@@ -1,5 +1,6 @@
 #include "libsysutil.h"
 #include "../ps3emu/MainMemory.h"
+#include "../ps3emu/ContentManager.h"
 #include "assert.h"
 #include <boost/log/trivial.hpp>
 

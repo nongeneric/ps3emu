@@ -5,6 +5,7 @@
 #include "../ps3emu/ppu/InterruptPPUThread.h"
 #include "../ps3emu/spu/SPUThread.h"
 #include "../ps3emu/utils.h"
+#include "../ps3emu/ContentManager.h"
 #include <boost/log/trivial.hpp>
 #include <array>
 #include <vector>

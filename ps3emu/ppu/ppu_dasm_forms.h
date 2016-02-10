@@ -27,6 +27,7 @@ using FLM_t = BitField<7, 15>;
 using FLM_t = BitField<7, 15>;
 
 union IForm {
+    uint32_t u32;
     BitField<0, 6> OPCD;
     LI_t LI;
     BitField<30, 31> AA;
