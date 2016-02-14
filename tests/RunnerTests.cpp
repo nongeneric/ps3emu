@@ -749,3 +749,22 @@ TEST_CASE("gcm_memory") {
         "io to va: 7 -> 305\n"
     );
 }
+
+TEST_CASE("gcm_transfer") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_transfer/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "success 100\n"
+        "success 100()\n"
+        "success 101\n"
+        "success 200\n"
+        "success 300\n"
+        "success 400\n"
+        "success 500\n"
+        "success 600\n"
+        "completed\n"
+    );
+}

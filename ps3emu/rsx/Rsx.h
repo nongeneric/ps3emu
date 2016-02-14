@@ -201,8 +201,50 @@ class Rsx {
                uint16_t outSizeY, 
                uint16_t inSizeX, 
                uint16_t inSizeY);
-    void Color(std::vector<uint32_t> const& vec);
+    void Color(uint32_t ptr, uint32_t count);
     void ContextDmaImageDestin(uint32_t location);
+    void OffsetIn(uint32_t offset);
+    void OffsetOut(uint32_t offset);
+    void PitchIn(int32_t inPitch,
+                 int32_t outPitch,
+                 uint32_t lineLength,
+                 uint32_t lineCount,
+                 uint8_t inFormat,
+                 uint8_t outFormat);
+    void DmaBufferIn(uint32_t sourceLocation, uint32_t dstLocation);
+    void OffsetIn(uint32_t inOffset,
+                  uint32_t outOffset,
+                  int32_t inPitch,
+                  int32_t outPitch,
+                  uint32_t lineLength,
+                  uint32_t lineCount,
+                  uint8_t inFormat,
+                  uint8_t outFormat,
+                  uint32_t notify);
+    void BufferNotify(uint32_t notify);
+    void Nv3089ContextDmaImage(uint32_t location);
+    void Nv3089ContextSurface(uint32_t surfaceType);
+    void Nv3089SetColorConversion(uint32_t conv,
+                                  uint32_t fmt,
+                                  uint32_t op,
+                                  int16_t x,
+                                  int16_t y,
+                                  uint16_t w,
+                                  uint16_t h,
+                                  int16_t outX,
+                                  int16_t outY,
+                                  uint16_t outW,
+                                  uint16_t outH,
+                                  float dsdx,
+                                  float dtdy);
+    void ImageInSize(uint16_t inW,
+                     uint16_t inH,
+                     uint16_t pitch,
+                     uint8_t origin,
+                     uint8_t interpolator,
+                     uint32_t offset,
+                     float inX,
+                     float inY);
     
 public:
     Rsx();

@@ -52,6 +52,14 @@ std::array<float, 4> parseColor(uint32_t raw) {
     return color;
 }
 
+float fixedSint32ToFloat(int32_t val) {
+    return (float)val / 1048576.f;
+}
+
+float fixedUint16ToFloat(uint16_t val) {
+    return (float)val / 16.f;
+}
+
 int64_t Rsx::interpret(uint32_t get) {
     MethodHeader header { _mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get)) };
     auto count = header.count.u();
@@ -828,20 +836,45 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_NOTIFIES";
             break;
         case 0x00002184:
-            name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_IN";
+            //name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_IN";
+            DmaBufferIn(readarg(1), readarg(2));
             break;
         case 0x00002188:
             name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_OUT";
             break;
         case 0x0000230C:
-            name = "CELL_GCM_NV0039_OFFSET_IN";
+            //name = "CELL_GCM_NV0039_OFFSET_IN";
+            if (count == 1) {
+                OffsetIn(readarg(1));
+            } else {
+                assert(count == 8);
+                auto arg = readarg(7);
+                OffsetIn(readarg(1), 
+                         readarg(2), 
+                         readarg(3), 
+                         readarg(4), 
+                         readarg(5), 
+                         readarg(6), 
+                         arg & 0xff, 
+                         arg >> 8,
+                         readarg(8));
+            }
             break;
         case 0x00002310:
-            name = "CELL_GCM_NV0039_OFFSET_OUT";
+            //name = "CELL_GCM_NV0039_OFFSET_OUT";
+            OffsetOut(readarg(1));
             break;
-        case 0x00002314:
-            name = "CELL_GCM_NV0039_PITCH_IN";
+        case 0x00002314: {
+            //name = "CELL_GCM_NV0039_PITCH_IN";
+            auto arg = readarg(5);
+            PitchIn(readarg(1),
+                    readarg(2),
+                    readarg(3),
+                    readarg(4),
+                    arg & 0xff,
+                    arg >> 8);
             break;
+        }
         case 0x00002318:
             name = "CELL_GCM_NV0039_PITCH_OUT";
             break;
@@ -855,7 +888,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV0039_FORMAT";
             break;
         case 0x00002328:
-            name = "CELL_GCM_NV0039_BUFFER_NOTIFY";
+            //name = "CELL_GCM_NV0039_BUFFER_NOTIFY";
+            BufferNotify(readarg(1));
             break;
         case 0x00006000:
             name = "CELL_GCM_NV3062_SET_OBJECT";
@@ -957,12 +991,8 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x0000A400: {
             //name = "CELL_GCM_NV308A_COLOR";
-            static std::vector<uint32_t> vec;
-            vec.resize(count - 1);
-            for (auto i = 0u; i < vec.size(); ++i) {
-                vec[i] = readarg(i + 1);
-            }
-            Color(vec);
+            auto ptr = rsxOffsetToEa(MemoryLocation::Main, get + 4);
+            Color(ptr, count);
             break;
         }
         case 0x0000C000:
@@ -972,7 +1002,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV3089_SET_CONTEXT_DMA_NOTIFIES";
             break;
         case 0x0000C184:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_DMA_IMAGE";
+            //name = "CELL_GCM_NV3089_SET_CONTEXT_DMA_IMAGE";
+            Nv3089ContextDmaImage(readarg(1));
             break;
         case 0x0000C188:
             name = "CELL_GCM_NV3089_SET_CONTEXT_PATTERN";
@@ -987,11 +1018,30 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV3089_SET_CONTEXT_BETA4";
             break;
         case 0x0000C198:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_SURFACE";
+            //name = "CELL_GCM_NV3089_SET_CONTEXT_SURFACE";
+            Nv3089ContextSurface(readarg(1));
             break;
-        case 0x0000C2FC:
-            name = "CELL_GCM_NV3089_SET_COLOR_CONVERSION";
+        case 0x0000C2FC: {
+            //name = "CELL_GCM_NV3089_SET_COLOR_CONVERSION";
+            auto xy = readarg(4);
+            auto hw = readarg(5);
+            auto outXy = readarg(6);
+            auto outHw = readarg(7);
+            Nv3089SetColorConversion(readarg(1),
+                                     readarg(2),
+                                     readarg(3),
+                                     xy & 0xffff,
+                                     xy >> 16,
+                                     hw & 0xffff,
+                                     hw >> 16,
+                                     outXy & 0xffff,
+                                     outXy >> 16,
+                                     outHw & 0xffff,
+                                     outHw >> 16,
+                                     fixedSint32ToFloat(readarg(8)),
+                                     fixedSint32ToFloat(readarg(9)));
             break;
+        }
         case 0x0000C300:
             name = "CELL_GCM_NV3089_SET_COLOR_FORMAT";
             break;
@@ -1016,9 +1066,21 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x0000C31C:
             name = "CELL_GCM_NV3089_DT_DY";
             break;
-        case 0x0000C400:
-            name = "CELL_GCM_NV3089_IMAGE_IN_SIZE";
+        case 0x0000C400: {
+            //name = "CELL_GCM_NV3089_IMAGE_IN_SIZE";
+            auto hw = readarg(1);
+            auto poi = readarg(2);
+            auto uv = readarg(4);
+            ImageInSize(hw & 0xffff,
+                        hw >> 16,
+                        poi & 0xffff,
+                        poi >> 16,
+                        poi >> 24,
+                        readarg(3),
+                        fixedUint16ToFloat(uv & 0xffff),
+                        fixedUint16ToFloat(uv >> 16));
             break;
+        }
         case 0x0000C404:
             name = "CELL_GCM_NV3089_IMAGE_IN_FORMAT";
             break;
@@ -1251,7 +1313,7 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<19, 24> integer;
                     BitField<24, 32> decimal;
                 } arg = { readarg(1) };
-                VertexTextureFilter(index, arg.integer.s() + (float)arg.decimal.u() / 255.f);
+                VertexTextureFilter(index, arg.integer.s() + (float)arg.decimal.u() / 256.f);
                 break;
             }
             if (isScale(offset,
