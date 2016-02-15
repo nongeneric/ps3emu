@@ -1626,8 +1626,8 @@ PRINT(MULHWU, XOForm_1) {
 }
 
 EMU(MULHWU, XOForm_1) {
-    uint64_t prod = (uint64_t)(int32_t)TH->getGPR(i->RA)
-                  * (uint64_t)(int32_t)TH->getGPR(i->RB);
+    uint64_t prod = (uint64_t)(uint32_t)TH->getGPR(i->RA)
+                  * (uint64_t)(uint32_t)TH->getGPR(i->RB);
     auto res = (uint64_t)((uint64_t)prod >> 32);
     TH->setGPR(i->RT, res);
     if (i->Rc.u())

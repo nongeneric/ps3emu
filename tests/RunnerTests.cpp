@@ -768,3 +768,14 @@ TEST_CASE("gcm_transfer") {
         "completed\n"
     );
 }
+
+TEST_CASE("opengl_hash") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_hash/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "hash: 1d0\n"
+    );
+}
