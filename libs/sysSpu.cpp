@@ -387,10 +387,19 @@ int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id,
     return CELL_OK;
 }
 
+#undef X
+#define X(k, v) case TagClassId::k: return #k;
+const char* tagToString(TagClassId tag) {
+    switch (tag) { TagClassIdX }
+    return "";
+}
+
 int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
                                TagClassId classId,
                                uint32_t value,
                                Process* proc) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf(
+        "ppu writes %x via mmio to spu %d tag %s", value, id, tagToString(classId));
     auto rawSpu = rawSpus.get(id);
     if (classId == TagClassId::SPU_RunCntl && value == 1) {
         rawSpu->thread->run();
@@ -438,7 +447,7 @@ int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
     throw std::runtime_error("unknown mmio offset");
 }
 
-uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc) {
+uint32_t sys_raw_spu_mmio_read_impl(sys_raw_spu_t id, TagClassId classId, Process* proc) {
     auto rawSpu = rawSpus.get(id);
     switch (classId) {
         case TagClassId::SPU_Status: return rawSpu->thread->getStatus();
@@ -454,6 +463,13 @@ uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* pr
         case TagClassId::SPU_MBox_Status: return 0x010101;
         default: throw std::runtime_error("unknown mmio offset");
     }
+}
+
+uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc) {
+    uint32_t value = sys_raw_spu_mmio_read_impl(id, classId, proc);
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf(
+        "ppu reads %x via mmio from spu %d tag %s", value, id, tagToString(classId));
+    return value;
 }
 
 int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,

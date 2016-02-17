@@ -62,6 +62,12 @@ public:
         while (!_values.empty())
             _values.pop();
     }
+    
+    unsigned size() {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        assert(_waiting.empty());
+        return _values.size();
+    }
 };
 
 template <typename T>

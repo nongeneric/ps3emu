@@ -4,6 +4,7 @@
 #include "../MainMemory.h"
 #include "SPUDasm.h"
 #include <boost/log/trivial.hpp>
+#include <stdio.h>
 
 void SPUThread::run() {
     _thread = boost::thread([=] { loop(); });
@@ -13,6 +14,13 @@ void SPUThread::loop() {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     _dbgPaused = true;
+    
+#ifdef DEBUG
+    auto f = fopen(ssnprintf("/tmp/spu_ls_dump_%x.bin", getNip()).c_str(), "w");
+    assert(f);
+    fwrite(ptr(0), LocalStorageSize, 1, f);
+    fclose(f);
+#endif
     
     for (;;) {
         if (_singleStep) {
@@ -76,6 +84,8 @@ SPUThread::SPUThread(Process* proc,
       _singleStep(false),
       _exitCode(0) {
     memset(_rs, 0, sizeof(_rs));
+    memset(_ch, 0, sizeof(_ch));
+    _ch[MFC_WrTagMask] = -1;
     _status = 0b11000; // BTHSM
 }
 
@@ -126,6 +136,7 @@ void SPUThread::command(uint32_t word) {
         BitField<16, 32> opcode;
     } cmd = { word };
     switch (cmd.opcode.u()) {
+        case MFC_GETF_CMD: // fence is meaningless when every dma is instant
         case MFC_GET_CMD: {
             auto ea = ch(MFC_EAL);
             auto ls = ptr(ch(MFC_LSA));
@@ -134,6 +145,7 @@ void SPUThread::command(uint32_t word) {
             __sync_synchronize();
             break;
         }
+        case MFC_PUTF_CMD:
         case MFC_PUT_CMD: {
             auto ea = ch(MFC_EAL);
             auto ls = ptr(ch(MFC_LSA));
@@ -142,7 +154,7 @@ void SPUThread::command(uint32_t word) {
             __sync_synchronize();
             break;
         }
-        default: throw std::runtime_error("unknown mfc command");
+        default: throw std::runtime_error(ssnprintf("unknown mfc command %x", cmd.opcode.u()));
     }
 }
 

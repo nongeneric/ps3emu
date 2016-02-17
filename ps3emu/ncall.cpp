@@ -226,7 +226,7 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
 
 uint32_t sys_fs_open_proxy(uint32_t path,
                            uint32_t flags,
-                           big_uint32_t *fd,
+                           big_int32_t *fd,
                            uint64_t mode,
                            uint32_t arg,
                            uint64_t size,
@@ -240,7 +240,7 @@ uint32_t sys_fs_open_proxy(uint32_t path,
     } else {
         argVec[0] = 0;
     }
-    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
+    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size, thread->proc());
 }
 
 CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, Process* proc) {
@@ -503,6 +503,9 @@ STUB_1(cellGcmUnmapEaIoAddress);
 STUB_1(cellGcmUnmapIoAddress);
 STUB_2(callbackThreadQueueWait);
 STUB_2(cellGcmSetVBlankHandler);
+STUB_4(sys_fs_lseek);
+STUB_5(sys_fs_read);
+STUB_1(sys_fs_close);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -704,6 +707,9 @@ void PPUThread::scall() {
         case 88: nstub_sys_interrupt_thread_eoi(this); break;
         case 161: nstub_sys_raw_spu_destroy(this); break;
         case 43: nstub_sys_ppu_thread_yield(this); break;
+        case 818: nstub_sys_fs_lseek(this); break;
+        case 802: nstub_sys_fs_read(this); break;
+        case 804: nstub_sys_fs_close(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

@@ -20,13 +20,31 @@ using namespace boost::filesystem;
 
 CellFsErrno sys_fs_open(const char* path,
                         uint32_t flags,
-                        big_uint32_t* fd,
+                        big_int32_t* fd,
                         uint64_t mode,
                         const void* arg,
-                        uint64_t size)
-{
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_fs_open(%s, ...)", path);
-    return 1;
+                        uint64_t size,
+                        Process* proc) {
+    return cellFsOpen(path, flags, fd, mode, 0, proc);
+}
+
+CellFsErrno sys_fs_lseek(int32_t fd,
+                         int64_t offset,
+                         int32_t whence,
+                         big_uint64_t* pos) {
+    return cellFsLseek(fd, offset, whence, pos);
+}
+
+CellFsErrno sys_fs_read(int32_t fd,
+                        ps3_uintptr_t buf,
+                        uint64_t nbytes,
+                        big_uint64_t* nread,
+                        MainMemory* mm) {
+    return cellFsRead(fd, buf, nbytes, nread, mm);
+}
+
+CellFsErrno sys_fs_close(int32_t fd) {
+    return cellFsClose(fd);
 }
 
 CellFsErrno toCellErrno(int err) {
@@ -50,7 +68,7 @@ namespace {
         }
     };
 
-    ThreadSafeIDMap<int32_t, FILE*> fileMap;
+    ThreadSafeIDMap<int32_t, FILE*, 20> fileMap;
     ThreadSafeIDMap<int32_t, std::shared_ptr<DirInfo>> dirMap;
 }
 

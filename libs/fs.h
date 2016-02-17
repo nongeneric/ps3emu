@@ -46,10 +46,18 @@ struct CellFsDirectoryEntry {
 
 CellFsErrno sys_fs_open(const char *path,
                         uint32_t flags,
-                        big_uint32_t *fd,
+                        big_int32_t *fd,
                         uint64_t mode,
                         const void *arg,
-                        uint64_t size);
+                        uint64_t size,
+                        Process* proc);
+CellFsErrno sys_fs_lseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t *pos);
+CellFsErrno sys_fs_read(int32_t fd,
+                        ps3_uintptr_t buf,
+                        uint64_t nbytes,
+                        big_uint64_t* nread,
+                        MainMemory* mm);
+CellFsErrno sys_fs_close(int32_t fd);
 CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc);
 CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc);
 CellFsErrno cellFsOpen(const char *path,

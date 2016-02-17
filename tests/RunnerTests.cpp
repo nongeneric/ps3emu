@@ -779,3 +779,22 @@ TEST_CASE("opengl_hash") {
         "hash: 1d0\n"
     );
 }
+
+TEST_CASE("raw_spu_opengl_dma") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/raw_spu_opengl_dma/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished();
+    auto output = QString(proc.readAll()).toStdString();
+    REQUIRE( output == 
+        "Initializing SPUs\n"
+        "sys_raw_spu_create succeeded. raw_spu number is 0\n"
+        "waiting for _jsAsyncCopyQ\n"
+        "reading for _jsAsyncCopyQ\n"
+        "waiting for _jsAsyncIOIF\n"
+        "reading for _jsAsyncIOIF\n"
+        "starting copy\n"
+        "waiting for completion\n"
+        "success!\n"
+    );
+}

@@ -503,8 +503,11 @@ void DebuggerModel::run() {
             cont = false;
         } else if (boost::get<SPUSingleStepBreakpointEvent>(&untyped)) {
             cont = false;
-        } else if (boost::get<SPUThreadStartedEvent>(&untyped)) {
+        } else if (auto ev = boost::get<SPUThreadStartedEvent>(&untyped)) {
             trySetPendingSPUBreaks();
+            cont = false;
+            _activeThread = nullptr;
+            _activeSPUThread = ev->thread;
         }
     }
     updateUI();

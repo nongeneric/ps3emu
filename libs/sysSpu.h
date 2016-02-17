@@ -54,25 +54,28 @@ struct sys_spu_thread_argument_t {
     big_uint64_t arg4;
 };
 
+#define X(k, v) k = v,
+#define TagClassIdX \
+    X(_MFC_LSA, 0x3004U) \
+    X(_MFC_EAH, 0x3008U) \
+    X(_MFC_EAL, 0x300CU) \
+    X(MFC_Size_Tag, 0x3010U) \
+    X(MFC_Class_CMD, 0x3014U) \
+    X(MFC_QStatus, 0x3104U) \
+    X(Prxy_QueryType, 0x3204U) \
+    X(Prxy_QueryMask, 0x321CU) \
+    X(Prxy_TagStatus, 0x322CU) \
+    X(SPU_Out_MBox, 0x4004U) \
+    X(SPU_In_MBox, 0x400CU) \
+    X(SPU_MBox_Status, 0x4014U) \
+    X(SPU_RunCntl, 0x401CU) \
+    X(SPU_Status, 0x4024U) \
+    X(SPU_NPC, 0x4034U) \
+    X(SPU_Sig_Notify_1, 0x1400CU) \
+    X(SPU_Sig_Notify_2, 0x1C00CU)
+    
 enum class TagClassId : uint32_t {
-    _MFC_LSA = 0x3004U,
-    _MFC_EAH = 0x3008U,
-    _MFC_EAL = 0x300CU,
-    MFC_Size_Tag = 0x3010U,
-    MFC_Class_CMD = 0x3014U,
-    MFC_CMDStatus = 0x3014U,
-    MFC_QStatus = 0x3104U,
-    Prxy_QueryType = 0x3204U,
-    Prxy_QueryMask = 0x321CU,
-    Prxy_TagStatus = 0x322CU,
-    SPU_Out_MBox = 0x4004U,
-    SPU_In_MBox = 0x400CU,
-    SPU_MBox_Status = 0x4014U,
-    SPU_RunCntl = 0x401CU,
-    SPU_Status = 0x4024U,
-    SPU_NPC = 0x4034U,
-    SPU_Sig_Notify_1 = 0x1400CU,
-    SPU_Sig_Notify_2 = 0x1C00CU
+    TagClassIdX
 };
 
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu);

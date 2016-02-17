@@ -3,8 +3,10 @@
 #include "SPUThread.h"
 #include "../BitField.h"
 #include "../dasm_utils.h"
+#include "../utils.h"
 #include <boost/endian/conversion.hpp>
 #include <bitset>
+#include <boost/log/trivial.hpp>
 
 using namespace boost::endian;
 
@@ -48,7 +50,7 @@ PRINT(lqx) {
 }
 
 EMU(lqx) {
-    auto lsa = (th->r(i->RA).w<0>() + th->r(i->RB).w<0>()) & 0xfffffff0;
+    auto lsa = (th->r(i->RA).w<0>() + th->r(i->RB).w<0>()) & LSLR & 0xfffffff0;
     th->r(i->RT).load(th->ptr(lsa));
 }
 
@@ -57,7 +59,7 @@ inline uint32_t abs_lsa(I16_t i16) {
 }
 
 inline uint32_t cia_lsa(I16_t i16, uint32_t cia) {
-    return ((i16 << 2) + cia) & LSLR & 0xfffffff0;
+    return ((i16 << 2) + cia) & LSLR & 0xfffffffc;
 }
 
 PRINT(lqa) {
@@ -147,7 +149,7 @@ EMU(chd) {
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
-    th->r(i->RT).hw(t & 0xe) = 0x0203;
+    th->r(i->RT).hw((t & 0xe) >> 1) = 0x0203;
 }
 
 PRINT(chx) {
@@ -159,7 +161,7 @@ EMU(chx) {
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
-    th->r(i->RT).hw(t & 0xe) = 0x0203;
+    th->r(i->RT).hw((t & 0xe) >> 1) = 0x0203;
 }
 
 PRINT(cwd) {
@@ -171,7 +173,7 @@ EMU(cwd) {
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
-    th->r(i->RT).w(t & 0xc) = 0x00010203;
+    th->r(i->RT).w((t & 0xc) >> 2) = 0x00010203;
 }
 
 PRINT(cwx) {
@@ -183,7 +185,7 @@ EMU(cwx) {
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
-    th->r(i->RT).w(t & 0xc) = 0x0203;
+    th->r(i->RT).w((t & 0xc) >> 2) = 0x10203;
 }
 
 PRINT(cdd) {
@@ -195,7 +197,7 @@ EMU(cdd) {
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
-    th->r(i->RT).dw(t & 0x8) = 0x0001020304050607ll;
+    th->r(i->RT).dw((t & 0x8) >> 3) = 0x0001020304050607ll;
 }
 
 PRINT(cdx) {
@@ -207,7 +209,7 @@ EMU(cdx) {
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
-    th->r(i->RT).dw(t & 0x8) = 0x0001020304050607ll;
+    th->r(i->RT).dw((t & 0x8) >> 3) = 0x0001020304050607ll;
 }
 
 PRINT(ilh) {
@@ -1894,45 +1896,45 @@ EMU(bisl) {
 }
 
 PRINT(brnz) {
-    *result = format_nu("brnz", i->RT, cia_lsa(i->I16, cia) + 4);
+    *result = format_nu("brnz", i->RT, cia_lsa(i->I16, cia));
 }
 
 EMU(brnz) {
     if (th->r(i->RT).w<0>() != 0) {
-        auto address = cia_lsa(i->I16, cia) + 4;
+        auto address = cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
 
 PRINT(brz) {
-    *result = format_nu("brz", i->RT, cia_lsa(i->I16, cia) + 4);
+    *result = format_nu("brz", i->RT, cia_lsa(i->I16, cia));
 }
 
 EMU(brz) {
     if (th->r(i->RT).w<0>() == 0) {
-        auto address = cia_lsa(i->I16, cia) + 4;
+        auto address = cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
 
 PRINT(brhnz) {
-    *result = format_nu("brhnz", i->RT, cia_lsa(i->I16, cia) + 4);
+    *result = format_nu("brhnz", i->RT, cia_lsa(i->I16, cia));
 }
 
 EMU(brhnz) {
     if (th->r(i->RT).hw<0>() != 0) {
-        auto address = cia_lsa(i->I16, cia) + 4;
+        auto address = cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
 
 PRINT(brhz) {
-    *result = format_nu("brhz", i->RT, cia_lsa(i->I16, cia) + 4);
+    *result = format_nu("brhz", i->RT, cia_lsa(i->I16, cia));
 }
 
 EMU(brhz) {
     if (th->r(i->RT).hw<0>() == 0) {
-        auto address = cia_lsa(i->I16, cia) + 4;
+        auto address = cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
@@ -2478,8 +2480,15 @@ EMU(dsync) {
     __sync_synchronize();
 }
 
+#undef X
+#define X(k, v) case k: return #k;
+const char* classIdToString(int id) {
+    switch (id) { SpuMfcClassIdX }
+    return "unknown";
+}
+
 PRINT(rdch) {
-    *result = format_nn("rdch", i->RT, i->CA);
+    *result = format_nn("rdch", i->CA, i->RT);
 }
 
 EMU(rdch) {
@@ -2489,19 +2498,21 @@ EMU(rdch) {
     rt.dw<1>() = 0;
     if (ch == SPU_RdInMbox) {
         rt.w<0>() = th->getToSpuMailbox().receive(0);
-        return;
+    } else {
+        if (ch == MFC_RdTagStat) {
+            // as every MFC request completes immediately
+            // it is possible to just always return the mask set last
+            ch = MFC_WrTagMask;
+        }
+        auto& ca = th->ch(ch);
+        rt.w<0>() = ca;
     }
-    if (ch == MFC_RdTagStat) {
-        // as every MFC request completes immediately
-        // it is possible to just always return the mask set last
-        ch = MFC_WrTagMask;
-    }
-    auto& ca = th->ch(ch);
-    rt.w<0>() = ca;
+    BOOST_LOG_TRIVIAL(trace) << 
+        ssnprintf("spu reads %x from channel %s", rt.w<0>(), classIdToString(ch));
 }
 
 PRINT(rchcnt) {
-    *result = format_nn("rchcnt", i->RT, i->CA);
+    *result = format_nn("rchcnt", i->CA, i->RT);
 }
 
 EMU(rchcnt) {
@@ -2510,18 +2521,20 @@ EMU(rchcnt) {
     rt.w<1>() = 0;
     rt.dw<1>() = 0;
     if (ch == SPU_RdInMbox) {
-        rt.w<0>() = 0;
-        return;
-    }
-    if (ch == MFC_RdTagStat) {
+        rt.w<0>() = th->getToSpuMailbox().size();
+    } else if (ch == MFC_RdTagStat) {
         rt.w<0>() = 1;
-        return;
+    } else {
+        throw std::runtime_error("rchcnt of unknown channel");
     }
-    throw std::runtime_error("rchcnt of unknown channel");
+    if (rt.w<0>() == 0 && ch == SPU_RdInMbox)
+        return;
+    BOOST_LOG_TRIVIAL(trace) << 
+        ssnprintf("spu reads count %d from channel %s", rt.w<0>(), classIdToString(ch));
 }
 
 PRINT(wrch) {
-    *result = format_nn("wrch", i->RT, i->CA);
+    *result = format_nn("wrch", i->CA, i->RT);
 }
 
 EMU(wrch) {
@@ -2530,19 +2543,22 @@ EMU(wrch) {
     if (ch == SPU_WrOutIntrMbox) {
         th->getFromSpuInterruptMailbox().send(rt.w<0>());
         th->getStatus() |= 1;
+        BOOST_LOG_TRIVIAL(trace) <<
+        ssnprintf("spu writes %x to interrupt mailbox", rt.w<0>());
         throw SPUThreadInterruptException();
-    }
-    if (ch == SPU_WrOutMbox) {
+    } else if (ch == SPU_WrOutMbox) {
         th->getFromSpuMailbox().send(rt.w<0>());
         th->getStatus() |= 1;
-        return;
+    } else {
+        auto& ca = th->ch(ch);
+        if (i->CA.u() == MFC_Cmd) {
+            th->command(rt.w<0>());
+        } else {
+            ca = rt.w<0>();
+        }
     }
-    auto& ca = th->ch(ch);
-    if (i->CA.u() == MFC_Cmd) {
-        th->command(rt.w<0>());
-        return;
-    }
-    ca = rt.w<0>();
+    BOOST_LOG_TRIVIAL(trace) << 
+        ssnprintf("spu writes %x to channel %s", rt.w<0>(), classIdToString(ch));
 }
 
 template <DasmMode M, typename S>
@@ -2589,6 +2605,7 @@ void SPUDasm(void* instr, uint32_t cia, S* state) {
         case 0b01001010011: INVOKE(sumb);
         case 0b01010110110: INVOKE(xsbh);
         case 0b01010101110: INVOKE(xshw);
+        case 0b01010100110: INVOKE(xswd);
         case 0b00011000001: INVOKE(and_);
         case 0b01011000001: INVOKE(andc);
         case 0b00001000001: INVOKE(or_);

@@ -133,36 +133,38 @@ public:
 #pragma GCC diagnostic pop
 };
 
-#define SPU_RdEventStat          0
-#define SPU_WrEventMask          1
-#define SPU_WrEventAck           2
-#define SPU_RdSigNotify1         3
-#define SPU_RdSigNotify2         4
-#define SPU_WrDec                7
-#define SPU_RdDec                8
-#define SPU_RdEventStatMask     11
-#define SPU_RdEventMask         11
-#define SPU_RdMachStat          13
-#define SPU_WrSRR0              14
-#define SPU_RdSRR0              15
-#define SPU_WrOutMbox           28 
-#define SPU_RdInMbox            29 
-#define SPU_WrOutIntrMbox       30 
-
-#define MFC_WrMSSyncReq          9
-#define MFC_RdTagMask           12
-#define MFC_LSA                 16 
-#define MFC_EAH                 17 
-#define MFC_EAL                 18 
-#define MFC_Size                19 
-#define MFC_TagID               20 
-#define MFC_Cmd                 21 
-#define MFC_WrTagMask           22 
-#define MFC_WrTagUpdate         23 
-#define MFC_RdTagStat           24 
-#define MFC_RdListStallStat     25 
-#define MFC_WrListStallAck      26 
-#define MFC_RdAtomicStat        27 
+#define X(k, v) k = v,
+#define SpuMfcClassIdX \
+    X(SPU_RdEventStat    , 0) \
+    X(SPU_WrEventMask    , 1) \
+    X(SPU_WrEventAck     , 2) \
+    X(SPU_RdSigNotify1   , 3) \
+    X(SPU_RdSigNotify2   , 4) \
+    X(SPU_WrDec          , 7) \
+    X(SPU_RdDec          , 8) \
+    X(SPU_RdEventMask    ,11) \
+    X(SPU_RdMachStat     ,13) \
+    X(SPU_WrSRR0         ,14) \
+    X(SPU_RdSRR0         ,15) \
+    X(SPU_WrOutMbox      ,28) \
+    X(SPU_RdInMbox       ,29) \
+    X(SPU_WrOutIntrMbox  ,30) \
+    X(MFC_WrMSSyncReq    , 9) \
+    X(MFC_RdTagMask      ,12) \
+    X(MFC_LSA            ,16) \
+    X(MFC_EAH            ,17) \
+    X(MFC_EAL            ,18) \
+    X(MFC_Size           ,19) \
+    X(MFC_TagID          ,20) \
+    X(MFC_Cmd            ,21) \
+    X(MFC_WrTagMask      ,22) \
+    X(MFC_WrTagUpdate    ,23) \
+    X(MFC_RdTagStat      ,24) \
+    X(MFC_RdListStallStat,25) \
+    X(MFC_WrListStallAck ,26) \
+    X(MFC_RdAtomicStat   ,27)
+    
+enum SpuMfcClassId { SpuMfcClassIdX };
 
 class Process;
 

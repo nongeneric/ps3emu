@@ -88,7 +88,7 @@ class MainMemory {
                                     const void* buf, 
                                     uint len,
                                     bool cond);
-    void writeSpuAddress(ps3_uintptr_t va, uint64_t val, uint32_t len);
+    void writeSpuAddress(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readSpuAddress(ps3_uintptr_t va);
         
 public:
