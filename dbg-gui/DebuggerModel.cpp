@@ -286,7 +286,7 @@ public:
     }
     
     virtual QString getCell(uint64_t row, int col) override {
-        if (_thread && col <= 31)
+        if (_thread && row < 32)
             return getPPUCell(row, col);
         if (_spuThread)
             return getSPUCell(row, col);

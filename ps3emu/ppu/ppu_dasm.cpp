@@ -168,7 +168,7 @@ PRINT(CRAND, XLForm_1) {
 
 EMU(CRAND, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, bit_test(cr, i->BA) & bit_test(cr, i->BB));
+    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) & bit_test(cr, i->BB));
     TH->setCR(cr);
 }
 
@@ -180,7 +180,7 @@ PRINT(CROR, XLForm_1) {
 
 EMU(CROR, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, bit_test(cr, i->BA) | bit_test(cr, i->BB));
+    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) | bit_test(cr, i->BB));
     TH->setCR(cr);
 }
 
@@ -192,7 +192,7 @@ PRINT(CRXOR, XLForm_1) {
 
 EMU(CRXOR, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, bit_test(cr, i->BA) ^ bit_test(cr, i->BB));
+    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) ^ bit_test(cr, i->BB));
     TH->setCR(cr);
 }
 
@@ -204,7 +204,7 @@ PRINT(CRNAND, XLForm_1) {
 
 EMU(CRNAND, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, !(bit_test(cr, i->BA) & bit_test(cr, i->BB)));
+    cr = bit_set(cr, i->BT.u(), !(bit_test(cr, i->BA) & bit_test(cr, i->BB)));
     TH->setCR(cr);
 }
 
@@ -216,7 +216,7 @@ PRINT(CRNOR, XLForm_1) {
 
 EMU(CRNOR, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, (!bit_test(cr, i->BA)) | bit_test(cr, i->BB));
+    cr = bit_set(cr, i->BT.u(), (!bit_test(cr, i->BA)) | bit_test(cr, i->BB));
     TH->setCR(cr);
 }
 
@@ -228,7 +228,7 @@ PRINT(CREQV, XLForm_1) {
 
 EMU(CREQV, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, bit_test(cr, i->BA) == bit_test(cr, i->BB));
+    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) == bit_test(cr, i->BB));
     TH->setCR(cr);
 }
 
@@ -240,7 +240,7 @@ PRINT(CRANDC, XLForm_1) {
 
 EMU(CRANDC, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, bit_test(cr, i->BA) & (!bit_test(cr, i->BB)));
+    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) & (!bit_test(cr, i->BB)));
     TH->setCR(cr);
 }
 
@@ -252,7 +252,7 @@ PRINT(CRORC, XLForm_1) {
 
 EMU(CRORC, XLForm_1) {
     auto cr = TH->getCR();
-    bit_set(cr, bit_test(cr, i->BA) | (!bit_test(cr, i->BB)));
+    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) | (!bit_test(cr, i->BB)));
     TH->setCR(cr);
 }
 
@@ -3125,6 +3125,17 @@ EMU(STVEWX, SIMDForm) { // TODO: SAT
     MM->store<4>(ea, s[eb]);
 }
 
+PRINT(DCBZ, XForm_1) {
+    *result = format_nn("dcbz", i->RA, i->RB);
+}
+
+EMU(DCBZ, XForm_1) {
+    auto b = getB(i->RA, TH);
+    auto ea = b + TH->getGPR(i->RB);
+    auto line = ea & ~127;
+    MM->setMemory(line, 0, 128);
+}
+
 struct PPUDasmInstruction {
     const char* mnemonic;
     std::string operands;
@@ -3343,6 +3354,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 214: invoke(STDCX);
                 case 199: invoke(STVEWX);
                 case 854: invoke(EIEIO);
+                case 1014: invoke(DCBZ);
                 default: throw IllegalInstructionException();
             }
             break;

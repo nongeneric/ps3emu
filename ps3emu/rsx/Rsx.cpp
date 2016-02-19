@@ -290,6 +290,7 @@ public:
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
     uint32_t vBlankHandlerDescr = 0;
+    MemoryLocation reportLocation = MemoryLocation::Local;
 };
 
 Rsx::Rsx() = default;
@@ -654,14 +655,12 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataArrayOffset(%x, %x, %x)",
         index, location, offset);
     auto& array = _context->vertexDataArrays[index];
-    array.location = location == CELL_GCM_LOCATION_LOCAL ?
-        MemoryLocation::Local : MemoryLocation::Main;
+    array.location = gcmEnumToLocation(location);
     array.offset = offset;
     array.binding = index;
     GLint maxBindings;
     (void)maxBindings;
     assert((GLint)array.binding < (glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBindings), maxBindings));
-    assert(location == CELL_GCM_LOCATION_LOCAL);
 }
 
 void Rsx::BeginEnd(uint32_t mode) {
@@ -755,6 +754,9 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
     //boost::unique_lock<boost::mutex> lock(_mutex);
     _context->isFlipInProgress = false;
+    
+    // PlatformDevice.cpp of jsgcm says so
+    _context->reportLocation = MemoryLocation::Local;
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals) {
@@ -1729,8 +1731,8 @@ void Rsx::ImageInSize(uint16_t inW,
     auto& conv = _context->transfer.conv;
     if (conv.dsdx == 0 || conv.dtdy == 0)
         return;
-    assert(conv.dsdx == 1);
-    assert(conv.dtdy == 1);
+    //assert(conv.dsdx == 1);
+    //assert(conv.dtdy == 1);
     
     auto sourceEa = rsxOffsetToEa(_context->transfer.sourceImageLocation, offset);
     auto destEa = rsxOffsetToEa(_context->transfer.destTransferLocation,

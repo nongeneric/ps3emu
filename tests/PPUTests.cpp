@@ -593,6 +593,12 @@ TEST_CASE("bit_test") {
     REQUIRE(bit_test(21, 6, 2) == 0);
     REQUIRE(bit_test(21, 6, 3) == 1);
     REQUIRE(bit_test(21, 6, 5) == 1);
+    REQUIRE(bit_test(0x48000084, 32, 31) == 0);
+    REQUIRE(bit_test(0x48000084, 32, 30) == 0);
+    REQUIRE(bit_test(0x48000084, 32, 29) == 1);
+    REQUIRE(bit_test(0x48000084, 32, 28) == 0);
+    REQUIRE(bit_set(0x48000084, 30, 1) == 0x48000086);
+    REQUIRE(bit_set(0x48000086, 30, 0) == 0x48000084);
 }
 
 TEST_CASE("emu cmpld") {

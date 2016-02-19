@@ -9,6 +9,7 @@
 #include <gcm_tool.h>
 
 class Process;
+class MainMemory;
 
 extern int gcmResetCommandsSize;
 extern int gcmInitCommandsSize;
@@ -87,6 +88,7 @@ int32_t cellGcmMapEaIoAddressWithFlags(uint32_t ea, uint32_t io, uint32_t size, 
 int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big_uint32_t *offset);
 int32_t cellGcmUnmapEaIoAddress(uint32_t ea);
 int32_t cellGcmUnmapIoAddress(uint32_t io);
+uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMemory* mm);
 
 emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
 

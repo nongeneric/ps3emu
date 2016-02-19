@@ -135,26 +135,28 @@ void SPUThread::command(uint32_t word) {
         BitField<8, 16> rid;
         BitField<16, 32> opcode;
     } cmd = { word };
-    switch (cmd.opcode.u()) {
-        case MFC_GETF_CMD: // fence is meaningless when every dma is instant
-        case MFC_GET_CMD: {
-            auto ea = ch(MFC_EAL);
-            auto ls = ptr(ch(MFC_LSA));
-            auto size = ch(MFC_Size);
-            _proc->mm()->readMemory(ea, ls, size);
+    auto opcode = cmd.opcode.u();
+    if (opcode >= 0x40) {
+        auto ea = ch(MFC_EAL);
+        auto ls = ptr(ch(MFC_LSA));
+        auto size = ch(MFC_Size);
+        if (opcode == MFC_GETS_CMD || opcode == MFC_GETBS_CMD ||
+            opcode == MFC_GETLB_CMD) {
             __sync_synchronize();
-            break;
         }
-        case MFC_PUTF_CMD:
-        case MFC_PUT_CMD: {
-            auto ea = ch(MFC_EAL);
-            auto ls = ptr(ch(MFC_LSA));
-            auto size = ch(MFC_Size);
-            _proc->mm()->writeMemory(ea, ls, size);
+        _proc->mm()->readMemory(ea, ls, size);
+        __sync_synchronize();
+    } else {
+        auto ea = ch(MFC_EAL);
+        auto ls = ptr(ch(MFC_LSA));
+        auto size = ch(MFC_Size);
+        if (opcode == MFC_PUTB_CMD || opcode == MFC_PUTBS_CMD ||
+            opcode == MFC_PUTRB_CMD || opcode == MFC_PUTLB_CMD ||
+            opcode == MFC_PUTRLB_CMD) {
             __sync_synchronize();
-            break;
         }
-        default: throw std::runtime_error(ssnprintf("unknown mfc command %x", cmd.opcode.u()));
+        _proc->mm()->writeMemory(ea, ls, size);
+        __sync_synchronize();
     }
 }
 

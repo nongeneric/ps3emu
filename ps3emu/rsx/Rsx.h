@@ -269,3 +269,5 @@ public:
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
 };
+
+MemoryLocation gcmEnumToLocation(uint32_t enumValue);

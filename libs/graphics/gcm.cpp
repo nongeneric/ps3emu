@@ -386,6 +386,19 @@ emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc) {
     return emu_void;
 }
 
+uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMemory* mm) {
+    auto locationEnum = gcmEnumToLocation(location);
+    if (locationEnum == MemoryLocation::Local) {
+        assert(index < 2048);
+    } else {
+        assert(index < 1024 * 1024);
+    }
+    const auto valueOffset = 8;
+    auto offset = 0x0e000000 + 16 * index + valueOffset;
+    auto ea = rsxOffsetToEa(locationEnum, offset);
+    return mm->load<4>(ea);
+}
+
 }}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset) {

@@ -506,6 +506,7 @@ STUB_2(cellGcmSetVBlankHandler);
 STUB_4(sys_fs_lseek);
 STUB_5(sys_fs_read);
 STUB_1(sys_fs_close);
+STUB_3(cellGcmGetReportDataLocation);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -630,6 +631,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmUnmapIoAddress),
     ENTRY(callbackThreadQueueWait),
     ENTRY(cellGcmSetVBlankHandler),
+    ENTRY(cellGcmGetReportDataLocation),
 };
 
 void PPUThread::ncall(uint32_t index) {

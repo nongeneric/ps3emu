@@ -398,6 +398,23 @@ namespace ShaderRewriter {
                 });
                 return swizzle;
             }
+            if (expected == ExprType::vec3 && current == ExprType::fp32) {
+                auto vec = new Invocation(FunctionName::vec3, { expr });
+                auto swizzle = new Swizzle(vec, {
+                    swizzle2bit_t::X,
+                    swizzle2bit_t::X,
+                    swizzle2bit_t::X
+                });
+                return swizzle;
+            }
+            if (expected == ExprType::vec2 && current == ExprType::fp32) {
+                auto vec = new Invocation(FunctionName::vec2, { expr });
+                auto swizzle = new Swizzle(vec, {
+                    swizzle2bit_t::X,
+                    swizzle2bit_t::X
+                });
+                return swizzle;
+            }
             if (expected == ExprType::fp32 && current == ExprType::vec4) {
                 auto mask = new ComponentMask(expr, { 1, 0, 0, 0 });
                 return mask;
@@ -743,7 +760,7 @@ namespace ShaderRewriter {
             auto refNum = apply_visitor(VertexRefVisitor(), ref);
             Expression* expr = new Variable(name, refNum);
             if (abs)
-                expr = new UnaryOperator(FunctionName::abs, expr);
+                expr = new Invocation(FunctionName::abs, { expr });
             if (neg)
                 expr = new UnaryOperator(FunctionName::neg, expr);
             if (!sw.is_xyzw())

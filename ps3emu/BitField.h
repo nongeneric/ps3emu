@@ -90,10 +90,10 @@ public:
 };
 
 template <typename N>
-inline uint8_t bit_test(uint64_t number, int width, N nvalue) {
-    auto n = getUValue(nvalue);
+inline uint8_t bit_test(uint64_t number, int width, N pos) {
+    auto n = getUValue(pos);
     auto sh = width - n - 1;
-    return (number & (1 << sh)) >> sh;
+    return (number & (1u << sh)) >> sh;
 }
 
 template <typename T, int Pos, int Next>
@@ -101,9 +101,17 @@ T bit_test(T number, BitField<Pos, Next> bf) {
     return bit_test(number, sizeof(T) * 8, bf);
 }
 
+template <typename N>
+uint64_t bit_set(uint64_t number, int width, N pos, int val) {
+    auto n = getUValue(pos);
+    auto sh = width - n - 1;
+    auto mask = ~(1u << sh);
+    return (number & mask) | (val << sh);
+}
+
 template <typename T>
-uint64_t bit_set(T number, int n) {
-    return number | (1 << (sizeof(T) * 8 - n));
+T bit_set(T number, int pos, int val) {
+    return bit_set(number, sizeof(T) * 8, pos, val);
 }
 
 // left shift on a negative value is undefined
