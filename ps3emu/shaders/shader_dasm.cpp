@@ -952,7 +952,7 @@ int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res) {
 class ref_visitor : public boost::static_visitor<std::string> {
 public:
     std::string operator()(vertex_arg_address_ref x) const {
-        return ssnprintf("A%d.%s+%d", x.a, displ_components[x.component], x.d);
+        return ssnprintf("A%d.%c+%d", x.a, displ_components[x.component], x.d);
     }
     
     std::string operator()(int x) const {

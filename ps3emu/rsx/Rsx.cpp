@@ -840,6 +840,8 @@ class FragmentShaderUpdateFunctor {
     MainMemory* _mm;
     
     void updateBytecode(FragmentShader* shader) {
+        auto dasm = PrintFragmentProgram(_newbytecode.data());
+        BOOST_LOG_TRIVIAL(trace) << "fragment program\n" << dasm;
         // TODO: handle sizes
         std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
         auto text = GenerateFragmentShader(_newbytecode, sizes, _rsxContext->isFlatShadeMode);
@@ -957,9 +959,12 @@ void Rsx::updateShaders() {
                                                         _context->vertexInstructions.data() + size) };
         auto shader = _context->vertexShaderCache.retrieve(key);
         if (!shader) {
+            auto dasm = PrintVertexProgram(_context->vertexInstructions.data());
+            BOOST_LOG_TRIVIAL(trace) << "vertex program\n" << dasm;
             auto text = GenerateVertexShader(_context->vertexInstructions.data(),
-                                         _context->vertexInputs,
-                                         samplerSizes, 0); // TODO: loadAt
+                                             _context->vertexInputs,
+                                             samplerSizes,
+                                             0); // TODO: loadAt
             BOOST_LOG_TRIVIAL(trace) << text;
             shader = new VertexShader(text.c_str());
             BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader->log();

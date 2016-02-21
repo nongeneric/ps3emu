@@ -17,6 +17,7 @@ namespace ShaderRewriter {
     };
     
     FunctionInfo functionInfos[] {
+        { FunctionName::equal, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::lessThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::greaterThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::lessThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
@@ -166,6 +167,7 @@ namespace ShaderRewriter {
                 case FunctionName::dot4: name = "dot"; break;
                 case FunctionName::max: name = "max"; break;
                 case FunctionName::min: name = "min"; break;
+                case FunctionName::equal: name = "equal"; break;
                 case FunctionName::lessThan: name = "lessThan"; break;
                 case FunctionName::greaterThan: name = "greaterThan"; break;
                 case FunctionName::lessThanEqual: name = "lessThanEqual"; break;
@@ -203,6 +205,18 @@ namespace ShaderRewriter {
             res += "}";
             _ret = res;
         }
+        
+        virtual void visit(SwitchStatement* sw) override {
+            std::string cases;
+            for (auto& c : sw->cases()) {
+                std::string body;
+                for (auto& st : c.body) {
+                    body += ssnprintf("    %s;\n", accept(st.get()));
+                }
+                cases += ssnprintf("case 0x%x: {\n%s}\n", body);
+            }
+            _ret = ssnprintf("switch (%s) {\n%s}", accept(sw->switchOn()), cases);
+        }
 
     public:
         std::string result() {
@@ -233,9 +247,65 @@ namespace ShaderRewriter {
         { TypeClass::fp,      2, ExprType::vec2 },
         { TypeClass::fp,      3, ExprType::vec3 },
         { TypeClass::fp,      4, ExprType::vec4 },
+    };    
+    
+    class DefaultVisitor : public IExpressionVisitor {
+    public:
+        virtual void visit(FloatLiteral* literal) override { }
+        
+        virtual void visit(BinaryOperator* op) override { 
+            op->args().at(0)->accept(this);
+            op->args().at(1)->accept(this);
+        }
+        
+        virtual void visit(UnaryOperator* op) override {
+            op->args().at(0)->accept(this);
+        }
+        
+        virtual void visit(Swizzle* swizzle) override {
+            swizzle->expr()->accept(this);
+        }
+        
+        virtual void visit(Variable* ref) override { }
+        virtual void visit(IntegerLiteral* ref) override { }
+        
+        virtual void visit(ComponentMask* mask) override {
+            mask->expr()->accept(this);
+        }
+        
+        virtual void visit(IfStatement* ifst) override { 
+            ifst->condition()->accept(this);
+            for (auto& st : ifst->statements()) {
+                st->accept(this);
+            }
+        }
+        
+        virtual void visit(Assignment* assignment) override {
+            assignment->dest()->accept(this);
+            assignment->expr()->accept(this);
+        }
+        
+        virtual void visit(Invocation* invocation) override {
+            for (auto& arg : invocation->args()) {
+                arg->accept(this);
+            }
+        }
+        
+        virtual void visit(SwitchStatement* sw) override {
+            sw->switchOn()->accept(this);
+            for (auto& c : sw->cases()) {
+                for (auto& st : c.body) {
+                    st->accept(this);
+                }
+            }
+        }
     };
     
-    class TypeVisitor : public IExpressionVisitor {
+    class RewriterVisitor : public DefaultVisitor {
+    public:
+    };
+    
+    class TypeVisitor : public DefaultVisitor {
         ExprType _ret;
         
         ExprType accept(Expression* expr) {
@@ -281,6 +351,10 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(Invocation* invocation) override {
+            if (invocation->name() == FunctionName::branch) {
+                _ret = ExprType::notype;
+                return;
+            }
             auto name = invocation->name();
             auto fi = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
                 return i.name == invocation->name();
@@ -322,49 +396,6 @@ namespace ShaderRewriter {
     public:
         ExprType result() {
             return _ret;
-        }
-    };
-    
-    class DefaultVisitor : public IExpressionVisitor {
-    public:
-        virtual void visit(FloatLiteral* literal) override { }
-        
-        virtual void visit(BinaryOperator* op) override { 
-            op->args().at(0)->accept(this);
-            op->args().at(1)->accept(this);
-        }
-        
-        virtual void visit(UnaryOperator* op) override {
-            op->args().at(0)->accept(this);
-        }
-        
-        virtual void visit(Swizzle* swizzle) override {
-            swizzle->expr()->accept(this);
-        }
-        
-        virtual void visit(Variable* ref) override { }
-        virtual void visit(IntegerLiteral* ref) override { }
-        
-        virtual void visit(ComponentMask* mask) override {
-            mask->expr()->accept(this);
-        }
-        
-        virtual void visit(IfStatement* ifst) override { 
-            ifst->condition()->accept(this);
-            for (auto& st : ifst->statements()) {
-                st->accept(this);
-            }
-        }
-        
-        virtual void visit(Assignment* assignment) override {
-            assignment->dest()->accept(this);
-            assignment->expr()->accept(this);
-        }
-        
-        virtual void visit(Invocation* invocation) override {
-            for (auto& arg : invocation->args()) {
-                arg->accept(this);
-            }
         }
     };
     
@@ -452,6 +483,8 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(Invocation* invocation) override {
+            if (invocation->name() == FunctionName::branch)
+                return;
             DefaultVisitor::visit(invocation);
             auto rti = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
                 return i.name == invocation->name();
@@ -812,7 +845,7 @@ namespace ShaderRewriter {
         for (int j = 0; j < i.op_count; ++j) {
             args[j] = apply_visitor(argVisitor, i.args[j]);
         }
-        std::vector<std::unique_ptr<Statement>> vec;
+        
         Expression* rhs, *lhs = nullptr;
         
         switch (i.operation) {
@@ -1015,13 +1048,49 @@ namespace ShaderRewriter {
         }
         bool isRegC = i.op_count > 1 && boost::get<vertex_arg_cond_reg_ref_t>(&i.args[0]);
         auto maskVal = mask ? mask->mask() : dest_mask_t { 1, 1, 1, 1 };
+        
+        std::vector<std::unique_ptr<Statement>> vec;
         vec.emplace_back(new Assignment(lhs ? lhs : args[0], rhs));
         
         appendCAssignment(i.control, isRegC, maskVal, "abc", 1, vec); // TODO:
         appendCondition(i.condition, vec);
+        vec.front()->address(address);
         
         TypeFixerVisitor fixer;
-        vec.back()->accept(&fixer);
+        for (auto& assignment : vec) {
+            assignment->accept(&fixer);
+        }
         return vec;
+    }
+    
+    class DoesContainBranchVisitor : public DefaultVisitor {
+        virtual void visit(Invocation* invocation) override {
+            if (invocation->name() == FunctionName::branch) {
+                
+                result = true;
+            }
+            
+            DefaultVisitor::visit(invocation);
+        }
+    public:
+        bool result = false;
+    };
+    
+    std::vector<std::unique_ptr<Statement>> RewriteBranches(
+        std::vector<std::unique_ptr<Statement>> uniqueStatements) {
+        DoesContainBranchVisitor visitor;
+        for (auto& st : uniqueStatements) {
+            st->accept(&visitor);
+        }
+        if (!visitor.result)
+            return uniqueStatements;
+        auto sts = release_unique(uniqueStatements);
+        auto sw = new SwitchStatement(new Variable("nip", nullptr));
+        for (auto st : sts) {
+            sw->addCase(st->address(), { st });
+        }
+        std::vector<Statement*> res = {
+            new Assignment(new Variable("nip", nullptr), new IntegerLiteral(0)), sw};
+        return pack_unique(res);
     }
 }

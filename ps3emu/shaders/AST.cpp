@@ -36,6 +36,7 @@ namespace ShaderRewriter {
     void BinaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void ComponentMask::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IfStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void SwitchStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
 
     float FloatLiteral::value() {
@@ -47,10 +48,7 @@ namespace ShaderRewriter {
     }
 
     std::vector<Expression*> Invocation::args() {
-        std::vector<Expression*> exprs;
-        for (auto& expr : _args)
-            exprs.push_back(expr.get());
-        return exprs;
+        return unpack_unique(_args);
     }
 
     Expression* Swizzle::expr() {
@@ -90,18 +88,13 @@ namespace ShaderRewriter {
     
     IfStatement::IfStatement(Expression* expr,
                              std::vector<Statement*> statements)
-        : _expr(expr)
+        : _expr(expr), _statements(pack_unique(statements))
     {
-        for (auto st : statements) {
-            _statements.emplace_back(st);
-        }
+        address(statements.front()->address());
     }
     
     std::vector<Statement*> IfStatement::statements() {
-        std::vector<Statement*> res;
-        for (auto& st : _statements)
-            res.push_back(st.get());
-        return res;
+        return unpack_unique(_statements);
     }
     
     Expression* IfStatement::condition() {
@@ -133,5 +126,31 @@ namespace ShaderRewriter {
     
     Expression* Variable::index() {
         return _index.get();
+    }
+    
+    Statement::Statement() : _address(-1) { }
+    
+    Statement::~Statement() = default;
+    
+    uint32_t Statement::address() {
+        return _address;
+    }
+    
+    void Statement::address(uint32_t value) {
+        _address = value;
+    }
+    
+    SwitchStatement::SwitchStatement(Expression* switchOn) : _switchOn(switchOn) { }
+    
+    void SwitchStatement::addCase(uint32_t address, std::vector<Statement*> body) {
+        _cases.emplace_back(Case{ address, pack_unique(body) });
+    }
+ 
+    std::vector<SwitchStatement::Case>& SwitchStatement::cases() {
+        return _cases;
+    }
+    
+    Expression* SwitchStatement::switchOn() {
+        return _switchOn.get();
     }
 }

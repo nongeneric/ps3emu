@@ -37,7 +37,12 @@ namespace ShaderRewriter {
     };
     
     class Statement : public Expression {
-        
+        uint32_t _address;
+    public:
+        Statement();
+        ~Statement();
+        uint32_t address();
+        void address(uint32_t value);
     };
     
     class Assignment : public Statement {
@@ -60,6 +65,27 @@ namespace ShaderRewriter {
         std::vector<Statement*> statements();
         Expression* condition();
         virtual void accept(IExpressionVisitor* visitor) override;
+    };
+    
+    class SwitchStatement : public Statement {
+    public:
+        struct Case {
+            uint32_t address;
+            std::vector<std::unique_ptr<Statement>> body;
+        };
+        
+        SwitchStatement(Expression* switchOn);
+        void addCase(uint32_t address, std::vector<Statement*> body);
+        std::vector<Case>& cases();
+        Expression* switchOn();
+        virtual void accept(IExpressionVisitor* visitor) override;
+    private:
+        std::vector<Case> _cases;
+        std::unique_ptr<Expression> _switchOn;
+    };
+    
+    class BreakStatement : public Statement {
+        
     };
     
     class FloatLiteral : public Expression {
@@ -150,5 +176,33 @@ namespace ShaderRewriter {
         virtual void visit(Invocation* invocation) = 0;
         virtual void visit(ComponentMask* mask) = 0;
         virtual void visit(IfStatement* mask) = 0;
+        virtual void visit(SwitchStatement* sw) = 0;
     };
+    
+    template <typename T>
+    std::vector<std::unique_ptr<T>> pack_unique(std::vector<T*> const& ts) {
+        std::vector<std::unique_ptr<T>> res;
+        for (auto t : ts) {
+            res.emplace_back(std::unique_ptr<T>(t));
+        }
+        return res;
+    }
+    
+    template <typename T>
+    std::vector<T*> unpack_unique(std::vector<std::unique_ptr<T>> const& ts) {
+        std::vector<T*> res;
+        for (auto& t : ts) {
+            res.push_back(t.get());
+        }
+        return res;
+    }
+    
+    template <typename T>
+    std::vector<T*> release_unique(std::vector<std::unique_ptr<T>>& ts) {
+        std::vector<T*> res;
+        for (auto& t : ts) {
+            res.push_back(t.release());
+        }
+        return res;
+    }
 }

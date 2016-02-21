@@ -262,19 +262,28 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         auto suffix = inputs[i].typeSize == 4 ? "f" : "b";
         line(ssnprintf("    v_in[%d] = reverse%d%s(v_in_be[%d]);", i, inputs[i].rank, suffix, i));
     }
+    std::vector<std::unique_ptr<Statement>> sts;
     std::array<VertexInstr, 2> instr;
     bool isLast = false;
     while (!isLast) {
         int count = vertex_dasm_instr(bytecode, instr);
         for (int n = 0; n < count; ++n) {
-            for (auto const& st : MakeStatement(instr[n], loadOffset)) {
-                line(PrintStatement(st.get()));
+            for (auto& st : MakeStatement(instr[n], loadOffset)) {
+                sts.emplace_back(std::move(st));
             }
             isLast |= instr[n].is_last;
         }
         loadOffset++;
         bytecode += 16;
     }
+    
+    sts = RewriteBranches(std::move(sts));
+    
+    for (auto& st : sts) {
+        line(PrintStatement(st.get()));
+    }
+    
+    
     line("    gl_Position = v_out[0];");
     line("    f_COL0 = v_out[1];");
     line("    f_COL1 = v_out[4];");
@@ -307,4 +316,33 @@ uint32_t CalcVertexBytecodeSize(const uint8_t* bytecode) {
         }
     }
     throw std::runtime_error("could not find the last instruction");
+}
+
+std::string PrintFragmentProgram(const uint8_t* instr) {
+    std::string res;
+    FragmentInstr fi;
+    do {
+        auto len = fragment_dasm_instr(instr, fi);
+        static std::string line;
+        fragment_dasm(fi, line);
+        instr += len;
+        res += line + "\n";
+        
+    } while(!fi.is_last);
+    return res;
+}
+
+std::string PrintVertexProgram(const uint8_t* instr) {
+    std::string res;
+    std::array<VertexInstr, 2> vi;
+    bool isLast = false;
+    while (!isLast) {
+        int count = vertex_dasm_instr(instr, vi);
+        for (int n = 0; n < count; ++n) {
+            res += vertex_dasm(vi[n]) + "\n";
+            isLast |= vi[n].is_last;
+        }
+        instr += 16;
+    }
+    return res;
 }
