@@ -211,15 +211,27 @@ namespace ShaderRewriter {
             for (auto& c : sw->cases()) {
                 std::string body;
                 for (auto& st : c.body) {
-                    body += ssnprintf("    %s;\n", accept(st.get()));
+                    body += ssnprintf("    %s\n", accept(st.get()));
                 }
-                cases += ssnprintf("case 0x%x: {\n%s}\n", body);
+                cases += ssnprintf("case %d: {\n%s}\n", c.address, body);
             }
             _ret = ssnprintf("switch (%s) {\n%s}", accept(sw->switchOn()), cases);
         }
+        
+        virtual void visit(BreakStatement* sw) override {
+            _ret = "break;";
+        }
+        
+        virtual void visit(WhileStatement* ws) override {
+            std::string body;
+            for (auto st : ws->body()) {
+                body += accept(st) + "\n";
+            }
+            _ret = ssnprintf("while (%s) {\n%s}", accept(ws->condition()), body);
+        }
 
     public:
-        std::string result() {
+        std::string& result() {
             return _ret;
         }
     };
@@ -299,10 +311,15 @@ namespace ShaderRewriter {
                 }
             }
         }
-    };
-    
-    class RewriterVisitor : public DefaultVisitor {
-    public:
+        
+        virtual void visit(BreakStatement* sw) override { }
+        
+        virtual void visit(WhileStatement* sw) override {
+            sw->condition()->accept(this);
+            for (auto st : sw->body()) {
+                st->accept(this);
+            }
+        }
     };
     
     class TypeVisitor : public DefaultVisitor {
@@ -347,14 +364,14 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(Variable* ref) override {
-            _ret = ExprType::vec4;
+            if (ref->name() == "nip") {
+                _ret = ExprType::int32;
+            } else {
+                _ret = ExprType::vec4;
+            }
         }
         
         virtual void visit(Invocation* invocation) override {
-            if (invocation->name() == FunctionName::branch) {
-                _ret = ExprType::notype;
-                return;
-            }
             auto name = invocation->name();
             auto fi = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
                 return i.name == invocation->name();
@@ -483,8 +500,6 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(Invocation* invocation) override {
-            if (invocation->name() == FunctionName::branch)
-                return;
             DefaultVisitor::visit(invocation);
             auto rti = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
                 return i.name == invocation->name();
@@ -498,6 +513,8 @@ namespace ShaderRewriter {
                 invocation->releaseAndReplaceArg(i, adjustedExpr);
             }
         }
+        
+        virtual void visit(BreakStatement* br) override { }
     };
     
     class InfoCollectorVisitor : public DefaultVisitor {
@@ -830,8 +847,7 @@ namespace ShaderRewriter {
         }
         
         Expression* operator()(vertex_arg_label_ref_t x) const {
-            assert(false);
-            return nullptr;
+            return new IntegerLiteral(x.l);
         }
         
         Expression* operator()(vertex_arg_tex_ref_t x) const {
@@ -846,7 +862,7 @@ namespace ShaderRewriter {
             args[j] = apply_visitor(argVisitor, i.args[j]);
         }
         
-        Expression* rhs, *lhs = nullptr;
+        Expression* rhs = nullptr, *lhs = nullptr;
         
         switch (i.operation) {
             case vertex_op_t::ADD: {
@@ -869,8 +885,8 @@ namespace ShaderRewriter {
             }
             case vertex_op_t::BRB:
             case vertex_op_t::BRI: {
-                lhs = new Variable("void_var", nullptr);
-                rhs = new Invocation(FunctionName::branch, { args[0] });
+                lhs = new Variable("nip", nullptr);
+                rhs = args[0];
                 break;
             }
             case vertex_op_t::CLI:
@@ -1051,6 +1067,9 @@ namespace ShaderRewriter {
         
         std::vector<std::unique_ptr<Statement>> vec;
         vec.emplace_back(new Assignment(lhs ? lhs : args[0], rhs));
+        if (i.operation == vertex_op_t::BRI) {
+            vec.emplace_back(new BreakStatement());
+        }
         
         appendCAssignment(i.control, isRegC, maskVal, "abc", 1, vec); // TODO:
         appendCondition(i.condition, vec);
@@ -1064,13 +1083,14 @@ namespace ShaderRewriter {
     }
     
     class DoesContainBranchVisitor : public DefaultVisitor {
-        virtual void visit(Invocation* invocation) override {
-            if (invocation->name() == FunctionName::branch) {
-                
-                result = true;
+        virtual void visit(Assignment* assignment) override {
+            if (auto variable = dynamic_cast<Variable*>(assignment->dest())) {
+                if (variable->name() == "nip") {
+                    result = true;
+                    return;
+                }
             }
-            
-            DefaultVisitor::visit(invocation);
+            DefaultVisitor::visit(assignment);
         }
     public:
         bool result = false;
@@ -1086,11 +1106,34 @@ namespace ShaderRewriter {
             return uniqueStatements;
         auto sts = release_unique(uniqueStatements);
         auto sw = new SwitchStatement(new Variable("nip", nullptr));
-        for (auto st : sts) {
-            sw->addCase(st->address(), { st });
+        
+        // a nop to prevent potential infinite loop when there is a
+        // branch past the last instruction
+        auto nop = new WhileStatement(new Variable("false", nullptr), {});
+        nop->address(sts.back()->address() + 1);
+        sts.push_back(nop); 
+        
+        std::vector<Statement*> curCase;
+        for (auto i = 0u; i < sts.size(); ++i) {
+            curCase.push_back(sts[i]);
+            if (i != sts.size() - 1 && sts[i]->address() == sts[i + 1]->address()) {
+                continue;
+            }
+            if (i == sts.size() - 1) {
+                curCase.push_back(new Assignment(new Variable("nip", nullptr),
+                                                 new IntegerLiteral(-1)));
+            }
+            sw->addCase(curCase.front()->address(), curCase);
+            curCase.clear();
         }
+        
         std::vector<Statement*> res = {
-            new Assignment(new Variable("nip", nullptr), new IntegerLiteral(0)), sw};
+            new Assignment(new Variable("nip", nullptr), new IntegerLiteral(0)),
+            new WhileStatement(new BinaryOperator(FunctionName::ne,
+                                                  new Variable("nip", nullptr),
+                                                  new IntegerLiteral(-1)),
+                               { sw })
+        };
         return pack_unique(res);
     }
 }

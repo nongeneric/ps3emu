@@ -312,7 +312,7 @@ TEST_CASE() {
     res.clear();
     
     REQUIRE( !vdasm_print(instr + 16, res) );
-    REQUIRE(res == "SFL R0.z, v[8].x, v[8].x;");
+    REQUIRE(res == "SFL R0.z;");
     res.clear();
     
     REQUIRE( !vdasm_print(instr + 16 * 2, res) );

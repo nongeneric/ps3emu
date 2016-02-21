@@ -38,6 +38,8 @@ namespace ShaderRewriter {
     void IfStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void SwitchStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void BreakStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void WhileStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
 
     float FloatLiteral::value() {
         return _val;
@@ -152,5 +154,29 @@ namespace ShaderRewriter {
     
     Expression* SwitchStatement::switchOn() {
         return _switchOn.get();
+    }
+    
+    void Expression::replace(Expression* what, Expression* with) {
+        throw std::runtime_error("not implemented");
+    }
+    
+    void Expression::replace(Expression* what, std::vector<Expression*> with) {
+        throw std::runtime_error("not implemented");
+    }
+    
+    Expression* Expression::release(Expression* expr) {
+        throw std::runtime_error("not implemented");
+    }
+    
+    WhileStatement::WhileStatement(Expression* condition,
+                                   std::vector<Statement*> body)
+        : _condition(condition), _body(pack_unique(body)) {}
+ 
+    Expression* WhileStatement::condition() {
+        return _condition.get();
+    }
+    
+    std::vector<Statement*> WhileStatement::body() {
+        return unpack_unique(_body);
     }
 }

@@ -208,6 +208,7 @@ struct VertexInstr {
     bool is_last;
     control_mod_t control;
     condition_t condition;
+    bool is_branch;
 };
 
 std::string print_dest_mask(dest_mask_t mask);

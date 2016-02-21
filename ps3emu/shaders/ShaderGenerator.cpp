@@ -253,6 +253,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    vec4 c[2];");
     line("    bool b[32];");
     line("    vec4 void_var;");
+    line("    int nip;");
     for (int i = 0; i < 16; ++i) {
         line(ssnprintf("    v_out[%d] = vec4(0,0,0,0);", i));
     }
@@ -265,15 +266,18 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     std::vector<std::unique_ptr<Statement>> sts;
     std::array<VertexInstr, 2> instr;
     bool isLast = false;
+    int num = 0;
     while (!isLast) {
         int count = vertex_dasm_instr(bytecode, instr);
+        if (count == 0)
+            break;
         for (int n = 0; n < count; ++n) {
-            for (auto& st : MakeStatement(instr[n], loadOffset)) {
+            for (auto& st : MakeStatement(instr[n], num)) {
                 sts.emplace_back(std::move(st));
             }
             isLast |= instr[n].is_last;
         }
-        loadOffset++;
+        num++;
         bytecode += 16;
     }
     
@@ -308,6 +312,8 @@ uint32_t CalcVertexBytecodeSize(const uint8_t* bytecode) {
     std::array<VertexInstr, 2> instr;
     while (size < 512 * 16) {
         int count = vertex_dasm_instr(bytecode, instr);
+        if (count == 0)
+            return size;
         size += 16;
         bytecode += 16;
         for (int n = 0; n < count; ++n) {
@@ -333,16 +339,24 @@ std::string PrintFragmentProgram(const uint8_t* instr) {
 }
 
 std::string PrintVertexProgram(const uint8_t* instr) {
+    int num = 0;
     std::string res;
     std::array<VertexInstr, 2> vi;
     bool isLast = false;
     while (!isLast) {
         int count = vertex_dasm_instr(instr, vi);
+        if (count == 0)
+            return res;
         for (int n = 0; n < count; ++n) {
-            res += vertex_dasm(vi[n]) + "\n";
+            if (n == 0) {
+                res += ssnprintf("%03d: %s\n", num, vertex_dasm(vi[n]));
+            } else {
+                res += ssnprintf("     %s\n", vertex_dasm(vi[n]));
+            }
             isLast |= vi[n].is_last;
         }
         instr += 16;
+        num++;
     }
     return res;
 }

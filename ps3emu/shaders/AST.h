@@ -13,7 +13,7 @@ namespace ShaderRewriter {
         cast_float, clamp4i, sign,
         gt, ge, eq, ne, lt, le,
         reverse4f, reverse3f, reverse2f,
-        branch, call, ret,
+        call, ret,
         txl0, txl1, txl2, txl3,
         ftex, ftxb, ftxd, ftxl
     };
@@ -24,6 +24,9 @@ namespace ShaderRewriter {
     public:
         virtual ~Expression();
         virtual void accept(IExpressionVisitor* visitor) = 0;
+        virtual void replace(Expression* what, Expression* with);
+        virtual void replace(Expression* what, std::vector<Expression*> with);
+        virtual Expression* release(Expression* expr);
     };
     
     class Variable : public Expression {
@@ -70,7 +73,7 @@ namespace ShaderRewriter {
     class SwitchStatement : public Statement {
     public:
         struct Case {
-            uint32_t address;
+            uint32_t address = -1;
             std::vector<std::unique_ptr<Statement>> body;
         };
         
@@ -84,8 +87,19 @@ namespace ShaderRewriter {
         std::unique_ptr<Expression> _switchOn;
     };
     
+    class WhileStatement : public Statement {
+        std::unique_ptr<Expression> _condition;
+        std::vector<std::unique_ptr<Statement>> _body;
+    public:
+        WhileStatement(Expression* condition, std::vector<Statement*> body);
+        Expression* condition();
+        std::vector<Statement*> body();
+        virtual void accept(IExpressionVisitor* visitor) override;
+    };
+    
     class BreakStatement : public Statement {
-        
+    public:
+        virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class FloatLiteral : public Expression {
@@ -177,6 +191,8 @@ namespace ShaderRewriter {
         virtual void visit(ComponentMask* mask) = 0;
         virtual void visit(IfStatement* mask) = 0;
         virtual void visit(SwitchStatement* sw) = 0;
+        virtual void visit(BreakStatement* be) = 0;
+        virtual void visit(WhileStatement* we) = 0;
     };
     
     template <typename T>
