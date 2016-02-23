@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|PS3">
+      <Configuration>Debug</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|PS3">
+      <Configuration>Release</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="SNC Debug|PS3">
+      <Configuration>SNC Debug</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="SNC Release|PS3">
+      <Configuration>SNC Release</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{80E93090-E1FD-4DFB-8B6B-FFEF5588E283}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SNC</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SNC</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>GCC</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>GCC</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">PS3_PPU_Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">PS3_PPU_Debug\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">PS3_PPU_Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">PS3_PPU_Release\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">.\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">PS3_PPU_Debug_SNC\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">.\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">PS3_PPU_Release_SNC\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">$(ProjectName).ppu</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">$(ProjectName).ppu</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">$(ProjectName).ppu</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">$(ProjectName).ppu</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>../../../../common/gcmutil;../../../../common/gtf;../../snavi/include;../../../../fw/include;../../../../fw/include/gcm;$(SCE_PS3_ROOT)\target\ppu\include\vectormath\cpp;$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <PreprocessorDefinitions>SN_TARGET_PS3;_DEBUG;__GCC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-Wl,--strip-unused %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>../../../../common/gcmutil/gcmutil.a;../../../../fw/libfwgcm.a;-lusbd_stub;-lgcm_cmd;-lgcm_sys_stub;-lsysmodule_stub;-lm;-lsysutil_stub;-lio_stub;-lstdc++;%(AdditionalDependencies)</AdditionalDependencies>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>../../../../common/gcmutil;../../../../common/gtf;../../snavi/include;../../../../fw/include;../../../../fw/include/gcm;$(SCE_PS3_ROOT)\target\ppu\include\vectormath\cpp;$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <OptimizationLevel>Level2</OptimizationLevel>
+      <PreprocessorDefinitions>SN_TARGET_PS3;NDEBUG;__GCC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-Wl,--strip-unused %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>../../../../common/gcmutil/gcmutil.a;../../../../fw/libfwgcm.a;-lusbd_stub;-lgcm_cmd;-lgcm_sys_stub;-lsysmodule_stub;-lm;-lsysutil_stub;-lio_stub;-lstdc++;%(AdditionalDependencies)</AdditionalDependencies>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">
+    <ClCompile>
+      <AdditionalOptions>--multibyte_chars %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>../../../../common/gcmutil;../../../../common/gtf;../../snavi/include;../../../../fw/include;../../../../fw/include/gcm;$(SCE_PS3_ROOT)\target\ppu\include\vectormath\cpp;$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderOutputFile>
+      </PrecompiledHeaderOutputFile>
+      <ForcedIncludeFiles>%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <PreprocessorDefinitions>SN_TARGET_PS3;_DEBUG;__SNC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-Wl,--strip-unused %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>../../../../common/gcmutil/gcmutil.a;../../../../fw/libfwgcm.a;-lusbd_stub;-lgcm_cmd;-lgcm_sys_stub;-lsysmodule_stub;-lm;-lsysutil_stub;-lio_stub;-lstdc++;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">
+    <ClCompile>
+      <AdditionalOptions>--multibyte_chars %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>../../../../common/gcmutil;../../../../common/gtf;../../snavi/include;../../../../fw/include;../../../../fw/include/gcm;$(SCE_PS3_ROOT)\target\ppu\include\vectormath\cpp;$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderOutputFile>
+      </PrecompiledHeaderOutputFile>
+      <ForcedIncludeFiles>%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <OptimizationLevel>Level2</OptimizationLevel>
+      <PreprocessorDefinitions>SN_TARGET_PS3;NDEBUG;__SNC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-Wl,--strip-unused %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>../../../../common/gcmutil/gcmutil.a;../../../../fw/libfwgcm.a;-lusbd_stub;-lgcm_cmd;-lgcm_sys_stub;-lsysmodule_stub;-lm;-lsysutil_stub;-lio_stub;-lstdc++;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="SampleApp.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SampleApp.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="fpshader.cg">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_fp_rsx -fastmath -fastprecision -o "%(Filename).fpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).fpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">%(Filename).fpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_fp_rsx -fastmath -fastprecision -o "%(Filename).fpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).fpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">%(Filename).fpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_fp_rsx -fastmath -fastprecision -o "%(Filename).fpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).fpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">%(Filename).fpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_fp_rsx -fastmath -fastprecision -o "%(Filename).fpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).fpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">%(Filename).fpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="vpshader.cg">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_vp_rsx -fastmath -fastprecision -o "%(Filename).vpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).vpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">%(Filename).vpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_vp_rsx -fastmath -fastprecision -o "%(Filename).vpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).vpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">%(Filename).vpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_vp_rsx -fastmath -fastprecision -o "%(Filename).vpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).vpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">%(Filename).vpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_vp_rsx -fastmath -fastprecision -o "%(Filename).vpo" "%(FullPath)"
+$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy  -I binary -O elf64-powerpc-celloslv2 -B powerpc "%(Filename).vpo" "%(Filename).ppu.o"
+</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">%(Filename).vpo;%(Filename).ppu.o;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\common\gcmutil\gcmutil.vcxproj">
+      <Project>{c3dcacae-0faa-4314-b2dd-3d3fa72fce0f}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\..\fw\fwgcm.vcxproj">
+      <Project>{a4d63f3a-579f-4436-9d28-ce72006bb919}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

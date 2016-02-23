@@ -269,8 +269,6 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     int num = 0;
     while (!isLast) {
         int count = vertex_dasm_instr(bytecode, instr);
-        if (count == 0)
-            break;
         for (int n = 0; n < count; ++n) {
             for (auto& st : MakeStatement(instr[n], num)) {
                 sts.emplace_back(std::move(st));
@@ -312,8 +310,6 @@ uint32_t CalcVertexBytecodeSize(const uint8_t* bytecode) {
     std::array<VertexInstr, 2> instr;
     while (size < 512 * 16) {
         int count = vertex_dasm_instr(bytecode, instr);
-        if (count == 0)
-            return size;
         size += 16;
         bytecode += 16;
         for (int n = 0; n < count; ++n) {
@@ -338,22 +334,67 @@ std::string PrintFragmentProgram(const uint8_t* instr) {
     return res;
 }
 
-std::string PrintVertexProgram(const uint8_t* instr) {
+std::string PrintMask(int mask) {
+    return ssnprintf("%d%d%d%d", 
+                     (mask & 8) != 0, 
+                     (mask & 4) != 0, 
+                     (mask & 2) != 0, 
+                     (mask & 1) != 0);
+}
+
+std::string PrintVertexProgram(const uint8_t* instr, bool verbose) {
     int num = 0;
     std::string res;
-    std::array<VertexInstr, 2> vi;
+    std::array<VertexInstr, 2> vis;
     bool isLast = false;
     while (!isLast) {
-        int count = vertex_dasm_instr(instr, vi);
-        if (count == 0)
-            return res;
+        vertex_decoded_instr_t decoded;
+        int count = vertex_dasm_instr(instr, vis, &decoded);
         for (int n = 0; n < count; ++n) {
+            auto& vi = vis[n];
             if (n == 0) {
-                res += ssnprintf("%03d: %s\n", num, vertex_dasm(vi[n]));
+                res += ssnprintf("%03d: %s\n", num, vertex_dasm(vi));
             } else {
-                res += ssnprintf("     %s\n", vertex_dasm(vi[n]));
+                res += ssnprintf("     %s\n", vertex_dasm(vi));
             }
-            isLast |= vi[n].is_last;
+            if (verbose) {
+                res += "{\n";
+                res += ssnprintf("    is_last: %d\n", decoded.is_last);
+                res += ssnprintf("    is_complex_offset: %d\n", decoded.is_complex_offset);
+                res += ssnprintf("    output_reg_num: %d\n", decoded.output_reg_num);
+                res += ssnprintf("    dest_reg_num: %d\n", decoded.dest_reg_num);
+                res += ssnprintf("    addr_data_reg_num: %d\n", decoded.addr_data_reg_num);
+                res += ssnprintf("    mask1: %s\n", PrintMask(decoded.mask1));
+                res += ssnprintf("    mask2: %s\n", PrintMask(decoded.mask2));
+                res += ssnprintf("    v_displ: %x\n", decoded.v_displ);
+                res += ssnprintf("    input_v_num: %d\n", decoded.input_v_num);
+                res += ssnprintf("    opcode1: %d\n", decoded.opcode1);
+                res += ssnprintf("    opcode2: %d\n", decoded.opcode2);
+                res += ssnprintf("    disp_component: %x\n", decoded.disp_component);
+                res += ssnprintf("    cond_swizzle: %s\n", print_swizzle(decoded.cond_swizzle, false));
+                res += ssnprintf("    cond_relation: %s\n", print_cond(decoded.cond_relation));
+                res += ssnprintf("    flag2: %d\n", decoded.flag2);
+                res += ssnprintf("    has_cond: %d\n", decoded.has_cond);
+                res += ssnprintf("    is_addr_reg: %d\n", decoded.is_addr_reg);
+                res += ssnprintf("    is_cond_c1: %d\n", decoded.is_cond_c1);
+                res += ssnprintf("    is_sat: %d\n", decoded.is_sat);
+                res += ssnprintf("    v_index_has_displ: %d\n", decoded.v_index_has_displ);
+                res += ssnprintf("    output_has_complex_offset: %d\n", decoded.output_has_complex_offset);
+                res += ssnprintf("    sets_c: %d\n", decoded.sets_c);
+                res += ssnprintf("    mask_selector: %d\n", decoded.mask_selector);
+                res += ssnprintf("    label: %d\n\n", decoded.label);
+                for (int i = 0; i < 3; ++i) {
+                    auto& arg = decoded.args[i];
+                    res += ssnprintf("arg %d\n", i);
+                    res += ssnprintf("    is_neg: %d\n", arg.is_neg);
+                    res += ssnprintf("    is_abs: %d\n", arg.is_abs);
+                    res += ssnprintf("    reg_num: %d\n", arg.reg_num);
+                    res += ssnprintf("    reg_type: %d\n", arg.reg_type);
+                    res += ssnprintf("    swizzle: %s\n", print_swizzle(arg.swizzle, false));
+                }
+                res += "}\n\n";
+            }
+            isLast |= vi.is_last;
         }
         instr += 16;
         num++;

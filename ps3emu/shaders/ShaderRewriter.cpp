@@ -259,7 +259,7 @@ namespace ShaderRewriter {
         { TypeClass::fp,      2, ExprType::vec2 },
         { TypeClass::fp,      3, ExprType::vec3 },
         { TypeClass::fp,      4, ExprType::vec4 },
-    };    
+    };
     
     class DefaultVisitor : public IExpressionVisitor {
     public:
@@ -855,106 +855,110 @@ namespace ShaderRewriter {
         }
     };
     
-    std::vector<std::unique_ptr<Statement>> MakeStatement(const VertexInstr& i, unsigned address) {
-        Expression* args[4];
-        VertexArgVisitor argVisitor;
-        for (int j = 0; j < i.op_count; ++j) {
-            args[j] = apply_visitor(argVisitor, i.args[j]);
+    Expression* wrapMask(Expression* lhs, Expression* expr) {
+        auto mask = dynamic_cast<ComponentMask*>(lhs);
+        if (mask) {
+            return new ComponentMask(expr, mask->mask());
         }
+        return expr;
+    }
+    
+    std::vector<std::unique_ptr<Statement>> MakeStatement(const VertexInstr& i, unsigned address) {
+        VertexArgVisitor argVisitor;
+        auto arg = [&](int j) {
+            return apply_visitor(argVisitor, i.args[j]);
+        };
         
         Expression* rhs = nullptr, *lhs = nullptr;
         
         switch (i.operation) {
             case vertex_op_t::ADD: {
-                rhs = new BinaryOperator(FunctionName::add, args[1], args[2]);
+                rhs = new BinaryOperator(FunctionName::add, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::MAD: {
-                auto mul = new BinaryOperator(FunctionName::mul, args[1], args[2]);
-                auto add = new BinaryOperator(FunctionName::add, mul, args[3]);
+                auto mul = new BinaryOperator(FunctionName::mul, arg(1), arg(2));
+                auto add = new BinaryOperator(FunctionName::add, mul, arg(3));
                 rhs = add;
                 break;
             }
             case vertex_op_t::ARL: {
-                rhs = new Invocation(FunctionName::floor, { args[1] });
+                rhs = new Invocation(FunctionName::floor, { arg(1) });
                 break;
             }
             case vertex_op_t::ARR: {
-                rhs = new Invocation(FunctionName::ceil, { args[1] });
+                rhs = new Invocation(FunctionName::ceil, { arg(1) });
                 break;
             }
             case vertex_op_t::BRB:
             case vertex_op_t::BRI: {
                 lhs = new Variable("nip", nullptr);
-                rhs = args[0];
+                rhs = arg(0);
                 break;
             }
             case vertex_op_t::CLI:
             case vertex_op_t::CLB: {
                 lhs = new Variable("void_var", nullptr);
-                rhs = new Invocation(FunctionName::call, { args[0] });
+                rhs = new Invocation(FunctionName::call, { arg(0) });
                 break;
             }
             case vertex_op_t::COS: {
-                rhs = new Invocation(FunctionName::cos, { args[1] });
+                rhs = new Invocation(FunctionName::cos, { arg(1) });
                 break;
             }
             case vertex_op_t::DP3: {
-                rhs = new Invocation(FunctionName::dot3, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::dot3, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::DP4: {
-                rhs = new Invocation(FunctionName::dot4, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::dot4, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::DST: {
                 auto c0 = new FloatLiteral(1);
                 auto c1 = new BinaryOperator(
                     FunctionName::mul,
-                    new ComponentMask(args[1], { 0, 1, 0, 0 }),
-                    new ComponentMask(args[2], { 0, 1, 0, 0 })
+                    new ComponentMask(arg(1), { 0, 1, 0, 0 }),
+                    new ComponentMask(arg(2), { 0, 1, 0, 0 })
                 );
-                auto c2 = new ComponentMask(args[1], { 0, 0, 1, 0 });
-                auto c3 = new ComponentMask(args[2], { 0, 0, 0, 1 });
+                auto c2 = new ComponentMask(arg(1), { 0, 0, 1, 0 });
+                auto c3 = new ComponentMask(arg(2), { 0, 0, 0, 1 });
                 rhs = new Invocation(FunctionName::vec4, { c0, c1, c2, c3 });
                 break;
             }
             case vertex_op_t::EXP:
             case vertex_op_t::EX2: {
-                rhs = new Invocation(FunctionName::exp2, { args[1] });
+                rhs = new Invocation(FunctionName::exp2, { arg(1) });
                 break;
             }
             case vertex_op_t::FLR: {
-                rhs = new Invocation(FunctionName::floor, { args[1] });
+                rhs = new Invocation(FunctionName::floor, { arg(1) });
                 break;
             }
             case vertex_op_t::FRC: {
-                rhs = new Invocation(FunctionName::fract, { args[1] });
+                rhs = new Invocation(FunctionName::fract, { arg(1) });
                 break;
             }
             case vertex_op_t::LG2:
             case vertex_op_t::LOG: {
-                rhs = new Invocation(FunctionName::lg2, { args[1] });
+                rhs = new Invocation(FunctionName::lg2, { arg(1) });
                 break;
             }
             case vertex_op_t::LIT: {
                 auto c0 = new FloatLiteral(1);
-                auto c1 = new ComponentMask(args[1], { 1, 0, 0, 0 });
-                auto arg1Clone1 = apply_visitor(argVisitor, i.args[1]);
-                auto arg1Clone2 = apply_visitor(argVisitor, i.args[1]);
-                auto arg1Clone3 = apply_visitor(argVisitor, i.args[1]);
+                auto c1 = new ComponentMask(arg(1), { 1, 0, 0, 0 });
                 auto mul = new BinaryOperator(
                     FunctionName::mul,
-                    new ComponentMask(arg1Clone2, { 0, 0, 0, 1 }),
+                    new ComponentMask(arg(1), { 0, 0, 0, 1 }),
                     new Invocation(
                         FunctionName::lg2,
-                        { new ComponentMask(arg1Clone3, { 0, 1, 0, 0 }) }
+                        { new ComponentMask(arg(1), { 0, 1, 0, 0 }) }
                     )
                 );
                 auto c2 = new TernaryOperator(
                     new BinaryOperator(
                         FunctionName::gt,
-                        new ComponentMask(arg1Clone1, { 1, 0, 0, 0 }),
+                        new ComponentMask(arg(1), { 1, 0, 0, 0 }),
                         new FloatLiteral(0)
                     ),
                     new Invocation(FunctionName::exp2, { mul }),
@@ -965,25 +969,23 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::MIN: {
-                rhs = new Invocation(FunctionName::min, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::min, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::MAX: {
-                rhs = new Invocation(FunctionName::max, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::max, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::MOV: {
-                rhs = args[1];
                 break;
             }
             case vertex_op_t::MUL: {
-                rhs = new BinaryOperator(FunctionName::mul, args[1], args[2]);
+                rhs = new BinaryOperator(FunctionName::mul, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::MVA: {
-                auto arg1Clone = apply_visitor(argVisitor, i.args[1]);
-                auto x = new Swizzle(args[1], { swizzle2bit_t::X, swizzle2bit_t::Y });
-                auto y = new Swizzle(arg1Clone, { swizzle2bit_t::Z, swizzle2bit_t::W });
+                auto x = new Swizzle(arg(1), { swizzle2bit_t::X, swizzle2bit_t::Y });
+                auto y = new Swizzle(arg(1), { swizzle2bit_t::Z, swizzle2bit_t::W });
                 auto sum = new BinaryOperator(FunctionName::add, x, y);
                 auto sw = new Swizzle(sum, {
                     swizzle2bit_t::X, swizzle2bit_t::Y, swizzle2bit_t::X, swizzle2bit_t::Y 
@@ -992,16 +994,16 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::RCP: {
-                auto mask = new ComponentMask(args[1], { 1, 0, 0, 0 });
+                auto mask = new ComponentMask(arg(1), { 1, 0, 0, 0 });
                 rhs = new Invocation(FunctionName::pow, { mask, new FloatLiteral(-1) });
                 break;
             }
             case vertex_op_t::RSQ: {
-                rhs = new Invocation(FunctionName::inversesqrt, { args[1] });
+                rhs = new Invocation(FunctionName::inversesqrt, { arg(1) });
                 break;
             }
             case vertex_op_t::SEQ: {
-                rhs = new Invocation(FunctionName::equal, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::equal, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::SFL: {
@@ -1012,31 +1014,31 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::SGE: {
-                rhs = new Invocation(FunctionName::greaterThanEqual, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::greaterThanEqual, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::SGT: {
-                rhs = new Invocation(FunctionName::greaterThan, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::greaterThan, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::SIN: {
-                rhs = new Invocation(FunctionName::sin, { args[1] });
+                rhs = new Invocation(FunctionName::sin, { arg(1) });
                 break;
             }
             case vertex_op_t::SLE: {
-                rhs = new Invocation(FunctionName::lessThanEqual, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::lessThanEqual, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::SLT: {
-                rhs = new Invocation(FunctionName::lessThan, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::lessThan, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::SNE: {
-                rhs = new Invocation(FunctionName::notEqual, { args[1], args[2] });
+                rhs = new Invocation(FunctionName::notEqual, { arg(1), arg(2) });
                 break;
             }
             case vertex_op_t::SSG: {
-                rhs = new Invocation(FunctionName::sign, { args[1] });
+                rhs = new Invocation(FunctionName::sign, { arg(1) });
                 break;
             }
             case vertex_op_t::STR: {
@@ -1047,36 +1049,55 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::TXL: {
-                auto txl = dynamic_cast<IntegerLiteral*>(args[2]);
+                auto txl = dynamic_cast<IntegerLiteral*>(arg(2));
                 assert(txl);
                 auto func = txl->value() == 0 ? FunctionName::txl0
                           : txl->value() == 1 ? FunctionName::txl1
                           : txl->value() == 2 ? FunctionName::txl2
                           : FunctionName::txl3;
-                rhs = new Invocation(func, { args[1] });
+                rhs = new Invocation(func, { arg(1) });
+                break;
+            }
+            case vertex_op_t::NOP: {
+                lhs = new WhileStatement(new Variable("false", nullptr), {});
                 break;
             }
             default: assert(false);
         }
-        auto mask = dynamic_cast<ComponentMask*>(args[0]);
-        if (mask) {
-            rhs = new ComponentMask(rhs, mask->mask());
-        }
+        auto mask = dynamic_cast<ComponentMask*>(arg(0));
         bool isRegC = i.op_count > 1 && boost::get<vertex_arg_cond_reg_ref_t>(&i.args[0]);
         auto maskVal = mask ? mask->mask() : dest_mask_t { 1, 1, 1, 1 };
         
         std::vector<std::unique_ptr<Statement>> vec;
-        vec.emplace_back(new Assignment(lhs ? lhs : args[0], rhs));
-        if (i.operation == vertex_op_t::BRI) {
-            vec.emplace_back(new BreakStatement());
+        if (rhs) {
+            auto dest = arg(0);
+            vec.emplace_back(new Assignment(lhs ? lhs : dest, wrapMask(dest, rhs)));
+            if (i.operation == vertex_op_t::BRI) {
+                vec.emplace_back(new BreakStatement());
+            }
+        } else {        
+            if (i.operation == vertex_op_t::MOV) {
+                if (i.op_count == 2) {
+                    auto dest = arg(0);
+                    vec.emplace_back(new Assignment(dest, wrapMask(dest, arg(1))));
+                } else {
+                    assert(i.op_count == 3);
+                    auto dest = arg(0);
+                    vec.emplace_back(new Assignment(dest, wrapMask(dest, arg(2))));
+                    dest = arg(1);
+                    vec.emplace_back(new Assignment(dest, wrapMask(dest, arg(2))));
+                }
+            } else {
+                vec.emplace_back(dynamic_cast<Statement*>(lhs));
+            }
         }
-        
+
         appendCAssignment(i.control, isRegC, maskVal, "abc", 1, vec); // TODO:
         appendCondition(i.condition, vec);
-        vec.front()->address(address);
         
         TypeFixerVisitor fixer;
         for (auto& assignment : vec) {
+            assignment->address(address);
             assignment->accept(&fixer);
         }
         return vec;
@@ -1106,12 +1127,6 @@ namespace ShaderRewriter {
             return uniqueStatements;
         auto sts = release_unique(uniqueStatements);
         auto sw = new SwitchStatement(new Variable("nip", nullptr));
-        
-        // a nop to prevent potential infinite loop when there is a
-        // branch past the last instruction
-        auto nop = new WhileStatement(new Variable("false", nullptr), {});
-        nop->address(sts.back()->address() + 1);
-        sts.push_back(nop); 
         
         std::vector<Statement*> curCase;
         for (auto i = 0u; i < sts.size(); ++i) {

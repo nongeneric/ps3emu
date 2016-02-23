@@ -211,12 +211,51 @@ struct VertexInstr {
     bool is_branch;
 };
 
+struct vertex_decoded_arg_t {
+    bool is_neg;
+    bool is_abs;
+    swizzle_t swizzle;
+    int reg_num;
+    int reg_type;
+};
+
+struct vertex_decoded_instr_t {
+    bool is_last;
+    bool is_complex_offset;
+    int output_reg_num;
+    int dest_reg_num;
+    int addr_data_reg_num;
+    uint16_t mask1;
+    uint16_t mask2;
+    vertex_decoded_arg_t args[3];
+    uint32_t v_displ;
+    int input_v_num;
+    int opcode1;
+    int opcode2;
+    int disp_component;
+    swizzle_t cond_swizzle;
+    cond_t cond_relation;
+    bool flag2;
+    bool has_cond;
+    bool is_addr_reg;
+    bool is_cond_c1;
+    bool is_sat;
+    bool v_index_has_displ;
+    bool output_has_complex_offset;
+    bool sets_c;
+    int mask_selector;
+    int label;
+};
+
+const char* print_cond(cond_t cond);
 std::string print_dest_mask(dest_mask_t mask);
 const char* print_attr(input_attr_t attr);
 std::string print_swizzle(swizzle_t swizzle, bool allComponents);
 void fragment_dasm(FragmentInstr const& i, std::string& res);
 int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res);
-int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res);
+int vertex_dasm_instr(const uint8_t* instr,
+                      std::array<VertexInstr, 2>& res,
+                      vertex_decoded_instr_t* decodedInstr = nullptr);
 std::string vertex_dasm(VertexInstr const& instr);
 std::array<float, 4> read_fragment_imm_val(const uint8_t* ptr);
 

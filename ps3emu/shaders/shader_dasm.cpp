@@ -2,6 +2,7 @@
 #include "../utils.h"
 #include <stdexcept>
 #include <boost/endian/arithmetic.hpp>
+#include <boost/concept_check.hpp>
 #include "assert.h"
 
 fragment_opcode_t fragment_opcodes[] = {
@@ -616,42 +617,6 @@ struct vertex_raw_instr_t {
     } b3;
 };
 
-struct vertex_decoded_arg_t {
-    bool is_neg;
-    bool is_abs;
-    swizzle_t swizzle;
-    int reg_num;
-    int reg_type;
-};
-
-struct vertex_decoded_instr_t {
-    bool is_last;
-    bool is_complex_offset;
-    int output_reg_num;
-    int dest_reg_num;
-    int addr_data_reg_num;
-    uint16_t mask1;
-    uint16_t mask2;
-    vertex_decoded_arg_t args[3];
-    uint32_t v_displ;
-    int input_v_num;
-    int opcode1;
-    int opcode2;
-    int disp_component;
-    swizzle_t cond_swizzle;
-    cond_t cond_relation;
-    bool flag2;
-    bool has_cond;
-    bool is_addr_reg;
-    bool is_cond_c1;
-    bool is_sat;
-    bool v_index_has_displ;
-    bool output_has_complex_offset;
-    bool sets_c;
-    int mask_selector;
-    int label;
-};
-
 void vertex_dasm_instr(const uint8_t* instr, vertex_decoded_instr_t& res) {
     uint8_t buf[16];
     for (auto i = 0u; i < sizeof(buf); i += 4) {
@@ -722,69 +687,88 @@ void vertex_dasm_instr(const uint8_t* instr, vertex_decoded_instr_t& res) {
     res.args[0].reg_type = typed->b2.arg0_reg_type.u();
 }
 
-struct vertex_opcode_t {
-    int op_count;
-    bool control;
-    bool addr_reg;
-    bool tex;
-    const char* mnemonic;
-    vertex_op_t instr;
+enum class vertex_argument_type_t {
+    none, v, cc, b, s, a, t
 };
 
+struct vertex_opcode_t {
+    int op_count; // remove
+    bool control; // remove
+    bool addr_reg; // remove
+    bool tex; // remove
+    
+    bool cond;
+    
+    const char* mnemonic;
+    vertex_op_t instr;
+    vertex_argument_type_t output_type;
+    vertex_argument_type_t input_type[3];
+};
+
+#define OUT(a) vertex_argument_type_t::a
+#define IN(a) { vertex_argument_type_t::a }
+#define IN2(a,b) { vertex_argument_type_t::a, vertex_argument_type_t::b }
+#define IN3(a,b,c) \
+    { vertex_argument_type_t::a, \
+      vertex_argument_type_t::b, \
+      vertex_argument_type_t::c }
+#define OP(a) #a, vertex_op_t::a
+
 vertex_opcode_t vertex_opcodes_1[] = {
-    { 0, 0, 0, 0, "NOP", vertex_op_t::NOP },
-    { 1, 0, 0, 0, "MOV", vertex_op_t::MOV },
-    { 2, 0, 0, 0, "MUL", vertex_op_t::MUL },
-    { 2, 0, 0, 0, "ADD", vertex_op_t::ADD },
-    { 3, 0, 0, 0, "MAD", vertex_op_t::MAD },
-    { 2, 0, 0, 0, "DP3", vertex_op_t::DP3 },
-    { 2, 0, 0, 0, "DPH", vertex_op_t::DPH },
-    { 2, 0, 0, 0, "DP4", vertex_op_t::DP4 },
-    { 2, 0, 0, 0, "DST", vertex_op_t::DST },
-    { 2, 0, 0, 0, "MIN", vertex_op_t::MIN },
-    { 2, 0, 0, 0, "MAX", vertex_op_t::MAX },
-    { 2, 0, 0, 0, "SLT", vertex_op_t::SLT },
-    { 2, 0, 0, 0, "SGE", vertex_op_t::SGE },
-    { 1, 0, 1, 0, "ARL", vertex_op_t::ARL },
-    { 1, 0, 0, 0, "FRC", vertex_op_t::FRC },
-    { 1, 0, 0, 0, "FLR", vertex_op_t::FLR },
-    { 2, 0, 0, 0, "SEQ", vertex_op_t::SEQ },
-    { 0, 0, 0, 0, "SFL", vertex_op_t::SFL },
-    { 2, 0, 0, 0, "SGT", vertex_op_t::SGT },
-    { 2, 0, 0, 0, "SLE", vertex_op_t::SLE },
-    { 2, 0, 0, 0, "SNE", vertex_op_t::SNE },
-    { 0, 0, 0, 0, "STR", vertex_op_t::STR },
-    { 1, 0, 0, 0, "SSG", vertex_op_t::SSG },
-    { 1, 0, 1, 0, "ARR", vertex_op_t::ARR },
-    { 1, 0, 1, 0, "ARA", vertex_op_t::ARA },
-    { 2, 0, 0, 1, "TXL", vertex_op_t::TXL },
-    { 1, 0, 0, 0, "PSH", vertex_op_t::PSH },
-    { 0, 0, 0, 0, "POP", vertex_op_t::POP }
+    { 0, 0, 0, 0, 0, OP(NOP) },
+    { 1, 0, 0, 0, 1, OP(MOV), OUT(v), IN(v) },
+    { 2, 0, 0, 0, 1, OP(MUL), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(ADD), OUT(v), IN2(v, v) },
+    { 3, 0, 0, 0, 1, OP(MAD), OUT(v), IN3(v, v, v) },
+    { 2, 0, 0, 0, 1, OP(DP3), OUT(s), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(DPH) },
+    { 2, 0, 0, 0, 1, OP(DP4), OUT(s), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(DST), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(MIN), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(MAX), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(SLT), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(SGE), OUT(v), IN2(v, v) },
+    { 1, 0, 1, 0, 1, OP(ARL), OUT(a), IN(v) },
+    { 1, 0, 0, 0, 1, OP(FRC), OUT(v), IN(v) },
+    { 1, 0, 0, 0, 1, OP(FLR), OUT(v), IN(v) },
+    { 2, 0, 0, 0, 1, OP(SEQ), OUT(v), IN2(v, v) },
+    { 0, 0, 0, 0, 1, OP(SFL), OUT(v) },
+    { 2, 0, 0, 0, 1, OP(SGT), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(SLE), OUT(v), IN2(v, v) },
+    { 2, 0, 0, 0, 1, OP(SNE), OUT(v), IN2(v, v) },
+    { 0, 0, 0, 0, 1, OP(STR), OUT(v) },
+    { 1, 0, 0, 0, 1, OP(SSG), OUT(v), IN(v) },
+    { 1, 0, 1, 0, 1, OP(ARR), OUT(a), IN(v) },
+    { 1, 0, 1, 0, 1, OP(ARA), OUT(a), IN(v) },
+    { 2, 0, 0, 1, 0, OP(TXL), OUT(s), IN2(v, t) },
+    { 1, 0, 0, 0, 0, OP(PSH) },
+    { 0, 0, 0, 0, 0, OP(POP) }
 };
 
 vertex_opcode_t vertex_opcodes_0[] = {
-    { 0, 0, 0, 0, "NOP", vertex_op_t::NOP },
-    { 1, 0, 0, 0, "MOV", vertex_op_t::MOV },
-    { 1, 0, 0, 0, "RCP", vertex_op_t::RCP },
-    { 1, 0, 0, 0, "RCC", vertex_op_t::RCC },
-    { 1, 0, 0, 0, "RSQ", vertex_op_t::RSQ },
-    { 1, 0, 0, 0, "EXP", vertex_op_t::EXP },
-    { 1, 0, 0, 0, "LOG", vertex_op_t::LOG },
-    { 1, 0, 0, 0, "LIT", vertex_op_t::LIT },
-    { 1, 1, 0, 0, "BRA", vertex_op_t::BRA },
-    { 1, 1, 0, 0, "BRI", vertex_op_t::BRI },
-    { 1, 1, 0, 0, "CAL", vertex_op_t::CAL },
-    { 1, 1, 0, 0, "CLI", vertex_op_t::CLI },
-    { 0, 1, 0, 0, "RET", vertex_op_t::RET },
-    { 1, 0, 0, 0, "LG2", vertex_op_t::LG2 },
-    { 1, 0, 0, 0, "EX2", vertex_op_t::EX2 },
-    { 1, 0, 0, 0, "SIN", vertex_op_t::SIN },
-    { 1, 0, 0, 0, "COS", vertex_op_t::COS },
-    { 1, 0, 0, 0, "BRB", vertex_op_t::BRB },
-    { 1, 0, 0, 0, "CLB", vertex_op_t::CLB },
-    { 1, 0, 0, 0, "PSH", vertex_op_t::PSH },
-    { 1, 0, 0, 0, "POP", vertex_op_t::POP }
+    { 0, 0, 0, 0, 1, OP(NOP) },
+    { 1, 0, 0, 0, 1, OP(MOV), OUT(v), IN(v) },
+    { 1, 0, 0, 0, 1, OP(RCP), OUT(s), IN(s) },
+    { 1, 0, 0, 0, 1, OP(RCC) },
+    { 1, 0, 0, 0, 1, OP(RSQ), OUT(s), IN(s) },
+    { 1, 0, 0, 0, 1, OP(EXP), OUT(v), IN(s) },
+    { 1, 0, 0, 0, 1, OP(LOG), OUT(v), IN(s) },
+    { 1, 0, 0, 0, 1, OP(LIT), OUT(v), IN(v) },
+    { 1, 1, 0, 0, 1, OP(BRA) },
+    { 1, 1, 0, 0, 0, OP(BRI), OUT(none), IN(cc) },
+    { 1, 1, 0, 0, 1, OP(CAL) },
+    { 1, 1, 0, 0, 0, OP(CLI), OUT(cc) },
+    { 0, 1, 0, 0, 0, OP(RET), OUT(none), IN(cc) },
+    { 1, 0, 0, 0, 1, OP(LG2), OUT(s), IN(s) },
+    { 1, 0, 0, 0, 1, OP(EX2), OUT(s), IN(s) },
+    { 1, 0, 0, 0, 1, OP(SIN), OUT(s), IN(s) },
+    { 1, 0, 0, 0, 1, OP(COS), OUT(s), IN(s) },
+    { 1, 0, 0, 0, 0, OP(BRB), OUT(b) },
+    { 1, 0, 0, 0, 0, OP(CLB), OUT(b) },
+    { 1, 0, 0, 0, 1, OP(PSH) },
+    { 1, 0, 0, 0, 1, OP(POP) }
 };
+
 
 // TODO: add MVA
 
@@ -812,50 +796,68 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
     };
     if (slot) {
         opcode = &vertex_opcodes_1[instr.opcode1];
-        if (opcode->instr == vertex_op_t::ADD)
+        if (opcode->instr == vertex_op_t::ADD) {
             args[1] = &instr.args[2];
+        }
     } else {
         opcode = &vertex_opcodes_0[instr.opcode2];
         args[0] = &instr.args[2];
     }
+    res.is_last = instr.is_last;
     res.is_branch = opcode->control;
     res.is_sat = instr.is_sat;
     res.operation = opcode->instr;
     res.mnemonic = opcode->mnemonic;
     res.control = control_mod_t::None;
-    res.is_last = instr.is_last;
     if (instr.flag2 && !(slot ^ instr.sets_c)) {
         res.control = instr.is_cond_c1 ?
             control_mod_t::C1 :
             control_mod_t::C0;
     }
     int res_arg = 0;
-    if (instr.output_reg_num != 31) {
-        if (!(slot ^ instr.mask_selector)) {
-            int regnum = instr.output_reg_num & 0x1f;
-            vertex_arg_ref_t ref;
-            if (instr.output_has_complex_offset) {
-                ref = vertex_arg_address_ref { 
-                    instr.is_addr_reg, instr.disp_component, regnum
-                };
-            } else {
-                ref = regnum;
+    
+    if (opcode->output_type != vertex_argument_type_t::none) {
+        if (instr.output_reg_num != 31) {
+            if (!(slot ^ instr.mask_selector)) {
+                int regnum = instr.output_reg_num & 0x1f;
+                vertex_arg_ref_t ref;
+                if (instr.output_has_complex_offset) {
+                    ref = vertex_arg_address_ref { 
+                        instr.is_addr_reg, instr.disp_component, regnum
+                    };
+                } else {
+                    ref = regnum;
+                }
+                uint16_t mask = instr.mask_selector ? instr.mask1 : instr.mask2;
+                res.args[res_arg] = vertex_arg_output_ref_t { ref, mask };
+                res_arg++;
             }
-            uint16_t mask = instr.mask_selector ? instr.mask1 : instr.mask2;
-            res.args[res_arg] = vertex_arg_output_ref_t { ref, mask };
-            res_arg++;
-        }
-    }
-    if (!opcode->control && !slot && opcode->instr != vertex_op_t::PSH) {
-        if (instr.addr_data_reg_num != 63 || instr.mask_selector || instr.output_reg_num == 31) {
-            auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask2;
-            if (instr.dest_reg_num == 63) {
-                res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
-            } else if (opcode->addr_reg) {
-                res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.dest_reg_num, mask };
+        } 
+        if (!opcode->control && !slot && opcode->instr != vertex_op_t::PSH) {
+            if (instr.addr_data_reg_num != 63 || instr.mask_selector || instr.output_reg_num == 31) {
+                auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask2;
+                if (instr.dest_reg_num == 63) {
+                    res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
+                } else if (opcode->addr_reg) {
+                    res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.dest_reg_num, mask };
+                } else {
+                    res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
+                        instr.dest_reg_num,
+                        false,
+                        false,
+                        swizzle_xyzw,
+                        mask
+                    };
+                }
+                res_arg++;
+            }
+        } else if (instr.addr_data_reg_num != 63) {
+            auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
+            if (opcode->addr_reg) {
+                res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.addr_data_reg_num, mask };
             } else {
                 res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
-                    instr.dest_reg_num,
+                    instr.addr_data_reg_num,
                     false,
                     false,
                     swizzle_xyzw,
@@ -863,29 +865,12 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
                 };
             }
             res_arg++;
+        } else if ((!instr.mask_selector || instr.output_reg_num == 31) && !opcode->control) {
+            auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
+            res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
+            res_arg++;
         }
-    } else if (instr.addr_data_reg_num != 0x3f) {
-        auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
-        if (opcode->addr_reg) {
-            res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.addr_data_reg_num, mask };
-        } else {
-            res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
-                instr.addr_data_reg_num,
-                false,
-                false,
-                swizzle_xyzw,
-                mask
-            };
-        }
-        res_arg++;
-    } else if ((!instr.mask_selector || instr.output_reg_num == 31) && !opcode->control) {
-        auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
-        res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
-        res_arg++;
     }
-    
-    if (opcode->control)
-        res_arg = 0;
     
     res.condition.relation = cond_t::TR;
     if (instr.has_cond || opcode->control) {
@@ -899,6 +884,7 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
 //             }
 //             res += ssnprintf("b%d,", instr.args[0].reg_num & 0x1f);
     }
+    
     for (auto i = 0; i < opcode->op_count; ++i, ++res_arg) {
         auto arg = args[i];
         if (opcode->control) {
@@ -941,13 +927,13 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
             }
         }
     }
-    if (opcode->instr == vertex_op_t::MOV && res_arg != 2) {
-        return res_arg;
-    }
+    
     return res_arg;
 }
 
-int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res) {
+int vertex_dasm_instr(const uint8_t* instr, 
+                      std::array<VertexInstr, 2>& res, 
+                      vertex_decoded_instr_t* decodedInstr) {
     vertex_decoded_instr_t decoded;
     vertex_dasm_instr(instr, decoded);
     int i = 0;
@@ -955,9 +941,18 @@ int vertex_dasm_instr(const uint8_t* instr, std::array<VertexInstr, 2>& res) {
         res[i].op_count = vertex_dasm_slot(decoded, 0, res[i]);
         i++;
     }
-    if (decoded.opcode1) {
+    if (decoded.opcode1 || !decoded.opcode2) {
         res[i].op_count = vertex_dasm_slot(decoded, 1, res[i]);
         i++;
+    }
+    if (decodedInstr) {
+        *decodedInstr = decoded;
+    }
+    if (i == 2 && res[0].is_branch) {
+        // combined instructions are always executed together
+        // if a branch comes first it may prevent the second instruction
+        // so always place the branch last
+        std::swap(res[0], res[1]);
     }
     return i;
 }

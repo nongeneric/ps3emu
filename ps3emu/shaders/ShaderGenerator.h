@@ -25,4 +25,4 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                                  unsigned loadOffset);
 
 std::string PrintFragmentProgram(const uint8_t* instr);
-std::string PrintVertexProgram(const uint8_t* instr);
+std::string PrintVertexProgram(const uint8_t* instr, bool verbose = false);

@@ -123,3 +123,12 @@ TEST_CASE("gcm_human") {
     compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
     compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);
 }
+
+TEST_CASE("gcm_vertex_shader_branch") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_vertex_shader_branch/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_vertex_shader_branch/ps3frame.png");
+}
