@@ -40,6 +40,7 @@ namespace ShaderRewriter {
     void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void BreakStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void WhileStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void TernaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
 
     float FloatLiteral::value() {
         return _val;
@@ -81,12 +82,9 @@ namespace ShaderRewriter {
     }
     
     TernaryOperator::TernaryOperator(Expression* cond, 
-                                     Expression* trueBranch,
-                                     Expression* falseBranch)
-        : Invocation(FunctionName::ternary, { }),
-          _cond(cond), 
-          _trueBranch(trueBranch),
-          _falseBranch(falseBranch) { }
+                                     Expression* trueExpr,
+                                     Expression* falseExpr)
+        : Invocation(FunctionName::none, { cond, trueExpr, falseExpr }) { }
     
     IfStatement::IfStatement(Expression* expr,
                              std::vector<Statement*> statements)

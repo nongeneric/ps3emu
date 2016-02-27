@@ -136,9 +136,9 @@ struct FragmentInstr {
 };
 
 struct vertex_arg_address_ref {
-    int a;
+    int reg;
     int component;
-    int d;
+    int displ;
 };
 
 typedef boost::variant<vertex_arg_address_ref, int> vertex_arg_ref_t;

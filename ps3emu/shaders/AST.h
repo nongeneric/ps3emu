@@ -8,14 +8,15 @@
 namespace ShaderRewriter {
     enum class FunctionName {
         vec4, vec3, vec2, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
-        mul, div, add, abs, neg, ternary, exp2, lg2, min, max, pow, inversesqrt,
+        mul, div, add, abs, neg, exp2, lg2, min, max, pow, inversesqrt,
         fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
         cast_float, clamp4i, sign,
         gt, ge, eq, ne, lt, le,
         reverse4f, reverse3f, reverse2f,
         call, ret,
         txl0, txl1, txl2, txl3,
-        ftex, ftxb, ftxd, ftxl
+        ftex, ftxb, ftxd, ftxl,
+        none
     };
     
     class IExpressionVisitor;
@@ -164,13 +165,11 @@ namespace ShaderRewriter {
     };
     
     class TernaryOperator : public Invocation {
-        std::unique_ptr<Expression> _cond;
-        std::unique_ptr<Expression> _trueBranch;
-        std::unique_ptr<Expression> _falseBranch;
     public:
         TernaryOperator(Expression* cond,
-                        Expression* trueBranch,
-                        Expression* falseBranch);
+                        Expression* trueExpr,
+                        Expression* falseExpr);
+        virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class BasicBlock {
@@ -193,6 +192,7 @@ namespace ShaderRewriter {
         virtual void visit(SwitchStatement* sw) = 0;
         virtual void visit(BreakStatement* be) = 0;
         virtual void visit(WhileStatement* we) = 0;
+        virtual void visit(TernaryOperator* we) = 0;
     };
     
     template <typename T>

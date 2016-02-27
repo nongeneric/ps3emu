@@ -18,8 +18,10 @@ namespace ShaderRewriter {
     
     FunctionInfo functionInfos[] {
         { FunctionName::equal, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::notEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::lessThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::greaterThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::greaterThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::lessThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::vec4, 
             { ExprType::vec4, ExprType::fp32, ExprType::fp32, ExprType::fp32, ExprType::fp32 } },
@@ -65,7 +67,7 @@ namespace ShaderRewriter {
             case cond_t::LE: return FunctionName::le;
             case cond_t::LT: return FunctionName::lt;
             case cond_t::NE: return FunctionName::ne;
-            default: assert(false); return FunctionName::ternary;
+            default: assert(false); return FunctionName::none;
         }
     }
     
@@ -168,8 +170,10 @@ namespace ShaderRewriter {
                 case FunctionName::max: name = "max"; break;
                 case FunctionName::min: name = "min"; break;
                 case FunctionName::equal: name = "equal"; break;
+                case FunctionName::notEqual: name = "notEqual"; break;
                 case FunctionName::lessThan: name = "lessThan"; break;
                 case FunctionName::greaterThan: name = "greaterThan"; break;
+                case FunctionName::greaterThanEqual: name = "greaterThanEqual"; break;
                 case FunctionName::lessThanEqual: name = "lessThanEqual"; break;
                 case FunctionName::abs: name = "abs"; break;
                 case FunctionName::cast_float: name = "float"; break;
@@ -228,6 +232,13 @@ namespace ShaderRewriter {
                 body += accept(st) + "\n";
             }
             _ret = ssnprintf("while (%s) {\n%s}", accept(ws->condition()), body);
+        }
+        
+        virtual void visit(TernaryOperator* ternary) override {
+            _ret = ssnprintf("(%s ? %s : %s)",
+                             accept(ternary->args()[0]),
+                             accept(ternary->args()[1]),
+                             accept(ternary->args()[2]));
         }
 
     public:
@@ -320,6 +331,10 @@ namespace ShaderRewriter {
                 st->accept(this);
             }
         }
+        
+        virtual void visit(TernaryOperator* ternary) override {
+            visit((Invocation*)ternary);
+        }
     };
     
     class TypeVisitor : public DefaultVisitor {
@@ -369,6 +384,10 @@ namespace ShaderRewriter {
             } else {
                 _ret = ExprType::vec4;
             }
+        }
+        
+        virtual void visit(TernaryOperator* ternary) override {
+            _ret = accept(ternary->args().at(2));   
         }
         
         virtual void visit(Invocation* invocation) override {
@@ -499,8 +518,19 @@ namespace ShaderRewriter {
             assignment->releaseAndReplaceExpr(adjustedExpr);
         }
         
+        virtual void visit(TernaryOperator* ternary) override {
+            auto args = ternary->args();
+            args.at(0)->accept(this);
+            args.at(1)->accept(this);
+            args.at(2)->accept(this);
+            auto trueExpr = args[1];
+            auto falseType = getType(args[2]);
+            auto adjustedTrueExpr = adjustType(trueExpr, falseType);
+            ternary->releaseAndReplaceArg(1, adjustedTrueExpr);
+        }
+        
         virtual void visit(Invocation* invocation) override {
-            DefaultVisitor::visit(invocation);
+            DefaultVisitor::visit(invocation);            
             auto rti = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
                 return i.name == invocation->name();
             });
@@ -787,8 +817,14 @@ namespace ShaderRewriter {
     class VertexRefVisitor : public boost::static_visitor<Expression*> {
     public:
         Expression* operator()(vertex_arg_address_ref x) const {
-            //assert(false);
-            return new IntegerLiteral(0);
+            Expression* var = new Variable("a", new IntegerLiteral(x.reg));
+            var = new ComponentMask(var,
+                                    {x.component == 0,
+                                     x.component == 1,
+                                     x.component == 2,
+                                     x.component == 3});
+            return new BinaryOperator(
+                FunctionName::add, var, new IntegerLiteral(x.displ));
         }
         
         Expression* operator()(int x) const {
@@ -798,15 +834,7 @@ namespace ShaderRewriter {
     
     class VertexArgVisitor : public boost::static_visitor<Expression*> {
     public:
-        Expression* operator()(vertex_arg_output_ref_t x) const {
-            auto ref = apply_visitor(VertexRefVisitor(), x.ref);
-            auto refExpr = new Variable("v_out", ref);
-            return new ComponentMask(refExpr,
-                { bool(x.mask & 8), bool(x.mask & 4), bool(x.mask & 2), bool(x.mask & 1) }
-            );
-        }
-        
-        Expression* convert(std::string name, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
+        Expression* convert(std::string name, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw, int mask) const {
             auto refNum = apply_visitor(VertexRefVisitor(), ref);
             Expression* expr = new Variable(name, refNum);
             if (abs)
@@ -815,35 +843,35 @@ namespace ShaderRewriter {
                 expr = new UnaryOperator(FunctionName::neg, expr);
             if (!sw.is_xyzw())
                 expr = new Swizzle(expr, sw);
-            return expr;
-        }
-        
-        Expression* operator()(vertex_arg_input_ref_t x) const {
-            return convert("v_in", x.ref, x.is_neg, x.is_abs, x.swizzle);
-        }
-        
-        Expression* operator()(vertex_arg_const_ref_t x) const {
-            return convert("constants.c", x.ref, x.is_neg, x.is_abs, x.swizzle);
-        }
-        
-        Expression* operator()(vertex_arg_temp_reg_ref_t x) const {
-            auto expr = convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle);
-            if (x.mask != 0xf) {
+            if (mask != 0xf) {
                 expr = new ComponentMask(expr, 
-                    { bool(x.mask & 8), bool(x.mask & 4), bool(x.mask & 2), bool(x.mask & 1) });
+                    { bool(mask & 8), bool(mask & 4), bool(mask & 2), bool(mask & 1) });
             }
             return expr;
         }
         
+        Expression* operator()(vertex_arg_output_ref_t x) const {
+            return convert("v_out", x.ref, false, false, swizzle_xyzw, x.mask);
+        }
+        
+        Expression* operator()(vertex_arg_input_ref_t x) const {
+            return convert("v_in", x.ref, x.is_neg, x.is_abs, x.swizzle, 0xf);
+        }
+        
+        Expression* operator()(vertex_arg_const_ref_t x) const {
+            return convert("constants.c", x.ref, x.is_neg, x.is_abs, x.swizzle, 0xf);
+        }
+        
+        Expression* operator()(vertex_arg_temp_reg_ref_t x) const {
+            return convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle, x.mask);
+        }
+        
         Expression* operator()(vertex_arg_address_reg_ref_t x) const {
-            assert(false);
-            return nullptr;
+            return convert("a", x.a, false, false, swizzle_xyzw, x.mask);
         }
         
         Expression* operator()(vertex_arg_cond_reg_ref_t x) const {
-            auto mask = dest_mask_t { bool(x.mask & 8), bool(x.mask & 4), bool(x.mask & 2), bool(x.mask & 1) };
-            auto index = new IntegerLiteral(x.c);
-            return new ComponentMask(new Variable("c", index), mask);
+            return convert("c", x.c, false, false, swizzle_xyzw, x.mask);
         }
         
         Expression* operator()(vertex_arg_label_ref_t x) const {
