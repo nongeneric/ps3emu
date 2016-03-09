@@ -35,13 +35,13 @@ void GLFramebuffer::bindDefault() {
     glcall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
-void GLFramebuffer::setSurface(const SurfaceInfo& info, ViewPortInfo const& viewPort) {
+void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned height) {
     _info = info;
     for (int i = 0; i < 4; ++i) {
         GLuint texHandle = 0;
         if (info.colorTarget[i]) {
             auto offset = rsxOffsetToEa(info.colorLocation[i], info.colorOffset[i]);
-            auto tex = searchCache(GL_RGBA32F, offset, viewPort.width, viewPort.height);
+            auto tex = searchCache(GL_RGBA32F, offset, width, height);
             texHandle = tex->handle();
         }
         glcall(glNamedFramebufferTexture(
@@ -53,7 +53,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, ViewPortInfo const& view
     auto offset = rsxOffsetToEa(info.depthLocation, info.depthOffset);
     auto format = info.depthFormat == SurfaceDepthFormat::z16 ?
                   GL_DEPTH_COMPONENT16 : GL_DEPTH24_STENCIL8;
-    auto tex = searchCache(format, offset, viewPort.width, viewPort.height);
+    auto tex = searchCache(format, offset, width, height);
     glcall(glNamedFramebufferTexture(
                _id,
                GL_DEPTH_STENCIL_ATTACHMENT,

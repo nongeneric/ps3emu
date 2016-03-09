@@ -1,5 +1,3 @@
-#pragma once
-
 #include "sys_defs.h"
 #include "../ps3emu/constants.h"
 #include "../ps3emu/ELFLoader.h"
@@ -52,7 +50,6 @@ typedef struct {
 
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUThread* thread);
 
-uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3);
 uint32_t cellSysmoduleInitialize();
 uint32_t cellSysmoduleLoadModule(uint16_t id);
 uint32_t cellSysmoduleUnloadModule(uint16_t id);
@@ -103,3 +100,4 @@ emu_void_t sys_process_exit(PPUThread* thread);
 emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread);
 
 int32_t sys_process_is_stack(ps3_uintptr_t p);
+int32_t _sys_strlen(cstring_ptr_t str);

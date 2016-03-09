@@ -171,12 +171,6 @@ int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUTh
     return CELL_OK;
 }
 
-uint32_t _sys_heap_create_heap(big_uint32_t* id, uint32_t size, uint32_t unk2, uint32_t unk3) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    *id = 0x123;
-    return CELL_OK;
-}
-
 constexpr uint16_t CELL_SYSMODULE_FS = 0x000e;
 
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
@@ -313,4 +307,8 @@ int32_t sys_process_is_stack(ps3_uintptr_t p) {
 emu_void_t sys_ppu_thread_yield(PPUThread* thread) {
     thread->yield();
     return emu_void;
+}
+
+int32_t _sys_strlen(cstring_ptr_t str) {
+    return str.str.size();
 }

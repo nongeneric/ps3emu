@@ -10,7 +10,7 @@ namespace ShaderRewriter {
         vec4, vec3, vec2, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
         mul, div, add, abs, neg, exp2, lg2, min, max, pow, inversesqrt,
         fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
-        cast_float, clamp4i, sign,
+        cast_float, cast_int, clamp4i, sign,
         gt, ge, eq, ne, lt, le,
         reverse4f, reverse3f, reverse2f,
         call, ret,

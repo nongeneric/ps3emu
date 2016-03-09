@@ -58,6 +58,7 @@ class Rsx {
     void updateShaders();
     void updateTextures();
     void updateFramebuffer();
+    void updateViewPort();
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);

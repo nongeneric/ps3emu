@@ -1,0 +1,17 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+void main
+(
+	float4 u_in : TEXCOORD0,
+	float4 v_in : TEXCOORD1,
+	uniform sampler2D texture,
+	out float4 color_out : COLOR
+)
+{
+	color_out = tex2D(texture, float2(u_in.x, v_in.x));
+	//color_out =  tex2D(texture, float2(0.5,0.5));
+	//color_out += float4(u_in.x, v_in.x, 0, 1);
+}

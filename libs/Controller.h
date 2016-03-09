@@ -49,6 +49,13 @@ typedef struct CellMouseInfo{
     big_uint8_t status[CELL_MAX_MICE];
 } CellMouseInfo;
 
+#define CELL_PAD_MAX_CODES (64)
+typedef struct CellPadData{
+  big_int32_t len;
+  big_uint16_t button[CELL_PAD_MAX_CODES];
+} CellPadData;
+
 int32_t cellMouseInit(uint32_t max_connect);
 int32_t cellMouseEnd();
 int32_t cellMouseGetInfo(CellMouseInfo* info);
+int32_t cellPadGetData(uint32_t port_no, CellPadData *data);

@@ -22,7 +22,8 @@ public:
 enum class SPUThreadExitCause {
     Exit,
     GroupExit,
-    GroupTerminate
+    GroupTerminate,
+    StillRunning
 };
 
 class SPUThreadFinishedException : public virtual std::exception {

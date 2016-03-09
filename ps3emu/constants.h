@@ -52,3 +52,4 @@ static constexpr unsigned VertexShaderConstantBinding = 1;
 static constexpr unsigned FragmentShaderConstantBinding = 2;
 static constexpr unsigned VertexShaderSamplesInfoBinding = 3;
 static constexpr unsigned FragmentShaderSamplesInfoBinding = 4;
+static constexpr unsigned VertexShaderViewportMatrixBinding = 5;

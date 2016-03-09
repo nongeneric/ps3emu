@@ -9,7 +9,7 @@ void Window::Init() {
     if (!glfwInit()) {
         throw std::runtime_error("glfw initialization failed");
     }
-    _window = glfwCreateWindow(1280, 720, "ps3emu", NULL, NULL);
+    _window = glfwCreateWindow(width(), height(), "ps3emu", NULL, NULL);
     if (!_window) {
         throw std::runtime_error("window creation failed");
     }
@@ -19,4 +19,12 @@ void Window::Init() {
 
 void Window::SwapBuffers() {
     glfwSwapBuffers(_window);
+}
+
+unsigned Window::width() {
+    return 1280;
+}
+
+unsigned Window::height() {
+    return 720;
 }

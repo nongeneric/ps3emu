@@ -1,0 +1,23 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+
+void main
+(
+	float4 position	: POSITION,
+	float4 tex0	: TEXCOORD0,
+	float4 tex1	: TEXCOORD1,
+
+    uniform float4x4 modelViewProj,
+
+	out float4 oPosition : POSITION,
+	out float4 otex0    : TEXCOORD0,
+	out float4 otex1    : TEXCOORD1
+)
+{
+	oPosition = mul(modelViewProj, position);
+	otex0 = tex0;
+	otex1 = tex1;
+}

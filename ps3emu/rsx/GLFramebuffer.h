@@ -14,13 +14,6 @@ enum class SurfaceDepthFormat {
     z16, z24s8
 };
 
-struct ViewPortInfo {
-    unsigned x;
-    unsigned y;
-    unsigned width;
-    unsigned height;
-};
-
 struct SurfaceInfo {
     MemoryLocation colorLocation[4];
     MemoryLocation depthLocation;
@@ -53,7 +46,7 @@ public:
     GLFramebuffer();
     ~GLFramebuffer();
     void bindDefault();
-    void setSurface(SurfaceInfo const& info, ViewPortInfo const& viewPort);
+    void setSurface(SurfaceInfo const& info, unsigned width, unsigned height);
     void dumpTextures();
     void updateTexture();
     GLSimpleTexture* findTexture(ps3_uintptr_t va);

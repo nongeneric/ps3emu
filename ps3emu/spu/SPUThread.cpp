@@ -90,7 +90,9 @@ SPUThread::SPUThread(Process* proc,
 }
 
 SPUThreadExitInfo SPUThread::join() {
-    _thread.join();
+    if (_thread.try_join_for( boost::chrono::milliseconds(0) )) {
+        return SPUThreadExitInfo{ SPUThreadExitCause::StillRunning, 0 };
+    }
     return SPUThreadExitInfo{_cause, _exitCode};
 }
 

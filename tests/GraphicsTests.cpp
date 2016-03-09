@@ -132,3 +132,19 @@ TEST_CASE("gcm_vertex_shader_branch") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_vertex_shader_branch/ps3frame.png");
 }
+
+TEST_CASE("gcm_fragment_texture") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_fragment_texture/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame2.png", 2);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame3.png", 3);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame4.png", 4);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame5.png", 5);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame6.png", 6);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame7.png", 7);
+}

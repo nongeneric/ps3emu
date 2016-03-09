@@ -8,4 +8,6 @@ class Window {
 public:
     void Init();
     void SwapBuffers();
+    unsigned width();
+    unsigned height();
 };

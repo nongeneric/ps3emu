@@ -337,9 +337,14 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
     if (tag) {
         tag->interruptThread->disestablish();
     }
-    rawSpu->thread->join();
-    proc->destroySpuThread(rawSpu->thread);
-    rawSpus.destroy(id);
+    static int hangingRawSpuThreads = 0;
+    if (rawSpu->thread->join().cause == SPUThreadExitCause::StillRunning) {
+        // leave a hanging thread if couldn't join
+        assert(hangingRawSpuThreads < 10);
+        proc->destroySpuThread(rawSpu->thread);
+        rawSpus.destroy(id);
+        hangingRawSpuThreads++;
+    }
     return CELL_OK;
 }
 

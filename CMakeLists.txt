@@ -13,7 +13,7 @@ find_package(Boost COMPONENTS
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-# glad --profile core --api gl=4.5 --generator=c --spec gl --no-loader --out-path GL --extensions=""
+# glad --profile compatibility --api gl=4.5 --generator=c --spec gl --no-loader --out-path GL --extensions=""
 include_directories(SYSTEM libs/graphics/GL/include)
 
 #-fsanitize=undefined

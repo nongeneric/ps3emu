@@ -1,6 +1,7 @@
 #include "ShaderRewriter.h"
 #include "../utils.h"
 #include <map>
+#include <set>
 #include <vector>
 #include <algorithm>
 
@@ -25,6 +26,7 @@ namespace ShaderRewriter {
         { FunctionName::lessThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::vec4, 
             { ExprType::vec4, ExprType::fp32, ExprType::fp32, ExprType::fp32, ExprType::fp32 } },
+        { FunctionName::cast_int, { ExprType::int32, ExprType::fp32 } },
         { FunctionName::fract, { ExprType::notype, ExprType::notype } },
         { FunctionName::floor, { ExprType::notype, ExprType::notype } },
         { FunctionName::ceil, { ExprType::notype, ExprType::notype } },
@@ -39,7 +41,7 @@ namespace ShaderRewriter {
         { FunctionName::exp2, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::sin, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::lg2, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::pow, { ExprType::notype, ExprType::notype } },
+        { FunctionName::pow, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::inversesqrt, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse3f, { ExprType::vec4, ExprType::vec4 } },
@@ -161,6 +163,7 @@ namespace ShaderRewriter {
                 case FunctionName::vec4: name = "vec4"; break;
                 case FunctionName::vec3: name = "vec3"; break;
                 case FunctionName::vec2: name = "vec2"; break;
+                case FunctionName::cast_int: name = "int"; break;
                 case FunctionName::fract: name = "fract"; break;
                 case FunctionName::floor: name = "floor"; break;
                 case FunctionName::ceil: name = "ceil"; break;
@@ -381,6 +384,8 @@ namespace ShaderRewriter {
         virtual void visit(Variable* ref) override {
             if (ref->name() == "nip") {
                 _ret = ExprType::int32;
+            } else if (ref->name() == "a") {
+                _ret = ExprType::ivec4;
             } else {
                 _ret = ExprType::vec4;
             }
@@ -448,53 +453,37 @@ namespace ShaderRewriter {
             if (current == expected || expected == ExprType::notype)
                 return expr;
             if (expected == ExprType::fp32 && current == ExprType::boolean) {
-                auto cast = new Invocation(FunctionName::cast_float, { expr });
-                return cast;
+                return new Invocation(FunctionName::cast_float, { expr });
             }
             if (expected == ExprType::vec2 && current == ExprType::vec4) {
-                auto mask = new ComponentMask(expr, { 1, 1, 0, 0 });
-                return mask;
+                return new ComponentMask(expr, { 1, 1, 0, 0 });
             }
             if (expected == ExprType::vec4 && current == ExprType::fp32) {
-                auto vec = new Invocation(FunctionName::vec4, { expr });
-                auto swizzle = new Swizzle(vec, {
-                    swizzle2bit_t::X,
-                    swizzle2bit_t::X,
-                    swizzle2bit_t::X,
-                    swizzle2bit_t::X
-                });
-                return swizzle;
+                return new Invocation(FunctionName::vec4, { expr });
             }
             if (expected == ExprType::vec3 && current == ExprType::fp32) {
-                auto vec = new Invocation(FunctionName::vec3, { expr });
-                auto swizzle = new Swizzle(vec, {
-                    swizzle2bit_t::X,
-                    swizzle2bit_t::X,
-                    swizzle2bit_t::X
-                });
-                return swizzle;
+                return new Invocation(FunctionName::vec3, { expr });
             }
             if (expected == ExprType::vec2 && current == ExprType::fp32) {
-                auto vec = new Invocation(FunctionName::vec2, { expr });
-                auto swizzle = new Swizzle(vec, {
-                    swizzle2bit_t::X,
-                    swizzle2bit_t::X
-                });
-                return swizzle;
+                return new Invocation(FunctionName::vec2, { expr });
             }
             if (expected == ExprType::fp32 && current == ExprType::vec4) {
-                auto mask = new ComponentMask(expr, { 1, 0, 0, 0 });
-                return mask;
+                return new ComponentMask(expr, { 1, 0, 0, 0 });
             }
-            if ((expected == ExprType::vec4 && current == ExprType::bvec4) ||
-                (expected == ExprType::vec3 && current == ExprType::bvec3) ||
-                (expected == ExprType::vec2 && current == ExprType::bvec2)) {
-                auto invoke = new Invocation(FunctionName::vec2, { expr });
-                return invoke;
+            if (expected == ExprType::vec4 && current == ExprType::bvec4) {
+                return new Invocation(FunctionName::vec4, { expr });
+            }
+            if (expected == ExprType::vec3 && current == ExprType::bvec3) {
+                return new Invocation(FunctionName::vec3, { expr });
+            }
+            if (expected == ExprType::vec2 && current == ExprType::bvec2) {
+                return new Invocation(FunctionName::vec2, { expr });
             }
             if (expected == ExprType::vec3 && current == ExprType::vec4) {
-                auto mask = new ComponentMask(expr, { 1, 1, 1, 0 });
-                return mask;
+                return new ComponentMask(expr, { 1, 1, 1, 0 });
+            }
+            if (expected == ExprType::int32 && current == ExprType::fp32) {
+                return new Invocation(FunctionName::cast_int, { expr });
             }
             if (current == ExprType::notype)
                 return expr;
@@ -1136,6 +1125,9 @@ namespace ShaderRewriter {
             if (auto variable = dynamic_cast<Variable*>(assignment->dest())) {
                 if (variable->name() == "nip") {
                     result = true;
+                    auto label = dynamic_cast<IntegerLiteral*>(assignment->expr());
+                    assert(label);
+                    labels.insert(label->value());
                     return;
                 }
             }
@@ -1143,6 +1135,7 @@ namespace ShaderRewriter {
         }
     public:
         bool result = false;
+        std::set<int> labels;
     };
     
     std::vector<std::unique_ptr<Statement>> RewriteBranches(
@@ -1159,8 +1152,12 @@ namespace ShaderRewriter {
         std::vector<Statement*> curCase;
         for (auto i = 0u; i < sts.size(); ++i) {
             curCase.push_back(sts[i]);
-            if (i != sts.size() - 1 && sts[i]->address() == sts[i + 1]->address()) {
-                continue;
+            if (i != sts.size() - 1) {
+                auto nextAddress = sts[i + 1]->address();
+                if (i != sts.size() - 1 && sts[i]->address() == nextAddress)
+                    continue;
+                if (visitor.labels.find(nextAddress) == end(visitor.labels))
+                    continue;
             }
             if (i == sts.size() - 1) {
                 curCase.push_back(new Assignment(new Variable("nip", nullptr),

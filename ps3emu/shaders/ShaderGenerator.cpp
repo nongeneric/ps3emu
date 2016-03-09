@@ -121,6 +121,12 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    ivec4 wrapMode[4];");
     line("    vec4 borderColor[4];");
     line("} samplersInfo;");
+    
+    line(ssnprintf("layout (std140, binding = %d) uniform ViewportInfo {",
+                   VertexShaderViewportMatrixBinding));
+    line("    mat4 glInverseGcm;");
+    line("} viewportInfo;");
+
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
         line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
                        i + VertexTextureUnit, samplerSizes[i], i));
@@ -145,8 +151,8 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("out vec4 f_TEX9;");
     line("out vec4 f_SSA;");
     line("float reverse(float f) {");
-    line("    unsigned int bits = floatBitsToUint(f);");
-    line("    unsigned int rev = ((bits & 0xff) << 24)");
+    line("    uint bits = floatBitsToUint(f);");
+    line("    uint rev = ((bits & 0xff) << 24)");
     line("                     | ((bits & 0xff00) << 8)");
     line("                     | ((bits & 0xff0000) >> 8)");
     line("                     | ((bits & 0xff000000) >> 24);");
@@ -286,7 +292,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     }
     
     
-    line("    gl_Position = v_out[0];");
+    line("    gl_Position = viewportInfo.glInverseGcm * v_out[0];");
     line("    f_COL0 = v_out[1];");
     line("    f_COL1 = v_out[4];");
     line("    f_FOGC = v_out[5];");
@@ -326,6 +332,7 @@ std::string PrintFragmentProgram(const uint8_t* instr) {
     do {
         auto len = fragment_dasm_instr(instr, fi);
         static std::string line;
+        line.clear();
         fragment_dasm(fi, line);
         instr += len;
         res += line + "\n";

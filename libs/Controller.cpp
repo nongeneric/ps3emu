@@ -47,3 +47,20 @@ int32_t cellMouseGetInfo(CellMouseInfo* info) {
     }
     return CELL_MOUSE_OK;
 }
+
+int32_t cellPadEnd() {
+    return CELL_OK;
+}
+
+int32_t cellPadGetData(uint32_t port_no, CellPadData* data) {
+    data->len = 0;
+    return CELL_OK;
+}
+
+int32_t cellKbEnd() {
+    return CELL_OK;
+}
+
+int32_t cellMouseEnd() {
+    return CELL_OK;
+}

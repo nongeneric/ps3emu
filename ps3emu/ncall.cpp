@@ -9,6 +9,7 @@
 #include "../libs/sceNp2.h"
 #include "../libs/sceNp.h"
 #include "../libs/sysSpu.h"
+#include "../libs/heap.h"
 #include "../libs/sync/lwmutex.h"
 #include "../libs/sync/mutex.h"
 #include "../libs/sync/lwcond.h"
@@ -397,7 +398,7 @@ STUB_1(sys_mutex_destroy);
 STUB_2(sys_mutex_lock);
 STUB_1(sys_mutex_trylock);
 STUB_1(sys_mutex_unlock);
-STUB_4(_sys_heap_create_heap);
+STUB_5(_sys_heap_create_heap);
 STUB_1(cellSysmoduleLoadModule);
 STUB_1(cellSysmoduleUnloadModule);
 STUB_1(cellSysmoduleIsLoaded);
@@ -507,6 +508,12 @@ STUB_4(sys_fs_lseek);
 STUB_5(sys_fs_read);
 STUB_1(sys_fs_close);
 STUB_3(cellGcmGetReportDataLocation);
+STUB_1(_sys_strlen);
+STUB_3(_sys_heap_malloc);
+STUB_0(cellPadEnd);
+STUB_2(cellPadGetData);
+STUB_0(cellKbEnd);
+STUB_0(cellMouseEnd);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -552,6 +559,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmMapMainMemory),
     ENTRY(cellGcmSetFlipHandler),
     ENTRY(cellPadInit),
+    ENTRY(cellPadEnd),
     ENTRY(cellKbInit),
     ENTRY(cellKbSetCodeType),
     ENTRY(cellMouseInit),
@@ -632,6 +640,11 @@ NCallEntry ncallTable[] {
     ENTRY(callbackThreadQueueWait),
     ENTRY(cellGcmSetVBlankHandler),
     ENTRY(cellGcmGetReportDataLocation),
+    ENTRY(_sys_strlen),
+    ENTRY(_sys_heap_malloc),
+    ENTRY(cellPadGetData),
+    ENTRY(cellKbEnd),
+    ENTRY(cellMouseEnd),
 };
 
 void PPUThread::ncall(uint32_t index) {
