@@ -3,6 +3,7 @@
 #include "../BitField.h"
 #include "../MainMemory.h"
 #include "../../libs/graphics/graphics.h"
+#include "../gcmviz/GcmDatabase.h"
 
 #include <vector>
 #include <boost/log/trivial.hpp>
@@ -1123,7 +1124,8 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR";
-                TextureBorderColor(index, parseColor(readarg(1)));
+                auto c = parseColor(readarg(1));
+                TextureBorderColor(index, c[0], c[1], c[2], c[3]);
                 break;
             }
             if (isScale(offset,
@@ -1278,7 +1280,8 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_BORDER_COLOR";
-                VertexTextureBorderColor(index, parseColor(readarg(1)));
+                auto c = parseColor(readarg(1));
+                VertexTextureBorderColor(index, c[0], c[1], c[2], c[3]);
                 break;
             }
             if (isScale(offset,
@@ -1493,11 +1496,19 @@ void Rsx::loop() {
     initGcm();
     _ret = 0;
     BOOST_LOG_TRIVIAL(trace) << "rsx loop started, waiting for updates";
+    if (_mode == RsxOperationMode::Replay) {
+        replayLoop();
+    } else {
+        runLoop();
+    }
+}
+
+void Rsx::runLoop() {
     boost::unique_lock<boost::mutex> lock(_mutex);
     for (;;) {
         _cv.wait(lock);
         BOOST_LOG_TRIVIAL(trace) << "rsx loop update received";
-        if (_shutdown && _get == _put) { // idle
+        if (_shutdown && _get == _put) {
             waitForIdle();
             return;
         }
@@ -1505,6 +1516,24 @@ void Rsx::loop() {
             BOOST_LOG_TRIVIAL(trace) << ssnprintf("get = %x put = %x", _get, _put);
             _get += interpret(_get);
         }
+    }
+}
+
+void Rsx::replayLoop() {
+    for (;;) {
+        auto command = _replayQueue.receive(0);
+        auto id = (CommandId)command.id;
+        if (id == CommandId::StopReplay)
+            break;
+//         auto& args = command.args;
+//         switch (id) {
+//             case CommandId::SurfaceClipHorizontal: {
+//                 SurfaceClipHorizontal(args.at(0).value, 
+//                                       args.at(1).value, 
+//                                       args.at(2).value, 
+//                                       args.at(3).value);
+//             }
+//        }
     }
 }
 
@@ -1529,4 +1558,8 @@ void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
     header.prefix.set(1);
     header.jumpoffset.set(destOffset);
     _mm->store<4>(va, header.val);
+}
+
+void Rsx::sendCommand(GcmCommand command) {
+    _replayQueue.send(command);
 }

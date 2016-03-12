@@ -166,6 +166,7 @@ public:
     X(MFC_RdAtomicStat   ,27)
     
 enum SpuMfcClassId { SpuMfcClassIdX };
+#undef X
 
 class Process;
 

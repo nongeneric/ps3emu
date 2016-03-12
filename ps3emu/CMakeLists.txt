@@ -41,6 +41,7 @@ set(SRC
     rsx/GLTexture.cpp
     rsx/GLFramebuffer.cpp
     rsx/GLBuffer.cpp
+    gcmviz/GcmDatabase.cpp
 )
 add_library(ps3emu ${SRC})
-target_link_libraries(ps3emu libs ${Boost_LIBRARIES} glfw pthread crypto)
+target_link_libraries(ps3emu libs ${Boost_LIBRARIES} glfw pthread crypto sqlite3)

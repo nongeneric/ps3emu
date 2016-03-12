@@ -4,6 +4,7 @@
 #include "Cache.h"
 #include "GLFramebuffer.h"
 #include "GLTexture.h"
+#include "../gcmviz/GcmDatabase.h"
 #include "../Process.h"
 #include "../ppu/CallbackThread.h"
 #include "../MainMemory.h"
@@ -19,6 +20,55 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+template<typename T> struct GcmType { static constexpr uint32_t type = (uint32_t)GcmArgType::None; };
+template<> struct GcmType<uint8_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::UInt8; };
+template<> struct GcmType<uint16_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::UInt16; };
+template<> struct GcmType<uint32_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::UInt32; };
+template<> struct GcmType<float> { static constexpr uint32_t type = (uint32_t)GcmArgType::Float; };
+template<> struct GcmType<bool> { static constexpr uint32_t type = (uint32_t)GcmArgType::Bool; };
+template<> struct GcmType<int32_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::Int32; };
+template<> struct GcmType<int16_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::Int16; };
+
+template <typename T> struct DbColumnType {
+    static uint32_t convert(T value) {
+        return value;
+    }
+};
+
+template <> struct DbColumnType<float> {
+    static uint32_t convert(float value) {
+        return union_cast<float, uint32_t>(value);
+    }
+};
+
+/*
+def a(i):
+     r = "#define TRACE" + str(i) + "(id"
+     for n in range(0, i): r += ", a" + str(n)
+     r += ") trace(CommandId::id, { ARG(a0)"
+     for n in range(1, i): r += ", ARG(a" + str(n) + ")"
+     r += " });"
+     print(r)
+for z in range(1, 14): a(z) 
+*/
+
+#define ARG(a) GcmCommandArg { DbColumnType<decltype(a)>::convert(a), \
+                               #a, GcmType<decltype(a)>::type }
+#define TRACE0(id) trace(CommandId::id);
+#define TRACE1(id, a0) trace(CommandId::id, { ARG(a0) });
+#define TRACE2(id, a0, a1) trace(CommandId::id, { ARG(a0), ARG(a1) });
+#define TRACE3(id, a0, a1, a2) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2) });
+#define TRACE4(id, a0, a1, a2, a3) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3) });
+#define TRACE5(id, a0, a1, a2, a3, a4) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4) });
+#define TRACE6(id, a0, a1, a2, a3, a4, a5) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5) });
+#define TRACE7(id, a0, a1, a2, a3, a4, a5, a6) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6) });
+#define TRACE8(id, a0, a1, a2, a3, a4, a5, a6, a7) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7) });
+#define TRACE9(id, a0, a1, a2, a3, a4, a5, a6, a7, a8) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8) });
+#define TRACE10(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9) });
+#define TRACE11(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10) });
+#define TRACE12(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11) });
+#define TRACE13(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11), ARG(a12) });
 
 struct VertexDataArrayFormatInfo {
     uint16_t frequency;
@@ -251,11 +301,47 @@ struct ViewPortInfo {
     float offset[3] = { 2048, 2048, 0.5 };
 };
 
+class Tracer {
+    bool _enabled = false;
+    GcmDatabase _db;
+public:
+    void enable() {
+        _enabled = true;
+        system("rm -rf /tmp/ps3emu.trace");
+        _db.createOrOpen("/tmp/ps3emu.trace");
+    }
+    
+    template <typename... Args>
+    void trace(uint32_t frame,
+               uint32_t num,
+               CommandId command,
+               std::vector<GcmCommandArg> args) {
+        if (!_enabled)
+            return;
+        GcmCommand gcmCommand;
+        gcmCommand.frame = frame;
+        gcmCommand.num = num;
+        gcmCommand.id = (uint32_t)command;
+        gcmCommand.args = args;
+        _db.insertCommand(gcmCommand);
+    }
+    
+    template <typename... Args>
+    void traceWithBlob(CommandId command,
+                       std::vector<uint8_t> const& blob,
+                       Args... args) {
+        
+    }
+};
+
 class FragmentShaderUpdateFunctor;
 class GLFramebuffer;
 class TextureRenderer;
 class RsxContext {
 public:
+    Tracer tracer;
+    uint32_t frame = 0;
+    uint32_t commandNum = 0;
     SurfaceInfo surface;
     ViewPortInfo viewPort;
     uint32_t colorMask;
@@ -416,42 +502,42 @@ void Rsx::SemaphoreRelease(uint32_t value) {
 }
 
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClearRectHorizontal(%d, %d, %d, %d)", x, w, y, h);
+    TRACE4(ClearRectHorizontal, x, w, y, h);
     //TODO: implement
 }
 
 void Rsx::ClipIdTestEnable(uint32_t x) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClipIdTestEnable(%d)", x);
+    TRACE1(ClipIdTestEnable, x);
     //TODO: implement
 }
 
 void Rsx::FlatShadeOp(uint32_t x) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("FlatShadeOp(%d)", x);
+    TRACE1(FlatShadeOp, x);
     //TODO: implement
 }
 
 void Rsx::VertexAttribOutputMask(uint32_t mask) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexAttribOutputMask(%x)", mask);
+    TRACE1(VertexAttribOutputMask, mask);
     //TODO: implement
 }
 
 void Rsx::FrequencyDividerOperation(uint16_t op) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("FrequencyDividerOperation(%x)", op);
+    TRACE1(FrequencyDividerOperation, op);
     //TODO: implement
 }
 
 void Rsx::TexCoordControl(unsigned int index, uint32_t control) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TexCoordControl(%d, %x)", index, control);
+    TRACE2(TexCoordControl, index, control);
     //TODO: implement
 }
 
 void Rsx::ReduceDstColor(bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ReduceDstColor(%d)", enable);
+    TRACE1(ReduceDstColor, enable);
     //TODO: implement
 }
 
 void Rsx::FogMode(uint32_t mode) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("FogMode(%x)", mode);
+    TRACE1(FogMode, mode);
     //TODO: implement
 }
 
@@ -462,39 +548,46 @@ void Rsx::AnisoSpread(unsigned int index,
                       uint8_t spacingSelect,
                       uint8_t hSpacingSelect,
                       uint8_t vSpacingSelect) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("AnisoSpread(%d, ...)", index);
+    TRACE7(AnisoSpread, 
+           index,
+           reduceSamplesEnable,
+           hReduceSamplesEnable,
+           vReduceSamplesEnable,
+           spacingSelect,
+           hSpacingSelect,
+           vSpacingSelect);
     //TODO: implement
 }
 
 void Rsx::VertexDataBaseOffset(uint32_t baseOffset, uint32_t baseIndex) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataBaseOffset(%x, %x)", baseOffset, baseIndex);
+    TRACE2(VertexDataBaseOffset, baseOffset, baseIndex);
     //TODO: implement
 }
 
 void Rsx::AlphaFunc(uint32_t af, uint32_t ref) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("AlphaFunc(%x, %x)", af, ref);
+    TRACE2(AlphaFunc, af, ref);
     //TODO: implement
 }
 
 void Rsx::AlphaTestEnable(bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("AlphaTestEnable(%d)", enable);
+    TRACE1(AlphaTestEnable, enable);
     //TODO: implement
 }
 
 void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderControl(%x, %d)", control, registerCount);
+    TRACE2(ShaderControl, control, registerCount);
     //TODO: implement
 }
 
 void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgramLoad(%x, %x)", load, start);
+    TRACE2(TransformProgramLoad, load, start);
     assert(load == 0);
     assert(start == 0);
     _context->vertexLoadOffset = load;
 }
 
 void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformProgram(..., %d)", size);
+    TRACE2(TransformProgram, locationOffset, size);
     auto bytes = size * 4;
     auto src = _mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, locationOffset), bytes);
     memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], src, bytes);
@@ -503,26 +596,25 @@ void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
 }
 
 void Rsx::VertexAttribInputMask(uint32_t mask) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexAttribInputMask(%x)", mask);
+    TRACE1(VertexAttribInputMask, mask);
 }
 
 void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformTimeout(%x, %d)", count, registerCount);
+    TRACE2(TransformTimeout, count, registerCount);
 }
 
 void Rsx::ShaderProgram(uint32_t locationOffset) {
+    TRACE1(ShaderProgram, locationOffset);
     // loads fragment program byte code from locationOffset-1 up to the last command
     // (with the "#last command" bit)
     locationOffset -= CELL_GCM_LOCATION_MAIN;
     auto ea = rsxOffsetToEa(MemoryLocation::Local, locationOffset);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderProgram(%x)", locationOffset);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("%x", _mm->load<4>(ea));
     _context->fragmentVa = ea;
     _context->fragmentShaderDirty = true;
 }
 
 void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ViewportHorizontal(%d, %d, %d, %d)", x, w, y, h);
+    TRACE4(ViewportHorizontal, x, w, y, h);
     _context->viewPort.x = x;
     _context->viewPort.y = y;
     _context->viewPort.width = w;
@@ -530,7 +622,7 @@ void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
 }
 
 void Rsx::ClipMin(float min, float max) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClipMin(%e, %e)", min, max);
+    TRACE2(ClipMin, min, max);
     _context->viewPort.zmin = min;
     _context->viewPort.zmax = max;
 }
@@ -543,7 +635,15 @@ void Rsx::ViewportOffset(float offset0,
                          float scale1,
                          float scale2,
                          float scale3) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ViewportOffset(%e, ...)", offset0);
+    TRACE8(ViewportOffset,
+           offset0,
+           offset1,
+           offset2,
+           offset3,
+           scale0,
+           scale1,
+           scale2,
+           scale3);
     assert(offset3 == 0);
     assert(scale3 == 0);
     _context->viewPort.offset[0] = offset0;
@@ -556,7 +656,7 @@ void Rsx::ViewportOffset(float offset0,
 }
 
 void Rsx::ColorMask(uint32_t mask) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorMask(%x)", mask);
+    TRACE1(ColorMask, mask);
     _context->colorMask = mask;
     glcall(glColorMask(
         (mask & CELL_GCM_COLOR_MASK_R) ? GL_TRUE : GL_FALSE,
@@ -567,7 +667,7 @@ void Rsx::ColorMask(uint32_t mask) {
 }
 
 void Rsx::DepthTestEnable(bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("DepthTestEnable(%d)", enable);
+    TRACE1(DepthTestEnable, enable);
     _context->isDepthTestEnabled = enable;
     if (enable) {
         glcall(glEnable(GL_DEPTH_TEST));
@@ -577,7 +677,7 @@ void Rsx::DepthTestEnable(bool enable) {
 }
 
 void Rsx::DepthFunc(uint32_t zf) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("DepthFunc(%d)", zf);
+    TRACE1(DepthFunc, zf);
     _context->depthFunc = zf;
     auto glfunc = zf == CELL_GCM_NEVER ? GL_NEVER
                 : zf == CELL_GCM_LESS ? GL_LESS
@@ -592,7 +692,7 @@ void Rsx::DepthFunc(uint32_t zf) {
 }
 
 void Rsx::CullFaceEnable(bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("CullFaceEnable(%d)", enable);
+    TRACE1(CullFaceEnable, enable);
     assert(!enable);
     _context->isCullFaceEnabled = enable;
     if (enable) {
@@ -603,14 +703,14 @@ void Rsx::CullFaceEnable(bool enable) {
 }
 
 void Rsx::ShadeMode(uint32_t sm) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShadeMode(%x)", sm);
+    TRACE1(ShadeMode, sm);
     _context->isFlatShadeMode = sm == CELL_GCM_FLAT;
     _context->fragmentShaderDirty = true;
     assert(sm == CELL_GCM_SMOOTH || sm == CELL_GCM_FLAT);
 }
 
 void Rsx::ColorClearValue(uint32_t color) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorClearValue(%x)", color);
+    TRACE1(ColorClearValue, color);
     union {
         uint32_t val;
         BitField<0, 8> a;
@@ -622,7 +722,7 @@ void Rsx::ColorClearValue(uint32_t color) {
 }
 
 void Rsx::ClearSurface(uint32_t mask) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ClearSurface(%x)", mask);
+    TRACE1(ClearSurface, mask);
     assert(mask & CELL_GCM_CLEAR_R);
     assert(mask & CELL_GCM_CLEAR_G);
     assert(mask & CELL_GCM_CLEAR_B);
@@ -642,8 +742,7 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
                                 uint8_t stride,
                                 uint8_t size,
                                 uint8_t type) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataArrayFormat(%x, %x, %x, %x, %x)",
-        index, frequency, stride, size, type);
+    TRACE5(VertexDataArrayFormat, index, frequency, stride, size, type);
     auto& format = _context->vertexDataArrays[index];
     format.frequency = frequency;
     format.stride = stride;
@@ -667,8 +766,7 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
 }
 
 void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexDataArrayOffset(%x, %x, %x)",
-        index, location, offset);
+    TRACE3(VertexDataArrayOffset, index, location, offset);
     auto& array = _context->vertexDataArrays[index];
     array.location = gcmEnumToLocation(location);
     array.offset = offset;
@@ -679,7 +777,7 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
 }
 
 void Rsx::BeginEnd(uint32_t mode) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("BeginEnd(%x)", mode);
+    TRACE1(BeginEnd, mode);
     _context->glVertexArrayMode = 
         mode == CELL_GCM_PRIMITIVE_QUADS ? GL_QUADS :
         mode == CELL_GCM_PRIMITIVE_QUAD_STRIP ? GL_QUAD_STRIP :
@@ -694,7 +792,7 @@ void Rsx::BeginEnd(uint32_t mode) {
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawArrays(%d, %d)", first, count);
+    TRACE2(DrawArrays, first, count);
     updateVertexDataArrays(first, count);
     updateShaders();
     updateTextures();
@@ -739,6 +837,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->textureRenderer->render(tex);
     _context->pipeline.bind();
     _window.SwapBuffers();
+    _context->frame++;
+    _context->commandNum = 0;
     
     if (_context->vBlankHandlerDescr) {
         fdescr descr;
@@ -780,7 +880,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TransformConstantLoad(%x, %d)", loadAt, vals.size());
+    TRACE1(TransformConstantLoad, loadAt);
     assert(vals.size() % 4 == 0);
     auto size = vals.size() * sizeof(uint32_t);
     glcall(glNamedBufferSubData(_context->vertexConstBuffer.handle(), loadAt * 16, size, vals.data()));
@@ -810,7 +910,7 @@ bool Rsx::linkShaderProgram() {
 }
 
 void Rsx::RestartIndexEnable(bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("RestartIndexEnable(%d)", enable);
+    TRACE1(RestartIndexEnable, enable);
     if (enable) {
         glcall(glEnable(GL_PRIMITIVE_RESTART));
     } else {
@@ -819,18 +919,18 @@ void Rsx::RestartIndexEnable(bool enable) {
 }
 
 void Rsx::RestartIndex(uint32_t index) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("RestartIndex(%x)", index);
+    TRACE1(RestartIndex, index);
     glcall(glPrimitiveRestartIndex(index));
 }
 
 void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("IndexArrayAddress(%x, %x, %x)", location, offset, type);
+    TRACE3(IndexArrayAddress, location, offset, type);
     _context->vertexIndexArrayOffset = offset;
     _context->vertexIndexArrayGlType = GL_UNSIGNED_INT; // no difference between 32 and 16 for rsx
 }
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("DrawIndexArray(%x, %x)", first, count);
+    TRACE2(DrawIndexArray, first, count);
     updateVertexDataArrays(first, count);
     updateTextures();
     updateShaders();
@@ -1008,7 +1108,7 @@ void Rsx::VertexTextureOffset(unsigned index,
                               uint8_t dimension,
                               uint8_t location)
 {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureOffset(%d, %x, ...)", index, offset);
+    TRACE6(VertexTextureOffset, index, offset, mipmap, format, dimension, location);
     auto& t = _context->vertexTextureSamplers[index].texture;
     t.offset = offset;
     t.mipmap = mipmap;
@@ -1018,32 +1118,31 @@ void Rsx::VertexTextureOffset(unsigned index,
 }
 
 void Rsx::VertexTextureControl3(unsigned index, uint32_t pitch) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureControl3(%d, %x)", index, pitch);
+    TRACE2(VertexTextureControl3, index, pitch);
     _context->vertexTextureSamplers[index].texture.pitch = pitch;
 }
 
 void Rsx::VertexTextureImageRect(unsigned index, uint16_t width, uint16_t height) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureImageRect(%d, %d, %d)", index, width, height);
+    TRACE3(VertexTextureImageRect, index, width, height);
     _context->vertexTextureSamplers[index].texture.width = width;
     _context->vertexTextureSamplers[index].texture.height = height;
 }
 
 void Rsx::VertexTextureControl0(unsigned index, bool enable, float minlod, float maxlod) {
-    BOOST_LOG_TRIVIAL(trace) << 
-        ssnprintf("VertexTextureControl0(%d, %d, %x, %x) [vertex]", index, enable, minlod, maxlod);
+    TRACE4(VertexTextureControl0, index, enable, minlod, maxlod);
     _context->vertexTextureSamplers[index].enable = enable;
     _context->vertexTextureSamplers[index].minlod = minlod;
     _context->vertexTextureSamplers[index].maxlod = maxlod;
 }
 
 void Rsx::VertexTextureAddress(unsigned index, uint8_t wraps, uint8_t wrapt) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureAddress(%d, %x, %x)", index, wraps, wrapt);
+    TRACE3(VertexTextureAddress, index, wraps, wrapt);
     _context->vertexTextureSamplers[index].wraps = wraps;
     _context->vertexTextureSamplers[index].wrapt = wrapt;
 }
 
 void Rsx::VertexTextureFilter(unsigned int index, float bias) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureFilter(%d, %x)", index, bias);
+    TRACE2(VertexTextureFilter, index, bias);
     _context->vertexTextureSamplers[index].bias = bias;
 }
 
@@ -1162,9 +1261,9 @@ void Rsx::init(Process* proc) {
     BOOST_LOG_TRIVIAL(trace) << "rsx loop completed initialization";
 }
 
-void Rsx::VertexTextureBorderColor(unsigned int index, std::array<float, int(4)> argb) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("VertexTextureBorderColor(%d, ...)", index);
-    _context->vertexTextureSamplers[index].borderColor = argb;
+void Rsx::VertexTextureBorderColor(unsigned int index, float a, float r, float g, float b) {
+    TRACE5(VertexTextureBorderColor, index, a, r, g, b);
+    _context->vertexTextureSamplers[index].borderColor = { a, r, g, b };
 }
 
 void Rsx::TextureAddress(unsigned index,
@@ -1188,9 +1287,9 @@ void Rsx::TextureAddress(unsigned index,
     s.texture.fragmentSignedRemap = signedRemap;
 }
 
-void Rsx::TextureBorderColor(unsigned index, std::array<float, int(4)> argb) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureBorderColor(%d, ...)", index);
-    _context->vertexTextureSamplers[index].borderColor = argb;
+void Rsx::TextureBorderColor(unsigned index, float a, float r, float g, float b) {
+    TRACE5(TextureBorderColor, index, a, r, g, b);
+    _context->vertexTextureSamplers[index].borderColor = { a, r, g, b };
 }
 
 void Rsx::TextureFilter(unsigned index,
@@ -1202,7 +1301,7 @@ void Rsx::TextureFilter(unsigned index,
                         uint8_t rs,
                         uint8_t gs,
                         uint8_t bs) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureFilter(%d, ...)", index);
+    TRACE9(TextureFilter, index, bias, min, mag, conv, as, rs, gs, bs);
     auto& s = _context->fragmentTextureSamplers[index];
     s.bias = bias;
     s.fragmentMin = min;
@@ -1223,7 +1322,7 @@ void Rsx::TextureOffset(unsigned index,
                         bool cubemap, 
                         uint8_t location)
 {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureOffset(...)");
+    TRACE8(TextureOffset, index, offset, mipmap, format, dimension, border, cubemap, location);
     auto& t = _context->fragmentTextureSamplers[index].texture;
     t.offset = offset;
     t.mipmap = mipmap;
@@ -1235,24 +1334,24 @@ void Rsx::TextureOffset(unsigned index,
 }
 
 void Rsx::TextureImageRect(unsigned int index, uint16_t width, uint16_t height) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureImageRect(%d, %d, %d)", index, width, height);
+    TRACE3(TextureImageRect, index, width, height);
     _context->fragmentTextureSamplers[index].texture.width = width;
     _context->fragmentTextureSamplers[index].texture.height = height;
 }
 
 void Rsx::TextureControl3(unsigned int index, uint16_t depth, uint32_t pitch) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl3(%d, %d, %d)", index, depth, pitch);
+    TRACE3(TextureControl3, index, depth, pitch);
     _context->fragmentTextureSamplers[index].texture.pitch = pitch;
     _context->fragmentTextureSamplers[index].texture.fragmentDepth = depth;
 }
 
 void Rsx::TextureControl1(unsigned int index, uint32_t remap) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl1(%d, %x)", index, remap);
+    TRACE2(TextureControl1, index, remap);
     _context->fragmentTextureSamplers[index].texture.fragmentRemapCrossbarSelect = remap;
 }
 
 void Rsx::TextureControl2(unsigned int index, uint8_t slope, bool iso, bool aniso) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl2(%d, %d, %d, %d)", index, slope, iso, aniso);
+    TRACE4(TextureControl2, index, slope, iso, aniso);
     // ignore these optimizations
 }
 
@@ -1262,7 +1361,7 @@ void Rsx::TextureControl0(unsigned index,
                           float maxlod,
                           float minlod,
                           bool enable) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureControl0(%d, ...)", index);
+    TRACE6(TextureControl0, index, alphaKill, maxaniso, maxlod, minlod, enable);
     // ignore maxaniso
     _context->fragmentTextureSamplers[index].fragmentAlphaKill = alphaKill;
     _context->fragmentTextureSamplers[index].enable = enable;
@@ -1277,7 +1376,7 @@ void Rsx::SetReference(uint32_t ref) {
 // Surface
 
 void Rsx::SurfaceCompression(uint32_t x) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceCompression(%d)", x);
+    TRACE1(SurfaceCompression, x);
 }
 
 void Rsx::setSurfaceColorLocation(unsigned index, uint32_t location) {
@@ -1296,7 +1395,19 @@ void Rsx::SurfaceFormat(uint8_t colorFormat,
                         uint32_t offsetZ,
                         uint32_t offsetB,
                         uint32_t pitchB) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceFormat(%x, ...)", colorFormat);
+    TRACE11(SurfaceFormat,
+            colorFormat,
+            depthFormat,
+            antialias,
+            type,
+            width,
+            height,
+            pitchA,
+            offsetA,
+            offsetZ,
+            offsetB,
+            pitchB
+    );
     assert(colorFormat == CELL_GCM_SURFACE_A8R8G8B8);
     if (depthFormat == CELL_GCM_SURFACE_Z16) {
         _context->surface.depthFormat = SurfaceDepthFormat::z16;
@@ -1319,13 +1430,12 @@ void Rsx::SurfaceFormat(uint8_t colorFormat,
 }
 
 void Rsx::SurfacePitchZ(uint32_t pitch) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfacePitchZ(%d)", pitch);
+    TRACE1(SurfacePitchZ, pitch);
     _context->surface.depthPitch = pitch;
 }
 
 void Rsx::SurfacePitchC(uint32_t pitchC, uint32_t pitchD, uint32_t offsetC, uint32_t offsetD) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfacePitchC(%d, %d, %d, %d)",
-                                          pitchC, pitchD, offsetC, offsetD);
+    TRACE4(SurfacePitchC, pitchC, pitchD, offsetC, offsetD);
     _context->surface.colorPitch[2] = pitchC;
     _context->surface.colorPitch[3] = pitchD;
     _context->surface.colorOffset[2] = offsetC;
@@ -1333,7 +1443,7 @@ void Rsx::SurfacePitchC(uint32_t pitchC, uint32_t pitchD, uint32_t offsetC, uint
 }
 
 void Rsx::SurfaceColorTarget(uint32_t target) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceColorTarget(%x)", target);
+    TRACE1(SurfaceColorTarget, target);
     if (target == CELL_GCM_SURFACE_TARGET_NONE) {
         _context->surface.colorTarget = { 0, 0, 0, 0 };
     } else {
@@ -1347,19 +1457,19 @@ void Rsx::SurfaceColorTarget(uint32_t target) {
 }
 
 void Rsx::WindowOffset(uint16_t x, uint16_t y) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("WindowOffset(%d, %d)", x, y);
+    TRACE2(WindowOffset, x, y);
     _context->surface.windowOriginX = x;
     _context->surface.windowOriginY = y;
 }
 
 void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SurfaceClipHorizontal(%d, %d, %d, %d)", x, w, y, h);
+    TRACE4(SurfaceClipHorizontal, x, w, y, h);
 }
 
 // assume cellGcmSetSurface is always used and not its subcommands
 // then this command is always set last
 void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ShaderWindow(%d, %x, %x)", height, origin, pixelCenters);
+    TRACE3(ShaderWindow, height, origin, pixelCenters);
     assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
     assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
     waitForIdle();
@@ -1369,7 +1479,7 @@ void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
 }
 
 void Rsx::Control0(uint32_t format) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Control0(%x)", format);
+    TRACE1(Control0, format);
     if (format & 0x00100000) {
         auto depthFormat = (format & ~0x00100000) >> 12;
         if (depthFormat == CELL_GCM_DEPTH_FORMAT_FIXED) {
@@ -1385,38 +1495,37 @@ void Rsx::Control0(uint32_t format) {
 }
 
 void Rsx::ContextDmaColorA(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorA(%x)", context);
+    TRACE1(ContextDmaColorA, context);
     setSurfaceColorLocation(0, context);
 }
 
 void Rsx::ContextDmaColorB(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorB(%x)", context);
+    TRACE1(ContextDmaColorB, context);
     setSurfaceColorLocation(1, context);
 }
 
 void Rsx::ContextDmaColorC(uint32_t contextC, uint32_t contextD) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorC(%x, %x)", contextC, contextD);
+    TRACE2(ContextDmaColorC_2, contextC, contextD);
     setSurfaceColorLocation(2, contextC);
     setSurfaceColorLocation(3, contextD);
 }
 
 void Rsx::ContextDmaColorD(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorD(%x)", context);
+    TRACE1(ContextDmaColorD, context);
     setSurfaceColorLocation(3, context);
 }
 
 void Rsx::ContextDmaColorC(uint32_t contextC) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaColorC(%x)", contextC);
+    TRACE1(ContextDmaColorC_1, contextC);
     setSurfaceColorLocation(2, contextC);
 }
 
 void Rsx::ContextDmaZeta(uint32_t context) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaZeta(%x)", context);
+    TRACE1(ContextDmaZeta, context);
     _context->surface.depthLocation = gcmEnumToLocation(context);
 }
 
 void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t width, uint32_t height) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("setDisplayBuffer(%x, ...)", id);
     auto& buffer = _context->displayBuffers[id];
     buffer.offset = offset;
     buffer.pitch = pitch;
@@ -1456,6 +1565,10 @@ void Rsx::initGcm() {
     glDebugMessageCallback(&glDebugCallbackFunction, nullptr);
     
     _context.reset(new RsxContext());
+    
+    if (_mode == RsxOperationMode::RunCapture) {
+        _context->tracer.enable();
+    }
     
     _mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
     _context->pipeline.bind();
@@ -1602,12 +1715,12 @@ void Rsx::setVBlankHandler(uint32_t descrEa) {
 // Data Transfer
 
 void Rsx::OffsetDestin(uint32_t offset) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("OffsetDestin(%x)", offset);
+    TRACE1(OffsetDestin, offset);
     _context->transfer.surfaceOffsetDestin = offset;
 }
 
 void Rsx::ColorFormat(uint32_t format, uint16_t dstPitch, uint16_t srcPitch) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ColorFormat(%x, %x, %x)", format, dstPitch, srcPitch);
+    TRACE3(ColorFormat, format, dstPitch, srcPitch);
     assert(format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5 ||
            format == CELL_GCM_TRANSFER_SURFACE_FORMAT_A8R8G8B8 ||
            format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32);
@@ -1623,9 +1736,7 @@ void Rsx::Point(uint16_t pointX,
                 uint16_t inSizeX, 
                 uint16_t inSizeY)
 {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Point(%d, %d, %d, %d, %d, %d)",
-        pointX, pointY, outSizeX, outSizeX, inSizeX, inSizeY
-    );
+    TRACE6(Point, pointX, pointY, outSizeX, outSizeY, inSizeX, inSizeY);
     _context->transfer.pointX = pointX;
     _context->transfer.pointY = pointY;
     _context->transfer.outSizeX = outSizeX;
@@ -1639,7 +1750,7 @@ void Rsx::Point(uint16_t pointX,
 }
 
 void Rsx::Color(uint32_t ptr, uint32_t count) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Color(..., %d)", count);
+    TRACE2(Color, ptr, count);
     assert(_context->transfer.format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32);
     auto dest = rsxOffsetToEa(_context->transfer.destTransferLocation,
                               _context->transfer.surfaceOffsetDestin +
@@ -1652,17 +1763,17 @@ void Rsx::Color(uint32_t ptr, uint32_t count) {
 }
 
 void Rsx::ContextDmaImageDestin(uint32_t location) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ContextDmaImageDestin(%x)", location);
+    TRACE1(ContextDmaImageDestin, location);
     _context->transfer.destTransferLocation = gcmEnumToLocation(location);
 }
 
 void Rsx::OffsetIn(uint32_t offset) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("OffsetIn(%x)", offset);
+    TRACE1(OffsetIn_1, offset);
     _context->transfer.sourceOffset = offset;
 }
 
 void Rsx::OffsetOut(uint32_t offset) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("OffsetOut(%x)", offset);
+    TRACE1(OffsetOut, offset);
     _context->transfer.destOffset = offset;
 }
 
@@ -1672,7 +1783,7 @@ void Rsx::PitchIn(int32_t inPitch,
                   uint32_t lineCount,
                   uint8_t inFormat,
                   uint8_t outFormat) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("PatchIn(...)");
+    TRACE6(PitchIn, inPitch, outPitch, lineLength, lineCount, inFormat, outFormat);
     _context->transfer.sourcePitch = inPitch;
     _context->transfer.destPitch = outPitch;
     _context->transfer.lineLength = lineLength;
@@ -1682,8 +1793,7 @@ void Rsx::PitchIn(int32_t inPitch,
 }
 
 void Rsx::DmaBufferIn(uint32_t sourceLocation, uint32_t dstLocation) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf(
-        "DmaBufferIn(%d, %d)", sourceLocation, dstLocation);
+    TRACE2(DmaBufferIn, sourceLocation, dstLocation);
     _context->transfer.sourceDataLocation = gcmEnumToLocation(sourceLocation);
     _context->transfer.destDataLocation = gcmEnumToLocation(dstLocation);
 }
@@ -1697,7 +1807,16 @@ void Rsx::OffsetIn(uint32_t inOffset,
                    uint8_t inFormat, 
                    uint8_t outFormat, 
                    uint32_t notify) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("OffsetIn(...)");
+    TRACE9(OffsetIn_9,
+           inOffset, 
+           outOffset, 
+           inPitch, 
+           outPitch, 
+           lineLength, 
+           lineCount, 
+           inFormat, 
+           outFormat, 
+           notify);
     assert(notify == 0);
     auto sourceEa = rsxOffsetToEa(_context->transfer.sourceDataLocation, inOffset);
     auto destEa = rsxOffsetToEa(_context->transfer.destDataLocation, outOffset);
@@ -1721,7 +1840,7 @@ void Rsx::OffsetIn(uint32_t inOffset,
 }
 
 void Rsx::BufferNotify(uint32_t notify) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("BufferNotify(%x)", notify);    
+    TRACE1(BufferNotify, notify);
     OffsetIn(_context->transfer.sourceOffset,
              _context->transfer.destOffset,
              _context->transfer.sourcePitch,
@@ -1734,12 +1853,12 @@ void Rsx::BufferNotify(uint32_t notify) {
 }
 
 void Rsx::Nv3089ContextDmaImage(uint32_t location) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Nv3089ContextDmaImage(%x)", location);
+    TRACE1(Nv3089ContextDmaImage, location);
     _context->transfer.sourceImageLocation = gcmEnumToLocation(location);
 }
 
 void Rsx::Nv3089ContextSurface(uint32_t surfaceType) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Nv3089ContextSurface(%x)", surfaceType);
+    TRACE1(Nv3089ContextSurface, surfaceType);
     if (surfaceType != CELL_GCM_CONTEXT_SURFACE2D)
         throw std::runtime_error("swizzled surface is not supported");
     _context->transfer.surfaceType = surfaceType;
@@ -1758,7 +1877,7 @@ void Rsx::Nv3089SetColorConversion(uint32_t conv,
                                    uint16_t outH,
                                    float dsdx,
                                    float dtdy) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("Nv3089SetColorConversion(...)");
+    TRACE13(Nv3089SetColorConversion, conv, fmt, op, x, y, w, h, outX, outY, outW, outH, dsdx, dtdy);
     assert(conv == CELL_GCM_TRANSFER_CONVERSION_TRUNCATE);
     assert(op == CELL_GCM_TRANSFER_OPERATION_SRCCOPY);
     _context->transfer.conv = {fmt, x, y, w, h, outX, outY, outW, outH, dsdx, dtdy};
@@ -1774,7 +1893,7 @@ void Rsx::ImageInSize(uint16_t inW,
                       uint32_t offset,
                       float inX,
                       float inY) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("ImageInSize(...)");
+    TRACE8(ImageInSize, inW, inH, pitch, origin, interpolator, offset, inX, inY);
     auto& conv = _context->transfer.conv;
     if (conv.dsdx == 0 || conv.dtdy == 0)
         return;
@@ -1807,4 +1926,22 @@ void Rsx::ImageInSize(uint16_t inW,
         srcLine += sourcePitch;
         destLine += destPitch;
     }
+}
+
+void Rsx::setOperationMode(RsxOperationMode mode) {
+    _mode = mode;
+}
+
+template <typename... Args>
+void Rsx::trace(CommandId id, std::vector<GcmCommandArg> const& args) {
+    _context->tracer.trace(_context->frame, _context->commandNum++, id, args);
+}
+
+RsxOperationMode Rsx::_mode = RsxOperationMode::Run;
+
+#define X(x) #x,
+const char* commandNames[] = { CommandIdX };
+
+const char* printCommandId(CommandId id) {
+    return commandNames[(int)id];
 }

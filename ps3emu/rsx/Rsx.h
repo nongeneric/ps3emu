@@ -3,6 +3,7 @@
 #include "../../libs/graphics/graphics.h"
 #include "../constants.h"
 #include "../../libs/graphics/gcm.h"
+#include "../../libs/ConcurrentQueue.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <memory>
@@ -21,11 +22,110 @@ typedef struct {
 
 constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 
+#define X(x) x,
+#define CommandIdX \
+    X(SurfaceClipHorizontal) \
+    X(SurfacePitchC) \
+    X(SurfaceCompression) \
+    X(WindowOffset) \
+    X(ClearRectHorizontal) \
+    X(ClipIdTestEnable) \
+    X(Control0) \
+    X(FlatShadeOp) \
+    X(VertexAttribOutputMask) \
+    X(FrequencyDividerOperation) \
+    X(TexCoordControl) \
+    X(ShaderWindow) \
+    X(ReduceDstColor) \
+    X(FogMode) \
+    X(AnisoSpread) \
+    X(VertexDataBaseOffset) \
+    X(AlphaFunc) \
+    X(AlphaTestEnable) \
+    X(ShaderControl) \
+    X(TransformProgramLoad) \
+    X(TransformProgram) \
+    X(VertexAttribInputMask) \
+    X(TransformTimeout) \
+    X(ShaderProgram) \
+    X(ViewportHorizontal) \
+    X(ClipMin) \
+    X(ViewportOffset) \
+    X(ContextDmaColorA) \
+    X(ContextDmaColorB) \
+    X(ContextDmaColorC_2) \
+    X(ContextDmaColorC_1) \
+    X(ContextDmaColorD) \
+    X(ContextDmaZeta) \
+    X(SurfaceFormat) \
+    X(SurfacePitchZ) \
+    X(SurfaceColorTarget) \
+    X(ColorMask) \
+    X(DepthFunc) \
+    X(CullFaceEnable) \
+    X(DepthTestEnable) \
+    X(ShadeMode) \
+    X(ColorClearValue) \
+    X(ClearSurface) \
+    X(VertexDataArrayFormat) \
+    X(VertexDataArrayOffset) \
+    X(BeginEnd) \
+    X(DrawArrays) \
+    X(TransformConstantLoad) \
+    X(RestartIndexEnable) \
+    X(RestartIndex) \
+    X(IndexArrayAddress) \
+    X(DrawIndexArray) \
+    X(VertexTextureOffset) \
+    X(VertexTextureControl3) \
+    X(VertexTextureImageRect) \
+    X(VertexTextureControl0) \
+    X(VertexTextureAddress) \
+    X(VertexTextureFilter) \
+    X(VertexTextureBorderColor) \
+    X(TextureOffset) \
+    X(TextureImageRect) \
+    X(TextureControl3) \
+    X(TextureControl2) \
+    X(TextureControl1) \
+    X(TextureAddress) \
+    X(TextureBorderColor) \
+    X(TextureControl0) \
+    X(TextureFilter) \
+    X(SetReference) \
+    X(SemaphoreOffset) \
+    X(BackEndWriteSemaphoreRelease) \
+    X(OffsetDestin) \
+    X(ColorFormat) \
+    X(Point) \
+    X(Color) \
+    X(ContextDmaImageDestin) \
+    X(OffsetIn_1) \
+    X(OffsetOut) \
+    X(PitchIn) \
+    X(DmaBufferIn) \
+    X(OffsetIn_9) \
+    X(BufferNotify) \
+    X(Nv3089ContextDmaImage) \
+    X(Nv3089ContextSurface) \
+    X(Nv3089SetColorConversion) \
+    X(ImageInSize) \
+    X(StopReplay)
+    
+enum class CommandId { CommandIdX };
+#undef X
+
+enum class RsxOperationMode {
+    Run, RunCapture, Replay
+};
+
 class RsxContext;
 class MainMemory;
 class Process;
-
+struct GcmCommandArg;
+struct GcmCommand;
 class Rsx {
+    static RsxOperationMode _mode;
     uint32_t _get = 0;
     uint32_t _put = 0;
     uint32_t _ref = 0xffffffff;
@@ -46,10 +146,17 @@ class Rsx {
     ps3_uintptr_t _gcmIoAddress;
     int64_t interpret(uint32_t get);
     Window _window;
+    ConcurrentFifoQueue<GcmCommand> _replayQueue;
+    
+    template <typename... Args>
+    void trace(CommandId id, std::vector<GcmCommandArg> const& args);
+    
     void watchCaches();
     void memoryBreakHandler(uint32_t va, uint32_t size);
     void waitForIdle();
     void loop();
+    void runLoop();
+    void replayLoop();
     void setSurfaceColorLocation(unsigned index, uint32_t location);
     void initGcm();
     void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
@@ -153,7 +260,7 @@ class Rsx {
     void VertexTextureControl0(unsigned index, bool enable, float minlod, float maxlod);
     void VertexTextureAddress(unsigned index, uint8_t wraps, uint8_t wrapt);
     void VertexTextureFilter(unsigned index, float bias);
-    void VertexTextureBorderColor(unsigned index, std::array<float, 4> argb);
+    void VertexTextureBorderColor(unsigned index, float a, float r, float g, float b);
     void TextureOffset(unsigned index,
                        uint32_t offset,
                        uint16_t mipmap,
@@ -175,7 +282,7 @@ class Rsx {
                         uint8_t gamma,
                         uint8_t anisoBias,
                         uint8_t signedRemap);
-    void TextureBorderColor(unsigned index, std::array<float, int(4)> argb);
+    void TextureBorderColor(unsigned index, float a, float r, float g, float b);
     void TextureControl0(unsigned index,
                          uint8_t alphaKill,
                          uint8_t maxaniso,
@@ -250,6 +357,7 @@ class Rsx {
 public:
     Rsx();
     ~Rsx();
+    static void setOperationMode(RsxOperationMode mode);
     void shutdown();
     void setPut(uint32_t put);
     void setGet(uint32_t get);
@@ -269,6 +377,8 @@ public:
     void init(Process* proc);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
+    void sendCommand(GcmCommand command);
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
+const char* printCommandId(CommandId id);

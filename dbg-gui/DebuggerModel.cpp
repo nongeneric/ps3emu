@@ -416,6 +416,7 @@ public:
 };
 
 DebuggerModel::DebuggerModel() {
+    Rsx::setOperationMode(RsxOperationMode::RunCapture);
     _gprModel.reset(new GPRModel());
     _dasmModel.reset(new DasmModel());
     _memoryDumpModel.reset(new MemoryDumpModel());
