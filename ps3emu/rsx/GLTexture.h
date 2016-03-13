@@ -41,7 +41,7 @@ public:
     GLTexture(MainMemory* mm, RsxTextureInfo const& info);
     ~GLTexture();
     RsxTextureInfo const& info() const;
-    void update(MainMemory* mm);
+    void update(std::vector<uint8_t>& blob);
     void bind(GLuint samplerIndex);
 };
 

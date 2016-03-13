@@ -1,4 +1,5 @@
 #include "Rsx.h"
+#include "RsxLoopMeta.h"
 #include "../utils.h"
 #include "../BitField.h"
 #include "../MainMemory.h"
@@ -179,9 +180,9 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x000001b4:
             //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_C";
             if (count == 1) {
-                ContextDmaColorC(readarg(1));
+                ContextDmaColorC_1(readarg(1));
             } else {
-                ContextDmaColorC(readarg(1), readarg(2));
+                ContextDmaColorC_2(readarg(1), readarg(2));
             }
             break;
         case 0x000001b8:
@@ -776,12 +777,9 @@ int64_t Rsx::interpret(uint32_t get) {
         }
         case 0x00001efc: {
             //name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD";
-            static std::vector<uint32_t> vec;
-            vec.resize(count - 1);
-            for (auto i = 0u; i < vec.size(); ++i) {
-                vec[i] = readarg(i + 2);
-            }
-            TransformConstantLoad(readarg(1), vec);
+            TransformConstantLoad(readarg(1), 
+                                  rsxOffsetToEa(MemoryLocation::Main, get + 4 * 2), 
+                                  count - 1);
             break;
         }
         case 0x00001f00:
@@ -846,19 +844,19 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x0000230C:
             //name = "CELL_GCM_NV0039_OFFSET_IN";
             if (count == 1) {
-                OffsetIn(readarg(1));
+                OffsetIn_1(readarg(1));
             } else {
                 assert(count == 8);
                 auto arg = readarg(7);
-                OffsetIn(readarg(1), 
-                         readarg(2), 
-                         readarg(3), 
-                         readarg(4), 
-                         readarg(5), 
-                         readarg(6), 
-                         arg & 0xff, 
-                         arg >> 8,
-                         readarg(8));
+                OffsetIn_9(readarg(1), 
+                           readarg(2), 
+                           readarg(3), 
+                           readarg(4), 
+                           readarg(5), 
+                           readarg(6), 
+                           arg & 0xff, 
+                           arg >> 8,
+                           readarg(8));
             }
             break;
         case 0x00002310:
@@ -1525,15 +1523,18 @@ void Rsx::replayLoop() {
         auto id = (CommandId)command.id;
         if (id == CommandId::StopReplay)
             break;
-//         auto& args = command.args;
-//         switch (id) {
-//             case CommandId::SurfaceClipHorizontal: {
-//                 SurfaceClipHorizontal(args.at(0).value, 
-//                                       args.at(1).value, 
-//                                       args.at(2).value, 
-//                                       args.at(3).value);
-//             }
-//        }
+        std::vector<uint32_t> argValues;
+        std::transform(begin(command.args), 
+                       end(command.args), 
+                       std::back_inserter(argValues),
+                       [](auto& arg) { return arg.value; });
+        _currentReplayBlob = command.blob;
+        switch (id) {
+#define X(x) case CommandId::x: replay(&Rsx::x, this, argValues); break;
+            CommandIdX
+#undef X    
+            default: break;
+       }
     }
 }
 

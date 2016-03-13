@@ -295,12 +295,7 @@ GLTexture::GLTexture(MainMemory* mm, const RsxTextureInfo& info): _info(info) {
     glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
 }
 
-void GLTexture::update(MainMemory* mm) {
-    auto size = _info.pitch * _info.height;
-    std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
-    auto va = rsxOffsetToEa(_info.location, _info.offset);
-    mm->readMemory(va, buf.get(), size);
-    
+void GLTexture::update(std::vector<uint8_t>& blob) {
     std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
 
     assert(_info.format & CELL_GCM_TEXTURE_LN);
@@ -308,7 +303,7 @@ void GLTexture::update(MainMemory* mm) {
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     
     TextureReader reader(texelFormat, _info);
-    TextureIterator it(&buf[0], _info.pitch, getTexelSize(texelFormat));
+    TextureIterator it(&blob[0], _info.pitch, getTexelSize(texelFormat));
     for (auto i = 0; i < _info.width * _info.height; ++i) {
         reader.read(*it, conv[i]);
         ++it;

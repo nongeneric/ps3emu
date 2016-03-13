@@ -46,7 +46,7 @@ template <> struct DbColumnType<float> {
 def a(i):
      r = "#define TRACE" + str(i) + "(id"
      for n in range(0, i): r += ", a" + str(n)
-     r += ") trace(CommandId::id, { ARG(a0)"
+     r += ") _context->trace(CommandId::id, { ARG(a0)"
      for n in range(1, i): r += ", ARG(a" + str(n) + ")"
      r += " });"
      print(r)
@@ -55,20 +55,20 @@ for z in range(1, 14): a(z)
 
 #define ARG(a) GcmCommandArg { DbColumnType<decltype(a)>::convert(a), \
                                #a, GcmType<decltype(a)>::type }
-#define TRACE0(id) trace(CommandId::id);
-#define TRACE1(id, a0) trace(CommandId::id, { ARG(a0) });
-#define TRACE2(id, a0, a1) trace(CommandId::id, { ARG(a0), ARG(a1) });
-#define TRACE3(id, a0, a1, a2) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2) });
-#define TRACE4(id, a0, a1, a2, a3) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3) });
-#define TRACE5(id, a0, a1, a2, a3, a4) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4) });
-#define TRACE6(id, a0, a1, a2, a3, a4, a5) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5) });
-#define TRACE7(id, a0, a1, a2, a3, a4, a5, a6) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6) });
-#define TRACE8(id, a0, a1, a2, a3, a4, a5, a6, a7) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7) });
-#define TRACE9(id, a0, a1, a2, a3, a4, a5, a6, a7, a8) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8) });
-#define TRACE10(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9) });
-#define TRACE11(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10) });
-#define TRACE12(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11) });
-#define TRACE13(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11), ARG(a12) });
+#define TRACE0(id) _context->trace(CommandId::id);
+#define TRACE1(id, a0) _context->trace(CommandId::id, { ARG(a0) });
+#define TRACE2(id, a0, a1) _context->trace(CommandId::id, { ARG(a0), ARG(a1) });
+#define TRACE3(id, a0, a1, a2) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2) });
+#define TRACE4(id, a0, a1, a2, a3) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3) });
+#define TRACE5(id, a0, a1, a2, a3, a4) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4) });
+#define TRACE6(id, a0, a1, a2, a3, a4, a5) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5) });
+#define TRACE7(id, a0, a1, a2, a3, a4, a5, a6) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6) });
+#define TRACE8(id, a0, a1, a2, a3, a4, a5, a6, a7) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7) });
+#define TRACE9(id, a0, a1, a2, a3, a4, a5, a6, a7, a8) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8) });
+#define TRACE10(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9) });
+#define TRACE11(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10) });
+#define TRACE12(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11) });
+#define TRACE13(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11), ARG(a12) });
 
 struct VertexDataArrayFormatInfo {
     uint16_t frequency;
@@ -304,11 +304,21 @@ struct ViewPortInfo {
 class Tracer {
     bool _enabled = false;
     GcmDatabase _db;
+    std::vector<uint8_t> _blob;
+    bool _blobSet = false;
 public:
     void enable() {
         _enabled = true;
         system("rm -rf /tmp/ps3emu.trace");
         _db.createOrOpen("/tmp/ps3emu.trace");
+    }
+    
+    void pushBlob(const void* ptr, uint32_t size) {
+        if (!_enabled)
+            return;
+        _blobSet = true;
+        _blob.resize(size);
+        memcpy(&_blob[0], ptr, size);
     }
     
     template <typename... Args>
@@ -323,14 +333,11 @@ public:
         gcmCommand.num = num;
         gcmCommand.id = (uint32_t)command;
         gcmCommand.args = args;
+        if (_blobSet) {
+            _blobSet = false;
+            gcmCommand.blob = _blob;
+        }
         _db.insertCommand(gcmCommand);
-    }
-    
-    template <typename... Args>
-    void traceWithBlob(CommandId command,
-                       std::vector<uint8_t> const& blob,
-                       Args... args) {
-        
     }
 };
 
@@ -385,6 +392,11 @@ public:
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
     uint32_t vBlankHandlerDescr = 0;
     MemoryLocation reportLocation = MemoryLocation::Local;
+    
+    template <typename... Args>
+    void trace(CommandId id, std::vector<GcmCommandArg> const& args) {
+        tracer.trace(frame, commandNum++, id, args);
+    }
 };
 
 Rsx::Rsx() = default;
@@ -587,10 +599,19 @@ void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
 }
 
 void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
-    TRACE2(TransformProgram, locationOffset, size);
     auto bytes = size * 4;
-    auto src = _mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, locationOffset), bytes);
-    memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], src, bytes);
+    
+    const void* source;
+    if (_mode == RsxOperationMode::Replay) {
+        source = _currentReplayBlob.data();
+    } else {
+        source = _mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, locationOffset), bytes);
+    }
+    
+    _context->tracer.pushBlob(source, bytes);
+    TRACE2(TransformProgram, locationOffset, size);
+    
+    memcpy(&_context->vertexInstructions[_context->vertexLoadOffset], source, bytes);
     _context->vertexShaderDirty = true;
     _context->vertexLoadOffset += bytes;
 }
@@ -836,23 +857,14 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     updateFramebuffer();
     _context->textureRenderer->render(tex);
     _context->pipeline.bind();
-    _window.SwapBuffers();
-    _context->frame++;
-    _context->commandNum = 0;
-    
-    if (_context->vBlankHandlerDescr) {
-        fdescr descr;
-        _mm->readMemory(_context->vBlankHandlerDescr, &descr, sizeof(descr));
-        auto future = _proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
-        future.get();
-    }
 
 #if TESTS
     static int framenum = 0;
-    
+    glFinish();
     if (framenum < 10) {
         auto& vec = _context->lastFrame;
         vec.resize(_window.width() * _window.height() * 4);
+        glcall(glReadBuffer(GL_BACK));
         glcall(glReadPixels(
             0,
             0,
@@ -867,6 +879,17 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
         framenum++;
     }
 #endif
+
+    _window.SwapBuffers();
+    _context->frame++;
+    _context->commandNum = 0;
+    
+    if (_context->vBlankHandlerDescr) {
+        fdescr descr;
+        _mm->readMemory(_context->vBlankHandlerDescr, &descr, sizeof(descr));
+        auto future = _proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
+        future.get();
+    }
     
     this->setLabel(1, 0);
     if (label != (uint32_t)-1) {
@@ -879,11 +902,27 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->reportLocation = MemoryLocation::Local;
 }
 
-void Rsx::TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals) {
-    TRACE1(TransformConstantLoad, loadAt);
-    assert(vals.size() % 4 == 0);
-    auto size = vals.size() * sizeof(uint32_t);
-    glcall(glNamedBufferSubData(_context->vertexConstBuffer.handle(), loadAt * 16, size, vals.data()));
+void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t va, uint32_t count) {
+    assert(count % 4 == 0);
+    auto size = count * sizeof(uint32_t);
+    
+    std::vector<uint8_t> source;
+    if (_mode == RsxOperationMode::Replay) {
+        source = _currentReplayBlob;
+    } else {
+        source.resize(size);
+        _mm->readMemory(va, &source[0], source.size());
+    }
+    
+    _context->tracer.pushBlob(&source[0], source.size());
+    TRACE3(TransformConstantLoad, loadAt, va, count);
+    
+    for (auto i = 0u; i < count; ++i) {
+        auto u = (uint32_t*)&source[i * 4];
+        boost::endian::endian_reverse_inplace(*u);
+    }
+    
+    glcall(glNamedBufferSubData(_context->vertexConstBuffer.handle(), loadAt * 16, size, source.data()));
 }
 
 bool Rsx::linkShaderProgram() {
@@ -959,7 +998,7 @@ class FragmentShaderUpdateFunctor {
     std::vector<uint8_t> _bytecode;
     std::vector<uint8_t> _newbytecode;
     FragmentProgramInfo _info;
-    RsxContext* _rsxContext;
+    RsxContext* _context;
     MainMemory* _mm;
     
     void updateBytecode(FragmentShader* shader) {
@@ -967,7 +1006,7 @@ class FragmentShaderUpdateFunctor {
         BOOST_LOG_TRIVIAL(trace) << "fragment program\n" << dasm;
         // TODO: handle sizes
         std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
-        auto text = GenerateFragmentShader(_newbytecode, sizes, _rsxContext->isFlatShadeMode);
+        auto text = GenerateFragmentShader(_newbytecode, sizes, _context->isFlatShadeMode);
         BOOST_LOG_TRIVIAL(trace) << text;
         *shader = FragmentShader(text.c_str());
         BOOST_LOG_TRIVIAL(trace) << "fragment shader log:\n" << shader->log();
@@ -999,7 +1038,7 @@ public:
                                 MainMemory* mm)
         : _constBuffer(GLBufferType::MapWrite, size / 2),
           _newbytecode(bytecode),
-          _rsxContext(rsxContext),
+          _context(rsxContext),
           _mm(mm),
           va(va), size(size)
     {
@@ -1007,12 +1046,21 @@ public:
         _info = get_fragment_bytecode_info(&_newbytecode[0]);
     }
     
-    void update(FragmentShader* shader) {
+    void updateWithBlob(FragmentShader* shader, std::vector<uint8_t>& blob) {
         if (_bytecode.empty()) { // first update
             updateBytecode(shader);
             return;
         }
-        _mm->readMemory(va, &_newbytecode[0], size);
+        if (blob.empty()) {
+            _mm->readMemory(va, &_newbytecode[0], size);
+        } else {
+            assert(blob.size() == size);
+            memcpy(&_newbytecode[0], &blob[0], size);
+        }
+        
+        _context->tracer.pushBlob(&_newbytecode[0], size);
+        TRACE2(UpdateFragmentCache, va, size);
+        
         bool constsChanged = false;
         bool bytecodeChanged = false;
         for (auto i = 0u; i < size; i += 16) {
@@ -1032,6 +1080,11 @@ public:
         }
     }
     
+    void update(FragmentShader* shader) {
+        std::vector<uint8_t> blob;
+        return updateWithBlob(shader, blob);
+    }
+    
     void bindConstBuffer() {
         glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
                                 FragmentShaderConstantBinding,
@@ -1040,6 +1093,9 @@ public:
 };
 
 void Rsx::updateShaders() {
+    if (_mode == RsxOperationMode::Replay)
+        return;
+    
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
         
@@ -1146,31 +1202,47 @@ void Rsx::VertexTextureFilter(unsigned int index, float bias) {
     _context->vertexTextureSamplers[index].bias = bias;
 }
 
+GLTexture* Rsx::getCachedTexture(RsxTextureInfo* info) {
+    TextureCacheKey key { 
+        rsxOffsetToEa(info->location, info->offset),
+        info->width,
+        info->height,
+        info->format
+    };
+    auto texture = _context->textureCache.retrieve(key);
+    if (!texture) {
+        auto updater = new SimpleCacheItemUpdater<GLTexture> {
+            key.va, info->height * info->pitch,
+            [=](auto t) {
+                auto size = info->pitch * info->height;
+                std::vector<uint8_t> buf(size);
+                auto va = rsxOffsetToEa(info->location, info->offset);
+                _mm->readMemory(va, &buf[0], size);
+                t->update(buf);
+                
+                _context->tracer.pushBlob(&buf[0], buf.size());
+                TRACE4(UpdateTextureCache, 
+                        rsxOffsetToEa(info->location, info->offset),
+                        info->width,
+                        info->height,
+                        info->format);
+            }, [=](auto t, auto& blob) {
+                t->update(blob);
+            }
+        };
+        texture = new GLTexture(_mm, *info);
+        _context->textureCache.insert(key, texture, updater);
+    }
+    return texture;
+}
+
 void Rsx::updateTextures() {
     int i = 0;
     auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.map();
     for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
             auto textureUnit = i + VertexTextureUnit;
-            auto& info = sampler.texture;
-            TextureCacheKey key { 
-                rsxOffsetToEa(info.location, info.offset),
-                info.width,
-                info.height,
-                info.format
-            };
-            auto texture = _context->textureCache.retrieve(key);
-            if (!texture) {
-                auto updater = new SimpleCacheItemUpdater<GLTexture> {
-                    key.va, info.height * info.pitch,
-                    [=](auto t) {
-                        t->update(_mm);
-                    }
-                };
-                texture = new GLTexture(_mm, sampler.texture);
-                _context->textureCache.insert(key, texture, updater);
-            }
-            
+            auto texture = getCachedTexture(&sampler.texture);
             texture->bind(textureUnit);
             auto handle = sampler.glSampler.handle();
             if (!handle) {
@@ -1203,24 +1275,7 @@ void Rsx::updateTextures() {
             if (surfaceTex) {
                 glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
             } else {
-                auto& info = sampler.texture;
-                TextureCacheKey key { 
-                    rsxOffsetToEa(info.location, info.offset),
-                    info.width,
-                    info.height,
-                    info.format
-                };
-                auto texture = _context->textureCache.retrieve(key);
-                if (!texture) {
-                    auto updater = new SimpleCacheItemUpdater<GLTexture> {
-                        key.va, info.height * info.pitch,
-                        [=](auto t) {
-                            t->update(_mm);
-                        }
-                    };
-                    texture = new GLTexture(_mm, sampler.texture);
-                    _context->textureCache.insert(key, texture, std::move(updater));
-                }
+                auto texture = getCachedTexture(&sampler.texture);
                 texture->bind(textureUnit);
             }
             
@@ -1504,7 +1559,7 @@ void Rsx::ContextDmaColorB(uint32_t context) {
     setSurfaceColorLocation(1, context);
 }
 
-void Rsx::ContextDmaColorC(uint32_t contextC, uint32_t contextD) {
+void Rsx::ContextDmaColorC_2(uint32_t contextC, uint32_t contextD) {
     TRACE2(ContextDmaColorC_2, contextC, contextD);
     setSurfaceColorLocation(2, contextC);
     setSurfaceColorLocation(3, contextD);
@@ -1515,7 +1570,7 @@ void Rsx::ContextDmaColorD(uint32_t context) {
     setSurfaceColorLocation(3, context);
 }
 
-void Rsx::ContextDmaColorC(uint32_t contextC) {
+void Rsx::ContextDmaColorC_1(uint32_t contextC) {
     TRACE1(ContextDmaColorC_1, contextC);
     setSurfaceColorLocation(2, contextC);
 }
@@ -1659,6 +1714,12 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
                 bufferVa, bufferSize, [=](auto b) {
                     auto mapped = b->map();
                     _mm->readMemory(bufferVa, mapped, bufferSize);
+                    _context->tracer.pushBlob(mapped, bufferSize);
+                    TRACE2(UpdateBufferCache, bufferVa, bufferSize);
+                    b->unmap();
+                }, [=](auto b, auto& blob) {
+                    auto mapped = b->map();
+                    memcpy(mapped, &blob[0], blob.size());
                     b->unmap();
                 }
             };
@@ -1702,6 +1763,8 @@ uint32_t Rsx::getGet() {
 }
 
 void Rsx::watchCaches() {
+    if (_mode == RsxOperationMode::Replay)
+        return;
     auto setMemoryBreak = [=](uint32_t va, uint32_t size) { _mm->memoryBreak(va, size); };
     _context->bufferCache.watch(setMemoryBreak);
     _context->textureCache.watch(setMemoryBreak);
@@ -1767,7 +1830,7 @@ void Rsx::ContextDmaImageDestin(uint32_t location) {
     _context->transfer.destTransferLocation = gcmEnumToLocation(location);
 }
 
-void Rsx::OffsetIn(uint32_t offset) {
+void Rsx::OffsetIn_1(uint32_t offset) {
     TRACE1(OffsetIn_1, offset);
     _context->transfer.sourceOffset = offset;
 }
@@ -1798,15 +1861,15 @@ void Rsx::DmaBufferIn(uint32_t sourceLocation, uint32_t dstLocation) {
     _context->transfer.destDataLocation = gcmEnumToLocation(dstLocation);
 }
 
-void Rsx::OffsetIn(uint32_t inOffset, 
-                   uint32_t outOffset, 
-                   int32_t inPitch, 
-                   int32_t outPitch, 
-                   uint32_t lineLength, 
-                   uint32_t lineCount, 
-                   uint8_t inFormat, 
-                   uint8_t outFormat, 
-                   uint32_t notify) {
+void Rsx::OffsetIn_9(uint32_t inOffset, 
+                     uint32_t outOffset, 
+                     int32_t inPitch, 
+                     int32_t outPitch, 
+                     uint32_t lineLength, 
+                     uint32_t lineCount, 
+                     uint8_t inFormat, 
+                     uint8_t outFormat, 
+                     uint32_t notify) {
     TRACE9(OffsetIn_9,
            inOffset, 
            outOffset, 
@@ -1841,15 +1904,15 @@ void Rsx::OffsetIn(uint32_t inOffset,
 
 void Rsx::BufferNotify(uint32_t notify) {
     TRACE1(BufferNotify, notify);
-    OffsetIn(_context->transfer.sourceOffset,
-             _context->transfer.destOffset,
-             _context->transfer.sourcePitch,
-             _context->transfer.destPitch,
-             _context->transfer.lineLength,
-             _context->transfer.lineCount,
-             _context->transfer.sourceFormat,
-             _context->transfer.destFormat,
-             notify);
+    OffsetIn_9(_context->transfer.sourceOffset,
+               _context->transfer.destOffset,
+               _context->transfer.sourcePitch,
+               _context->transfer.destPitch,
+               _context->transfer.lineLength,
+               _context->transfer.lineCount,
+               _context->transfer.sourceFormat,
+               _context->transfer.destFormat,
+               notify);
 }
 
 void Rsx::Nv3089ContextDmaImage(uint32_t location) {
@@ -1932,11 +1995,6 @@ void Rsx::setOperationMode(RsxOperationMode mode) {
     _mode = mode;
 }
 
-template <typename... Args>
-void Rsx::trace(CommandId id, std::vector<GcmCommandArg> const& args) {
-    _context->tracer.trace(_context->frame, _context->commandNum++, id, args);
-}
-
 RsxOperationMode Rsx::_mode = RsxOperationMode::Run;
 
 #define X(x) #x,
@@ -1944,4 +2002,29 @@ const char* commandNames[] = { CommandIdX };
 
 const char* printCommandId(CommandId id) {
     return commandNames[(int)id];
+}
+
+void Rsx::UpdateBufferCache(uint32_t va) {
+    auto tuple = _context->bufferCache.retrieveWithUpdater( { va, (uint32_t)_currentReplayBlob.size() });
+    auto buffer = std::get<0>(tuple);
+    auto updater = std::get<1>(tuple);
+    updater->updateWithBlob(buffer, _currentReplayBlob);
+}
+
+void Rsx::UpdateTextureCache(uint32_t offset,
+                             uint16_t width,
+                             uint16_t height,
+                             uint8_t format) {
+    auto tuple = _context->textureCache.retrieveWithUpdater(
+        { offset, width, height, format });
+    auto buffer = std::get<0>(tuple);
+    auto updater = std::get<1>(tuple);
+    updater->updateWithBlob(buffer, _currentReplayBlob);
+}
+
+void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size) {
+    auto tuple = _context->fragmentShaderCache.retrieveWithUpdater( { va, size });
+    auto buffer = std::get<0>(tuple);
+    auto updater = std::get<1>(tuple);
+    updater->updateWithBlob(buffer, _currentReplayBlob);
 }

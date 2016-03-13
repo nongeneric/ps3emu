@@ -12,6 +12,7 @@ struct SimpleCacheItemUpdater {
     uint32_t va;
     uint32_t size;
     std::function<void(T*)> update;
+    std::function<void(T*, std::vector<uint8_t>&)> updateWithBlob;
 };
 
 template <typename T, typename U>
@@ -70,3 +71,5 @@ public:
         }
     }
 };
+
+

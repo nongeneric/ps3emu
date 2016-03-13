@@ -110,7 +110,10 @@ constexpr uint32_t EmuFlipCommandMethod = 0xacac;
     X(Nv3089ContextSurface) \
     X(Nv3089SetColorConversion) \
     X(ImageInSize) \
-    X(StopReplay)
+    X(StopReplay) \
+    X(UpdateBufferCache) \
+    X(UpdateTextureCache) \
+    X(UpdateFragmentCache) \
     
 enum class CommandId { CommandIdX };
 #undef X
@@ -124,6 +127,8 @@ class MainMemory;
 class Process;
 struct GcmCommandArg;
 struct GcmCommand;
+class GLTexture;
+struct RsxTextureInfo;
 class Rsx {
     static RsxOperationMode _mode;
     uint32_t _get = 0;
@@ -147,9 +152,7 @@ class Rsx {
     int64_t interpret(uint32_t get);
     Window _window;
     ConcurrentFifoQueue<GcmCommand> _replayQueue;
-    
-    template <typename... Args>
-    void trace(CommandId id, std::vector<GcmCommandArg> const& args);
+    std::vector<uint8_t> _currentReplayBlob;
     
     void watchCaches();
     void memoryBreakHandler(uint32_t va, uint32_t size);
@@ -166,6 +169,8 @@ class Rsx {
     void updateTextures();
     void updateFramebuffer();
     void updateViewPort();
+    GLTexture* getCachedTexture(RsxTextureInfo* info);
+    
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
@@ -212,8 +217,8 @@ class Rsx {
                         float scale3);
     void ContextDmaColorA(uint32_t context);
     void ContextDmaColorB(uint32_t context);
-    void ContextDmaColorC(uint32_t contextC, uint32_t contextD);
-    void ContextDmaColorC(uint32_t contextC);
+    void ContextDmaColorC_2(uint32_t contextC, uint32_t contextD);
+    void ContextDmaColorC_1(uint32_t contextC);
     void ContextDmaColorD(uint32_t context);
     void ContextDmaZeta(uint32_t context);
     void SurfaceFormat(uint8_t colorFormat,
@@ -244,7 +249,7 @@ class Rsx {
     void VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset);
     void BeginEnd(uint32_t mode);
     void DrawArrays(unsigned first, unsigned count);
-    void TransformConstantLoad(uint32_t loadAt, std::vector<uint32_t> const& vals);
+    void TransformConstantLoad(uint32_t loadAt, uint32_t va, uint32_t count);
     void RestartIndexEnable(bool enable);
     void RestartIndex(uint32_t index);
     void IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type);
@@ -311,7 +316,7 @@ class Rsx {
                uint16_t inSizeY);
     void Color(uint32_t ptr, uint32_t count);
     void ContextDmaImageDestin(uint32_t location);
-    void OffsetIn(uint32_t offset);
+    void OffsetIn_1(uint32_t offset);
     void OffsetOut(uint32_t offset);
     void PitchIn(int32_t inPitch,
                  int32_t outPitch,
@@ -320,7 +325,7 @@ class Rsx {
                  uint8_t inFormat,
                  uint8_t outFormat);
     void DmaBufferIn(uint32_t sourceLocation, uint32_t dstLocation);
-    void OffsetIn(uint32_t inOffset,
+    void OffsetIn_9(uint32_t inOffset,
                   uint32_t outOffset,
                   int32_t inPitch,
                   int32_t outPitch,
@@ -353,6 +358,15 @@ class Rsx {
                      uint32_t offset,
                      float inX,
                      float inY);
+    
+    // Replay-specific
+    void UpdateBufferCache(uint32_t va);
+    void UpdateTextureCache(uint32_t offset,
+                            uint16_t width,
+                            uint16_t height,
+                            uint8_t format);
+    void UpdateFragmentCache(uint32_t va, uint32_t size);
+    inline void StopReplay() { }
     
 public:
     Rsx();

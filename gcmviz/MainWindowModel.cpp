@@ -2,8 +2,10 @@
 
 #include <QAbstractItemModel>
 #include <QItemSelectionModel>
+#include <QAction>
 #include "../ps3emu/utils.h"
 #include "../ps3emu/rsx/Rsx.h"
+#include "../ps3emu/Process.h"
 
 class CommandTableModel : public QAbstractItemModel {
     GcmDatabase* _db;
@@ -121,8 +123,11 @@ public:
 
 MainWindowModel::MainWindowModel() {
     _window.setupUi(&_qwindow);
+    QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
     Rsx::setOperationMode(RsxOperationMode::Replay);
 }
+
+MainWindowModel::~MainWindowModel() = default;
 
 QMainWindow* MainWindowModel::window() {
     return &_qwindow;
@@ -139,4 +144,16 @@ void MainWindowModel::loadTrace(std::string path) {
         auto command = _db.getCommand(0, current.row());
         _window.argTableView->setModel(new ArgumentTableModel(command));
     });
+}
+
+void MainWindowModel::onRun() {
+    _proc.reset(new Process());
+    _rsx.reset(new Rsx());
+    _rsx->init(_proc.get());
+    
+    auto count = _db.commands(0);
+    for (auto i = 0u; i < count; ++i) {
+        auto command = _db.getCommand(0, i);
+        _rsx->sendCommand(command);
+    }
 }

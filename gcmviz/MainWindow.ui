@@ -106,7 +106,14 @@
     </property>
     <addaction name="actionQuit"/>
    </widget>
+   <widget class="QMenu" name="menuTrace">
+    <property name="title">
+     <string>Trace</string>
+    </property>
+    <addaction name="actionRun"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuTrace"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionQuit">
@@ -114,7 +121,15 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Quit</string>
+    <string>&amp;Quit</string>
+   </property>
+  </action>
+  <action name="actionRun">
+   <property name="text">
+    <string>Run</string>
+   </property>
+   <property name="shortcut">
+    <string>F5</string>
    </property>
   </action>
  </widget>
