@@ -110,6 +110,13 @@ constexpr uint32_t EmuFlipCommandMethod = 0xacac;
     X(Nv3089ContextSurface) \
     X(Nv3089SetColorConversion) \
     X(ImageInSize) \
+    X(setSurfaceColorLocation) \
+    X(setDisplayBuffer) \
+    X(waitForIdle) \
+    X(addBufferToCache) \
+    X(addTextureToCache) \
+    X(addFragmentShaderToCache) \
+    X(EmuFlip) \
     X(StopReplay) \
     X(UpdateBufferCache) \
     X(UpdateTextureCache) \
@@ -128,6 +135,8 @@ class Process;
 struct GcmCommandArg;
 struct GcmCommand;
 class GLTexture;
+class GLBuffer;
+class FragmentShader;
 struct RsxTextureInfo;
 class Rsx {
     static RsxOperationMode _mode;
@@ -169,7 +178,12 @@ class Rsx {
     void updateTextures();
     void updateFramebuffer();
     void updateViewPort();
-    GLTexture* getCachedTexture(RsxTextureInfo* info);
+    GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
+    GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
+    GLBuffer* getBufferFromCache(uint32_t va, uint32_t size);
+    GLBuffer* addBufferToCache(uint32_t va, uint32_t size);
+    FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size);
+    FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size);
     
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
@@ -361,10 +375,7 @@ class Rsx {
     
     // Replay-specific
     void UpdateBufferCache(uint32_t va);
-    void UpdateTextureCache(uint32_t offset,
-                            uint16_t width,
-                            uint16_t height,
-                            uint8_t format);
+    void UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format);
     void UpdateFragmentCache(uint32_t va, uint32_t size);
     inline void StopReplay() { }
     

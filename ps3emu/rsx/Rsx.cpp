@@ -55,7 +55,7 @@ for z in range(1, 14): a(z)
 
 #define ARG(a) GcmCommandArg { DbColumnType<decltype(a)>::convert(a), \
                                #a, GcmType<decltype(a)>::type }
-#define TRACE0(id) _context->trace(CommandId::id);
+#define TRACE0(id) _context->trace(CommandId::id, {});
 #define TRACE1(id, a0) _context->trace(CommandId::id, { ARG(a0) });
 #define TRACE2(id, a0, a1) _context->trace(CommandId::id, { ARG(a0), ARG(a1) });
 #define TRACE3(id, a0, a1, a2) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2) });
@@ -261,13 +261,14 @@ struct BufferCacheKey {
 };
 
 struct TextureCacheKey {
-    uint32_t va;
+    uint32_t offset;
+    uint32_t location;
     uint32_t width;
     uint32_t height;
     uint8_t internalType;
     inline bool operator<(TextureCacheKey const& other) const {
-        return std::tie(va, width, height, internalType)
-             < std::tie(other.va, other.width, other.height, other.internalType);
+        return std::tie(offset, location, width, height, internalType)
+             < std::tie(other.offset, other.location, other.width, other.height, other.internalType);
     }
 };
 
@@ -370,7 +371,6 @@ public:
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentVa = 0;
-    std::vector<uint8_t> fragmentBytecode;
     std::vector<uint8_t> lastFrame;
     std::array<VertexShaderInputFormat, 16> vertexInputs;
     std::array<uint8_t, 512 * 16> vertexInstructions;
@@ -477,6 +477,8 @@ public:
 };
 
 void Rsx::setLabel(int index, uint32_t value) {
+    if (_mode == RsxOperationMode::Replay)
+        return;
     auto offset = index * 0x10;
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("setting rsx label at offset %x", offset);
     auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
@@ -813,13 +815,13 @@ void Rsx::BeginEnd(uint32_t mode) {
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
-    TRACE2(DrawArrays, first, count);
     updateVertexDataArrays(first, count);
     updateShaders();
     updateTextures();
     watchCaches();
     linkShaderProgram();
     glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
+    TRACE2(DrawArrays, first, count);
 }
 
 bool Rsx::isFlipInProgress() const {
@@ -851,6 +853,7 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
 }
 
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
+    TRACE3(EmuFlip, buffer, label, labelValue);
     auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
     auto tex = _context->framebuffer->findTexture(va);
     _context->framebuffer->bindDefault();
@@ -861,7 +864,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
 #if TESTS
     static int framenum = 0;
     glFinish();
-    if (framenum < 10) {
+    if (framenum < 10 && _mode != RsxOperationMode::Replay) {
         auto& vec = _context->lastFrame;
         vec.resize(_window.width() * _window.height() * 4);
         glcall(glReadBuffer(GL_BACK));
@@ -1002,12 +1005,9 @@ class FragmentShaderUpdateFunctor {
     MainMemory* _mm;
     
     void updateBytecode(FragmentShader* shader) {
-        auto dasm = PrintFragmentProgram(_newbytecode.data());
-        BOOST_LOG_TRIVIAL(trace) << "fragment program\n" << dasm;
         // TODO: handle sizes
         std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
         auto text = GenerateFragmentShader(_newbytecode, sizes, _context->isFlatShadeMode);
-        BOOST_LOG_TRIVIAL(trace) << text;
         *shader = FragmentShader(text.c_str());
         BOOST_LOG_TRIVIAL(trace) << "fragment shader log:\n" << shader->log();
         
@@ -1033,33 +1033,33 @@ public:
     
     FragmentShaderUpdateFunctor(uint32_t va, 
                                 uint32_t size,
-                                std::vector<uint8_t>&& bytecode,
                                 RsxContext* rsxContext,
                                 MainMemory* mm)
         : _constBuffer(GLBufferType::MapWrite, size / 2),
-          _newbytecode(bytecode),
           _context(rsxContext),
           _mm(mm),
           va(va), size(size)
     {
         assert(size % 16 == 0);
-        _info = get_fragment_bytecode_info(&_newbytecode[0]);
     }
     
     void updateWithBlob(FragmentShader* shader, std::vector<uint8_t>& blob) {
-        if (_bytecode.empty()) { // first update
-            updateBytecode(shader);
-            return;
-        }
         if (blob.empty()) {
+            _newbytecode.resize(size);
             _mm->readMemory(va, &_newbytecode[0], size);
         } else {
             assert(blob.size() == size);
+            _newbytecode.resize(size);
             memcpy(&_newbytecode[0], &blob[0], size);
         }
         
         _context->tracer.pushBlob(&_newbytecode[0], size);
         TRACE2(UpdateFragmentCache, va, size);
+        
+        if (_bytecode.empty()) { // first update
+            updateBytecode(shader);
+            return;
+        }
         
         bool constsChanged = false;
         bool bytecodeChanged = false;
@@ -1092,35 +1092,38 @@ public:
     }
 };
 
-void Rsx::updateShaders() {
-    if (_mode == RsxOperationMode::Replay)
-        return;
-    
+FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size) {
+    TRACE2(addFragmentShaderToCache, va, size);
+    FragmentShaderCacheKey key { va, size };
+    auto shader = new FragmentShader();
+    auto updater = new FragmentShaderUpdateFunctor(
+        _context->fragmentVa,
+        size,
+        _context.get(),
+        _mm
+    );
+    _context->fragmentShaderCache.insert(key, shader, updater);
+    return shader;
+}
+
+FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size) {
+    FragmentShaderCacheKey key { va, size };
+    FragmentShaderUpdateFunctor* updater;
+    FragmentShader* shader;
+    std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
+    if (!shader) {
+        shader = addFragmentShaderToCache(va, size);
+        std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
+    }
+    updater->bindConstBuffer();
+    return shader;
+}
+
+void Rsx::updateShaders() {    
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
-        
-        auto& vec = _context->fragmentBytecode;
-        vec.resize(512 * 16);
-        _mm->readMemory(_context->fragmentVa, &vec[0], vec.size());
-        
-        auto len = get_fragment_bytecode_length(&vec[0]);
-        FragmentShaderCacheKey key { _context->fragmentVa, len };
-        FragmentShaderUpdateFunctor* updater;
-        FragmentShader* shader;
-        std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
-        if (!shader) {
-             shader = new FragmentShader();
-             updater = new FragmentShaderUpdateFunctor(
-                 _context->fragmentVa,
-                 len,
-                 std::vector<uint8_t>(begin(vec), begin(vec) + len),
-                 _context.get(),
-                 _mm
-             );
-             _context->fragmentShaderCache.insert(key, shader, updater);
-        }
-        updater->bindConstBuffer();
-        _context->fragmentShader = shader;
+        constexpr auto fragmentProgramSize = 512 * 16;
+        _context->fragmentShader = getFragmentShaderFromCache(_context->fragmentVa, fragmentProgramSize);
     }
     
     if (_context->vertexShaderDirty) {
@@ -1138,13 +1141,10 @@ void Rsx::updateShaders() {
                                                         _context->vertexInstructions.data() + size) };
         auto shader = _context->vertexShaderCache.retrieve(key);
         if (!shader) {
-            auto dasm = PrintVertexProgram(_context->vertexInstructions.data());
-            BOOST_LOG_TRIVIAL(trace) << "vertex program\n" << dasm;
             auto text = GenerateVertexShader(_context->vertexInstructions.data(),
                                              _context->vertexInputs,
                                              samplerSizes,
                                              0); // TODO: loadAt
-            BOOST_LOG_TRIVIAL(trace) << text;
             
             shader = new VertexShader(text.c_str());
             BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader->log();
@@ -1202,36 +1202,52 @@ void Rsx::VertexTextureFilter(unsigned int index, float bias) {
     _context->vertexTextureSamplers[index].bias = bias;
 }
 
-GLTexture* Rsx::getCachedTexture(RsxTextureInfo* info) {
+GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
+    TRACE2(addTextureToCache, samplerId, isFragment);
+    auto& info = isFragment ? _context->fragmentTextureSamplers[samplerId].texture
+                            : _context->vertexTextureSamplers[samplerId].texture;
+    TextureCacheKey key { info.offset, (uint32_t)info.location, info.width, info.height, info.format };
+    uint32_t va = 0;
+    if (_mode != RsxOperationMode::Replay) {
+        va = rsxOffsetToEa(info.location, key.offset);
+    }
+    auto updater = new SimpleCacheItemUpdater<GLTexture> {
+        va, info.height * info.pitch,
+        [=](auto t) {
+            auto size = info.pitch * info.height;
+            std::vector<uint8_t> buf(size);
+            _mm->readMemory(va, &buf[0], size);
+            t->update(buf);
+            
+            _context->tracer.pushBlob(&buf[0], buf.size());
+            TRACE5(UpdateTextureCache, 
+                   key.offset, 
+                   key.location,
+                   key.width,
+                   key.height,
+                   key.internalType);
+        }, [=](auto t, auto& blob) {
+            t->update(blob);
+        }
+    };
+    auto texture = new GLTexture(_mm, info);
+    _context->textureCache.insert(key, texture, updater);
+    return texture;
+}
+
+GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
+    auto& info = isFragment ? _context->fragmentTextureSamplers[samplerId].texture
+                            : _context->vertexTextureSamplers[samplerId].texture;
     TextureCacheKey key { 
-        rsxOffsetToEa(info->location, info->offset),
-        info->width,
-        info->height,
-        info->format
+        info.offset,
+        (uint32_t)info.location,
+        info.width,
+        info.height,
+        info.format
     };
     auto texture = _context->textureCache.retrieve(key);
     if (!texture) {
-        auto updater = new SimpleCacheItemUpdater<GLTexture> {
-            key.va, info->height * info->pitch,
-            [=](auto t) {
-                auto size = info->pitch * info->height;
-                std::vector<uint8_t> buf(size);
-                auto va = rsxOffsetToEa(info->location, info->offset);
-                _mm->readMemory(va, &buf[0], size);
-                t->update(buf);
-                
-                _context->tracer.pushBlob(&buf[0], buf.size());
-                TRACE4(UpdateTextureCache, 
-                        rsxOffsetToEa(info->location, info->offset),
-                        info->width,
-                        info->height,
-                        info->format);
-            }, [=](auto t, auto& blob) {
-                t->update(blob);
-            }
-        };
-        texture = new GLTexture(_mm, *info);
-        _context->textureCache.insert(key, texture, updater);
+        texture = addTextureToCache(samplerId, isFragment);
     }
     return texture;
 }
@@ -1242,7 +1258,7 @@ void Rsx::updateTextures() {
     for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
             auto textureUnit = i + VertexTextureUnit;
-            auto texture = getCachedTexture(&sampler.texture);
+            auto texture = getTextureFromCache(i, false);
             texture->bind(textureUnit);
             auto handle = sampler.glSampler.handle();
             if (!handle) {
@@ -1275,7 +1291,7 @@ void Rsx::updateTextures() {
             if (surfaceTex) {
                 glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
             } else {
-                auto texture = getCachedTexture(&sampler.texture);
+                auto texture = getTextureFromCache(i, true);
                 texture->bind(textureUnit);
             }
             
@@ -1330,7 +1346,16 @@ void Rsx::TextureAddress(unsigned index,
                          uint8_t gamma,
                          uint8_t anisoBias,
                          uint8_t signedRemap) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("TextureAddress(%d, ...)", index);
+    TRACE9(TextureAddress, 
+           index,
+           wraps,
+           wrapt,
+           wrapr,
+           unsignedRemap,
+           zfunc,
+           gamma,
+           anisoBias,
+           signedRemap);
     auto& s = _context->fragmentTextureSamplers[index];
     s.wraps = wraps;
     s.wrapt = wrapt;
@@ -1435,6 +1460,7 @@ void Rsx::SurfaceCompression(uint32_t x) {
 }
 
 void Rsx::setSurfaceColorLocation(unsigned index, uint32_t location) {
+    TRACE2(setSurfaceColorLocation, index, location);
     assert(index < 4);
     _context->surface.colorLocation[index] = gcmEnumToLocation(location);
 }
@@ -1581,6 +1607,7 @@ void Rsx::ContextDmaZeta(uint32_t context) {
 }
 
 void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t width, uint32_t height) {
+    TRACE5(setDisplayBuffer, id, offset, pitch, width, height);
     auto& buffer = _context->displayBuffers[id];
     buffer.offset = offset;
     buffer.pitch = pitch;
@@ -1696,6 +1723,36 @@ void Rsx::updateFramebuffer() {
     glcall(glClear(_context->glClearSurfaceMask));
 }
 
+GLBuffer* Rsx::addBufferToCache(uint32_t va, uint32_t size) {
+    BufferCacheKey key { va, size };
+    auto updater = new SimpleCacheItemUpdater<GLBuffer> {
+        va, size, [=](auto b) {
+            auto mapped = b->map();
+            _mm->readMemory(va, mapped, size);
+            _context->tracer.pushBlob(mapped, size);
+            TRACE2(UpdateBufferCache, va, size);
+            b->unmap();
+        }, [=](auto b, auto& blob) {
+            auto mapped = b->map();
+            memcpy(mapped, &blob[0], blob.size());
+            b->unmap();
+        }
+    };
+    auto buffer = new GLBuffer(GLBufferType::MapWrite, size);
+    _context->bufferCache.insert(key, buffer, updater);
+    TRACE2(addBufferToCache, va, size);
+    return buffer;
+}
+
+GLBuffer* Rsx::getBufferFromCache(uint32_t va, uint32_t size) {
+    BufferCacheKey key { va, size };
+    GLBuffer* buffer = _context->bufferCache.retrieve(key);
+    if (!buffer) {
+        buffer = addBufferToCache(va, size);
+    }
+    return buffer;
+}
+
 void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
     for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
         auto& format = _context->vertexDataArrays[i];
@@ -1706,26 +1763,7 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
         auto va = rsxOffsetToEa(format.location, format.offset);
         auto bufferVa = va + first * format.stride;
         auto bufferSize = count * format.stride;
-        
-        BufferCacheKey key { bufferVa, bufferSize };
-        GLBuffer* buffer = _context->bufferCache.retrieve(key);
-        if (!buffer) {
-            auto updater = new SimpleCacheItemUpdater<GLBuffer> {
-                bufferVa, bufferSize, [=](auto b) {
-                    auto mapped = b->map();
-                    _mm->readMemory(bufferVa, mapped, bufferSize);
-                    _context->tracer.pushBlob(mapped, bufferSize);
-                    TRACE2(UpdateBufferCache, bufferVa, bufferSize);
-                    b->unmap();
-                }, [=](auto b, auto& blob) {
-                    auto mapped = b->map();
-                    memcpy(mapped, &blob[0], blob.size());
-                    b->unmap();
-                }
-            };
-            buffer = new GLBuffer(GLBufferType::MapWrite, bufferSize);
-            _context->bufferCache.insert(key, buffer, updater);
-        }
+        auto buffer = getBufferFromCache(bufferVa, bufferSize);
         
         glcall(glVertexAttribBinding(i, format.binding));
         glcall(glBindVertexBuffer(format.binding, buffer->handle(), 0, format.stride));
@@ -1733,6 +1771,7 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
 }
 
 void Rsx::waitForIdle() {
+    TRACE0(waitForIdle);
     glcall(glFinish());
 }
 
@@ -1814,6 +1853,10 @@ void Rsx::Point(uint16_t pointX,
 
 void Rsx::Color(uint32_t ptr, uint32_t count) {
     TRACE2(Color, ptr, count);
+    
+    if (_mode == RsxOperationMode::Replay)
+        return;
+    
     assert(_context->transfer.format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32);
     auto dest = rsxOffsetToEa(_context->transfer.destTransferLocation,
                               _context->transfer.surfaceOffsetDestin +
@@ -1957,6 +2000,10 @@ void Rsx::ImageInSize(uint16_t inW,
                       float inX,
                       float inY) {
     TRACE8(ImageInSize, inW, inH, pitch, origin, interpolator, offset, inX, inY);
+    
+    if (_mode == RsxOperationMode::Replay)
+        return;
+    
     auto& conv = _context->transfer.conv;
     if (conv.dsdx == 0 || conv.dtdy == 0)
         return;
@@ -2005,26 +2052,24 @@ const char* printCommandId(CommandId id) {
 }
 
 void Rsx::UpdateBufferCache(uint32_t va) {
-    auto tuple = _context->bufferCache.retrieveWithUpdater( { va, (uint32_t)_currentReplayBlob.size() });
+    BufferCacheKey key { va, (uint32_t)_currentReplayBlob.size() };
+    auto tuple = _context->bufferCache.retrieveWithUpdater(key);
     auto buffer = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
     updater->updateWithBlob(buffer, _currentReplayBlob);
 }
 
-void Rsx::UpdateTextureCache(uint32_t offset,
-                             uint16_t width,
-                             uint16_t height,
-                             uint8_t format) {
-    auto tuple = _context->textureCache.retrieveWithUpdater(
-        { offset, width, height, format });
-    auto buffer = std::get<0>(tuple);
+void Rsx::UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format) {
+    TextureCacheKey key { offset, location, width, height, format };
+    auto tuple = _context->textureCache.retrieveWithUpdater(key);
+    auto texture = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
-    updater->updateWithBlob(buffer, _currentReplayBlob);
+    updater->updateWithBlob(texture, _currentReplayBlob);
 }
 
 void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size) {
     auto tuple = _context->fragmentShaderCache.retrieveWithUpdater( { va, size });
-    auto buffer = std::get<0>(tuple);
+    auto program = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
-    updater->updateWithBlob(buffer, _currentReplayBlob);
+    updater->updateWithBlob(program, _currentReplayBlob);
 }

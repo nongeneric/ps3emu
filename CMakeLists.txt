@@ -27,10 +27,10 @@ set(CMAKE_CXX_FLAGS "-Wno-unknown-pragmas ${CMAKE_CXX_FLAGS}")
 
 add_definitions(-DDEBUG)
 add_definitions(-DTESTS)
-set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
-#set(CMAKE_CXX_FLAGS "-O2 -Wall -Werror -std=c++14 ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-O2 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
