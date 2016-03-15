@@ -4,7 +4,6 @@
 #include "Cache.h"
 #include "GLFramebuffer.h"
 #include "GLTexture.h"
-#include "../gcmviz/GcmDatabase.h"
 #include "../Process.h"
 #include "../ppu/CallbackThread.h"
 #include "../MainMemory.h"
@@ -18,386 +17,18 @@
 #include <boost/log/trivial.hpp>
 #include "../../libs/graphics/graphics.h"
 
+#include "FragmentShaderUpdateFunctor.h"
+#include "RsxContext.h"
+#include "TextureRenderer.h"
+#include "GLShader.h"
+#include "GLProgramPipeline.h"
+#include "GLSampler.h"
+#include "Tracer.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-template<typename T> struct GcmType { static constexpr uint32_t type = (uint32_t)GcmArgType::None; };
-template<> struct GcmType<uint8_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::UInt8; };
-template<> struct GcmType<uint16_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::UInt16; };
-template<> struct GcmType<uint32_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::UInt32; };
-template<> struct GcmType<float> { static constexpr uint32_t type = (uint32_t)GcmArgType::Float; };
-template<> struct GcmType<bool> { static constexpr uint32_t type = (uint32_t)GcmArgType::Bool; };
-template<> struct GcmType<int32_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::Int32; };
-template<> struct GcmType<int16_t> { static constexpr uint32_t type = (uint32_t)GcmArgType::Int16; };
-
-template <typename T> struct DbColumnType {
-    static uint32_t convert(T value) {
-        return value;
-    }
-};
-
-template <> struct DbColumnType<float> {
-    static uint32_t convert(float value) {
-        return union_cast<float, uint32_t>(value);
-    }
-};
-
-/*
-def a(i):
-     r = "#define TRACE" + str(i) + "(id"
-     for n in range(0, i): r += ", a" + str(n)
-     r += ") _context->trace(CommandId::id, { ARG(a0)"
-     for n in range(1, i): r += ", ARG(a" + str(n) + ")"
-     r += " });"
-     print(r)
-for z in range(1, 14): a(z) 
-*/
-
-#define ARG(a) GcmCommandArg { DbColumnType<decltype(a)>::convert(a), \
-                               #a, GcmType<decltype(a)>::type }
-#define TRACE0(id) _context->trace(CommandId::id, {});
-#define TRACE1(id, a0) _context->trace(CommandId::id, { ARG(a0) });
-#define TRACE2(id, a0, a1) _context->trace(CommandId::id, { ARG(a0), ARG(a1) });
-#define TRACE3(id, a0, a1, a2) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2) });
-#define TRACE4(id, a0, a1, a2, a3) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3) });
-#define TRACE5(id, a0, a1, a2, a3, a4) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4) });
-#define TRACE6(id, a0, a1, a2, a3, a4, a5) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5) });
-#define TRACE7(id, a0, a1, a2, a3, a4, a5, a6) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6) });
-#define TRACE8(id, a0, a1, a2, a3, a4, a5, a6, a7) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7) });
-#define TRACE9(id, a0, a1, a2, a3, a4, a5, a6, a7, a8) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8) });
-#define TRACE10(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9) });
-#define TRACE11(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10) });
-#define TRACE12(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11) });
-#define TRACE13(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11), ARG(a12) });
-
-struct VertexDataArrayFormatInfo {
-    uint16_t frequency;
-    uint8_t stride;
-    uint8_t size;
-    uint8_t type;
-    MemoryLocation location;
-    uint32_t offset;
-    GLuint binding = 0;
-};
-
 typedef std::array<float, 4> glvec4_t;
-
-enum class GLShaderType {
-    vertex, fragment
-};
-
-void deleteShader(GLuint handle) {
-    glDeleteShader(handle);
-}
-
-class GLShader : public HandleWrapper<GLuint, deleteShader> {
-public:
-    GLShader() : HandleWrapper(0) { }
-    GLShader(GLShaderType type) : HandleWrapper(init(type)) { }
-    GLuint init(GLShaderType type) {
-        auto glType = type == GLShaderType::fragment ? 
-            GL_FRAGMENT_SHADER : GL_VERTEX_SHADER;
-        return glCreateShader(glType);
-    }
-};
-
-void deleteProgram(GLuint handle) {
-    glDeleteProgram(handle);
-}
-
-class GLProgram : public HandleWrapper<GLuint, deleteProgram> {
-public:
-    GLProgram(GLuint handle) : HandleWrapper(handle) { }
-    GLProgram() : HandleWrapper(glCreateProgram()) { }
-};
-
-void deleteSampler(GLuint handle) {
-    glDeleteSamplers(1, &handle);
-}
-
-class GLSampler : public HandleWrapper<GLuint, deleteSampler> {
-public:
-    GLSampler(GLuint handle) : HandleWrapper(handle) { }
-    GLSampler() : HandleWrapper(init()) { }
-    GLuint init() {
-        GLuint handle;
-        glcall(glCreateSamplers(1, &handle));
-        return handle;
-    }
-};
-
-void deleteProgramPipeline(GLuint handle) {
-    glDeleteProgramPipelines(1, &handle);
-}
-
-template <GLuint Type>
-class Shader {
-    GLProgram _program;
-    GLuint create(const char* text) {
-        return glCreateShaderProgramv(Type, 1, &text);
-    }
-public:
-    Shader() : _program(0) { }
-    Shader(const char* text) : _program(create(text)) { }
-    GLuint handle() {
-        return _program.handle();
-    }
-    std::string log() {
-        GLint len;
-        glcall(glGetProgramiv(_program.handle(), GL_INFO_LOG_LENGTH, &len));
-        std::string str;
-        str.resize(len);
-        glcall(glGetProgramInfoLog(_program.handle(), len, nullptr, &str[0]));
-        return str;   
-    }
-};
-
-class VertexShader : public Shader<GL_VERTEX_SHADER> {
-public:
-    VertexShader() { }
-    VertexShader(const char* text) : Shader(text) { }
-};
-
-class FragmentShader : public Shader<GL_FRAGMENT_SHADER> {
-public:
-    FragmentShader() { }
-    FragmentShader(const char* text) : Shader(text) { }
-};
-
-class GLProgramPipeline : public HandleWrapper<GLuint, deleteProgramPipeline> {
-    GLuint create() {
-        GLuint handle = 0;
-        glcall(glGenProgramPipelines(1, &handle));
-        return handle;
-    }
-public:
-    GLProgramPipeline() : HandleWrapper(create()) { }
-    void bind() {
-        glcall(glBindProgramPipeline(handle()));
-    }
-    void useShader(VertexShader& shader) {
-        glcall(glUseProgramStages(handle(), GL_VERTEX_SHADER_BIT, shader.handle()));
-    }
-    void useShader(FragmentShader& shader) {
-        glcall(glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader.handle()));
-    }
-    void validate() {
-        glcall(glValidateProgramPipeline(handle()));
-    }
-};
-
-struct TextureSamplerInfo {
-    bool enable = false;
-    GLSampler glSampler = GLSampler(0);
-    float minlod;
-    float maxlod;
-    uint32_t wraps;
-    uint32_t wrapt;
-    uint8_t fragmentWrapr;
-    uint8_t fragmentZfunc;
-    uint8_t fragmentAnisoBias;
-    float bias;
-    uint8_t fragmentMin;
-    uint8_t fragmentMag;
-    uint8_t fragmentConv;
-    uint8_t fragmentAlphaKill;
-    std::array<float, 4> borderColor;
-    RsxTextureInfo texture;
-};
-
-struct DisplayBufferInfo {
-    ps3_uintptr_t offset;
-    uint32_t pitch;
-    uint32_t width;
-    uint32_t height;
-};
-
-struct ColorConvertionInfo {
-    uint32_t fmt;
-    int16_t clipX;
-    int16_t clipY;
-    uint16_t clipW;
-    uint16_t clipH;
-    int16_t outX;
-    int16_t outY;
-    uint16_t outW;
-    uint16_t outH;
-    float dsdx;
-    float dtdy;
-};
-
-struct TransferInfo {
-    uint32_t format;
-    uint32_t destOffset;
-    uint32_t sourceOffset;
-    uint32_t surfaceOffsetDestin;
-    int32_t destPitch;
-    int32_t sourcePitch;
-    uint32_t lineLength;
-    uint32_t lineCount;
-    uint32_t sourceFormat;
-    uint32_t destFormat;
-    uint16_t pointX; 
-    uint16_t pointY; 
-    uint16_t outSizeX;
-    uint16_t outSizeY; 
-    uint16_t inSizeX;
-    uint16_t inSizeY;
-    MemoryLocation destTransferLocation = MemoryLocation::Local;
-    MemoryLocation sourceDataLocation = MemoryLocation::Local;
-    MemoryLocation destDataLocation = MemoryLocation::Local;
-    MemoryLocation sourceImageLocation = MemoryLocation::Local;
-    uint32_t surfaceType;
-    ColorConvertionInfo conv;
-};
-
-struct BufferCacheKey {
-    uint32_t va;
-    uint32_t size;
-    inline bool operator<(BufferCacheKey const& other) const {
-        return std::tie(va, size)
-             < std::tie(other.va, other.size);
-    }
-};
-
-struct TextureCacheKey {
-    uint32_t offset;
-    uint32_t location;
-    uint32_t width;
-    uint32_t height;
-    uint8_t internalType;
-    inline bool operator<(TextureCacheKey const& other) const {
-        return std::tie(offset, location, width, height, internalType)
-             < std::tie(other.offset, other.location, other.width, other.height, other.internalType);
-    }
-};
-
-struct VertexShaderCacheKey {
-    std::vector<uint8_t> bytecode;
-    inline bool operator<(VertexShaderCacheKey const& other) const {
-        auto size = bytecode.size();
-        auto othersize = other.bytecode.size();
-        return std::tie(size, bytecode)
-             < std::tie(othersize, other.bytecode);
-    }
-};
-
-struct FragmentShaderCacheKey {
-    uint32_t va;
-    uint32_t size;
-    inline bool operator<(FragmentShaderCacheKey const& other) const {
-        return std::tie(va, size)
-             < std::tie(other.va, other.size);
-    }
-};
-
-struct ViewPortInfo {
-    float x = 0;
-    float y = 0;
-    float width = 4096;
-    float height = 4096;
-    float zmin = 0;
-    float zmax = 1;
-    float scale[3] = { 2048, 2048, 0.5 };
-    float offset[3] = { 2048, 2048, 0.5 };
-};
-
-class Tracer {
-    bool _enabled = false;
-    GcmDatabase _db;
-    std::vector<uint8_t> _blob;
-    bool _blobSet = false;
-public:
-    void enable() {
-        _enabled = true;
-        system("rm -rf /tmp/ps3emu.trace");
-        _db.createOrOpen("/tmp/ps3emu.trace");
-    }
-    
-    void pushBlob(const void* ptr, uint32_t size) {
-        if (!_enabled)
-            return;
-        _blobSet = true;
-        _blob.resize(size);
-        memcpy(&_blob[0], ptr, size);
-    }
-    
-    template <typename... Args>
-    void trace(uint32_t frame,
-               uint32_t num,
-               CommandId command,
-               std::vector<GcmCommandArg> args) {
-        if (!_enabled)
-            return;
-        GcmCommand gcmCommand;
-        gcmCommand.frame = frame;
-        gcmCommand.num = num;
-        gcmCommand.id = (uint32_t)command;
-        gcmCommand.args = args;
-        if (_blobSet) {
-            _blobSet = false;
-            gcmCommand.blob = _blob;
-        }
-        _db.insertCommand(gcmCommand);
-    }
-};
-
-class FragmentShaderUpdateFunctor;
-class GLFramebuffer;
-class TextureRenderer;
-class RsxContext {
-public:
-    Tracer tracer;
-    uint32_t frame = 0;
-    uint32_t commandNum = 0;
-    SurfaceInfo surface;
-    ViewPortInfo viewPort;
-    uint32_t colorMask;
-    bool isDepthTestEnabled;
-    uint32_t depthFunc;
-    bool isCullFaceEnabled;
-    bool isFlatShadeMode;
-    glm::vec4 colorClearValue;
-    GLuint glClearSurfaceMask;
-    bool isFlipInProgress = false;
-    std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
-    GLuint glVertexArrayMode;
-    VertexShader* vertexShader = nullptr;
-    FragmentShader* fragmentShader = nullptr;
-    GLBuffer vertexConstBuffer;
-    GLBuffer vertexSamplersBuffer;
-    GLBuffer vertexViewportBuffer;
-    GLBuffer fragmentSamplersBuffer;
-    bool vertexShaderDirty = false;
-    bool fragmentShaderDirty = false;
-    uint32_t fragmentVa = 0;
-    std::vector<uint8_t> lastFrame;
-    std::array<VertexShaderInputFormat, 16> vertexInputs;
-    std::array<uint8_t, 512 * 16> vertexInstructions;
-    uint32_t vertexLoadOffset = 0;
-    uint32_t vertexIndexArrayOffset = 0;
-    GLuint vertexIndexArrayGlType = 0;
-    TextureSamplerInfo vertexTextureSamplers[4];
-    TextureSamplerInfo fragmentTextureSamplers[16];
-    DisplayBufferInfo displayBuffers[8];
-    std::unique_ptr<GLFramebuffer> framebuffer;
-    std::unique_ptr<TextureRenderer> textureRenderer;
-    std::unique_ptr<uint8_t[]> localMemory;
-    uint32_t semaphoreOffset = 0;
-    TransferInfo transfer;
-    GLProgramPipeline pipeline;
-    Cache<BufferCacheKey, GLBuffer, 256 * (2 >> 20)> bufferCache;
-    Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
-    Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
-    Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
-    uint32_t vBlankHandlerDescr = 0;
-    MemoryLocation reportLocation = MemoryLocation::Local;
-    
-    template <typename... Args>
-    void trace(CommandId id, std::vector<GcmCommandArg> const& args) {
-        tracer.trace(frame, commandNum++, id, args);
-    }
-};
 
 Rsx::Rsx() = default;
 
@@ -414,67 +45,6 @@ MemoryLocation gcmEnumToLocation(uint32_t enumValue) {
         return MemoryLocation::Main;
     throw std::runtime_error("bad location");
 }
-
-class TextureRenderer {
-    GLProgramPipeline _pipeline;
-    VertexShader _vertexShader;
-    FragmentShader _fragmentShader;
-    GLSampler _sampler;
-    GLBuffer _buffer;
-public:
-    TextureRenderer() {
-        auto fragmentCode =
-            "#version 450 core\n"
-            "out vec4 color;\n"
-            "layout (binding = 20) uniform sampler2D tex;\n"
-            "void main(void) {\n"
-            "    vec2 size = textureSize(tex, 0);\n"
-            "    color = texture(tex, gl_FragCoord.xy / size, 0);\n"
-            "}";
-
-        auto vertexCode =
-            "#version 450 core\n"
-            "layout (location = 0) in vec2 pos;\n"
-            "out gl_PerVertex {\n"
-            "    vec4 gl_Position;\n"
-            "};\n"
-            "void main(void) {\n"
-            "    gl_Position = vec4(pos, 0, 1);\n"
-            "}\n";
-        
-        _fragmentShader = FragmentShader(fragmentCode);
-        _vertexShader = VertexShader(vertexCode);
-        _pipeline.useShader(_fragmentShader);
-        _pipeline.useShader(_vertexShader);
-        
-        glm::vec2 vertices[] {
-            { -1.f, 1.f }, { -1.f, -1.f }, { 1.f, -1.f },
-            { -1.f, 1.f }, { 1.f, 1.f }, { 1.f, -1.f }
-        };
-        
-        _buffer = GLBuffer(GLBufferType::Static, sizeof(vertices), vertices);
-    }
-    
-    void render(GLSimpleTexture* tex) {
-        glcall(glEnableVertexAttribArray(0));
-        glcall(glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0));
-        glcall(glVertexAttribBinding(0, 0));
-        glcall(glBindVertexBuffer(0, _buffer.handle(), 0, sizeof(glm::vec2)));
-        
-        auto samplerIndex = 20;
-        glcall(glBindTextureUnit(samplerIndex, tex->handle()));
-        glcall(glBindSampler(samplerIndex, _sampler.handle()));
-        glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        _pipeline.bind();
-        
-        glcall(glViewport(0, 0, tex->width(), tex->height()));
-        glcall(glDepthRange(0, 1));
-        glcall(glDrawArrays(GL_TRIANGLES, 0, 6));
-        
-        // TODO: restore vertex attrib if required
-    }
-};
 
 void Rsx::setLabel(int index, uint32_t value) {
     if (_mode == RsxOperationMode::Replay)
@@ -996,102 +566,6 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     glcall(glDrawElements(_context->glVertexArrayMode, count, _context->vertexIndexArrayGlType, offset));
 }
 
-class FragmentShaderUpdateFunctor {
-    GLBuffer _constBuffer;
-    std::vector<uint8_t> _bytecode;
-    std::vector<uint8_t> _newbytecode;
-    FragmentProgramInfo _info;
-    RsxContext* _context;
-    MainMemory* _mm;
-    
-    void updateBytecode(FragmentShader* shader) {
-        // TODO: handle sizes
-        std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
-        auto text = GenerateFragmentShader(_newbytecode, sizes, _context->isFlatShadeMode);
-        *shader = FragmentShader(text.c_str());
-        BOOST_LOG_TRIVIAL(trace) << "fragment shader log:\n" << shader->log();
-        
-        _bytecode = _newbytecode;
-        _info = get_fragment_bytecode_info(&_bytecode[0]);
-        updateConsts();
-    }
-    
-    void updateConsts() {
-        auto fconst = (std::array<float, 4>*)_constBuffer.map();
-        for (auto i = 0u; i < _info.length; i += 16) {
-            if (_info.constMap[i / 16]) {
-                *fconst = read_fragment_imm_val(&_newbytecode[i]);
-                fconst++;
-            }
-        }
-        _constBuffer.unmap();
-    }
-    
-public:
-    uint32_t va;
-    uint32_t size;
-    
-    FragmentShaderUpdateFunctor(uint32_t va, 
-                                uint32_t size,
-                                RsxContext* rsxContext,
-                                MainMemory* mm)
-        : _constBuffer(GLBufferType::MapWrite, size / 2),
-          _context(rsxContext),
-          _mm(mm),
-          va(va), size(size)
-    {
-        assert(size % 16 == 0);
-    }
-    
-    void updateWithBlob(FragmentShader* shader, std::vector<uint8_t>& blob) {
-        if (blob.empty()) {
-            _newbytecode.resize(size);
-            _mm->readMemory(va, &_newbytecode[0], size);
-        } else {
-            assert(blob.size() == size);
-            _newbytecode.resize(size);
-            memcpy(&_newbytecode[0], &blob[0], size);
-        }
-        
-        _context->tracer.pushBlob(&_newbytecode[0], size);
-        TRACE2(UpdateFragmentCache, va, size);
-        
-        if (_bytecode.empty()) { // first update
-            updateBytecode(shader);
-            return;
-        }
-        
-        bool constsChanged = false;
-        bool bytecodeChanged = false;
-        for (auto i = 0u; i < size; i += 16) {
-            auto equals = memcmp(&_bytecode[i], &_newbytecode[i], 16) == 0;
-            if (!equals) {
-                if (_info.constMap[i / 16]) {
-                    constsChanged = true;
-                } else {
-                    bytecodeChanged = true;
-                }
-            }
-        }
-        if (bytecodeChanged) {
-            updateBytecode(shader);
-        } else if (constsChanged) {
-            updateConsts();
-        }
-    }
-    
-    void update(FragmentShader* shader) {
-        std::vector<uint8_t> blob;
-        return updateWithBlob(shader, blob);
-    }
-    
-    void bindConstBuffer() {
-        glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                                FragmentShaderConstantBinding,
-                                _constBuffer.handle()));
-    }
-};
-
 FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size) {
     TRACE2(addFragmentShaderToCache, va, size);
     FragmentShaderCacheKey key { va, size };
@@ -1122,8 +596,7 @@ FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size) {
 void Rsx::updateShaders() {    
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
-        constexpr auto fragmentProgramSize = 512 * 16;
-        _context->fragmentShader = getFragmentShaderFromCache(_context->fragmentVa, fragmentProgramSize);
+        _context->fragmentShader = getFragmentShaderFromCache(_context->fragmentVa, FragmentProgramSize);
     }
     
     if (_context->vertexShaderDirty) {
@@ -1145,7 +618,6 @@ void Rsx::updateShaders() {
                                              _context->vertexInputs,
                                              samplerSizes,
                                              0); // TODO: loadAt
-            
             shader = new VertexShader(text.c_str());
             BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader->log();
             auto updater = new SimpleCacheItemUpdater<VertexShader> {
@@ -1230,7 +702,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
             t->update(blob);
         }
     };
-    auto texture = new GLTexture(_mm, info);
+    auto texture = new GLTexture(info);
     _context->textureCache.insert(key, texture, updater);
     return texture;
 }
@@ -2044,13 +1516,6 @@ void Rsx::setOperationMode(RsxOperationMode mode) {
 
 RsxOperationMode Rsx::_mode = RsxOperationMode::Run;
 
-#define X(x) #x,
-const char* commandNames[] = { CommandIdX };
-
-const char* printCommandId(CommandId id) {
-    return commandNames[(int)id];
-}
-
 void Rsx::UpdateBufferCache(uint32_t va) {
     BufferCacheKey key { va, (uint32_t)_currentReplayBlob.size() };
     auto tuple = _context->bufferCache.retrieveWithUpdater(key);
@@ -2072,4 +1537,8 @@ void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size) {
     auto program = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
     updater->updateWithBlob(program, _currentReplayBlob);
+}
+
+RsxContext* Rsx::context() {
+    return _context.get();
 }

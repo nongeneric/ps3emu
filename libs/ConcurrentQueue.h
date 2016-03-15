@@ -65,7 +65,6 @@ public:
     
     unsigned size() {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        assert(_waiting.empty());
         return _values.size();
     }
 };

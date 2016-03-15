@@ -41,6 +41,9 @@ set(SRC
     rsx/GLTexture.cpp
     rsx/GLFramebuffer.cpp
     rsx/GLBuffer.cpp
+    rsx/Tracer.cpp
+    rsx/TextureRenderer.cpp
+    rsx/FragmentShaderUpdateFunctor.cpp
     gcmviz/GcmDatabase.cpp
 )
 add_library(ps3emu ${SRC})

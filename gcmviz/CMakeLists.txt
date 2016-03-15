@@ -9,11 +9,13 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 qt5_wrap_ui(MainWindow_ui_moc ${PROJECT_SOURCE_DIR}/MainWindow.ui)
+qt5_wrap_ui(ImageView_ui_moc ${PROJECT_SOURCE_DIR}/ImageView.ui)
 
 set(SRC
     main.cpp
     MainWindowModel.cpp
     ${MainWindow_ui_moc}
+    ${ImageView_ui_moc}
 )
 add_executable(gcmviz ${SRC} ${QT_RESOURCES})
 target_link_libraries(gcmviz Qt5::Core Qt5::Widgets ps3emu)

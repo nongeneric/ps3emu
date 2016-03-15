@@ -21,6 +21,14 @@ struct ValueInfo {
     std::unique_ptr<U> updater;
 };
 
+template <typename K, typename T, typename U>
+struct CacheEntryView {
+    K key;
+    U* updater;
+    T* value;
+    bool isDirty;
+};
+
 template <typename K, typename T, unsigned CacheSize, typename U = SimpleCacheItemUpdater<T>>
 class Cache {
     std::map<K, ValueInfo<T, U>> _store;
@@ -69,6 +77,19 @@ public:
         for (auto& p : _store) {
             setBreak(p.second.updater->va, p.second.updater->size);
         }
+    }
+    
+    std::vector<CacheEntryView<K, T, U>> cacheSnapshot() {
+        std::vector<CacheEntryView<K, T, U>> res;
+        for (auto& entry : _store) {
+            CacheEntryView<K, T, U> view;
+            view.key = entry.first;
+            view.updater = entry.second.updater.get();
+            view.value = entry.second.value.get();
+            view.isDirty = _dirty.find(view.key) != end(_dirty);
+            res.push_back(view);
+        }
+        return res;
     }
 };
 

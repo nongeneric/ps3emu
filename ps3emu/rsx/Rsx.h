@@ -4,6 +4,7 @@
 #include "../constants.h"
 #include "../../libs/graphics/gcm.h"
 #include "../../libs/ConcurrentQueue.h"
+#include "../gcmviz/GcmDatabase.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <memory>
@@ -21,112 +22,16 @@ typedef struct {
 }
 
 constexpr uint32_t EmuFlipCommandMethod = 0xacac;
-
-#define X(x) x,
-#define CommandIdX \
-    X(SurfaceClipHorizontal) \
-    X(SurfacePitchC) \
-    X(SurfaceCompression) \
-    X(WindowOffset) \
-    X(ClearRectHorizontal) \
-    X(ClipIdTestEnable) \
-    X(Control0) \
-    X(FlatShadeOp) \
-    X(VertexAttribOutputMask) \
-    X(FrequencyDividerOperation) \
-    X(TexCoordControl) \
-    X(ShaderWindow) \
-    X(ReduceDstColor) \
-    X(FogMode) \
-    X(AnisoSpread) \
-    X(VertexDataBaseOffset) \
-    X(AlphaFunc) \
-    X(AlphaTestEnable) \
-    X(ShaderControl) \
-    X(TransformProgramLoad) \
-    X(TransformProgram) \
-    X(VertexAttribInputMask) \
-    X(TransformTimeout) \
-    X(ShaderProgram) \
-    X(ViewportHorizontal) \
-    X(ClipMin) \
-    X(ViewportOffset) \
-    X(ContextDmaColorA) \
-    X(ContextDmaColorB) \
-    X(ContextDmaColorC_2) \
-    X(ContextDmaColorC_1) \
-    X(ContextDmaColorD) \
-    X(ContextDmaZeta) \
-    X(SurfaceFormat) \
-    X(SurfacePitchZ) \
-    X(SurfaceColorTarget) \
-    X(ColorMask) \
-    X(DepthFunc) \
-    X(CullFaceEnable) \
-    X(DepthTestEnable) \
-    X(ShadeMode) \
-    X(ColorClearValue) \
-    X(ClearSurface) \
-    X(VertexDataArrayFormat) \
-    X(VertexDataArrayOffset) \
-    X(BeginEnd) \
-    X(DrawArrays) \
-    X(TransformConstantLoad) \
-    X(RestartIndexEnable) \
-    X(RestartIndex) \
-    X(IndexArrayAddress) \
-    X(DrawIndexArray) \
-    X(VertexTextureOffset) \
-    X(VertexTextureControl3) \
-    X(VertexTextureImageRect) \
-    X(VertexTextureControl0) \
-    X(VertexTextureAddress) \
-    X(VertexTextureFilter) \
-    X(VertexTextureBorderColor) \
-    X(TextureOffset) \
-    X(TextureImageRect) \
-    X(TextureControl3) \
-    X(TextureControl2) \
-    X(TextureControl1) \
-    X(TextureAddress) \
-    X(TextureBorderColor) \
-    X(TextureControl0) \
-    X(TextureFilter) \
-    X(SetReference) \
-    X(SemaphoreOffset) \
-    X(BackEndWriteSemaphoreRelease) \
-    X(OffsetDestin) \
-    X(ColorFormat) \
-    X(Point) \
-    X(Color) \
-    X(ContextDmaImageDestin) \
-    X(OffsetIn_1) \
-    X(OffsetOut) \
-    X(PitchIn) \
-    X(DmaBufferIn) \
-    X(OffsetIn_9) \
-    X(BufferNotify) \
-    X(Nv3089ContextDmaImage) \
-    X(Nv3089ContextSurface) \
-    X(Nv3089SetColorConversion) \
-    X(ImageInSize) \
-    X(setSurfaceColorLocation) \
-    X(setDisplayBuffer) \
-    X(waitForIdle) \
-    X(addBufferToCache) \
-    X(addTextureToCache) \
-    X(addFragmentShaderToCache) \
-    X(EmuFlip) \
-    X(StopReplay) \
-    X(UpdateBufferCache) \
-    X(UpdateTextureCache) \
-    X(UpdateFragmentCache) \
-    
-enum class CommandId { CommandIdX };
-#undef X
+constexpr auto FragmentProgramSize = 512 * 16;
 
 enum class RsxOperationMode {
     Run, RunCapture, Replay
+};
+
+struct GcmCommandReplayInfo {
+    GcmCommand command;
+    bool notifyCompletion;
+    std::function<void()> action;
 };
 
 class RsxContext;
@@ -160,7 +65,8 @@ class Rsx {
     ps3_uintptr_t _gcmIoAddress;
     int64_t interpret(uint32_t get);
     Window _window;
-    ConcurrentFifoQueue<GcmCommand> _replayQueue;
+    ConcurrentFifoQueue<GcmCommandReplayInfo> _replayQueue;
+    ConcurrentFifoQueue<bool> _completionQueue;
     std::vector<uint8_t> _currentReplayBlob;
     
     void watchCaches();
@@ -402,8 +308,9 @@ public:
     void init(Process* proc);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
-    void sendCommand(GcmCommand command);
+    void sendCommand(GcmCommandReplayInfo info);
+    bool receiveCommandCompletion();
+    RsxContext* context();
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
-const char* printCommandId(CommandId id);

@@ -4,7 +4,7 @@
 #include "../BitField.h"
 #include "../MainMemory.h"
 #include "../../libs/graphics/graphics.h"
-#include "../gcmviz/GcmDatabase.h"
+#include "Tracer.h"
 
 #include <vector>
 #include <boost/log/trivial.hpp>
@@ -1519,7 +1519,8 @@ void Rsx::runLoop() {
 
 void Rsx::replayLoop() {
     for (;;) {
-        auto command = _replayQueue.receive(0);
+        auto info = _replayQueue.receive(0);
+        auto command = info.command;
         auto id = (CommandId)command.id;
         if (id == CommandId::StopReplay)
             break;
@@ -1534,6 +1535,14 @@ void Rsx::replayLoop() {
             CommandIdX
 #undef X    
             default: break;
+       }
+       
+       if (info.action) {
+           info.action();
+       }
+       
+       if (info.notifyCompletion) {
+           _completionQueue.send(true);
        }
     }
 }
@@ -1561,6 +1570,10 @@ void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
     _mm->store<4>(va, header.val);
 }
 
-void Rsx::sendCommand(GcmCommand command) {
-    _replayQueue.send(command);
+void Rsx::sendCommand(GcmCommandReplayInfo info) {
+    _replayQueue.send(info);
+}
+
+bool Rsx::receiveCommandCompletion() {
+    return _completionQueue.receive(0);
 }

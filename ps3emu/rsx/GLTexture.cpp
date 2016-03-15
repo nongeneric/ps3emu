@@ -290,7 +290,7 @@ public:
     }
 };
 
-GLTexture::GLTexture(MainMemory* mm, const RsxTextureInfo& info): _info(info) {
+GLTexture::GLTexture(const RsxTextureInfo& info): _info(info) {
     glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
     glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
 }
@@ -458,4 +458,8 @@ unsigned GLSimpleTexture::height() {
 
 GLuint GLSimpleTexture::format() {
     return _format;
+}
+
+GLuint GLTexture::handle() {
+    return _handle;
 }

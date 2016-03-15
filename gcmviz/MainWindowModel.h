@@ -19,6 +19,7 @@ public:
     ~MainWindowModel();
     QMainWindow* window();
     void loadTrace(std::string path);
+    void update();
 public slots:
     void onRun();
 };
