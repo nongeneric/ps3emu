@@ -41,10 +41,25 @@ public:
     
     QVariant data(const QModelIndex& index,
                   int role = Qt::DisplayRole) const override {
-         if (role != Qt::DisplayRole)
-             return QVariant();
-         auto command = _db->getCommand(0, index.row());
-         return printCommandId((CommandId)command.id);
+        auto command = _db->getCommand(0, index.row());
+        auto id = (CommandId)command.id;
+        if (role == Qt::BackgroundColorRole) {
+           if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
+               return QColor(Qt::green);
+           }
+           if (id == CommandId::addBufferToCache ||
+               id == CommandId::UpdateBufferCache ||
+               id == CommandId::addFragmentShaderToCache ||
+               id == CommandId::UpdateFragmentCache ||
+               id == CommandId::addTextureToCache ||
+               id == CommandId::UpdateTextureCache ||
+               id == CommandId::updateOffsetTableForReplay)
+               return QColor(Qt::yellow);
+           return QVariant();
+        }
+        if (role != Qt::DisplayRole)
+            return QVariant();
+        return printCommandId((CommandId)command.id);
     }
     
     QModelIndex parent(const QModelIndex& child) const override {
@@ -148,24 +163,45 @@ public:
             case 1: return "Location";
             case 2: return "Width";
             case 3: return "Height";
+            case 4: return "Kind";
+            case 5: return "Format";
         }
         return QVariant();
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 4;
+        return 6;
     }
     
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
-        auto cache = _rsx->context()->textureCache.cacheSnapshot();
-        auto texture = cache[index.row()];
-        switch (index.column()) {
-            case 0: return QString::fromStdString(ssnprintf("#%08x", texture.key.offset));
-            case 1: return (MemoryLocation)texture.key.location == MemoryLocation::Local ? "Local" : "Main";
-            case 2: return QString::fromStdString(ssnprintf("%d", texture.key.width));
-            case 3: return QString::fromStdString(ssnprintf("%d", texture.key.height));
+        auto regular = _rsx->context()->textureCache.cacheSnapshot();
+        auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
+        if (index.row() < regular.size()) {
+            auto texture = regular[index.row()];
+            switch (index.column()) {
+                case 0: return QString::fromStdString(ssnprintf("#%08x", texture.key.offset));
+                case 1: return (MemoryLocation)texture.key.location == MemoryLocation::Local ? "Local" : "Main";
+                case 2: return QString::fromStdString(ssnprintf("%d", texture.key.width));
+                case 3: return QString::fromStdString(ssnprintf("%d", texture.key.height));
+                case 4: return "Regular";
+                case 5: return "GL_RGBA32F";
+            }
+        } else {
+            auto entry = framebuffer[index.row() - regular.size()];
+            auto format = entry.texture->format() == GL_DEPTH_COMPONENT16 ? "GL_DEPTH_COMPONENT16"
+                        : entry.texture->format() == GL_DEPTH24_STENCIL8 ? "GL_DEPTH24_STENCIL8"
+                        : entry.texture->format() == GL_RGBA32F ? "GL_RGBA32F"
+                        : "unknown";
+            switch (index.column()) {
+                case 0: return QString::fromStdString(ssnprintf("#%08x", entry.va));
+                case 1: return "Local";
+                case 2: return QString::fromStdString(ssnprintf("%d", entry.texture->width()));
+                case 3: return QString::fromStdString(ssnprintf("%d", entry.texture->height()));
+                case 4: return "Framebuffer";
+                case 5: return format;
+            }
         }
         return QVariant();
     }
@@ -179,15 +215,35 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        auto cache = _rsx->context()->textureCache.cacheSnapshot();
-        return cache.size();
+        auto regular = _rsx->context()->textureCache.cacheSnapshot();
+        auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
+        return regular.size() + framebuffer.size();
     }
     
     void showPreview(unsigned row) {
-        auto cache = _rsx->context()->textureCache.cacheSnapshot();
-        auto info = cache[row];
-        auto handle = info.value->handle();
-        QImage image(info.key.width, info.key.height, QImage::Format_RGBA8888);
+        auto regular = _rsx->context()->textureCache.cacheSnapshot();
+        auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
+        
+        uint32_t width, height;
+        GLuint handle;
+        QImage::Format qtFormat;
+        
+        if (row < regular.size()) {
+            auto info = regular[row];
+            handle = info.value->handle();
+            width = info.key.width;
+            height = info.key.height;
+            qtFormat = QImage::Format_RGBA8888;
+        } else {
+            row -= regular.size();
+            auto entry = framebuffer[row];
+            handle = entry.texture->handle();
+            width = entry.texture->width();
+            height = entry.texture->height();
+            qtFormat = QImage::Format_RGBA8888;
+        }
+        
+        QImage image(width, height, qtFormat);
         
         auto command = makeNopCommand();
         command.action = [&] {
@@ -213,10 +269,13 @@ public:
     }
 };
 
-MainWindowModel::MainWindowModel() {
+MainWindowModel::MainWindowModel() : _currentCommand(0) {
     _window.setupUi(&_qwindow);
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
     Rsx::setOperationMode(RsxOperationMode::Replay);
+    QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
+        runTo(index.row());
+    });
 }
 
 MainWindowModel::~MainWindowModel() = default;
@@ -229,6 +288,7 @@ void MainWindowModel::loadTrace(std::string path) {
     _db.createOrOpen(path);
     auto commandModel = new CommandTableModel(&_db);
     _window.commandTableView->setModel(commandModel);
+    _window.commandTableView->resizeColumnsToContents();
     auto selectionModel = _window.commandTableView->selectionModel();
     QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=] (auto current) {
         if (current == QModelIndex())
@@ -239,20 +299,7 @@ void MainWindowModel::loadTrace(std::string path) {
 }
 
 void MainWindowModel::onRun() {
-    _proc.reset(new Process());
-    _rsx.reset(new Rsx());
-    _rsx->init(_proc.get());
-    
-    auto count = _db.commands(0);
-    for (auto i = 0u; i < count; ++i) {
-        auto command = _db.getCommand(0, i);
-        _rsx->sendCommand({command, false});
-    }
-    
-    _rsx->sendCommand(makeNopCommand());
-    _rsx->receiveCommandCompletion();
-    
-    update();
+    runTo(_db.commands(0) - 1);
 }
 
 void MainWindowModel::update() {
@@ -291,7 +338,28 @@ void MainWindowModel::update() {
     
     auto textureModel = new TextureTableModel(_rsx.get());
     _window.twTextures->setModel(textureModel);
+    QObject::disconnect(_window.twTextures, &QTableView::doubleClicked, 0, 0);
     QObject::connect(_window.twTextures, &QTableView::doubleClicked, [=] (auto index) {
         textureModel->showPreview(index.row());
     });
+}
+
+void MainWindowModel::runTo(int last) {
+    if (!_proc) {
+        _proc.reset(new Process());
+        _rsx.reset(new Rsx());
+        _rsx->init(_proc.get());
+    }
+    
+    for (auto i = _currentCommand; i <= last; ++i) {
+        auto command = _db.getCommand(0, i);
+        _rsx->sendCommand({command, false});
+    }
+    
+    _rsx->sendCommand(makeNopCommand());
+    _rsx->receiveCommandCompletion();
+    
+    update();
+    
+    _currentCommand = last + 1;
 }

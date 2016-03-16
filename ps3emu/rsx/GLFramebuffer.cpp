@@ -92,3 +92,11 @@ GLSimpleTexture* GLFramebuffer::findTexture(ps3_uintptr_t va) {
         return nullptr;
     return it->second.get();
 }
+
+std::vector<GLFramebufferCacheEntry> GLFramebuffer::cacheSnapshot() {
+    std::vector<GLFramebufferCacheEntry> res;
+    for (auto& pair : _cache) {
+        res.push_back({ pair.first, pair.second.get() });
+    }
+    return res;
+}

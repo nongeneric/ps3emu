@@ -537,33 +537,30 @@ void Rsx::RestartIndex(uint32_t index) {
 
 void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
     TRACE3(IndexArrayAddress, location, offset, type);
-    _context->vertexIndexArrayOffset = offset;
-    _context->vertexIndexArrayGlType = GL_UNSIGNED_INT; // no difference between 32 and 16 for rsx
+    _context->indexArray.location = gcmEnumToLocation(location);
+    _context->indexArray.offset = offset;
+    _context->indexArray.glType = GL_UNSIGNED_INT; // no difference between 32 and 16 for rsx
 }
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
-    TRACE2(DrawIndexArray, first, count);
+    assert(first == 0);
+    auto va = rsxOffsetToEa(_context->indexArray.location, 
+                            _context->indexArray.offset);
+    auto size = count * 4;
+    auto buffer = getBufferFromCache(va, size, true);
+    
     updateVertexDataArrays(first, count);
     updateTextures();
     updateShaders();
     watchCaches();
     linkShaderProgram();
     
-    // TODO: proper buffer management
-    std::unique_ptr<uint8_t[]> copy(new uint8_t[count * 4]); // TODO: check index format
-    auto va = first + _context->vertexIndexArrayOffset + RsxFbBaseAddr;
-    _mm->readMemory(va, copy.get(), count * 4);
-    auto ptr = (uint32_t*)copy.get();
-    for (auto i = 0u; i < count; ++i) {
-        ptr[i] = boost::endian::endian_reverse(ptr[i]);
-    }
-    GLuint buffer;
-    glcall(glCreateBuffers(1, &buffer));
-    glcall(glNamedBufferStorage(buffer, count * 4, copy.get(), 0));
-    glcall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer));
+    glcall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->handle()));
     
     auto offset = (void*)(uintptr_t)first;
-    glcall(glDrawElements(_context->glVertexArrayMode, count, _context->vertexIndexArrayGlType, offset));
+    glcall(glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset));
+    
+    TRACE2(DrawIndexArray, first, count);
 }
 
 FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size) {
@@ -1195,12 +1192,19 @@ void Rsx::updateFramebuffer() {
     glcall(glClear(_context->glClearSurfaceMask));
 }
 
-GLBuffer* Rsx::addBufferToCache(uint32_t va, uint32_t size) {
+GLBuffer* Rsx::addBufferToCache(uint32_t va, uint32_t size, bool wordReversed) {
     BufferCacheKey key { va, size };
     auto updater = new SimpleCacheItemUpdater<GLBuffer> {
         va, size, [=](auto b) {
-            auto mapped = b->map();
+            auto mapped = (uint32_t*)b->map();
             _mm->readMemory(va, mapped, size);
+            
+            if (wordReversed) {
+                for (auto i = 0u; i < size / 4; ++i) {
+                    boost::endian::endian_reverse_inplace(mapped[i]);
+                }
+            }
+            
             _context->tracer.pushBlob(mapped, size);
             TRACE2(UpdateBufferCache, va, size);
             b->unmap();
@@ -1216,11 +1220,11 @@ GLBuffer* Rsx::addBufferToCache(uint32_t va, uint32_t size) {
     return buffer;
 }
 
-GLBuffer* Rsx::getBufferFromCache(uint32_t va, uint32_t size) {
+GLBuffer* Rsx::getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed) {
     BufferCacheKey key { va, size };
     GLBuffer* buffer = _context->bufferCache.retrieve(key);
     if (!buffer) {
-        buffer = addBufferToCache(va, size);
+        buffer = addBufferToCache(va, size, wordReversed);
     }
     return buffer;
 }
@@ -1235,7 +1239,7 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
         auto va = rsxOffsetToEa(format.location, format.offset);
         auto bufferVa = va + first * format.stride;
         auto bufferSize = count * format.stride;
-        auto buffer = getBufferFromCache(bufferVa, bufferSize);
+        auto buffer = getBufferFromCache(bufferVa, bufferSize, false);
         
         glcall(glVertexAttribBinding(i, format.binding));
         glcall(glBindVertexBuffer(format.binding, buffer->handle(), 0, format.stride));
@@ -1541,4 +1545,19 @@ void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size) {
 
 RsxContext* Rsx::context() {
     return _context.get();
+}
+
+void Rsx::updateOffsetTableForReplay() {
+    if (_mode == RsxOperationMode::Run)
+        return;
+    
+    if (_mode == RsxOperationMode::RunCapture) {
+        auto table = serializeOffsetTable();
+        _context->tracer.pushBlob(&table[0], table.size() * 2);
+        TRACE0(updateOffsetTableForReplay);
+    } else {
+        std::vector<uint16_t> vec(_currentReplayBlob.size() / 2);
+        memcpy(&vec[0], &_currentReplayBlob[0], _currentReplayBlob.size());
+        deserializeOffsetTable(vec);
+    }
 }

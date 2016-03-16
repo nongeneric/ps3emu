@@ -95,3 +95,5 @@ emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
 }}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset);
+std::vector<uint16_t> serializeOffsetTable();
+void deserializeOffsetTable(std::vector<uint16_t> const& vec);

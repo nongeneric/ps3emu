@@ -135,6 +135,12 @@ struct VertexDataArrayFormatInfo {
     GLuint binding = 0;
 };
 
+struct IndexArrayInfo {
+    uint32_t offset = 0;
+    MemoryLocation location = MemoryLocation::Local;
+    GLuint glType = 0;
+};
+
 class FragmentShaderUpdateFunctor;
 class GLFramebuffer;
 class TextureRenderer;
@@ -168,8 +174,7 @@ public:
     std::array<VertexShaderInputFormat, 16> vertexInputs;
     std::array<uint8_t, 512 * 16> vertexInstructions;
     uint32_t vertexLoadOffset = 0;
-    uint32_t vertexIndexArrayOffset = 0;
-    GLuint vertexIndexArrayGlType = 0;
+    IndexArrayInfo indexArray;
     TextureSamplerInfo vertexTextureSamplers[4];
     TextureSamplerInfo fragmentTextureSamplers[16];
     DisplayBufferInfo displayBuffers[8];

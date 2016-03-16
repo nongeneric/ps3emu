@@ -14,12 +14,14 @@ class MainWindowModel {
     GcmDatabase _db;
     std::unique_ptr<Process> _proc;
     std::unique_ptr<Rsx> _rsx;
+    unsigned _currentCommand;
 public:
     MainWindowModel();
     ~MainWindowModel();
     QMainWindow* window();
     void loadTrace(std::string path);
     void update();
+    void runTo(int last);
 public slots:
     void onRun();
 };

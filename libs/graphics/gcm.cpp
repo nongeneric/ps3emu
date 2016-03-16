@@ -16,6 +16,21 @@ using namespace boost::endian;
 namespace emu {
 namespace Gcm {
 
+struct OffsetTable;
+struct {
+    Process* proc;
+    MainMemory* mm;
+    Rsx* rsx;
+    TargetCellGcmContextData* context = nullptr;
+    uint32_t defaultContextDataEa;
+    ps3_uintptr_t gCellGcmCurrentContext = 0;
+    uint32_t defaultCommandBufferSize = 0;
+    OffsetTable* offsetTable = nullptr;
+    ps3_uintptr_t offsetTableEmuEa;
+    uint32_t ioSize;
+} emuGcmState;
+
+  
 struct OffsetTable {
     OffsetTable() {
         for (auto& i : ioAddress) {
@@ -58,6 +73,7 @@ struct OffsetTable {
             eaAddress[io + i] = 0xffff;
         }
         count = 0;
+        emuGcmState.rsx->updateOffsetTableForReplay();
     }
     
     void unmapOffset(uint32_t offset) {
@@ -75,21 +91,9 @@ struct OffsetTable {
             ioIndex++;
             eaIndex++;
         }
+        emuGcmState.rsx->updateOffsetTableForReplay();
     }
 };
-
-struct {
-    Process* proc;
-    MainMemory* mm;
-    Rsx* rsx;
-    TargetCellGcmContextData* context = nullptr;
-    uint32_t defaultContextDataEa;
-    ps3_uintptr_t gCellGcmCurrentContext = 0;
-    uint32_t defaultCommandBufferSize = 0;
-    OffsetTable* offsetTable;
-    ps3_uintptr_t offsetTableEmuEa;
-    uint32_t ioSize;
-} emuGcmState;
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
@@ -405,4 +409,63 @@ ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset) {
     if (location == MemoryLocation::Local)
         return RsxFbBaseAddr + offset;
     return emu::Gcm::emuGcmState.offsetTable->offsetToEa(offset);
+}
+
+std::vector<uint16_t> serializeOffsetTable() {
+    auto table = emu::Gcm::emuGcmState.offsetTable;
+    std::vector<uint16_t> res = { 0, 0, 0 };
+    uint16_t ioAddressCount = 0, eaAddressCount = 0, pageCount = 0;
+    for (auto i = 0u; i < table->ioAddress.size(); ++i) {
+        if (table->ioAddress[i] != 0xffff) {
+            res.push_back(i);
+            res.push_back(table->ioAddress[i]);
+            ioAddressCount++;
+        }
+    }
+    
+    for (auto i = 0u; i < table->eaAddress.size(); ++i) {
+        if (table->eaAddress[i] != 0xffff) {
+            res.push_back(i);
+            res.push_back(table->eaAddress[i]);
+            eaAddressCount++;
+        }
+    }
+    
+    for (auto i = 0u; i < table->mapPageCount.size(); ++i) {
+        if (table->mapPageCount[i]) {
+            res.push_back(i);
+            res.push_back(table->mapPageCount[i]);
+            pageCount++;
+        }
+    }
+    
+    res[0] = ioAddressCount;
+    res[1] = eaAddressCount;
+    res[2] = pageCount;
+    
+    return res;
+}
+
+void deserializeOffsetTable(std::vector<uint16_t> const& vec) {
+    if (!emu::Gcm::emuGcmState.offsetTable) {
+        emu::Gcm::emuGcmState.offsetTable = new emu::Gcm::OffsetTable();
+    }
+    auto table = emu::Gcm::emuGcmState.offsetTable;
+    std::fill(begin(table->ioAddress), end(table->ioAddress), 0xffff);
+    std::fill(begin(table->eaAddress), end(table->eaAddress), 0xffff);
+    std::fill(begin(table->mapPageCount), end(table->mapPageCount), 0);
+    
+    unsigned pos = 2;
+    for (auto i = 0u; i < vec[0]; ++i) {
+        table->ioAddress[vec[pos]] = vec[pos + 1];
+        pos += 2;
+    }
+    for (auto i = 0u; i < vec[1]; ++i) {
+        table->eaAddress[vec[pos]] = vec[pos + 1];
+        pos += 2;
+    }
+    for (auto i = 0u; i < vec[2]; ++i) {
+        table->mapPageCount[vec[pos]] = vec[pos + 1];
+        pos += 2;
+    }
 }

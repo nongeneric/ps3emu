@@ -98,6 +98,7 @@
     X(addBufferToCache) \
     X(addTextureToCache) \
     X(addFragmentShaderToCache) \
+    X(updateOffsetTableForReplay) \
     X(EmuFlip) \
     X(StopReplay) \
     X(UpdateBufferCache) \

@@ -30,6 +30,11 @@ struct SurfaceInfo {
     std::array<bool, 4> colorTarget;
 };
 
+struct GLFramebufferCacheEntry {
+    ps3_uintptr_t va;
+    GLSimpleTexture* texture;
+};
+
 class GLFramebuffer {
     std::map<ps3_uintptr_t, std::unique_ptr<GLSimpleTexture>> _cache;
     GLuint _id;
@@ -50,4 +55,5 @@ public:
     void dumpTextures();
     void updateTexture();
     GLSimpleTexture* findTexture(ps3_uintptr_t va);
+    std::vector<GLFramebufferCacheEntry> cacheSnapshot();
 };

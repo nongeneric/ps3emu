@@ -86,8 +86,8 @@ class Rsx {
     void updateViewPort();
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
-    GLBuffer* getBufferFromCache(uint32_t va, uint32_t size);
-    GLBuffer* addBufferToCache(uint32_t va, uint32_t size);
+    GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
+    GLBuffer* addBufferToCache(uint32_t va, uint32_t size, bool wordReversed);
     FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size);
     FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size);
     
@@ -308,6 +308,7 @@ public:
     void init(Process* proc);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
+    void updateOffsetTableForReplay();
     void sendCommand(GcmCommandReplayInfo info);
     bool receiveCommandCompletion();
     RsxContext* context();
