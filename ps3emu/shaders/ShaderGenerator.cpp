@@ -106,7 +106,8 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
 std::string GenerateVertexShader(const uint8_t* bytecode, 
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
                                  std::array<int, 4> const& samplerSizes,
-                                 unsigned loadOffset)
+                                 unsigned loadOffset,
+                                 std::vector<unsigned>* usedConsts)
 {   
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
@@ -273,16 +274,25 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     std::array<VertexInstr, 2> instr;
     bool isLast = false;
     int num = 0;
+    UsedConstsVisitor usedConstsVisitor;
     while (!isLast) {
         int count = vertex_dasm_instr(bytecode, instr);
         for (int n = 0; n < count; ++n) {
             for (auto& st : MakeStatement(instr[n], num)) {
+                if (usedConsts) {
+                    st->accept(&usedConstsVisitor);
+                }
                 sts.emplace_back(std::move(st));
             }
             isLast |= instr[n].is_last;
         }
         num++;
         bytecode += 16;
+    }
+    
+    if (usedConsts) {
+        auto const& consts = usedConstsVisitor.consts();
+        std::copy(begin(consts), end(consts), std::back_inserter(*usedConsts));
     }
     
     sts = RewriteBranches(std::move(sts));
@@ -328,14 +338,16 @@ uint32_t CalcVertexBytecodeSize(const uint8_t* bytecode) {
 
 std::string PrintFragmentProgram(const uint8_t* instr) {
     std::string res;
+    unsigned pos = 0;
     FragmentInstr fi;
     do {
         auto len = fragment_dasm_instr(instr, fi);
         static std::string line;
         line.clear();
         fragment_dasm(fi, line);
+        res += ssnprintf("%03d: %s\n", pos / 16, line);
         instr += len;
-        res += line + "\n";
+        pos += len;
         
     } while(!fi.is_last);
     return res;

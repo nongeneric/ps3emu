@@ -87,3 +87,7 @@ void FragmentShaderUpdateFunctor::bindConstBuffer() {
 std::vector<uint8_t> const& FragmentShaderUpdateFunctor::bytecode() {
     return _bytecode;
 }
+
+GLBuffer* FragmentShaderUpdateFunctor::constBuffer() {
+    return &_constBuffer;
+}

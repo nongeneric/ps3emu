@@ -29,7 +29,7 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QHBoxLayout" name="horizontalLayout_3">
+   <layout class="QHBoxLayout" name="horizontalLayout_4">
     <item>
      <widget class="QSplitter" name="splitter">
       <property name="orientation">
@@ -66,7 +66,7 @@
       </widget>
       <widget class="QTabWidget" name="tabWidget">
        <property name="currentIndex">
-        <number>2</number>
+        <number>0</number>
        </property>
        <property name="documentMode">
         <bool>false</bool>
@@ -78,58 +78,64 @@
         <attribute name="title">
          <string>Vertex</string>
         </attribute>
-        <layout class="QVBoxLayout" name="verticalLayout">
+        <layout class="QHBoxLayout" name="horizontalLayout_9">
          <item>
-          <widget class="QTabWidget" name="tabWidget_2">
-           <property name="currentIndex">
-            <number>0</number>
+          <widget class="QSplitter" name="splitter_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
            </property>
-           <widget class="QWidget" name="tab">
-            <attribute name="title">
-             <string>Assembler</string>
-            </attribute>
-            <layout class="QHBoxLayout" name="horizontalLayout_4">
-             <item>
-              <widget class="QTextEdit" name="teVertexAsm">
-               <property name="undoRedoEnabled">
-                <bool>false</bool>
-               </property>
-               <property name="lineWrapMode">
-                <enum>QTextEdit::NoWrap</enum>
-               </property>
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-               <property name="acceptRichText">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
+           <widget class="QTabWidget" name="tabWidget_2">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <widget class="QWidget" name="tab">
+             <attribute name="title">
+              <string>Assembler</string>
+             </attribute>
+             <layout class="QHBoxLayout" name="horizontalLayout_10">
+              <item>
+               <widget class="QTextEdit" name="teVertexAsm">
+                <property name="undoRedoEnabled">
+                 <bool>false</bool>
+                </property>
+                <property name="lineWrapMode">
+                 <enum>QTextEdit::NoWrap</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tab_2">
+             <attribute name="title">
+              <string>GLSL</string>
+             </attribute>
+             <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <item>
+               <widget class="QTextEdit" name="teVertexGlsl">
+                <property name="undoRedoEnabled">
+                 <bool>false</bool>
+                </property>
+                <property name="lineWrapMode">
+                 <enum>QTextEdit::NoWrap</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
            </widget>
-           <widget class="QWidget" name="tab_2">
-            <attribute name="title">
-             <string>GLSL</string>
-            </attribute>
-            <layout class="QHBoxLayout" name="horizontalLayout_5">
-             <item>
-              <widget class="QTextEdit" name="teVertexGlsl">
-               <property name="undoRedoEnabled">
-                <bool>false</bool>
-               </property>
-               <property name="lineWrapMode">
-                <enum>QTextEdit::NoWrap</enum>
-               </property>
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-               <property name="acceptRichText">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
+           <widget class="QTableView" name="twVertexConsts"/>
           </widget>
          </item>
         </layout>
@@ -140,56 +146,62 @@
         </attribute>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
-          <widget class="QTabWidget" name="tabWidget_3">
-           <property name="currentIndex">
-            <number>1</number>
+          <widget class="QSplitter" name="splitter_3">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
            </property>
-           <widget class="QWidget" name="tab_3">
-            <attribute name="title">
-             <string>Assembler</string>
-            </attribute>
-            <layout class="QHBoxLayout" name="horizontalLayout_6">
-             <item>
-              <widget class="QTextEdit" name="teFragmentAsm">
-               <property name="undoRedoEnabled">
-                <bool>false</bool>
-               </property>
-               <property name="lineWrapMode">
-                <enum>QTextEdit::NoWrap</enum>
-               </property>
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-               <property name="acceptRichText">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
+           <widget class="QTabWidget" name="tabWidget_3">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <widget class="QWidget" name="tab_3">
+             <attribute name="title">
+              <string>Assembler</string>
+             </attribute>
+             <layout class="QHBoxLayout" name="horizontalLayout_6">
+              <item>
+               <widget class="QTextEdit" name="teFragmentAsm">
+                <property name="undoRedoEnabled">
+                 <bool>false</bool>
+                </property>
+                <property name="lineWrapMode">
+                 <enum>QTextEdit::NoWrap</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tab_4">
+             <attribute name="title">
+              <string>GLSL</string>
+             </attribute>
+             <layout class="QHBoxLayout" name="horizontalLayout_7">
+              <item>
+               <widget class="QTextEdit" name="teFragmentGlsl">
+                <property name="undoRedoEnabled">
+                 <bool>false</bool>
+                </property>
+                <property name="lineWrapMode">
+                 <enum>QTextEdit::NoWrap</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
            </widget>
-           <widget class="QWidget" name="tab_4">
-            <attribute name="title">
-             <string>GLSL</string>
-            </attribute>
-            <layout class="QHBoxLayout" name="horizontalLayout_7">
-             <item>
-              <widget class="QTextEdit" name="teFragmentGlsl">
-               <property name="undoRedoEnabled">
-                <bool>false</bool>
-               </property>
-               <property name="lineWrapMode">
-                <enum>QTextEdit::NoWrap</enum>
-               </property>
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-               <property name="acceptRichText">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
+           <widget class="QTableView" name="twFragmentConsts"/>
           </widget>
          </item>
         </layout>
@@ -201,6 +213,23 @@
         <layout class="QHBoxLayout" name="horizontalLayout_8">
          <item>
           <widget class="QTableView" name="twTextures">
+           <property name="selectionMode">
+            <enum>QAbstractItemView::SingleSelection</enum>
+           </property>
+           <property name="selectionBehavior">
+            <enum>QAbstractItemView::SelectRows</enum>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="tab_6">
+        <attribute name="title">
+         <string>Buffers</string>
+        </attribute>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QTableView" name="twBuffers">
            <property name="selectionMode">
             <enum>QAbstractItemView::SingleSelection</enum>
            </property>

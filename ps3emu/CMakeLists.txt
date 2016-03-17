@@ -35,6 +35,8 @@ set(SRC
     shaders/ShaderGenerator.cpp
     shaders/AST.h
     shaders/AST.cpp
+    shaders/DefaultVisitor.h
+    shaders/DefaultVisitor.cpp
     rsx/Rsx.h
     rsx/Rsx.cpp
     rsx/RsxLoop.cpp

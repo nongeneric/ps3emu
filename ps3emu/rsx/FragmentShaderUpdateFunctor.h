@@ -27,4 +27,5 @@ public:
     void update(FragmentShader* shader);
     void bindConstBuffer();
     std::vector<uint8_t> const& bytecode();
+    GLBuffer* constBuffer();
 };

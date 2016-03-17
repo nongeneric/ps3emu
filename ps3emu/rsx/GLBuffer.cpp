@@ -9,7 +9,7 @@ GLBuffer::GLBuffer(GLBufferType type, uint32_t size, void* data)
 
 GLuint GLBuffer::init(GLBufferType type, uint32_t size, void* data) {
     if (!data && type == GLBufferType::Static)
-        throw std::runtime_error("static buffer should be initilized with data");
+        throw std::runtime_error("static buffer should be initialized with data");
     GLuint handle;
     auto flags = type == GLBufferType::Dynamic ? GL_DYNAMIC_STORAGE_BIT
                : type == GLBufferType::MapRead ? 
@@ -53,4 +53,8 @@ GLBuffer& GLBuffer::operator=(GLBuffer&& other) {
     _type = other._type;
     HandleWrapper::operator=(std::move(other));
     return *this;
+}
+
+uint32_t GLBuffer::size() {
+    return _size;
 }

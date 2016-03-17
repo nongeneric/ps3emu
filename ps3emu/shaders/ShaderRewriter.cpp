@@ -1,4 +1,5 @@
 #include "ShaderRewriter.h"
+#include "DefaultVisitor.h"
 #include "../utils.h"
 #include <map>
 #include <set>
@@ -273,71 +274,6 @@ namespace ShaderRewriter {
         { TypeClass::fp,      2, ExprType::vec2 },
         { TypeClass::fp,      3, ExprType::vec3 },
         { TypeClass::fp,      4, ExprType::vec4 },
-    };
-    
-    class DefaultVisitor : public IExpressionVisitor {
-    public:
-        virtual void visit(FloatLiteral* literal) override { }
-        
-        virtual void visit(BinaryOperator* op) override { 
-            op->args().at(0)->accept(this);
-            op->args().at(1)->accept(this);
-        }
-        
-        virtual void visit(UnaryOperator* op) override {
-            op->args().at(0)->accept(this);
-        }
-        
-        virtual void visit(Swizzle* swizzle) override {
-            swizzle->expr()->accept(this);
-        }
-        
-        virtual void visit(Variable* ref) override { }
-        virtual void visit(IntegerLiteral* ref) override { }
-        
-        virtual void visit(ComponentMask* mask) override {
-            mask->expr()->accept(this);
-        }
-        
-        virtual void visit(IfStatement* ifst) override { 
-            ifst->condition()->accept(this);
-            for (auto& st : ifst->statements()) {
-                st->accept(this);
-            }
-        }
-        
-        virtual void visit(Assignment* assignment) override {
-            assignment->dest()->accept(this);
-            assignment->expr()->accept(this);
-        }
-        
-        virtual void visit(Invocation* invocation) override {
-            for (auto& arg : invocation->args()) {
-                arg->accept(this);
-            }
-        }
-        
-        virtual void visit(SwitchStatement* sw) override {
-            sw->switchOn()->accept(this);
-            for (auto& c : sw->cases()) {
-                for (auto& st : c.body) {
-                    st->accept(this);
-                }
-            }
-        }
-        
-        virtual void visit(BreakStatement* sw) override { }
-        
-        virtual void visit(WhileStatement* sw) override {
-            sw->condition()->accept(this);
-            for (auto st : sw->body()) {
-                st->accept(this);
-            }
-        }
-        
-        virtual void visit(TernaryOperator* ternary) override {
-            visit((Invocation*)ternary);
-        }
     };
     
     class TypeVisitor : public DefaultVisitor {
@@ -1175,5 +1111,17 @@ namespace ShaderRewriter {
                                { sw })
         };
         return pack_unique(res);
+    }
+    
+    void UsedConstsVisitor::visit(Variable* variable) {
+        if (variable->name() == "constants.c") {
+            if (auto index = dynamic_cast<IntegerLiteral*>(variable->index())) {
+                _consts.insert(index->value());
+            }
+        }
+    }
+    
+    const std::set< unsigned int >& UsedConstsVisitor::consts() {
+        return _consts;
     }
 }
