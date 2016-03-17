@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1350</width>
-    <height>796</height>
+    <width>1540</width>
+    <height>793</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -47,7 +47,7 @@
        </property>
        <property name="maximumSize">
         <size>
-         <width>16777215</width>
+         <width>500</width>
          <height>16777215</height>
         </size>
        </property>
@@ -66,7 +66,7 @@
       </widget>
       <widget class="QTabWidget" name="tabWidget">
        <property name="currentIndex">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="documentMode">
         <bool>false</bool>
@@ -240,6 +240,22 @@
          </item>
         </layout>
        </widget>
+       <widget class="QWidget" name="tab_7">
+        <attribute name="title">
+         <string>VDAs</string>
+        </attribute>
+        <layout class="QHBoxLayout" name="horizontalLayout_11">
+         <item>
+          <widget class="QSplitter" name="splitter_4">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <widget class="QTableView" name="twVertexDataArrays"/>
+           <widget class="QTableView" name="twVertexDataArraysBuffer"/>
+          </widget>
+         </item>
+        </layout>
+       </widget>
        <widget class="QWidget" name="tabArgs">
         <attribute name="title">
          <string>Arguments</string>
@@ -267,7 +283,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1350</width>
+     <width>1540</width>
      <height>27</height>
     </rect>
    </property>

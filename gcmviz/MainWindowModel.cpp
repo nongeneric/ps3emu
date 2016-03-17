@@ -7,6 +7,7 @@
 #include <QDialog>
 #include <QImage>
 #include <QSize>
+#include <boost/endian/conversion.hpp>
 #include "../ps3emu/utils.h"
 #include "../ps3emu/rsx/Rsx.h"
 #include "../ps3emu/rsx/RsxContext.h"
@@ -14,6 +15,8 @@
 #include "../ps3emu/Process.h"
 #include "../ps3emu/shaders/ShaderGenerator.h"
 #include "../ps3emu/rsx/FragmentShaderUpdateFunctor.h"
+
+using namespace boost::endian;
 
 GcmCommandReplayInfo makeNopCommand() {
     return GcmCommandReplayInfo{GcmCommand{0, 0, (int)CommandId::waitForIdle}, true};
@@ -385,6 +388,129 @@ public:
     }
 };
 
+class VDATableModel : public QAbstractItemModel {
+    Rsx* _rsx;
+public:
+    VDATableModel(Rsx* rsx) : _rsx(rsx) { }
+    
+    QVariant headerData(int section,
+                        Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
+            return QVariant();
+        switch (section) {
+            case 0: return "Enabled";
+            case 1: return "Offset";
+            case 2: return "Location";
+            case 3: return "Frequency";
+            case 4: return "Stride";
+            case 5: return "Size";
+            case 6: return "Type";
+        }
+        return QVariant();
+    }
+    
+    int columnCount(const QModelIndex& parent = QModelIndex()) const override {
+        return 7;
+    }
+    
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole)
+            return QVariant();
+        auto vda = _rsx->context()->vertexDataArrays[index.row()];
+        auto input = _rsx->context()->vertexInputs[index.row()];
+        switch (index.column()) {
+            case 0: return QString::fromStdString(ssnprintf("%d", input.enabled));
+            case 1: return QString::fromStdString(ssnprintf("#%08x", vda.offset));
+            case 2: return vda.location == MemoryLocation::Local ? "Local" : "Main";
+            case 3: return QString::fromStdString(ssnprintf("%d", vda.frequency));
+            case 4: return QString::fromStdString(ssnprintf("%d", vda.stride));
+            case 5: return QString::fromStdString(ssnprintf("%d", vda.size));
+            case 6: return vda.type == CELL_GCM_VERTEX_UB ? "uint8_t"
+                         : vda.type == CELL_GCM_VERTEX_F ? "float"
+                         : "unknown";
+        }
+        return QVariant();
+    }
+    
+    QModelIndex parent(const QModelIndex& child) const override {
+        return QModelIndex();
+    }
+    
+    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
+        return createIndex(row, column);
+    }
+    
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override {
+        return _rsx->context()->vertexDataArrays.size();
+    }
+};
+
+class VDABufferTableModel : public QAbstractItemModel {
+    Rsx* _rsx;
+    VertexDataArrayFormatInfo _info;
+    std::vector<uint8_t> _buffer;
+public:
+    VDABufferTableModel(Rsx* rsx, std::vector<uint8_t> buffer, unsigned vdaIndex) 
+        : _rsx(rsx), _buffer(buffer) {
+        _info = _rsx->context()->vertexDataArrays[vdaIndex];
+    }
+    
+    QVariant headerData(int section,
+                        Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
+            return QVariant();
+        switch (section) {
+            case 0: return "Offset";
+            case 1: return "x";
+            case 2: return "y";
+            case 3: return "z";
+            case 4: return "w";
+        }
+        return QVariant();
+    }
+    
+    int columnCount(const QModelIndex& parent = QModelIndex()) const override {
+        return _info.size + 1;
+    }
+    
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole)
+            return QVariant();
+        
+        auto offset = _info.stride * index.row();
+        if (index.column() == 0) {
+            return QString::fromStdString(ssnprintf("#%08x", offset));
+        }
+        
+        auto typeSize = _info.type == CELL_GCM_VERTEX_UB ? 1 : 4;
+        auto valueOffset = offset + (index.column() - 1) * typeSize;
+        
+        if (_info.type == CELL_GCM_VERTEX_UB) {
+            uint8_t u8Value = *(uint8_t*)&_buffer[valueOffset];    
+            return QString::fromStdString(ssnprintf("#%02x", u8Value));
+        } else {
+            float fValue = union_cast<uint32_t, float>(endian_reverse(*(uint32_t*)&_buffer[valueOffset]));
+            return QString::fromStdString(ssnprintf("%g", fValue));
+        }
+        
+        return QVariant();
+    }
+    
+    QModelIndex parent(const QModelIndex& child) const override {
+        return QModelIndex();
+    }
+    
+    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
+        return createIndex(row, column);
+    }
+    
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override {
+        return _buffer.size() / _info.stride;
+    }
+};
+
 MainWindowModel::MainWindowModel() : _currentCommand(0) {
     _window.setupUi(&_qwindow);
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
@@ -496,6 +622,28 @@ void MainWindowModel::update() {
     
     auto bufferModel = new BufferTableModel(_rsx.get());
     _window.twBuffers->setModel(bufferModel);
+    
+    auto vdaModel = new VDATableModel(_rsx.get());
+    QObject::connect(_window.twVertexDataArrays, &QTableView::doubleClicked, [&] (auto index) {
+        auto input = _rsx->context()->vertexInputs[index.row()];
+        if (!input.enabled)
+            return;
+        auto info = _rsx->context()->vertexDataArrays[index.row()];
+        auto ea = rsxOffsetToEa(info.location, info.offset);
+        auto bufferVec = _rsx->context()->bufferCache.cacheSnapshot();
+        auto entry = std::find_if(begin(bufferVec), end(bufferVec), [&](auto e) {
+            return e.key.va == ea;
+        });
+        assert(entry != end(bufferVec));
+        auto buffer = entry->value;
+        std::vector<uint8_t> vec(buffer->size());
+        execInRsxThread(_rsx.get(), [&] {
+            glGetNamedBufferSubData(buffer->handle(), 0, buffer->size(), &vec[0]);
+        });
+        auto vdaBufferModel = new VDABufferTableModel(_rsx.get(), vec, index.row());
+        _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
+    });
+    _window.twVertexDataArrays->setModel(vdaModel);
 }
 
 void MainWindowModel::runTo(int last) {
