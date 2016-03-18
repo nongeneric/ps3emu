@@ -262,7 +262,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    vec4 void_var;");
     line("    int nip;");
     for (int i = 0; i < 16; ++i) {
-        line(ssnprintf("    v_out[%d] = vec4(0,0,0,0);", i));
+        line(ssnprintf("    v_out[%d] = vec4(0,0,0,1);", i));
     }
     for (size_t i = 0; i < inputs.size(); ++i) {
         if (!inputs[i].enabled)
@@ -300,8 +300,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     for (auto& st : sts) {
         line(PrintStatement(st.get()));
     }
-    
-    
+
     line("    gl_Position = viewportInfo.glInverseGcm * v_out[0];");
     line("    f_COL0 = v_out[1];");
     line("    f_COL1 = v_out[4];");

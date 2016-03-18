@@ -155,7 +155,11 @@ void Rsx::AlphaFunc(uint32_t af, uint32_t ref) {
 
 void Rsx::AlphaTestEnable(bool enable) {
     TRACE1(AlphaTestEnable, enable);
-    //TODO: implement
+    if (enable) {
+        glEnable(GL_BLEND);
+    } else {
+        glDisable(GL_BLEND);
+    }
 }
 
 void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {

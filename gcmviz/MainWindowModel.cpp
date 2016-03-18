@@ -7,6 +7,7 @@
 #include <QDialog>
 #include <QImage>
 #include <QSize>
+#include <QPainter>
 #include <boost/endian/conversion.hpp>
 #include "../ps3emu/utils.h"
 #include "../ps3emu/rsx/Rsx.h"
@@ -253,8 +254,15 @@ public:
             qtFormat = QImage::Format_RGBA8888;
         }
         
+        QImage background(width, height, qtFormat);
+        for (int x = 0; x < width; ++x) {
+            for (int y = 0; y < height; ++y) {
+                bool dark = (x / 10 + y / 10) % 2;
+                background.setPixel(x, y, dark ? 0xff666666 : 0xff999999);
+            }
+        }
+        
         QImage image(width, height, qtFormat);
-
         execInRsxThread(_rsx, [&] {
             assert(glIsTexture(handle));
             glGetTextureImage(handle, 
@@ -265,10 +273,14 @@ public:
                               image.bits());
         });
         
+        QPainter p(&background);
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        p.drawImage(0, 0, image);
+        
         auto dialog = new QDialog();
         auto imageView = new Ui::ImageView();
         imageView->setupUi(dialog);
-        auto pixmap = QPixmap::fromImage(image);
+        auto pixmap = QPixmap::fromImage(background);
         imageView->labelImage->setPixmap(pixmap);
         
         dialog->show();
@@ -511,12 +523,79 @@ public:
     }
 };
 
-MainWindowModel::MainWindowModel() : _currentCommand(0) {
+class ContextTableModel : public QAbstractItemModel {
+    Rsx* _rsx;
+public:
+    ContextTableModel(Rsx* rsx) : _rsx(rsx) { }
+    
+    QVariant headerData(int section,
+                        Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
+            return QVariant();
+        switch (section) {
+            case 0: return "Name";
+            case 1: return "Value";
+        }
+        return QVariant();
+    }
+    
+    int columnCount(const QModelIndex& parent = QModelIndex()) const override {
+        return 2;
+    }
+    
+    const char* printVertexArrayMode() const {
+        switch (_rsx->context()->glVertexArrayMode) {
+            case GL_QUADS: return "GL_QUADS";
+            case GL_QUAD_STRIP: return "GL_QUAD_STRIP";
+            case GL_POLYGON: return "GL_POLYGON";
+            case GL_POINTS: return "GL_POINTS";
+            case GL_LINES: return "GL_LINES";
+            case GL_LINE_LOOP: return "GL_LINE_LOOP";
+            case GL_LINE_STRIP: return "GL_LINE_STRIP";
+            case GL_TRIANGLES: return "GL_TRIANGLES";
+            case GL_TRIANGLE_STRIP: return "GL_TRIANGLE_STRIP";
+            case GL_TRIANGLE_FAN: return "GL_TRIANGLE_FAN";
+        }
+        return "unknown";
+    }
+    
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole)
+            return QVariant();
+        
+        if (index.column() == 0) {
+            switch (index.row()) {
+                case 0: return "glVertexArrayMode";
+            }   
+        }
+        
+        switch (index.row()) {
+            case 0: return printVertexArrayMode();
+        }
+        
+        return QVariant();
+    }
+    
+    QModelIndex parent(const QModelIndex& child) const override {
+        return QModelIndex();
+    }
+    
+    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
+        return createIndex(row, column);
+    }
+    
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override {
+        return 1;
+    }
+};
+
+MainWindowModel::MainWindowModel() : _currentCommand(0), _currentFrame(0) {
     _window.setupUi(&_qwindow);
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
     Rsx::setOperationMode(RsxOperationMode::Replay);
     QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
-        runTo(index.row());
+        runTo(index.row(), _currentFrame);
     });
 }
 
@@ -528,20 +607,11 @@ QMainWindow* MainWindowModel::window() {
 
 void MainWindowModel::loadTrace(std::string path) {
     _db.createOrOpen(path);
-    auto commandModel = new CommandTableModel(&_db);
-    _window.commandTableView->setModel(commandModel);
-    _window.commandTableView->resizeColumnsToContents();
-    auto selectionModel = _window.commandTableView->selectionModel();
-    QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=] (auto current) {
-        if (current == QModelIndex())
-            return;
-        auto command = _db.getCommand(0, current.row());
-        _window.twArgs->setModel(new ArgumentTableModel(command));
-    });
+    changeFrame();
 }
 
 void MainWindowModel::onRun() {
-    runTo(_db.commands(0) - 1);
+    runTo(_db.commands(_currentFrame) - 1, _currentFrame);
 }
 
 void MainWindowModel::update() {
@@ -624,13 +694,17 @@ void MainWindowModel::update() {
     _window.twBuffers->setModel(bufferModel);
     
     auto vdaModel = new VDATableModel(_rsx.get());
-    QObject::connect(_window.twVertexDataArrays, &QTableView::doubleClicked, [&] (auto index) {
+    QObject::disconnect(_window.twVertexDataArrays, &QTableView::clicked, 0, 0);
+    QObject::connect(_window.twVertexDataArrays, &QTableView::clicked, [&] (auto index) {
         auto input = _rsx->context()->vertexInputs[index.row()];
         if (!input.enabled)
             return;
         auto info = _rsx->context()->vertexDataArrays[index.row()];
         auto ea = rsxOffsetToEa(info.location, info.offset);
         auto bufferVec = _rsx->context()->bufferCache.cacheSnapshot();
+        std::sort(begin(bufferVec), end(bufferVec), [&](auto l, auto r) {
+            return l.key.size > r.key.size;
+        });
         auto entry = std::find_if(begin(bufferVec), end(bufferVec), [&](auto e) {
             return e.key.va == ea;
         });
@@ -644,17 +718,24 @@ void MainWindowModel::update() {
         _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
     });
     _window.twVertexDataArrays->setModel(vdaModel);
+    
+    auto contextModel = new ContextTableModel(_rsx.get());
+    _window.twContext->setModel(contextModel);
+    _window.twContext->resizeColumnsToContents();
 }
 
-void MainWindowModel::runTo(int last) {
+void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
+    if (frame >= _db.frames())
+        return;
+    
     if (!_proc) {
         _proc.reset(new Process());
         _rsx.reset(new Rsx());
         _rsx->init(_proc.get());
     }
     
-    for (auto i = _currentCommand; i <= last; ++i) {
-        auto command = _db.getCommand(0, i);
+    for (auto i = _currentCommand; i <= lastCommand; ++i) {
+        auto command = _db.getCommand(frame, i);
         _rsx->sendCommand({command, false});
     }
     
@@ -663,5 +744,25 @@ void MainWindowModel::runTo(int last) {
     
     update();
     
-    _currentCommand = last + 1;
+    _currentCommand = (lastCommand + 1) % _db.commands(frame);
+    if (_currentCommand == 0) {
+        _currentFrame++;
+        changeFrame();
+    }
+}
+
+void MainWindowModel::changeFrame() {
+    auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames() - 1);
+    _window.labelFrame->setText(QString::fromStdString(text));
+    
+    auto commandModel = new CommandTableModel(&_db);
+    _window.commandTableView->setModel(commandModel);
+    _window.commandTableView->resizeColumnsToContents();
+    auto selectionModel = _window.commandTableView->selectionModel();
+    QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=] (auto current) {
+        if (current == QModelIndex())
+            return;
+        auto command = _db.getCommand(0, current.row());
+        _window.twArgs->setModel(new ArgumentTableModel(command));
+    });
 }

@@ -15,13 +15,15 @@ class MainWindowModel {
     std::unique_ptr<Process> _proc;
     std::unique_ptr<Rsx> _rsx;
     unsigned _currentCommand;
+    unsigned _currentFrame;
+    void changeFrame();
 public:
     MainWindowModel();
     ~MainWindowModel();
     QMainWindow* window();
     void loadTrace(std::string path);
     void update();
-    void runTo(int last);
+    void runTo(unsigned lastCommand, unsigned frame);
 public slots:
     void onRun();
 };
