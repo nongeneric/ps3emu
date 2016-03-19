@@ -92,6 +92,8 @@
     X(Nv3089ContextSurface) \
     X(Nv3089SetColorConversion) \
     X(ImageInSize) \
+    X(BlendEnable) \
+    X(BlendFuncSFactor) \
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \

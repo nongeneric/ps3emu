@@ -41,7 +41,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
         GLuint texHandle = 0;
         if (info.colorTarget[i]) {
             auto offset = rsxOffsetToEa(info.colorLocation[i], info.colorOffset[i]);
-            auto tex = searchCache(GL_RGBA32F, offset, width, height);
+            auto tex = searchCache(GL_RGB32F, offset, width, height);
             texHandle = tex->handle();
         }
         glcall(glNamedFramebufferTexture(

@@ -12,7 +12,7 @@ void compareLastFrame(const char* expected, int n = 0) {
     auto args = QStringList() << "-depth" << "8"
                               << "-size" << "1280x720"
                               << "-flip"
-                              << QString("/tmp/ps3frame%1.rgba").arg(n)
+                              << QString("/tmp/ps3frame%1.rgb").arg(n)
                               << QString("/tmp/ps3frame%1.png").arg(n);
     proc.start("convert", args);
     proc.waitForFinished(-1);
@@ -147,4 +147,13 @@ TEST_CASE("gcm_fragment_texture") {
     compareLastFrame("./binaries/gcm_fragment_texture/ps3frame5.png", 5);
     compareLastFrame("./binaries/gcm_fragment_texture/ps3frame6.png", 6);
     compareLastFrame("./binaries/gcm_fragment_texture/ps3frame7.png", 7);
+}
+
+TEST_CASE("simple_console_gcm") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/simple_console_gcm/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/simple_console_gcm/ps3frame0.png");
 }

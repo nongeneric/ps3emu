@@ -47,6 +47,8 @@ void TextureRenderer::render(GLSimpleTexture* tex) {
     glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     _pipeline.bind();
 
+    glClearDepth(1);
+    glClear(GL_DEPTH_BUFFER_BIT);
     glcall(glViewport(0, 0, tex->width(), tex->height()));
     glcall(glDepthRange(0, 1));
     glcall(glDrawArrays(GL_TRIANGLES, 0, 6));

@@ -204,6 +204,7 @@ public:
             auto format = entry.texture->format() == GL_DEPTH_COMPONENT16 ? "GL_DEPTH_COMPONENT16"
                         : entry.texture->format() == GL_DEPTH24_STENCIL8 ? "GL_DEPTH24_STENCIL8"
                         : entry.texture->format() == GL_RGBA32F ? "GL_RGBA32F"
+                        : entry.texture->format() == GL_RGB32F ? "GL_RGB32F"
                         : "unknown";
             switch (index.column()) {
                 case 0: return QString::fromStdString(ssnprintf("#%08x", entry.va));
@@ -237,24 +238,23 @@ public:
         
         uint32_t width, height;
         GLuint handle;
-        QImage::Format qtFormat;
         
-        if (row < regular.size()) {
+        bool isRegular = row < regular.size();
+        
+        if (isRegular) {
             auto info = regular[row];
             handle = info.value->handle();
             width = info.key.width;
             height = info.key.height;
-            qtFormat = QImage::Format_RGBA8888;
         } else {
             row -= regular.size();
             auto entry = framebuffer[row];
             handle = entry.texture->handle();
             width = entry.texture->width();
             height = entry.texture->height();
-            qtFormat = QImage::Format_RGBA8888;
         }
         
-        QImage background(width, height, qtFormat);
+        QImage background(width, height, QImage::Format_RGBA8888);
         for (int x = 0; x < width; ++x) {
             for (int y = 0; y < height; ++y) {
                 bool dark = (x / 10 + y / 10) % 2;
@@ -262,7 +262,7 @@ public:
             }
         }
         
-        QImage image(width, height, qtFormat);
+        QImage image(width, height, QImage::Format_RGBA8888);
         execInRsxThread(_rsx, [&] {
             assert(glIsTexture(handle));
             glGetTextureImage(handle, 
@@ -276,6 +276,10 @@ public:
         QPainter p(&background);
         p.setCompositionMode(QPainter::CompositionMode_SourceOver);
         p.drawImage(0, 0, image);
+        p.end();
+        if (!isRegular) {
+            background = background.mirrored();
+        }
         
         auto dialog = new QDialog();
         auto imageView = new Ui::ImageView();
@@ -752,7 +756,7 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
 }
 
 void MainWindowModel::changeFrame() {
-    auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames() - 1);
+    auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames());
     _window.labelFrame->setText(QString::fromStdString(text));
     
     auto commandModel = new CommandTableModel(&_db);

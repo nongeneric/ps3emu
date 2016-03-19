@@ -82,7 +82,6 @@ class Rsx {
     void updateVertexDataArrays(unsigned first, unsigned count);
     void updateShaders();
     void updateTextures();
-    void updateFramebuffer();
     void updateViewPort();
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
@@ -278,6 +277,11 @@ class Rsx {
                      uint32_t offset,
                      float inX,
                      float inY);
+    void BlendEnable(bool enable);
+    void BlendFuncSFactor(uint16_t sfcolor, 
+                          uint16_t sfalpha,
+                          uint16_t dfcolor,
+                          uint16_t dfalpha);
     
     // Replay-specific
     void UpdateBufferCache(uint32_t va);

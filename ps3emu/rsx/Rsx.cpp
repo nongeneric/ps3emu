@@ -36,6 +36,14 @@ Rsx::~Rsx() {
     shutdown();
 }
 
+void glEnableb(GLenum e, bool enable) {
+    if (enable) {
+        glEnable(e);
+    } else {
+        glDisable(e);
+    }
+}
+
 MemoryLocation gcmEnumToLocation(uint32_t enumValue) {
     if (enumValue == CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER ||
         enumValue == CELL_GCM_LOCATION_LOCAL)
@@ -150,16 +158,21 @@ void Rsx::VertexDataBaseOffset(uint32_t baseOffset, uint32_t baseIndex) {
 
 void Rsx::AlphaFunc(uint32_t af, uint32_t ref) {
     TRACE2(AlphaFunc, af, ref);
-    //TODO: implement
+    auto glFunc = af == CELL_GCM_NEVER ? GL_NEVER
+                : af == CELL_GCM_LESS ? GL_LESS
+                : af == CELL_GCM_EQUAL ? GL_EQUAL
+                : af == CELL_GCM_LEQUAL ? GL_LEQUAL
+                : af == CELL_GCM_GREATER ? GL_GREATER
+                : af == CELL_GCM_NOTEQUAL ? GL_NOTEQUAL
+                : af == CELL_GCM_GEQUAL ? GL_GEQUAL
+                : af == CELL_GCM_ALWAYS ? GL_ALWAYS
+                : 0;
+    glcall(glAlphaFunc(glFunc, ref));
 }
 
 void Rsx::AlphaTestEnable(bool enable) {
     TRACE1(AlphaTestEnable, enable);
-    if (enable) {
-        glEnable(GL_BLEND);
-    } else {
-        glDisable(GL_BLEND);
-    }
+    glEnableb(GL_ALPHA_TEST, enable);
 }
 
 void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
@@ -266,11 +279,7 @@ void Rsx::ColorMask(uint32_t mask) {
 void Rsx::DepthTestEnable(bool enable) {
     TRACE1(DepthTestEnable, enable);
     _context->isDepthTestEnabled = enable;
-    if (enable) {
-        glcall(glEnable(GL_DEPTH_TEST));
-    } else {
-        glcall(glDisable(GL_DEPTH_TEST));
-    }
+    glEnableb(GL_DEPTH_TEST, enable);
 }
 
 void Rsx::DepthFunc(uint32_t zf) {
@@ -292,11 +301,7 @@ void Rsx::CullFaceEnable(bool enable) {
     TRACE1(CullFaceEnable, enable);
     assert(!enable);
     _context->isCullFaceEnabled = enable;
-    if (enable) {
-        glcall(glEnable(GL_CULL_FACE));
-    } else {
-        glcall(glDisable(GL_CULL_FACE));
-    }
+    glEnableb(GL_CULL_FACE, enable);
 }
 
 void Rsx::ShadeMode(uint32_t sm) {
@@ -315,7 +320,12 @@ void Rsx::ColorClearValue(uint32_t color) {
         BitField<16, 24> g;
         BitField<24, 32> b;
     } c = { color };
-    _context->colorClearValue = { c.r.u() / 255., c.g.u() / 255., c.b.u() / 255., c.a.u() / 255. };
+    _context->colorClearValue = {
+        c.r.u() / 255.,
+        c.g.u() / 255.,
+        c.b.u() / 255.,
+        c.a.u() / 255.
+    };
 }
 
 void Rsx::ClearSurface(uint32_t mask) {
@@ -323,6 +333,7 @@ void Rsx::ClearSurface(uint32_t mask) {
     assert(mask & CELL_GCM_CLEAR_R);
     assert(mask & CELL_GCM_CLEAR_G);
     assert(mask & CELL_GCM_CLEAR_B);
+    assert(mask & CELL_GCM_CLEAR_A);
     auto glmask = GL_COLOR_BUFFER_BIT;
     if (mask & CELL_GCM_CLEAR_Z)
         glmask |= GL_DEPTH_BUFFER_BIT;
@@ -431,35 +442,29 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
     auto tex = _context->framebuffer->findTexture(va);
     _context->framebuffer->bindDefault();
-    updateFramebuffer();
     _context->textureRenderer->render(tex);
     _context->pipeline.bind();
-
+    _window.SwapBuffers();
+    _context->frame++;
+    _context->commandNum = 0;
+    
 #if TESTS
     static int framenum = 0;
-    glFinish();
     if (framenum < 10 && _mode != RsxOperationMode::Replay) {
         auto& vec = _context->lastFrame;
-        vec.resize(_window.width() * _window.height() * 4);
-        glcall(glReadBuffer(GL_BACK));
-        glcall(glReadPixels(
-            0,
-            0,
-            _window.width(),
-            _window.height(),
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            &vec[0]));
-        std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgba", framenum));
+        vec.resize(_window.width() * _window.height() * 3);
+        glGetTextureImage(tex->handle(), 
+                          0,
+                          GL_RGB,
+                          GL_UNSIGNED_BYTE, 
+                          vec.size(), 
+                          &vec[0]);
+        std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgb", framenum));
         assert(f.is_open());
         f.write((const char*)vec.data(), vec.size());
         framenum++;
     }
 #endif
-
-    _window.SwapBuffers();
-    _context->frame++;
-    _context->commandNum = 0;
     
     if (_context->vBlankHandlerDescr) {
         fdescr descr;
@@ -527,11 +532,7 @@ bool Rsx::linkShaderProgram() {
 
 void Rsx::RestartIndexEnable(bool enable) {
     TRACE1(RestartIndexEnable, enable);
-    if (enable) {
-        glcall(glEnable(GL_PRIMITIVE_RESTART));
-    } else {
-        glcall(glDisable(GL_PRIMITIVE_RESTART));
-    }
+    glEnableb(GL_PRIMITIVE_RESTART, enable);
 }
 
 void Rsx::RestartIndex(uint32_t index) {
@@ -1159,22 +1160,39 @@ void Rsx::initGcm() {
 }
 
 void Rsx::updateViewPort() {
-    glcall(glClipControl(GL_UPPER_LEFT, GL_NEGATIVE_ONE_TO_ONE));
-    glcall(glViewport(_context->viewPort.x,
-                      _window.height() - (_context->viewPort.y + _context->viewPort.height),
-                      _context->viewPort.width,
-                      _context->viewPort.height));
     auto f = _context->viewPort.zmax;
     auto n = _context->viewPort.zmin;
+    
+    if (n == 0 && f == 0)
+        return;
+    
+    auto glDepth = (n == 0 && f == 1) ? GL_ZERO_TO_ONE
+                 : (n == -1 && f == 1) ? GL_NEGATIVE_ONE_TO_ONE
+                 : 0;
+    assert(glDepth);
+    
+    glcall(glClipControl(GL_UPPER_LEFT, glDepth));
+    auto w = _context->viewPort.width;
+    auto h = _context->viewPort.height;
+    auto x = _context->viewPort.x;
+    auto y = _context->viewPort.y;
+    glcall(glViewport(x, _window.height() - (y + h), w, h));
     glcall(glDepthRange(n, f));
     
+    float s, b;
+    if (glDepth == GL_NEGATIVE_ONE_TO_ONE) {
+        s = (f - n) / 2;
+        b = (n + f) / 2;
+    } else {
+        s = f - n;
+        b = n;
+    }
+    
     glm::mat4 gl;
-    gl[0] = glm::vec4(_context->viewPort.width / 2, 0, 0, 0);
-    gl[1] = glm::vec4(0, _context->viewPort.height / 2, 0, 0);
-    gl[2] = glm::vec4(0, 0, (f - n) / 2, 0);
-    gl[3] = glm::vec4(_context->viewPort.x + _context->viewPort.width / 2,
-                      _context->viewPort.y + _context->viewPort.height / 2,
-                      (f + n) / 2, 1);
+    gl[0] = glm::vec4(w / 2, 0, 0, 0);
+    gl[1] = glm::vec4(0, h / 2, 0, 0);
+    gl[2] = glm::vec4(0, 0, s, 0);
+    gl[3] = glm::vec4(x + w / 2, y + h / 2, b, 1);
 
     glm::mat4 gcm;
     gcm[0] = glm::vec4(_context->viewPort.scale[0], 0, 0, 0);
@@ -1188,12 +1206,6 @@ void Rsx::updateViewPort() {
     auto viewportUniform = (VertexShaderViewportUniform*)_context->vertexViewportBuffer.map();
     viewportUniform->glInverseGcm = glm::inverse(gl) * gcm;
     _context->vertexViewportBuffer.unmap();
-}
-
-void Rsx::updateFramebuffer() {
-    auto& c = _context->colorClearValue;
-    glcall(glClearColor(c.r, c.g, c.b, c.a));
-    glcall(glClear(_context->glClearSurfaceMask));
 }
 
 GLBuffer* Rsx::addBufferToCache(uint32_t va, uint32_t size, bool wordReversed) {
@@ -1516,6 +1528,47 @@ void Rsx::ImageInSize(uint16_t inW,
         srcLine += sourcePitch;
         destLine += destPitch;
     }
+}
+
+void Rsx::BlendEnable(bool enable) {
+    TRACE1(BlendEnable, enable);
+    glEnableb(GL_BLEND, enable);
+}
+
+GLenum gcmBlendFuncToOpengl(uint16_t func) {
+#define X(x) case CELL_GCM_##x: return GL_##x;
+    switch (func) {
+        X(ZERO)
+        X(ONE)
+        X(SRC_COLOR)
+        X(ONE_MINUS_SRC_COLOR)
+        X(DST_COLOR)
+        X(ONE_MINUS_DST_COLOR)
+        X(SRC_ALPHA)
+        X(ONE_MINUS_SRC_ALPHA)
+        X(DST_ALPHA)
+        X(ONE_MINUS_DST_ALPHA)
+        X(SRC_ALPHA_SATURATE)
+        X(CONSTANT_COLOR)
+        X(ONE_MINUS_CONSTANT_COLOR)
+        X(CONSTANT_ALPHA)
+        X(ONE_MINUS_CONSTANT_ALPHA)
+        default: assert(false); return 0;
+    }
+#undef X
+}
+
+void Rsx::BlendFuncSFactor(uint16_t sfcolor, 
+                           uint16_t sfalpha,
+                           uint16_t dfcolor,
+                           uint16_t dfalpha) {
+    TRACE4(BlendFuncSFactor, sfcolor, sfalpha, dfcolor, dfalpha);
+    glBlendFuncSeparate(
+        gcmBlendFuncToOpengl(sfcolor),
+        gcmBlendFuncToOpengl(dfcolor),
+        gcmBlendFuncToOpengl(sfalpha),
+        gcmBlendFuncToOpengl(dfalpha)
+    );
 }
 
 void Rsx::setOperationMode(RsxOperationMode mode) {

@@ -96,6 +96,12 @@ int64_t Rsx::interpret(uint32_t get) {
     auto offset = header.offset.u();
     auto len = 4;
     const char* name = nullptr;
+    
+    static bool drawActive = false;
+    static uint32_t drawArrayFirst = -1;
+    static uint32_t drawIndexFirst = -1;
+    static uint32_t drawCount = 0;
+    
     switch (offset) {
         case EmuFlipCommandMethod:
             EmuFlip(readarg(1), readarg(2), readarg(3));
@@ -300,11 +306,17 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_ALPHA_REF";
             break;
         case 0x00000310:
-            name = "CELL_GCM_NV4097_SET_BLEND_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_BLEND_ENABLE";
+            BlendEnable(readarg(1));
             break;
-        case 0x00000314:
-            name = "CELL_GCM_NV4097_SET_BLEND_FUNC_SFACTOR";
+        case 0x00000314: {
+            //name = "CELL_GCM_NV4097_SET_BLEND_FUNC_SFACTOR";
+            auto arg1 = readarg(1);
+            auto arg2 = readarg(2);
+            BlendFuncSFactor(arg1 & 0xffff, arg1 >> 16,
+                             arg2 & 0xffff, arg2 >> 16);
             break;
+        }
         case 0x00000318:
             name = "CELL_GCM_NV4097_SET_BLEND_FUNC_DFACTOR";
             break;
@@ -555,10 +567,23 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001804:
             name = "CELL_GCM_NV4097_SET_ZCULL_STATS_ENABLE";
             break;
-        case 0x00001808:
+        case 0x00001808: {
             //name = "CELL_GCM_NV4097_SET_BEGIN_END";
-            BeginEnd(readarg(1));
+            auto mode = readarg(1);
+            drawActive = mode;
+            if (!drawActive) {
+                if (drawArrayFirst != -1) {
+                    DrawArrays(drawArrayFirst, drawCount);
+                } else if (drawIndexFirst != -1) {
+                    DrawIndexArray(drawIndexFirst, drawCount);
+                }
+                drawArrayFirst = -1;
+                drawIndexFirst = -1;
+                drawCount = 0;
+            }
+            BeginEnd(mode);
             break;
+        }
         case 0x0000180c:
             name = "CELL_GCM_NV4097_ARRAY_ELEMENT16";
             break;
@@ -568,16 +593,11 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001814: {
             //name = "CELL_GCM_NV4097_DRAW_ARRAYS";
             auto arg = readarg(1);
-            int indexCount = (arg >> 24) + 1;
-            int veryFirst = arg & 0xffffff;
-            for (auto i = 2u; i <= count; ++i) {
-                if (i == 2) veryFirst--;
-                arg = readarg(i);
-                int c = (arg >> 24);
-                //int f = arg & 0xffffff;
-                indexCount += c;
+            auto vertexCount = (arg >> 24) + 1;
+            if (drawArrayFirst == -1) {
+                drawArrayFirst = arg & 0xffffff;
             }
-            DrawArrays(veryFirst, indexCount);
+            drawCount += vertexCount * count;
             break;
         }
         case 0x00001818:
@@ -595,17 +615,11 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001824: {
             //name = "CELL_GCM_NV4097_DRAW_INDEX_ARRAY";
             auto arg = readarg(1);
-            int indexCount = (arg >> 24) + 1;
-            int veryFirst = arg & 0xff;
-            for (auto i = 2u; i <= count; ++i) {
-                arg = readarg(i);
-                int first = arg & 0xff;
-                int c = (arg >> 24) + 1;
-                assert(first == 0);
-                (void)first;
-                indexCount += c;
+            auto indexCount = (arg >> 24) + 1;
+            if (drawIndexFirst == -1) {
+                drawIndexFirst = arg & 0xffffff;
             }
-            DrawIndexArray(veryFirst, indexCount);
+            drawCount = indexCount * count;
             break;
         }
         case 0x00001828:
