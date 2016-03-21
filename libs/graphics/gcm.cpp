@@ -455,7 +455,7 @@ void deserializeOffsetTable(std::vector<uint16_t> const& vec) {
     std::fill(begin(table->eaAddress), end(table->eaAddress), 0xffff);
     std::fill(begin(table->mapPageCount), end(table->mapPageCount), 0);
     
-    unsigned pos = 2;
+    unsigned pos = 3;
     for (auto i = 0u; i < vec[0]; ++i) {
         table->ioAddress[vec[pos]] = vec[pos + 1];
         pos += 2;

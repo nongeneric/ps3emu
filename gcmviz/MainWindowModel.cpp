@@ -738,9 +738,14 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         _rsx->init(_proc.get());
     }
     
+    std::vector<GcmCommand> commands;
     for (auto i = _currentCommand; i <= lastCommand; ++i) {
         auto command = _db.getCommand(frame, i);
-        _rsx->sendCommand({command, false});
+        commands.push_back(command);
+    }
+    
+    for (auto i = _currentCommand; i <= lastCommand; ++i) {
+        _rsx->sendCommand({commands[i], false});
     }
     
     _rsx->sendCommand(makeNopCommand());
