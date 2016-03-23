@@ -657,34 +657,35 @@ void MainWindowModel::update() {
         FragmentShaderUpdateFunctor* updater;
         FragmentShader* shader;
         std::tie(shader, updater) = context->fragmentShaderCache.retrieveWithUpdater(key);
-        auto const& bytecode = updater->bytecode();
-        
-        // TODO: handle sizes
-        std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
-        auto asmText = PrintFragmentProgram(&bytecode[0]);
-        auto glslText = GenerateFragmentShader(bytecode, sizes, context->isFlatShadeMode);
-        _window.teFragmentAsm->setText(QString::fromStdString(asmText));
-        _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
-        
-        auto info = get_fragment_bytecode_info(&bytecode[0]);
-        
-        std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
-        auto buffer = updater->constBuffer();
-        execInRsxThread(_rsx.get(), [&] {
-            std::vector<uint8_t> vec(buffer->size());
-            glGetNamedBufferSubData(buffer->handle(), 0, buffer->size(), &vec[0]);
-            auto ptr = (std::array<uint32_t, 4>*)&vec[0];
-            auto index = 0u;
-            for (auto i = 0u; i < info.constMap.size(); ++i) {
-                if (info.constMap[i]) {
-                    values.push_back(std::make_tuple(index, ptr[index]));
-                    index++;
+        if (updater) {
+            auto const& bytecode = updater->bytecode();
+            // TODO: handle sizes
+            std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
+            auto asmText = PrintFragmentProgram(&bytecode[0]);
+            auto glslText = GenerateFragmentShader(bytecode, sizes, context->isFlatShadeMode);
+            _window.teFragmentAsm->setText(QString::fromStdString(asmText));
+            _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
+            
+            auto info = get_fragment_bytecode_info(&bytecode[0]);
+            
+            std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
+            auto buffer = updater->constBuffer();
+            execInRsxThread(_rsx.get(), [&] {
+                std::vector<uint8_t> vec(buffer->size());
+                glGetNamedBufferSubData(buffer->handle(), 0, buffer->size(), &vec[0]);
+                auto ptr = (std::array<uint32_t, 4>*)&vec[0];
+                auto index = 0u;
+                for (auto i = 0u; i < info.constMap.size(); ++i) {
+                    if (info.constMap[i]) {
+                        values.push_back(std::make_tuple(index, ptr[index]));
+                        index++;
+                    }
                 }
-            }
-        });
-        
-        auto vertexConstModel = new ConstTableModel(values);
-        _window.twFragmentConsts->setModel(vertexConstModel);
+            });
+            
+            auto vertexConstModel = new ConstTableModel(values);
+            _window.twFragmentConsts->setModel(vertexConstModel);
+        }
     }
     
     auto textureModel = new TextureTableModel(_rsx.get());
@@ -744,8 +745,8 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         commands.push_back(command);
     }
     
-    for (auto i = _currentCommand; i <= lastCommand; ++i) {
-        _rsx->sendCommand({commands[i], false});
+    for (auto& c : commands) {
+        _rsx->sendCommand({c, false});
     }
     
     _rsx->sendCommand(makeNopCommand());
@@ -773,5 +774,10 @@ void MainWindowModel::changeFrame() {
             return;
         auto command = _db.getCommand(0, current.row());
         _window.twArgs->setModel(new ArgumentTableModel(command));
+    });
+    
+    QObject::disconnect(_window.leSearchCommand, &QLineEdit::textChanged, 0, 0);
+    QObject::connect(_window.leSearchCommand, &QLineEdit::textChanged, [=] (auto text) {
+        
     });
 }

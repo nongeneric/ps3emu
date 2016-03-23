@@ -94,6 +94,10 @@
     X(ImageInSize) \
     X(BlendEnable) \
     X(BlendFuncSFactor) \
+    X(LogicOpEnable) \
+    X(BlendEquation) \
+    X(ZStencilClearValue) \
+    X(VertexData4fM) \
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \

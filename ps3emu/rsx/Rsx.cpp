@@ -205,8 +205,15 @@ void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
     _context->vertexLoadOffset += bytes;
 }
 
-void Rsx::VertexAttribInputMask(uint32_t mask) {
+void Rsx::VertexAttribInputMask(uint16_t mask) {
     TRACE1(VertexAttribInputMask, mask);
+    for (auto i = 0u; i < 16; ++i) {
+        if (!(mask & 1)) {
+            glDisableVertexAttribArray(i);
+            glVertexAttrib4f(i, 0, 0, 0, 1);
+        }
+        mask >>= 1;
+    }
 }
 
 void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
@@ -612,8 +619,15 @@ void Rsx::updateShaders() {
         
         auto size = CalcVertexBytecodeSize(_context->vertexInstructions.data());
         
-        VertexShaderCacheKey key { std::vector<uint8_t>(_context->vertexInstructions.data(),
-                                                        _context->vertexInstructions.data() + size) };
+        std::array<uint8_t, 16> arraySizes;
+        assert(_context->vertexInputs.size() == arraySizes.size());
+        for (auto i = 0u; i < arraySizes.size(); ++i) {
+            arraySizes[i] = _context->vertexInputs[i].rank;
+        }
+        VertexShaderCacheKey key{
+            std::vector<uint8_t>(_context->vertexInstructions.data(),
+                                 _context->vertexInstructions.data() + size),
+            arraySizes};
         auto shader = _context->vertexShaderCache.retrieve(key);
         if (!shader) {
             auto text = GenerateVertexShader(_context->vertexInstructions.data(),
@@ -1240,6 +1254,7 @@ GLBuffer* Rsx::getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed)
     BufferCacheKey key { va, size };
     GLBuffer* buffer = _context->bufferCache.retrieve(key);
     if (!buffer) {
+        assert(_mode != RsxOperationMode::Replay);
         buffer = addBufferToCache(va, size, wordReversed);
     }
     return buffer;
@@ -1569,6 +1584,39 @@ void Rsx::BlendFuncSFactor(uint16_t sfcolor,
         gcmBlendFuncToOpengl(sfalpha),
         gcmBlendFuncToOpengl(dfalpha)
     );
+}
+
+void Rsx::LogicOpEnable(bool enable) {
+    TRACE1(LogicOpEnable, enable);
+    glEnableb(GL_COLOR_LOGIC_OP, enable);
+}
+
+GLenum gcmBlendEquationToOpengl(uint16_t eq) {
+    switch (eq) {
+        case CELL_GCM_FUNC_ADD: return GL_FUNC_ADD;
+        case CELL_GCM_MIN: return GL_MIN;
+        case CELL_GCM_MAX: return GL_MAX;
+        case CELL_GCM_FUNC_SUBTRACT: return GL_FUNC_SUBTRACT;
+        case CELL_GCM_FUNC_REVERSE_SUBTRACT: return GL_FUNC_REVERSE_SUBTRACT;
+    }
+    throw std::runtime_error("unsupported blend equation");
+}
+
+void Rsx::BlendEquation(uint16_t color, uint16_t alpha) {
+    TRACE2(BlendEquation, color, alpha);
+    glBlendEquationSeparate(
+        gcmBlendEquationToOpengl(color),
+        gcmBlendEquationToOpengl(alpha));
+}
+
+void Rsx::ZStencilClearValue(uint32_t value) {
+    TRACE1(ZStencilClearValue, value);
+    glClearStencil(value);
+}
+
+void Rsx::VertexData4fM(unsigned index, float x, float y, float z, float w) {
+    TRACE5(VertexData4fM, index, x, y, z, w);
+    glVertexAttrib4f(index, x, y, z, w);
 }
 
 void Rsx::setOperationMode(RsxOperationMode mode) {

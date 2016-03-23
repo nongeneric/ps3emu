@@ -38,6 +38,9 @@
       <widget class="QWidget" name="">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
+         <widget class="QLineEdit" name="leSearchCommand"/>
+        </item>
+        <item>
          <widget class="QTableView" name="commandTableView">
           <property name="enabled">
            <bool>true</bool>

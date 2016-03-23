@@ -328,17 +328,17 @@ void GLTexture::bind(GLuint textureUnit) {
 }
 
 void glcheck(int line, const char* call) {
-    BOOST_LOG_TRIVIAL(trace) << "glcall: " << call;
-    auto err = glGetError();
-    if (err) {
-        auto msg = err == GL_INVALID_ENUM ? "GL_INVALID_ENUM"
-                   : err == GL_INVALID_VALUE ? "GL_INVALID_VALUE"
-                   : err == GL_INVALID_OPERATION ? "GL_INVALID_OPERATION"
-                   : err == GL_INVALID_FRAMEBUFFER_OPERATION ? "GL_INVALID_FRAMEBUFFER_OPERATION"
-                   : err == GL_OUT_OF_MEMORY ? "GL_OUT_OF_MEMORY"
-                   : "unknown";
-        throw std::runtime_error(ssnprintf("[%d] error: %x (%s)\n", line, err, msg));
-    }
+//     BOOST_LOG_TRIVIAL(trace) << "glcall: " << call;
+//     auto err = glGetError();
+//     if (err) {
+//         auto msg = err == GL_INVALID_ENUM ? "GL_INVALID_ENUM"
+//                    : err == GL_INVALID_VALUE ? "GL_INVALID_VALUE"
+//                    : err == GL_INVALID_OPERATION ? "GL_INVALID_OPERATION"
+//                    : err == GL_INVALID_FRAMEBUFFER_OPERATION ? "GL_INVALID_FRAMEBUFFER_OPERATION"
+//                    : err == GL_OUT_OF_MEMORY ? "GL_OUT_OF_MEMORY"
+//                    : "unknown";
+//         throw std::runtime_error(ssnprintf("[%d] error: %x (%s)\n", line, err, msg));
+//     }
 }
 
 TextureReader::TextureReader(uint32_t format, const RsxTextureInfo& info)

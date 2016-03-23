@@ -121,7 +121,7 @@ class Rsx {
     void ShaderControl(uint32_t control, uint8_t registerCount);
     void TransformProgramLoad(uint32_t load, uint32_t start);
     void TransformProgram(uint32_t locationOffset, unsigned size);
-    void VertexAttribInputMask(uint32_t mask);
+    void VertexAttribInputMask(uint16_t mask);
     void TransformTimeout(uint16_t count, uint16_t registerCount);
     void ShaderProgram(uint32_t locationOffset);
     void ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h);
@@ -282,6 +282,10 @@ class Rsx {
                           uint16_t sfalpha,
                           uint16_t dfcolor,
                           uint16_t dfalpha);
+    void LogicOpEnable(bool enable);
+    void BlendEquation(uint16_t color, uint16_t alpha);
+    void ZStencilClearValue(uint32_t value);
+    void VertexData4fM(unsigned index, float x, float y, float z, float w);
     
     // Replay-specific
     void UpdateBufferCache(uint32_t va);

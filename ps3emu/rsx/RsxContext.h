@@ -97,11 +97,12 @@ struct TextureCacheKey {
 
 struct VertexShaderCacheKey {
     std::vector<uint8_t> bytecode;
+    std::array<uint8_t, 16> arraySizes;
     inline bool operator<(VertexShaderCacheKey const& other) const {
         auto size = bytecode.size();
         auto othersize = other.bytecode.size();
-        return std::tie(size, bytecode)
-             < std::tie(othersize, other.bytecode);
+        return std::tie(size, bytecode, arraySizes)
+             < std::tie(othersize, other.bytecode, other.arraySizes);
     }
 };
 

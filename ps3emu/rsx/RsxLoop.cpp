@@ -323,9 +323,12 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x0000031c:
             name = "CELL_GCM_NV4097_SET_BLEND_COLOR";
             break;
-        case 0x00000320:
-            name = "CELL_GCM_NV4097_SET_BLEND_EQUATION";
+        case 0x00000320: {
+            //name = "CELL_GCM_NV4097_SET_BLEND_EQUATION";
+            auto arg = readarg(1);
+            BlendEquation(arg & 0xffff, arg >> 16);
             break;
+        }
         case 0x00000324:
             //name = "CELL_GCM_NV4097_SET_COLOR_MASK";
             ColorMask(readarg(1));
@@ -389,7 +392,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_COLOR_MASK_MRT";
             break;
         case 0x00000374:
-            name = "CELL_GCM_NV4097_SET_LOGIC_OP_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_LOGIC_OP_ENABLE";
+            LogicOpEnable(readarg(1));
             break;
         case 0x00000378:
             name = "CELL_GCM_NV4097_SET_LOGIC_OP";
@@ -656,9 +660,6 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001a04:
             name = "CELL_GCM_NV4097_SET_TEXTURE_FORMAT";
             break;
-        case 0x00001c00:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA4F_M";
-            break;
         case 0x00001d00:
             name = "CELL_GCM_NV4097_SET_COLOR_KEY_COLOR";
             break;
@@ -706,7 +707,8 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         }
         case 0x00001d8c:
-            name = "CELL_GCM_NV4097_SET_ZSTENCIL_CLEAR_VALUE";
+            //name = "CELL_GCM_NV4097_SET_ZSTENCIL_CLEAR_VALUE";
+            ZStencilClearValue(readarg(1));
             break;
         case 0x00001d90:
             //name = "CELL_GCM_NV4097_SET_COLOR_CLEAR_VALUE";
@@ -1468,6 +1470,21 @@ int64_t Rsx::interpret(uint32_t get) {
                 //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM";
                 assert(count <= 32);
                 TransformProgram(get + 4, count);
+                break;
+            }
+            if (isScale(offset,
+                        0x00001c00,
+                        16,
+                        16,
+                        index)) {
+                //name = "CELL_GCM_NV4097_SET_VERTEX_DATA4F_M";
+                VertexData4fM(
+                    index,
+                    union_cast<uint32_t, float>(readarg(1)),
+                    union_cast<uint32_t, float>(readarg(2)),
+                    union_cast<uint32_t, float>(readarg(3)),
+                    union_cast<uint32_t, float>(readarg(4))
+                );
                 break;
             }
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("illegal method offset %x", offset);

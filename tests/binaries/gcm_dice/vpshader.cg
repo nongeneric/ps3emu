@@ -1,0 +1,20 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+void main
+(
+	float4 position	: POSITION,
+	float2 texcoord	: TEXCOORD0,
+    float4 tint       : COLOR,
+
+	out float4 oPosition : POSITION,
+	out float2 oTexCoord : TEXCOORD0,
+    out float4 oTint     : COLOR
+)
+{
+    oPosition = position;
+    oTexCoord = texcoord;
+    oTint = tint;
+}

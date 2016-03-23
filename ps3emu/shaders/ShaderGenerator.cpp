@@ -90,6 +90,12 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("    vec4 c[2];");
     line(ssnprintf("    vec4 r[%d];", lastReg + 1));
     line(ssnprintf("    vec4 h[%d];", 2 * (lastReg + 1)));
+    for (auto i = 0u; i < lastReg + 1; ++i) {
+        line(ssnprintf("    r[%d] = vec4(0, 0, 0, 0);", i));
+    }
+    for (auto i = 0u; i < 2 * (lastReg + 1); ++i) {
+        line(ssnprintf("    h[%d] = vec4(0, 0, 0, 0);", i));
+    }
     for (auto& st : sts) {
         auto str = PrintStatement(st.get());
         line(str);
@@ -265,10 +271,12 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         line(ssnprintf("    v_out[%d] = vec4(0,0,0,1);", i));
     }
     for (size_t i = 0; i < inputs.size(); ++i) {
-        if (!inputs[i].enabled)
-            continue;
-        auto suffix = inputs[i].typeSize == 4 ? "f" : "b";
-        line(ssnprintf("    v_in[%d] = reverse%d%s(v_in_be[%d]);", i, inputs[i].rank, suffix, i));
+        if (inputs[i].enabled) {
+            auto suffix = inputs[i].typeSize == 4 ? "f" : "b";
+            line(ssnprintf("    v_in[%d] = reverse%d%s(v_in_be[%d]);", i, inputs[i].rank, suffix, i));
+        } else {
+            line(ssnprintf("    v_in[%d] = v_in_be[%d];", i, i));
+        }
     }
     std::vector<std::unique_ptr<Statement>> sts;
     std::array<VertexInstr, 2> instr;
