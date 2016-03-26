@@ -17,18 +17,18 @@ void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
 }
 
 void FragmentShaderUpdateFunctor::updateConsts() {
-    auto fconst = (std::array<float, 4>*)_constBuffer.map();
+    auto fconst = (std::array<float, 4>*)_constBuffer.mapped();
     for (auto i = 0u; i < _info.length; i += 16) {
         if (_info.constMap[i / 16]) {
             *fconst = read_fragment_imm_val(&_newbytecode[i]);
             fconst++;
         }
     }
-    _constBuffer.unmap();
+    _constBuffer.flush(0, _info.length * 16);
 }
 
 FragmentShaderUpdateFunctor::FragmentShaderUpdateFunctor(uint32_t va, uint32_t size, RsxContext* rsxContext, MainMemory* mm)
-    : _constBuffer(GLBufferType::MapWrite, size / 2),
+    : _constBuffer(size / 2),
       _context(rsxContext),
       _mm(mm),
       va(va), size(size)
@@ -88,6 +88,6 @@ std::vector<uint8_t> const& FragmentShaderUpdateFunctor::bytecode() {
     return _bytecode;
 }
 
-GLBuffer* FragmentShaderUpdateFunctor::constBuffer() {
+GLPersistentBuffer* FragmentShaderUpdateFunctor::constBuffer() {
     return &_constBuffer;
 }

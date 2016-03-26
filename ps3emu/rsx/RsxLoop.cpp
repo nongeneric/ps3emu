@@ -547,7 +547,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_INVALIDATE_VERTEX_CACHE_FILE";
             break;
         case 0x00001714:
-            name = "CELL_GCM_NV4097_INVALIDATE_VERTEX_FILE";
+            //name = "CELL_GCM_NV4097_INVALIDATE_VERTEX_FILE";
+            // no-op
             break;
         case 0x00001718:
             name = "CELL_GCM_NV4097_PIPE_NOP";
@@ -1490,10 +1491,10 @@ int64_t Rsx::interpret(uint32_t get) {
             BOOST_LOG_TRIVIAL(fatal) << ssnprintf("illegal method offset %x", offset);
         }
     }
-    if (!name)
-        name = "";
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("[0x%08x: %02d%s] %s", 
-        get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
+    if (name) {
+        BOOST_LOG_TRIVIAL(trace) << ssnprintf("[0x%08x: %02d%s] %s", 
+            get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
+    }
     len = (header.count.u() + 1) * 4;
     assert(len != 0);
     return len;
@@ -1530,6 +1531,7 @@ void Rsx::loop() {
     } else {
         runLoop();
     }
+    shutdownGcm();
 }
 
 void Rsx::runLoop() {
@@ -1542,7 +1544,6 @@ void Rsx::runLoop() {
             return;
         }
         while (_get != _put || _ret) {
-            BOOST_LOG_TRIVIAL(trace) << ssnprintf("get = %x put = %x", _get, _put);
             _get += interpret(_get);
         }
     }

@@ -12,11 +12,13 @@ class MainWindowModel {
     Ui::MainWindow _window;
     QMainWindow _qwindow;
     GcmDatabase _db;
+    unsigned _lastDrawCount;
     std::unique_ptr<Process> _proc;
     std::unique_ptr<Rsx> _rsx;
     unsigned _currentCommand;
     unsigned _currentFrame;
     void changeFrame();
+    
 public:
     MainWindowModel();
     ~MainWindowModel();

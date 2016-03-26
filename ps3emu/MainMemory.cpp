@@ -42,8 +42,8 @@ void MainMemory::copy(ps3_uintptr_t va,
         if (!Read) {
             auto ptr = page.ptr.fetch_and(PagePtrMask);
             if (ptr & 1) {
-                _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize, 
-                                   DefaultMainMemoryPageSize);
+                _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize,
+                                    DefaultMainMemoryPageSize);
             }
         }
         if (!page.ptr) {

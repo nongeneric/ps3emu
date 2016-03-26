@@ -83,9 +83,9 @@ int32_t cellGcmAddressToOffset(uint32_t address, boost::endian::big_uint32_t *of
 int32_t cellGcmIoOffsetToAddress(uint32_t offset, boost::endian::big_uint32_t *address);
 uint32_t cellGcmGetMaxIoMapSize();
 int32_t cellGcmGetOffsetTable(CellGcmOffsetTable* table);
-int32_t cellGcmMapEaIoAddress(uint32_t ea, uint32_t io, uint32_t size);
-int32_t cellGcmMapEaIoAddressWithFlags(uint32_t ea, uint32_t io, uint32_t size, uint32_t userflags);
-int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big_uint32_t *offset);
+int32_t cellGcmMapEaIoAddress(uint32_t ea, uint32_t io, uint32_t size, Process* proc);
+int32_t cellGcmMapEaIoAddressWithFlags(uint32_t ea, uint32_t io, uint32_t size, uint32_t userflags, Process* proc);
+int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big_uint32_t *offset, Process* proc);
 int32_t cellGcmUnmapEaIoAddress(uint32_t ea);
 int32_t cellGcmUnmapIoAddress(uint32_t io);
 uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMemory* mm);

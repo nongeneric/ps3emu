@@ -7,7 +7,7 @@
 class MainMemory;
 class RsxContext;
 class FragmentShaderUpdateFunctor {
-    GLBuffer _constBuffer;
+    GLPersistentBuffer _constBuffer;
     std::vector<uint8_t> _bytecode;
     std::vector<uint8_t> _newbytecode;
     FragmentProgramInfo _info;
@@ -27,5 +27,5 @@ public:
     void update(FragmentShader* shader);
     void bindConstBuffer();
     std::vector<uint8_t> const& bytecode();
-    GLBuffer* constBuffer();
+    GLPersistentBuffer* constBuffer();
 };

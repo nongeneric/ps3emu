@@ -34,14 +34,12 @@ class Cache {
     std::map<K, ValueInfo<T, U>> _store;
     std::set<K> _dirty;
     
-    void actualize() {
-        for (auto& k : _dirty) {
-            auto it = _store.find(k);
-            assert(it != end(_store));
-            it->second.updater->update(it->second.value.get());
-        }
-        _dirty.clear();
+    bool intersects(ValueInfo<T, U>& info, uint32_t va, uint32_t size) {
+        auto itemVa = info.updater->va;
+        auto itemSize = info.updater->size;
+        return !(itemVa > va + size || itemVa + itemSize < va);
     }
+    
 public:
     T* retrieve(K const& key) {
         return std::get<0>(retrieveWithUpdater(key));
@@ -63,17 +61,34 @@ public:
     void invalidate(uint32_t va, uint32_t size) {
         BOOST_LOG_TRIVIAL(trace) << ssnprintf("invalidating cache %x, %x", va, size);
         for (auto& p : _store) {
-            auto itemVa = p.second.updater->va;
-            auto itemSize = p.second.updater->size;
-            if (itemVa > va + size || itemVa + itemSize < va)
+            if (!intersects(p.second, va, size))
                 continue;
             _dirty.insert(p.first);
         }
     }
     
+    bool sync(K const& key) {
+        auto it = _dirty.find(key);
+        if (it != end(_dirty)) {
+            auto& info = _store[key];
+            info.updater->update(info.value.get());
+            _dirty.erase(it);
+            return true;
+        }
+        return false;
+    }
+    
+    void syncAll() {
+        for (auto& k : _dirty) {
+            auto it = _store.find(k);
+            assert(it != end(_store));
+            it->second.updater->update(it->second.value.get());
+        }
+        _dirty.clear();
+    }
+    
     template <typename F>
     void watch(F setBreak) {
-        actualize();
         for (auto& p : _store) {
             setBreak(p.second.updater->va, p.second.updater->size);
         }

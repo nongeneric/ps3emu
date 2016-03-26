@@ -58,8 +58,7 @@ public:
            if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
                return QColor(Qt::green);
            }
-           if (id == CommandId::addBufferToCache ||
-               id == CommandId::UpdateBufferCache ||
+           if (id == CommandId::UpdateBufferCache ||
                id == CommandId::addFragmentShaderToCache ||
                id == CommandId::UpdateFragmentCache ||
                id == CommandId::addTextureToCache ||
@@ -302,8 +301,8 @@ public:
         if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
             return QVariant();
         switch (section) {
-            case 0: return "EA";
-            case 1: return "Size";
+            case 0: return "Location";
+            case 1: return "Offset";
         }
         return QVariant();
     }
@@ -316,10 +315,10 @@ public:
         if (role != Qt::DisplayRole)
             return QVariant();
         auto cache = _rsx->context()->bufferCache.cacheSnapshot();
-        auto buffer = cache[index.row()];
+        auto key = cache[index.row()].key;
         switch (index.column()) {
-            case 0: return QString::fromStdString(ssnprintf("#%08x", buffer.key.va));
-            case 1: return QString::fromStdString(ssnprintf("%d", buffer.key.size));
+            case 0: return key.location == MemoryLocation::Local ? "Local" : "Main";
+            case 1: return QString::fromStdString(ssnprintf("#%x", key.offset));
         }
         return QVariant();
     }
@@ -465,10 +464,12 @@ public:
 class VDABufferTableModel : public QAbstractItemModel {
     Rsx* _rsx;
     VertexDataArrayFormatInfo _info;
-    std::vector<uint8_t> _buffer;
+    uint8_t* _buffer;
+    unsigned _size;
+    
 public:
-    VDABufferTableModel(Rsx* rsx, std::vector<uint8_t> buffer, unsigned vdaIndex) 
-        : _rsx(rsx), _buffer(buffer) {
+    VDABufferTableModel(Rsx* rsx, std::uint8_t* buffer, unsigned vdaIndex, unsigned size) 
+        : _rsx(rsx), _buffer(buffer), _size(size) {
         _info = _rsx->context()->vertexDataArrays[vdaIndex];
     }
     
@@ -523,7 +524,7 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        return _buffer.size() / _info.stride;
+        return _size;
     }
 };
 
@@ -594,7 +595,7 @@ public:
     }
 };
 
-MainWindowModel::MainWindowModel() : _currentCommand(0), _currentFrame(0) {
+MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _currentFrame(0) {
     _window.setupUi(&_qwindow);
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
     Rsx::setOperationMode(RsxOperationMode::Replay);
@@ -640,14 +641,10 @@ void MainWindowModel::update() {
         
         std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
         auto& buffer = _rsx->context()->vertexConstBuffer;
-        execInRsxThread(_rsx.get(), [&] {
-            std::vector<uint8_t> vec(buffer.size());
-            glGetNamedBufferSubData(buffer.handle(), 0, buffer.size(), &vec[0]);
-            auto uints = (std::array<uint32_t, 4>*)&vec[0];
-            for (auto constIndex : usedConsts) {
-                values.push_back(std::make_tuple(constIndex, uints[constIndex]));
-            }
-        });
+        auto uints = (std::array<uint32_t, 4>*)buffer.mapped();
+        for (auto constIndex : usedConsts) {
+            values.push_back(std::make_tuple(constIndex, uints[constIndex]));
+        }
         auto vertexConstModel = new ConstTableModel(values);
         _window.twVertexConsts->setModel(vertexConstModel);
     }
@@ -670,19 +667,14 @@ void MainWindowModel::update() {
             
             std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
             auto buffer = updater->constBuffer();
-            execInRsxThread(_rsx.get(), [&] {
-                std::vector<uint8_t> vec(buffer->size());
-                glGetNamedBufferSubData(buffer->handle(), 0, buffer->size(), &vec[0]);
-                auto ptr = (std::array<uint32_t, 4>*)&vec[0];
-                auto index = 0u;
-                for (auto i = 0u; i < info.constMap.size(); ++i) {
-                    if (info.constMap[i]) {
-                        values.push_back(std::make_tuple(index, ptr[index]));
-                        index++;
-                    }
+            auto ptr = (std::array<uint32_t, 4>*)buffer->mapped();
+            auto index = 0u;
+            for (auto i = 0u; i < info.constMap.size(); ++i) {
+                if (info.constMap[i]) {
+                    values.push_back(std::make_tuple(index, ptr[index]));
+                    index++;
                 }
-            });
-            
+            }
             auto vertexConstModel = new ConstTableModel(values);
             _window.twFragmentConsts->setModel(vertexConstModel);
         }
@@ -705,21 +697,9 @@ void MainWindowModel::update() {
         if (!input.enabled)
             return;
         auto info = _rsx->context()->vertexDataArrays[index.row()];
-        auto ea = rsxOffsetToEa(info.location, info.offset);
-        auto bufferVec = _rsx->context()->bufferCache.cacheSnapshot();
-        std::sort(begin(bufferVec), end(bufferVec), [&](auto l, auto r) {
-            return l.key.size > r.key.size;
-        });
-        auto entry = std::find_if(begin(bufferVec), end(bufferVec), [&](auto e) {
-            return e.key.va == ea;
-        });
-        assert(entry != end(bufferVec));
-        auto buffer = entry->value;
-        std::vector<uint8_t> vec(buffer->size());
-        execInRsxThread(_rsx.get(), [&] {
-            glGetNamedBufferSubData(buffer->handle(), 0, buffer->size(), &vec[0]);
-        });
-        auto vdaBufferModel = new VDABufferTableModel(_rsx.get(), vec, index.row());
+        auto buffer = _rsx->getBuffer(info.location);
+        auto mapped = (uint8_t*)buffer->mapped() + info.offset;
+        auto vdaBufferModel = new VDABufferTableModel(_rsx.get(), mapped, index.row(), _lastDrawCount);
         _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
     });
     _window.twVertexDataArrays->setModel(vdaModel);
@@ -746,6 +726,10 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
     }
     
     for (auto& c : commands) {
+        auto id = (CommandId)c.id;
+        if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
+            _lastDrawCount = c.args[0].value + c.args[1].value; // first + count
+        }
         _rsx->sendCommand({c, false});
     }
     

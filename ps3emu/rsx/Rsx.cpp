@@ -511,7 +511,9 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t va, uint32_t count) {
         boost::endian::endian_reverse_inplace(*u);
     }
     
-    glcall(glNamedBufferSubData(_context->vertexConstBuffer.handle(), loadAt * 16, size, source.data()));
+    auto mapped = (uint8_t*)_context->vertexConstBuffer.mapped() + loadAt * 16;
+    memcpy(mapped, source.data(), size);
+    _context->vertexConstBuffer.flush(loadAt * 16, size);
 }
 
 bool Rsx::linkShaderProgram() {
@@ -556,10 +558,9 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     assert(first == 0);
-    auto va = rsxOffsetToEa(_context->indexArray.location, 
-                            _context->indexArray.offset);
-    auto size = count * 4;
-    auto buffer = getBufferFromCache(va, size, true);
+    //auto size = count * 4;
+    //syncBuffer(_context->indexArray.location, _context->indexArray.offset, size, true);
+    auto buffer = getBuffer(_context->indexArray.location);
     
     updateVertexDataArrays(first, count);
     updateTextures();
@@ -569,7 +570,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     
     glcall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->handle()));
     
-    auto offset = (void*)(uintptr_t)first;
+    auto offset = (void*)(uintptr_t)(first * 4 + _context->indexArray.offset);
     glcall(glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset));
     
     TRACE2(DrawIndexArray, first, count);
@@ -742,7 +743,7 @@ GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
 
 void Rsx::updateTextures() {
     int i = 0;
-    auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.map();
+    auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
     for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
             auto textureUnit = i + VertexTextureUnit;
@@ -767,10 +768,10 @@ void Rsx::updateTextures() {
         }
         i++;
     }
-    _context->vertexSamplersBuffer.unmap();
+    _context->vertexSamplersBuffer.flush(0, sizeof(VertexShaderSamplerUniform));
     
     i = 0;
-    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->fragmentSamplersBuffer.map();
+    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->fragmentSamplersBuffer.mapped();
     for (auto& sampler : _context->fragmentTextureSamplers) {
         if (sampler.enable && sampler.texture.width && sampler.texture.height) {
             auto textureUnit = i + FragmentTextureUnit;
@@ -802,7 +803,7 @@ void Rsx::updateTextures() {
         }
         i++;
     }
-    _context->fragmentSamplersBuffer.unmap();
+    _context->fragmentSamplersBuffer.flush(0, sizeof(FragmentShaderSamplerUniform));
 }
 
 void Rsx::init(Process* proc) {
@@ -1116,12 +1117,10 @@ void glDebugCallbackFunction(GLenum source,
                    : source == GL_DEBUG_SOURCE_THIRD_PARTY ? "ThirdParty"
                    : source == GL_DEBUG_SOURCE_APPLICATION ? "Application"
                    : "Other";
-    auto text = ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
-    if (type == GL_DEBUG_TYPE_ERROR) {
+    //if (type == GL_DEBUG_TYPE_ERROR) {
+        auto text = ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
         BOOST_LOG_TRIVIAL(error) << text;
-    } else {
-        BOOST_LOG_TRIVIAL(trace) << text;
-    }
+    //}
     if (severity == GL_DEBUG_SEVERITY_HIGH)
         exit(1);
 }
@@ -1146,16 +1145,23 @@ void Rsx::initGcm() {
     _mm->provideMemory(RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemory.get());
     
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
-    _context->vertexConstBuffer = GLBuffer(GLBufferType::Dynamic, constBufferSize);
+    _context->vertexConstBuffer = GLPersistentBuffer(constBufferSize);
     
     auto uniformSize = sizeof(VertexShaderSamplerUniform);
-    _context->vertexSamplersBuffer = GLBuffer(GLBufferType::MapWrite, uniformSize);
+    _context->vertexSamplersBuffer = GLPersistentBuffer(uniformSize);
     
     uniformSize = sizeof(VertexShaderViewportUniform);
-    _context->vertexViewportBuffer = GLBuffer(GLBufferType::MapWrite, uniformSize);
+    _context->vertexViewportBuffer = GLPersistentBuffer(uniformSize);
     
     uniformSize = sizeof(FragmentShaderSamplerUniform);
-    _context->fragmentSamplersBuffer = GLBuffer(GLBufferType::MapWrite, uniformSize);
+    _context->fragmentSamplersBuffer = GLPersistentBuffer(uniformSize);
+    
+    _context->localMemoryBuffer = GLPersistentBuffer(256 * (1u << 20));
+    _context->mainMemoryBuffer = GLPersistentBuffer(256 * (1u << 20));
+    
+    _mm->provideMemory(RsxFbBaseAddr,
+                       _context->localMemoryBuffer.size(),
+                       _context->localMemoryBuffer.mapped());
     
     for (auto& s : _context->vertexTextureSamplers) {
         s.enable = false;
@@ -1171,6 +1177,10 @@ void Rsx::initGcm() {
     BOOST_LOG_TRIVIAL(trace) << "rsx initialized";
     _initialized = true;
     _initCv.notify_all();
+}
+
+void Rsx::shutdownGcm() {
+    _context.reset();
 }
 
 void Rsx::updateViewPort() {
@@ -1217,47 +1227,53 @@ void Rsx::updateViewPort() {
                        _context->viewPort.offset[2],
                        1);
     
-    auto viewportUniform = (VertexShaderViewportUniform*)_context->vertexViewportBuffer.map();
+    auto viewportUniform = (VertexShaderViewportUniform*)_context->vertexViewportBuffer.mapped();
     viewportUniform->glInverseGcm = glm::inverse(gl) * gcm;
-    _context->vertexViewportBuffer.unmap();
+    _context->vertexViewportBuffer.flush(0, sizeof(VertexShaderViewportUniform));
 }
 
-GLBuffer* Rsx::addBufferToCache(uint32_t va, uint32_t size, bool wordReversed) {
-    BufferCacheKey key { va, size };
-    auto updater = new SimpleCacheItemUpdater<GLBuffer> {
-        va, size, [=](auto b) {
-            auto mapped = (uint32_t*)b->map();
-            _mm->readMemory(va, mapped, size);
-            
-            if (wordReversed) {
-                for (auto i = 0u; i < size / 4; ++i) {
-                    boost::endian::endian_reverse_inplace(mapped[i]);
-                }
-            }
-            
-            _context->tracer.pushBlob(mapped, size);
-            TRACE2(UpdateBufferCache, va, size);
-            b->unmap();
-        }, [=](auto b, auto& blob) {
-            auto mapped = b->map();
-            memcpy(mapped, &blob[0], blob.size());
-            b->unmap();
+GLPersistentBuffer* Rsx::getBuffer(MemoryLocation location) {
+    return location == MemoryLocation::Local ? &_context->localMemoryBuffer
+                                             : &_context->mainMemoryBuffer;
+}
+
+void Rsx::syncBuffer(MemoryLocation location, uint32_t offset, uint32_t areaSize, bool wordReverse) {
+    if (_mode == RsxOperationMode::Replay)
+        return;
+    auto pageSize = 1u << 20;
+    for (auto cur = offset; cur < offset + areaSize; cur += pageSize) {
+        auto page = cur & (~0u << 20);
+        BufferCacheKey key { location, page, pageSize };
+        int* token;
+        SimpleCacheItemUpdater<int>* updater;
+        std::tie(token, updater) = _context->bufferCache.retrieveWithUpdater(key);
+        if (!updater) {
+            auto buffer = getBuffer(location);
+            updater = new SimpleCacheItemUpdater<int>{
+                rsxOffsetToEa(location, page), pageSize};
+            updater->update = [=](auto) {
+                auto mapped = (uint8_t*)buffer->mapped() + page;
+                _mm->readMemory(updater->va, mapped, pageSize, true);
+                buffer->flush(page, pageSize);
+                _context->tracer.pushBlob(mapped, pageSize);
+                TRACE2(UpdateBufferCache, location, page);
+            };
+            _context->bufferCache.insert(key, new int(), updater);
         }
-    };
-    auto buffer = new GLBuffer(GLBufferType::MapWrite, size);
-    _context->bufferCache.insert(key, buffer, updater);
-    TRACE2(addBufferToCache, va, size);
-    return buffer;
-}
-
-GLBuffer* Rsx::getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed) {
-    BufferCacheKey key { va, size };
-    GLBuffer* buffer = _context->bufferCache.retrieve(key);
-    if (!buffer) {
-        assert(_mode != RsxOperationMode::Replay);
-        buffer = addBufferToCache(va, size, wordReversed);
+        updater->va = rsxOffsetToEa(location, page); // in case the buffer has been remapped
+        if (_context->bufferCache.sync(key) && wordReverse) {
+            assert(cur == offset);
+            auto buffer = getBuffer(location);
+            auto ptr = (uint8_t*)buffer->mapped() + offset;
+            auto words = (uint32_t*)ptr;
+            for (auto i = 0u; i < areaSize / 4; ++i) {
+                boost::endian::endian_reverse_inplace(words[i]);
+            }
+            buffer->flush(offset, areaSize);
+            _context->tracer.pushBlob(ptr, areaSize);
+            TRACE2(UpdateBufferCache, location, offset);
+        }
     }
-    return buffer;
 }
 
 void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
@@ -1267,13 +1283,13 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
         if (!input.enabled)
             continue;
    
-        auto va = rsxOffsetToEa(format.location, format.offset);
-        auto bufferVa = va + first * format.stride;
-        auto bufferSize = count * format.stride;
-        auto buffer = getBufferFromCache(bufferVa, bufferSize, false);
+        auto bufferOffset = format.offset + first * format.stride;
+        //auto bufferSize = count * format.stride;
+        //syncBuffer(format.location, bufferOffset, bufferSize, false);
+        auto handle = getBuffer(format.location)->handle();
         
         glcall(glVertexAttribBinding(i, format.binding));
-        glcall(glBindVertexBuffer(format.binding, buffer->handle(), 0, format.stride));
+        glcall(glBindVertexBuffer(format.binding, handle, bufferOffset, format.stride));
     }
 }
 
@@ -1295,7 +1311,7 @@ void Rsx::SemaphoreOffset(uint32_t offset) {
 }
 
 void Rsx::memoryBreakHandler(uint32_t va, uint32_t size) {
-    _context->bufferCache.invalidate(va, size);
+    //_context->bufferCache.invalidate(va, size);
     _context->textureCache.invalidate(va, size);
     _context->fragmentShaderCache.invalidate(va, size);
 }
@@ -1311,10 +1327,12 @@ uint32_t Rsx::getGet() {
 void Rsx::watchCaches() {
     if (_mode == RsxOperationMode::Replay)
         return;
-    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { _mm->memoryBreak(va, size); };
-    _context->bufferCache.watch(setMemoryBreak);
-    _context->textureCache.watch(setMemoryBreak);
-    _context->fragmentShaderCache.watch(setMemoryBreak);
+    //auto setMemoryBreak = [=](uint32_t va, uint32_t size) { _mm->memoryBreak(va, size); };
+    //_context->bufferCache.watch(setMemoryBreak);
+    //_context->textureCache.watch(setMemoryBreak);
+    _context->textureCache.syncAll();
+    //_context->fragmentShaderCache.watch(setMemoryBreak);
+    _context->fragmentShaderCache.syncAll();
 }
 
 void Rsx::setVBlankHandler(uint32_t descrEa) {
@@ -1625,12 +1643,11 @@ void Rsx::setOperationMode(RsxOperationMode mode) {
 
 RsxOperationMode Rsx::_mode = RsxOperationMode::Run;
 
-void Rsx::UpdateBufferCache(uint32_t va) {
-    BufferCacheKey key { va, (uint32_t)_currentReplayBlob.size() };
-    auto tuple = _context->bufferCache.retrieveWithUpdater(key);
-    auto buffer = std::get<0>(tuple);
-    auto updater = std::get<1>(tuple);
-    updater->updateWithBlob(buffer, _currentReplayBlob);
+void Rsx::UpdateBufferCache(MemoryLocation location, uint32_t offset) {
+    auto buffer = getBuffer(location);
+    auto ptr = (uint8_t*)buffer->mapped() + offset;
+    memcpy(ptr, &_currentReplayBlob[0], _currentReplayBlob.size());
+    buffer->flush(offset, _currentReplayBlob.size());
 }
 
 void Rsx::UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format) {

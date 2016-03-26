@@ -4,6 +4,7 @@
 #include "../../ps3emu/constants.h"
 #include "../../ps3emu/Process.h"
 #include "../../ps3emu/rsx/Rsx.h"
+#include "../../ps3emu/rsx/RsxContext.h"
 #include "../../ps3emu/ELFLoader.h"
 #include "../../ps3emu/InternalMemoryManager.h"
 #include <algorithm>
@@ -144,6 +145,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     emuGcmState.rsx = proc->rsx();
     
     emuGcmState.offsetTable->map(ioAddress, 0, ioSize);
+    proc->mm()->provideMemory(ioAddress, ioSize, proc->rsx()->context()->mainMemoryBuffer.mapped());
     proc->mm()->writeMemory(ioAddress, gcmResetCommands, gcmResetCommandsSize);
     proc->mm()->writeMemory(ioAddress + gcmResetCommandsSize, gcmInitCommands, gcmInitCommandsSize);
     emuGcmState.context->begin = ioAddress + gcmResetCommandsSize;
@@ -350,19 +352,20 @@ int32_t cellGcmGetOffsetTable(CellGcmOffsetTable* table) {
     return CELL_OK;
 }
 
-int32_t cellGcmMapEaIoAddress(uint32_t ea, uint32_t io, uint32_t size) {
+int32_t cellGcmMapEaIoAddress(uint32_t ea, uint32_t io, uint32_t size, Process* proc) {
     if ((io & 0xfffff) || (size & 0xfffff)) {
         return CELL_GCM_ERROR_FAILURE;
     }
     emuGcmState.offsetTable->map(ea, io, size);
+    proc->mm()->provideMemory(ea, size, (uint8_t*)proc->rsx()->context()->mainMemoryBuffer.mapped() + io);
     return CELL_OK;
 }
 
-int32_t cellGcmMapEaIoAddressWithFlags(uint32_t ea, uint32_t io, uint32_t size, uint32_t) {
-    return cellGcmMapEaIoAddress(ea, io, size);
+int32_t cellGcmMapEaIoAddressWithFlags(uint32_t ea, uint32_t io, uint32_t size, uint32_t, Process* proc) {
+    return cellGcmMapEaIoAddress(ea, io, size, proc);
 }
 
-int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big_uint32_t* offset) {
+int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big_uint32_t* offset, Process* proc) {
     auto& eas = emuGcmState.offsetTable->eaAddress;
     auto ioGap = findGap<big_uint16_t>(begin(eas),
                                        end(eas),
@@ -370,7 +373,7 @@ int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big
                                        [](big_uint16_t x) { return x == 0xffff; });
     auto io = (uint32_t)std::distance(begin(eas), ioGap) << 20;
     *offset = io;
-    return cellGcmMapEaIoAddress(address, io, size);
+    return cellGcmMapEaIoAddress(address, io, size, proc);
 }
 
 int32_t cellGcmUnmapEaIoAddress(uint32_t ea) {

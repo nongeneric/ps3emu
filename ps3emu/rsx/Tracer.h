@@ -2,6 +2,7 @@
 
 #include "../utils.h"
 #include "../gcmviz/GcmDatabase.h"
+#include "../../libs/graphics/gcm.h"
 #include <vector>
 
 #define X(x) x,
@@ -101,7 +102,6 @@
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \
-    X(addBufferToCache) \
     X(addTextureToCache) \
     X(addFragmentShaderToCache) \
     X(updateOffsetTableForReplay) \
@@ -140,6 +140,12 @@ template<> struct GcmType<int16_t> { static constexpr uint32_t type = (uint32_t)
 template <typename T> struct ConvertType {
     static uint32_t convert(T value) {
         return value;
+    }
+};
+
+template <> struct ConvertType<MemoryLocation> {
+    static uint32_t convert(MemoryLocation value) {
+        return (uint32_t)value;
     }
 };
 

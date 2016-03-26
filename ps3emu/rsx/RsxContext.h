@@ -75,11 +75,12 @@ struct TransferInfo {
 };
 
 struct BufferCacheKey {
-    uint32_t va;
+    MemoryLocation location;
+    uint32_t offset;
     uint32_t size;
     inline bool operator<(BufferCacheKey const& other) const {
-        return std::tie(va, size)
-             < std::tie(other.va, other.size);
+        return std::tie(location, offset, size)
+             < std::tie(other.location, other.offset, other.size);
     }
 };
 
@@ -164,10 +165,10 @@ public:
     GLuint glVertexArrayMode;
     VertexShader* vertexShader = nullptr;
     FragmentShader* fragmentShader = nullptr;
-    GLBuffer vertexConstBuffer;
-    GLBuffer vertexSamplersBuffer;
-    GLBuffer vertexViewportBuffer;
-    GLBuffer fragmentSamplersBuffer;
+    GLPersistentBuffer vertexConstBuffer;
+    GLPersistentBuffer vertexSamplersBuffer;
+    GLPersistentBuffer vertexViewportBuffer;
+    GLPersistentBuffer fragmentSamplersBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentVa = 0;
@@ -185,7 +186,9 @@ public:
     uint32_t semaphoreOffset = 0;
     TransferInfo transfer;
     GLProgramPipeline pipeline;
-    Cache<BufferCacheKey, GLBuffer, 256 * (2 >> 20)> bufferCache;
+    GLPersistentBuffer mainMemoryBuffer;
+    GLPersistentBuffer localMemoryBuffer;
+    Cache<BufferCacheKey, int, 256 * (2 >> 20)> bufferCache;
     Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;

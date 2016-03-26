@@ -43,6 +43,7 @@ class GLTexture;
 class GLBuffer;
 class FragmentShader;
 struct RsxTextureInfo;
+class GLPersistentBuffer;
 class Rsx {
     static RsxOperationMode _mode;
     uint32_t _get = 0;
@@ -77,6 +78,7 @@ class Rsx {
     void replayLoop();
     void setSurfaceColorLocation(unsigned index, uint32_t location);
     void initGcm();
+    void shutdownGcm();
     void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
     bool linkShaderProgram();
     void updateVertexDataArrays(unsigned first, unsigned count);
@@ -85,7 +87,6 @@ class Rsx {
     void updateViewPort();
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
-    GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
     GLBuffer* addBufferToCache(uint32_t va, uint32_t size, bool wordReversed);
     FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size);
     FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size);
@@ -288,7 +289,8 @@ class Rsx {
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
     
     // Replay-specific
-    void UpdateBufferCache(uint32_t va);
+    void syncBuffer(MemoryLocation location, uint32_t offset, uint32_t areaSize, bool wordReverse);
+    void UpdateBufferCache(MemoryLocation location, uint32_t offset);
     void UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format);
     void UpdateFragmentCache(uint32_t va, uint32_t size);
     inline void StopReplay() { }
@@ -320,6 +322,7 @@ public:
     void sendCommand(GcmCommandReplayInfo info);
     bool receiveCommandCompletion();
     RsxContext* context();
+    GLPersistentBuffer* getBuffer(MemoryLocation location);
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);

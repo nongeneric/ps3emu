@@ -41,6 +41,12 @@ template<> struct DbColumnType<float> {
     }
 };
 
+template<> struct DbColumnType<MemoryLocation> {
+    static MemoryLocation convert(uint32_t value) {
+        return (MemoryLocation)value;
+    }
+};
+
 template<typename Vec>
 struct SeqBuilder {
     Vec* vec;
