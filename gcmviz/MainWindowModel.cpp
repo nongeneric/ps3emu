@@ -69,7 +69,11 @@ public:
         }
         if (role != Qt::DisplayRole)
             return QVariant();
-        return printCommandId((CommandId)command.id);
+        auto display = printCommandId((CommandId)command.id);
+        if (command.blob.empty())
+            return display;
+        return QString::fromStdString(
+            ssnprintf("%s (blob %d)", display, command.blob.size()));
     }
     
     QModelIndex parent(const QModelIndex& child) const override {
@@ -124,6 +128,7 @@ public:
             case GcmArgType::UInt16:
             case GcmArgType::UInt32: return ssnprintf("%d", arg.value);
         }
+        throw std::runtime_error("unknown type");
     }
     
     std::string printArgHex(GcmCommandArg const& arg) const {
@@ -137,6 +142,7 @@ public:
             case GcmArgType::Int32:
             case GcmArgType::UInt32: return ssnprintf("#%08x", arg.value);
         }
+        throw std::runtime_error("unknown type");
     }
     
     QVariant data(const QModelIndex& index,
@@ -188,7 +194,7 @@ public:
             return QVariant();
         auto regular = _rsx->context()->textureCache.cacheSnapshot();
         auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
-        if (index.row() < regular.size()) {
+        if ((unsigned)index.row() < regular.size()) {
             auto texture = regular[index.row()];
             switch (index.column()) {
                 case 0: return QString::fromStdString(ssnprintf("#%08x", texture.key.offset));
@@ -254,8 +260,8 @@ public:
         }
         
         QImage background(width, height, QImage::Format_RGBA8888);
-        for (int x = 0; x < width; ++x) {
-            for (int y = 0; y < height; ++y) {
+        for (auto x = 0u; x < width; ++x) {
+            for (auto y = 0u; y < height; ++y) {
                 bool dark = (x / 10 + y / 10) % 2;
                 background.setPixel(x, y, dark ? 0xff666666 : 0xff999999);
             }
@@ -314,11 +320,11 @@ public:
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
-        auto cache = _rsx->context()->bufferCache.cacheSnapshot();
-        auto key = cache[index.row()].key;
+        //auto cache = _rsx->context()->bufferCache.cacheSnapshot();
+        //auto key = cache[index.row()].key;
         switch (index.column()) {
-            case 0: return key.location == MemoryLocation::Local ? "Local" : "Main";
-            case 1: return QString::fromStdString(ssnprintf("#%x", key.offset));
+//             case 0: return key.location == MemoryLocation::Local ? "Local" : "Main";
+//             case 1: return QString::fromStdString(ssnprintf("#%x", key.offset));
         }
         return QVariant();
     }
@@ -332,8 +338,7 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        auto cache = _rsx->context()->bufferCache.cacheSnapshot();
-        return cache.size();
+        return 0;
     }
 };
 
@@ -600,7 +605,7 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
     Rsx::setOperationMode(RsxOperationMode::Replay);
     QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
-        runTo(index.row(), _currentFrame);
+        this->runTo(index.row(), _currentFrame);
     });
 }
 
@@ -710,7 +715,7 @@ void MainWindowModel::update() {
 }
 
 void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
-    if (frame >= _db.frames())
+    if (frame >= (unsigned)_db.frames())
         return;
     
     if (!_proc) {
@@ -728,7 +733,8 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
     for (auto& c : commands) {
         auto id = (CommandId)c.id;
         if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
-            _lastDrawCount = c.args[0].value + c.args[1].value; // first + count
+            // first + count (first is actually in bytes, not attributes, so it is an overfetch
+            _lastDrawCount = c.args[0].value + c.args[1].value;
         }
         _rsx->sendCommand({c, false});
     }

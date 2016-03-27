@@ -1,33 +1,42 @@
 #include <catch.hpp>
 
 #include <QProcess>
+#include <vector>
 
 static const char* runnerPath = "../ps3run/ps3run";
 
-TEST_CASE("simple_printf") {
+std::string startWaitGetOutput(std::vector<std::string> args) {
     QProcess proc;
-    proc.start(runnerPath, QStringList() << "./binaries/simple_printf/a.elf");
+    QStringList argList;
+    for (auto& arg : args) {
+        argList << arg.c_str();
+    }
+    proc.start(runnerPath, argList);
+    proc.waitForStarted();
     proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    return QString(proc.readAll()).toStdString();
+}
+
+TEST_CASE("simple_printf") {
+    auto output = startWaitGetOutput({"./binaries/simple_printf/a.elf"});
     REQUIRE( output == "some output\n" );
 }
 
 TEST_CASE("bubblesort") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/bubblesort/a.elf" 
-                              << "5" << "17" << "30" << "-1" << "20" << "12" << "100" << "0";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/bubblesort/a.elf",
+                                      "5",
+                                      "17",
+                                      "30",
+                                      "-1",
+                                      "20",
+                                      "12",
+                                      "100",
+                                      "0"});
     REQUIRE( output == "args: 5 17 30 -1 20 12 100 0 \nsorted: -1 0 5 12 17 20 30 100 \n" );
 }
 
 TEST_CASE("md5") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/md5/a.elf" << "-x";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/md5/a.elf", "-x"});
     REQUIRE( output ==
         "MD5 test suite results:\n\n"
         "d41d8cd98f00b204e9800998ecf8427e \"\"\n\n"
@@ -41,11 +50,7 @@ TEST_CASE("md5") {
 }
 
 TEST_CASE("printf") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/printf/a.elf" << "-x";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/printf/a.elf", "-x"});
     REQUIRE( output ==
         "    0\n"
         "123456789\n"
@@ -79,11 +84,7 @@ TEST_CASE("printf") {
 }
 
 TEST_CASE("fcmpconv") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/fcmpconv/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/fcmpconv/a.elf"});
     REQUIRE( output == 
         "b > c: 0\n"
         "b < c: 1\n"
@@ -102,11 +103,7 @@ TEST_CASE("fcmpconv") {
 }
 
 TEST_CASE("matrixmul") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/matrixmul/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/matrixmul/a.elf"});
     REQUIRE( output == 
         "mul3 = 1.851600e+01\n"
         "isnan(NAN)         = 1\n"
@@ -155,11 +152,7 @@ TEST_CASE("matrixmul") {
 }
 
 TEST_CASE("dtoa") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/dtoa/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/dtoa/a.elf"});
     REQUIRE( output == 
         "3.13 = 3.13\n"
         "0.02380113 = 0.02380113\n"
@@ -171,11 +164,7 @@ TEST_CASE("dtoa") {
 }
 
 TEST_CASE("float_printf") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/float_printf/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/float_printf/a.elf"});
     REQUIRE( output == 
         "18.516 = 1.851600e+01\n"
         "float = 4.179412e-01\n"
@@ -184,20 +173,12 @@ TEST_CASE("float_printf") {
 }
 
 TEST_CASE("gcm_context_size") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/gcm_context_size/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/gcm_context_size/a.elf"});
     REQUIRE( output ==  "1bff\n" );
 }
 
 TEST_CASE("gcm_memory_mapping") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/gcm_memory_mapping/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/gcm_memory_mapping/a.elf"});
     REQUIRE( output == 
         "host_addr to offset: 0\n"
         "offset 0 to address == host_addr?: 1\n"
@@ -206,12 +187,7 @@ TEST_CASE("gcm_memory_mapping") {
 }
 
 TEST_CASE("hello_simd") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/hello_simd/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    REQUIRE(proc.exitCode() == 0);
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/hello_simd/a.elf"});
     REQUIRE( output == 
         "vector: 2,2,2,2\n"
         "x: 2\n"
@@ -271,11 +247,7 @@ TEST_CASE("hello_simd") {
 }
 
 TEST_CASE("basic_large_cmdbuf") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/basic_large_cmdbuf/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/basic_large_cmdbuf/a.elf"});
     REQUIRE( output ==  
         "end - begin = 6ffc\n"
         "success\n"
@@ -283,20 +255,12 @@ TEST_CASE("basic_large_cmdbuf") {
 }
 
 TEST_CASE("ppu_threads") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads/a.elf"});
     REQUIRE( output == "exitstatus: 3; i: 4000\n" );
 }
 
 TEST_CASE("ppu_threads_tls") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_tls/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_tls/a.elf"});
     REQUIRE( output == 
         "exitstatus: 125055; i: 4000\n"
         "primary thread tls_int: 500\n"
@@ -304,29 +268,17 @@ TEST_CASE("ppu_threads_tls") {
 }
 
 TEST_CASE("ppu_threads_atomic_inc") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_atomic_inc/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_atomic_inc/a.elf"});
     REQUIRE( output == "exitstatus: 1; i: 80000\n" );
 }
 
 TEST_CASE("ppu_threads_atomic_single_lwarx") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_atomic_single_lwarx/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_atomic_single_lwarx/a.elf"});
     REQUIRE( output == "5, 3\n" );
 }
 
 TEST_CASE("ppu_cellgame") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_cellgame/USRDIR/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_cellgame/USRDIR/a.elf"});
     REQUIRE( output == 
         "title: GameUpdate Utility Sample\n"
         "gamedir: EMUGAME\n"
@@ -337,11 +289,7 @@ TEST_CASE("ppu_cellgame") {
 }
 
 TEST_CASE("ppu_cellSysutil") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_cellSysutil/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_cellSysutil/a.elf"});
     REQUIRE( output == 
         "CELL_SYSUTIL_SYSTEMPARAM_ID_LANG = 1\n"
         "CELL_SYSUTIL_SYSTEMPARAM_ID_ENTER_BUTTON_ASSIGN = 1\n"
@@ -366,11 +314,7 @@ TEST_CASE("ppu_cellSysutil") {
 }
 
 TEST_CASE("ppu_threads_lwmutex_lwcond") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_lwmutex_lwcond/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_lwmutex_lwcond/a.elf"});
     REQUIRE( output == 
         "test_lwmutex: 0; i: 4000\n"
         "test_lwmutex_recursive: 0; i: 4000\n"
@@ -379,11 +323,7 @@ TEST_CASE("ppu_threads_lwmutex_lwcond") {
 }
 
 TEST_CASE("ppu_threads_mutex_cond") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_mutex_cond/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_mutex_cond/a.elf"});
     REQUIRE( output == 
         "test_mutex: 0; i: 4000\n"
         "test_mutex_recursive: 0; i: 4000\n"
@@ -392,11 +332,7 @@ TEST_CASE("ppu_threads_mutex_cond") {
 }
 
 TEST_CASE("ppu_threads_rwlock") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_rwlock/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_rwlock/a.elf"});
     REQUIRE( output == 
         "test_rwlock_w: 0; i: 4000\n"
         "test_lwmutex: 40; i: 10\n"
@@ -404,11 +340,7 @@ TEST_CASE("ppu_threads_rwlock") {
 }
 
 TEST_CASE("ppu_threads_queue") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_queue/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_queue/a.elf"});
     REQUIRE( output == 
         "test_correctness(1): 0; i: 481200\n"
         "test_correctness(0): 0; i: 481200\n"
@@ -416,11 +348,7 @@ TEST_CASE("ppu_threads_queue") {
 }
 
 TEST_CASE("ppu_threads_lwcond_init") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_lwcond_init/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_lwcond_init/a.elf"});
     REQUIRE( output == 
         "sys_lwmutex_t.recursive_count 0\n"
         "sys_lwmutex_t.attribute 22\n"
@@ -431,11 +359,7 @@ TEST_CASE("ppu_threads_lwcond_init") {
 }
 
 TEST_CASE("ppu_syscache") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_syscache/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_syscache/a.elf"});
     REQUIRE( output == 
         "cellSysCacheMount() : 0x0  sysCachePath:[/dev_hdd1]\n"
         "cellSysCacheClear Ok\n"
@@ -448,11 +372,7 @@ TEST_CASE("ppu_syscache") {
 }
 
 TEST_CASE("ppu_threads_is_stack") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_threads_is_stack/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_is_stack/a.elf"});
     REQUIRE( output == 
         "main thread: 1100\n"
         "other thread: 1100\n"
@@ -460,11 +380,7 @@ TEST_CASE("ppu_threads_is_stack") {
 }
 
 TEST_CASE("ppu_fs_readdir") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_fs_readdir/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_fs_readdir/a.elf"});
     REQUIRE( output == 
         "type: 1, namelen: 1, name: .\n"
         "type: 1, namelen: 2, name: ..\n"
@@ -482,11 +398,7 @@ TEST_CASE("ppu_fs_readdir") {
 }
 
 TEST_CASE("ppu_fios") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_fios/USRDIR/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_fios/USRDIR/a.elf"});
     REQUIRE( output == 
         "FiosSimple build date : Jan  4 2016 09:39:06\n"
         "FiosSimple start.\n"
@@ -501,11 +413,7 @@ TEST_CASE("ppu_fios") {
 }
 
 TEST_CASE("ppu_hash") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_hash/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_hash/a.elf"});
     REQUIRE( output == 
         "md5 0 b1a49029323448bf6407b94ad6f6f2cf\n"
         "sha1 0 6eb89053fa6048876d0210e5524b55752908af55\n"
@@ -517,11 +425,7 @@ TEST_CASE("ppu_hash") {
 }
 
 TEST_CASE("ppu_simd_math") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_simd_math/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_simd_math/a.elf"});
     REQUIRE( output == 
         "Vector3(01): 5.280, 5.280, 5.280\n"
         "Vector3(02): 1.900, 1.900, 1.900\n"
@@ -620,11 +524,7 @@ TEST_CASE("ppu_simd_math") {
 }
 
 TEST_CASE("spu_getting_argp") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/spu_getting_argp/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/spu_getting_argp/a.elf"});
     REQUIRE( output == 
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
@@ -638,11 +538,7 @@ TEST_CASE("spu_getting_argp") {
 }
 
 TEST_CASE("raw_spu_printf") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/raw_spu_printf/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/raw_spu_printf/a.elf"});
     REQUIRE( output == 
         "Initializing SPUs\n"
         "sys_raw_spu_create succeeded. raw_spu number is 0\n"
@@ -653,11 +549,7 @@ TEST_CASE("raw_spu_printf") {
 }
 
 TEST_CASE("gcm_memory") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/gcm_memory/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/gcm_memory/a.elf"});
     REQUIRE( output == 
         "* vidmem base: 0xc0000000\n"
         "* IO base    : 0x30100000\n"
@@ -751,11 +643,7 @@ TEST_CASE("gcm_memory") {
 }
 
 TEST_CASE("gcm_transfer") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/gcm_transfer/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/gcm_transfer/a.elf"});
     REQUIRE( output == 
         "success 100\n"
         "success 100()\n"
@@ -770,22 +658,14 @@ TEST_CASE("gcm_transfer") {
 }
 
 TEST_CASE("opengl_hash") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/opengl_hash/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/opengl_hash/a.elf"});
     REQUIRE( output == 
         "hash: 1d0\n"
     );
 }
 
 TEST_CASE("raw_spu_opengl_dma") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/raw_spu_opengl_dma/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/raw_spu_opengl_dma/a.elf"});
     REQUIRE( output == 
         "Initializing SPUs\n"
         "sys_raw_spu_create succeeded. raw_spu number is 0\n"
@@ -800,11 +680,7 @@ TEST_CASE("raw_spu_opengl_dma") {
 }
 
 TEST_CASE("ppu_dcbz") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_dcbz/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_dcbz/a.elf"});
     REQUIRE( output == 
         "0000000000000000000000000000000000000000000000000000000000000000\n"
         "0000000000000000000000000000000000000000000000000000000000000000\n"
@@ -850,11 +726,7 @@ TEST_CASE("ppu_dcbz") {
 }
 
 TEST_CASE("ppu_float_cmp") {
-    QProcess proc;
-    auto args = QStringList() << "./binaries/ppu_float_cmp/a.elf";
-    proc.start(runnerPath, args);
-    proc.waitForFinished();
-    auto output = QString(proc.readAll()).toStdString();
+    auto output = startWaitGetOutput({"./binaries/ppu_float_cmp/a.elf"});
     REQUIRE( output == 
         "1 1 1 0 0 0 1 0 "
     );

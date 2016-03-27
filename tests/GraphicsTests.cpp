@@ -15,6 +15,7 @@ void compareLastFrame(const char* expected, int n = 0) {
                               << QString("/tmp/ps3frame%1.rgb").arg(n)
                               << QString("/tmp/ps3frame%1.png").arg(n);
     proc.start("convert", args);
+    proc.waitForStarted();
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() == 0 );
     

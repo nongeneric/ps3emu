@@ -171,8 +171,6 @@ int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUTh
     return CELL_OK;
 }
 
-constexpr uint16_t CELL_SYSMODULE_FS = 0x000e;
-
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;

@@ -90,10 +90,10 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("    vec4 c[2];");
     line(ssnprintf("    vec4 r[%d];", lastReg + 1));
     line(ssnprintf("    vec4 h[%d];", 2 * (lastReg + 1)));
-    for (auto i = 0u; i < lastReg + 1; ++i) {
+    for (auto i = 0; i < lastReg + 1; ++i) {
         line(ssnprintf("    r[%d] = vec4(0, 0, 0, 0);", i));
     }
-    for (auto i = 0u; i < 2 * (lastReg + 1); ++i) {
+    for (auto i = 0; i < 2 * (lastReg + 1); ++i) {
         line(ssnprintf("    h[%d] = vec4(0, 0, 0, 0);", i));
     }
     for (auto& st : sts) {

@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-void Window::Init() {
+void Window::init() {
     if (!glfwInit()) {
         throw std::runtime_error("glfw initialization failed");
     }
@@ -17,7 +17,11 @@ void Window::Init() {
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 }
 
-void Window::SwapBuffers() {
+void Window::shutdown() {
+    glfwTerminate();
+}
+
+void Window::swapBuffers() {
     glfwSwapBuffers(_window);
 }
 

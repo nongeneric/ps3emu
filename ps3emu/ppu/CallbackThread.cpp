@@ -36,7 +36,7 @@ CallbackThread::CallbackThread(Process* proc) {
     auto body = internal->internalAlloc<2, ThreadBody>(&bodyEa);
     body->ncall = (1 << 26) | index;
     
-    IForm br;
+    IForm br {0};
     br.OPCD.set(18);
     br.LI.set(-4);
     br.AA.set(0);

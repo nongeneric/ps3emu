@@ -4,6 +4,12 @@
 #include "ppu_dasm.h"
 #include <boost/log/trivial.hpp>
 
+#ifdef DEBUG
+#define dbgpause(value) _dbgPaused = value
+#else
+#define dbgpause(value)
+#endif
+
 PPUThread::PPUThread(Process* proc,
                      std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
                      bool primaryThread)
@@ -11,12 +17,14 @@ PPUThread::PPUThread(Process* proc,
       _mm(proc->mm()),
       _eventHandler(eventHandler),
       _init(false),
-      _dbgPaused(false),
-      _singleStep(false),
       _isStackInfoSet(false),
       _threadFinishedGracefully(primaryThread),
       _priority(1000) {
-
+          
+#ifdef DEBUG
+    _singleStep = false;
+    _dbgPaused = false;
+#endif
     for(auto& r : _GPR)
         r = 0;
     for(auto& r : _FPR)
@@ -27,14 +35,17 @@ PPUThread::PPUThread(Process* proc,
 
 void PPUThread::innerLoop() {
     for (;;) {
+#ifdef DEBUG
         if (_singleStep) {
             _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
-            _dbgPaused = true;
+            dbgpause(true);
             _singleStep = false;
         }
+        
         while (_dbgPaused) {
             ums_sleep(100);
         }
+#endif
         
         uint32_t cia;
         try {
@@ -46,7 +57,7 @@ void PPUThread::innerLoop() {
         } catch (BreakpointException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Breakpoint);
-            _dbgPaused = true;
+            dbgpause(true);
         } catch (IllegalInstructionException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::InvalidInstruction);
@@ -74,7 +85,7 @@ void PPUThread::innerLoop() {
 void PPUThread::loop() {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
     _eventHandler(this, PPUThreadEvent::Started);
-    _dbgPaused = true;
+    dbgpause(true);
     
     innerLoop();
     
@@ -82,10 +93,6 @@ void PPUThread::loop() {
         _threadFinishedGracefully ? "gracefully" : "with a failure"
     );
     _eventHandler(this, PPUThreadEvent::Finished);
-}
-
-void PPUThread::dbgPause(bool val) {
-    _dbgPaused = val;
 }
 
 MainMemory* PPUThread::mm() {
@@ -98,9 +105,15 @@ Process* PPUThread::proc() {
 
 PPUThread::PPUThread(MainMemory* mm) : _mm(mm) {}
 
+#ifdef DEBUG
 void PPUThread::singleStepBreakpoint() {
     _singleStep = true;
 }
+
+void PPUThread::dbgPause(bool val) {
+    _dbgPaused = val;
+}
+#endif
 
 void PPUThread::run() {
     if (!_init) {

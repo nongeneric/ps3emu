@@ -84,6 +84,11 @@ Event Process::run() {
             case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
             case PPUThreadEvent::ProcessFinished: {
                 _callbackThread->terminate();
+#ifdef DEBUG
+                for (auto& t : _threads) {
+                    t->dbgPause(false);
+                }
+#endif
                 for (auto& t : _threads) {
                     t->join();
                 }

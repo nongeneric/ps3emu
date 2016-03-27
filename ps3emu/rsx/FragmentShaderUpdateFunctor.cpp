@@ -24,7 +24,6 @@ void FragmentShaderUpdateFunctor::updateConsts() {
             fconst++;
         }
     }
-    _constBuffer.flush(0, _info.length * 16);
 }
 
 FragmentShaderUpdateFunctor::FragmentShaderUpdateFunctor(uint32_t va, uint32_t size, RsxContext* rsxContext, MainMemory* mm)
@@ -88,6 +87,6 @@ std::vector<uint8_t> const& FragmentShaderUpdateFunctor::bytecode() {
     return _bytecode;
 }
 
-GLPersistentBuffer* FragmentShaderUpdateFunctor::constBuffer() {
+GLPersistentCpuBuffer* FragmentShaderUpdateFunctor::constBuffer() {
     return &_constBuffer;
 }

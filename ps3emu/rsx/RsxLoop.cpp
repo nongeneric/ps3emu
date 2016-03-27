@@ -577,13 +577,13 @@ int64_t Rsx::interpret(uint32_t get) {
             auto mode = readarg(1);
             drawActive = mode;
             if (!drawActive) {
-                if (drawArrayFirst != -1) {
+                if (drawArrayFirst != -1u) {
                     DrawArrays(drawArrayFirst, drawCount);
-                } else if (drawIndexFirst != -1) {
+                } else if (drawIndexFirst != -1u) {
                     DrawIndexArray(drawIndexFirst, drawCount);
                 }
-                drawArrayFirst = -1;
-                drawIndexFirst = -1;
+                drawArrayFirst = -1u;
+                drawIndexFirst = -1u;
                 drawCount = 0;
             }
             BeginEnd(mode);
@@ -599,7 +599,7 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_DRAW_ARRAYS";
             auto arg = readarg(1);
             auto vertexCount = (arg >> 24) + 1;
-            if (drawArrayFirst == -1) {
+            if (drawArrayFirst == -1u) {
                 drawArrayFirst = arg & 0xffffff;
             }
             drawCount += vertexCount * count;
@@ -621,7 +621,7 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_DRAW_INDEX_ARRAY";
             auto arg = readarg(1);
             auto indexCount = (arg >> 24) + 1;
-            if (drawIndexFirst == -1) {
+            if (drawIndexFirst == -1u) {
                 drawIndexFirst = arg & 0xffffff;
             }
             drawCount = indexCount * count;
@@ -795,7 +795,7 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00001efc: {
             //name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD";
             TransformConstantLoad(readarg(1), 
-                                  rsxOffsetToEa(MemoryLocation::Main, get + 4 * 2), 
+                                  get + 4 * 2, 
                                   count - 1);
             break;
         }
@@ -1513,18 +1513,18 @@ void Rsx::setGet(uint32_t get) {
 }
 
 uint32_t Rsx::getRef() {
-    boost::unique_lock<boost::mutex> lock(_mutex);
     return _ref;
 }
 
 void Rsx::setRef(uint32_t ref) {
-    boost::unique_lock<boost::mutex> lock(_mutex);
     _ref = ref;
 }
 
 void Rsx::loop() {
     initGcm();
     _ret = 0;
+    _ref = 0xffffffff;
+    _isFlipInProgress = false;
     BOOST_LOG_TRIVIAL(trace) << "rsx loop started, waiting for updates";
     if (_mode == RsxOperationMode::Replay) {
         replayLoop();
@@ -1539,12 +1539,12 @@ void Rsx::runLoop() {
     for (;;) {
         _cv.wait(lock);
         BOOST_LOG_TRIVIAL(trace) << "rsx loop update received";
+        while (_get != _put || _ret) {
+            _get += interpret(_get);
+        }
         if (_shutdown && _get == _put) {
             waitForIdle();
             return;
-        }
-        while (_get != _put || _ret) {
-            _get += interpret(_get);
         }
     }
 }
@@ -1588,8 +1588,8 @@ void Rsx::shutdown() {
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             _shutdown = true;
+            _cv.notify_all();
         }
-        _cv.notify_all();
     }
     _thread->join();
 }

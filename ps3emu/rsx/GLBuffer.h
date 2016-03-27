@@ -30,15 +30,24 @@ public:
     void unmap(bool sync = true);
 };
 
-class GLPersistentBuffer : public HandleWrapper<GLuint, deleteBuffer> {
+class GLPersistentGpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
+    GLuint init(uint32_t size);
+    uint32_t _size;
+public:
+    GLPersistentGpuBuffer();
+    GLPersistentGpuBuffer& operator=(GLPersistentGpuBuffer&& other);
+    GLPersistentGpuBuffer(uint32_t size);
+    uint32_t size() const;
+};
+
+class GLPersistentCpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
     GLuint init(uint32_t size);
     uint32_t _size;
     void* _ptr;
 public:
-    GLPersistentBuffer();
-    GLPersistentBuffer& operator=(GLPersistentBuffer&& other);
-    GLPersistentBuffer(uint32_t size);
-    void* mapped();
-    void flush(uint32_t offset, uint32_t size);
+    GLPersistentCpuBuffer();
+    GLPersistentCpuBuffer& operator=(GLPersistentCpuBuffer&& other);
+    GLPersistentCpuBuffer(uint32_t size);
+    uint8_t* mapped();
     uint32_t size();
 };

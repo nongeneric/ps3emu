@@ -6,8 +6,9 @@ class GLFWwindow;
 class Window {
     GLFWwindow* _window;
 public:
-    void Init();
-    void SwapBuffers();
+    void init();
+    void shutdown();
+    void swapBuffers();
     unsigned width();
     unsigned height();
 };

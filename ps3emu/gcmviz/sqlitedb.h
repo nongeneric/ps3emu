@@ -262,7 +262,7 @@ public:
         default:
             assert(false);
         }
-        assert(false);
+        throw std::runtime_error("unsupported type");
     }    
     template <typename FSeq, typename... Ts>
     std::vector<FSeq> Select(std::string sql, Ts... ts) {
@@ -289,9 +289,9 @@ public:
             for (int idxCol = 0; idxCol < colCount; ++idxCol) {
                 sqlite3_value* colValue = sqlite3_column_value(statement, idxCol); // unprotected!!!
                 int colType = sqlite3_value_type(colValue);                
-                assert((SQLiteTypeToString(colType) == types[idxCol] ||
-                        SQLiteTypeToString(colType) == "NULL") &&
-                       "Type mismatch");
+                if (SQLiteTypeToString(colType) != types[idxCol] &&
+                    SQLiteTypeToString(colType) != "NULL")
+                    throw std::runtime_error("Type mismatch");
             }
 
             FSeq curSeq;

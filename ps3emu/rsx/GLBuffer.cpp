@@ -59,41 +59,52 @@ uint32_t GLBuffer::size() {
     return _size;
 }
 
-GLPersistentBuffer::GLPersistentBuffer() : HandleWrapper(0) { }
+GLPersistentCpuBuffer::GLPersistentCpuBuffer() : HandleWrapper(0) { }
 
-GLPersistentBuffer& GLPersistentBuffer::operator=(GLPersistentBuffer&& other) {
+GLPersistentCpuBuffer& GLPersistentCpuBuffer::operator=(GLPersistentCpuBuffer&& other) {
     _ptr = other._ptr;
+    _size = other._size;
     HandleWrapper::operator=(std::move(other));
     return *this;
 }
 
-GLPersistentBuffer::GLPersistentBuffer(uint32_t size)
+GLPersistentCpuBuffer::GLPersistentCpuBuffer(uint32_t size)
     : HandleWrapper(init(size)), _size(size) {}
 
-void* GLPersistentBuffer::mapped() {
-    return _ptr;
+uint8_t* GLPersistentCpuBuffer::mapped() {
+    return (uint8_t*)_ptr;
 }
 
-void GLPersistentBuffer::flush(uint32_t offset, uint32_t size) {
-    //glFlushMappedNamedBufferRange(handle(), offset, size);
-    //glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
-}
-
-GLuint GLPersistentBuffer::init(uint32_t size) {
+GLuint GLPersistentCpuBuffer::init(uint32_t size) {
     GLuint handle;
     glCreateBuffers(1, &handle);
-//     auto flags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
-//     glNamedBufferStorage(handle, size, 0, flags);
-//     auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT |
-//                     GL_MAP_FLUSH_EXPLICIT_BIT;
-    auto flags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+    auto flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT |
+                 GL_CLIENT_STORAGE_BIT;
     glNamedBufferStorage(handle, size, 0, flags);
-    auto mapFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+    auto mapFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     _ptr = glMapNamedBufferRange(handle, 0, size, mapFlags);
     return handle;
 }
 
-uint32_t GLPersistentBuffer::size() {
+uint32_t GLPersistentCpuBuffer::size() {
     return _size;
 }
 
+GLPersistentGpuBuffer::GLPersistentGpuBuffer() : HandleWrapper(0) { }
+
+GLPersistentGpuBuffer& GLPersistentGpuBuffer::operator=(GLPersistentGpuBuffer&& other) {
+    _size = other._size;
+    HandleWrapper::operator=(std::move(other));
+    return *this;
+}
+
+GLPersistentGpuBuffer::GLPersistentGpuBuffer(uint32_t size)
+    : HandleWrapper(init(size)), _size(size) {}
+
+GLuint GLPersistentGpuBuffer::init(uint32_t size) {
+    GLuint handle;
+    glCreateBuffers(1, &handle);
+    auto flags = 0;
+    glNamedBufferStorage(handle, size, 0, flags);
+    return handle;
+}

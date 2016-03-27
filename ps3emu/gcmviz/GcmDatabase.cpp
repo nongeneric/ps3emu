@@ -105,4 +105,5 @@ const char* printArgType(GcmArgType type) {
         case GcmArgType::Int32: return "int32_t";
         case GcmArgType::Int16: return "int16_t";
     }
+    assert(false); return "";
 }

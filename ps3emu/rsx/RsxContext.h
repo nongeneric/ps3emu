@@ -74,16 +74,6 @@ struct TransferInfo {
     ColorConvertionInfo conv;
 };
 
-struct BufferCacheKey {
-    MemoryLocation location;
-    uint32_t offset;
-    uint32_t size;
-    inline bool operator<(BufferCacheKey const& other) const {
-        return std::tie(location, offset, size)
-             < std::tie(other.location, other.offset, other.size);
-    }
-};
-
 struct TextureCacheKey {
     uint32_t offset;
     uint32_t location;
@@ -160,15 +150,15 @@ public:
     bool isFlatShadeMode;
     glm::vec4 colorClearValue;
     GLuint glClearSurfaceMask;
-    bool isFlipInProgress = false;
     std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;
     VertexShader* vertexShader = nullptr;
     FragmentShader* fragmentShader = nullptr;
-    GLPersistentBuffer vertexConstBuffer;
-    GLPersistentBuffer vertexSamplersBuffer;
-    GLPersistentBuffer vertexViewportBuffer;
-    GLPersistentBuffer fragmentSamplersBuffer;
+    GLPersistentCpuBuffer vertexConstBuffer;
+    GLPersistentCpuBuffer vertexSamplersBuffer;
+    GLPersistentCpuBuffer vertexViewportBuffer;
+    GLPersistentCpuBuffer fragmentSamplersBuffer;
+    GLPersistentCpuBuffer elementArrayIndexBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentVa = 0;
@@ -182,13 +172,11 @@ public:
     DisplayBufferInfo displayBuffers[8];
     std::unique_ptr<GLFramebuffer> framebuffer;
     std::unique_ptr<TextureRenderer> textureRenderer;
-    std::unique_ptr<uint8_t[]> localMemory;
     uint32_t semaphoreOffset = 0;
     TransferInfo transfer;
     GLProgramPipeline pipeline;
-    GLPersistentBuffer mainMemoryBuffer;
-    GLPersistentBuffer localMemoryBuffer;
-    Cache<BufferCacheKey, int, 256 * (2 >> 20)> bufferCache;
+    GLPersistentCpuBuffer mainMemoryBuffer;
+    GLPersistentCpuBuffer localMemoryBuffer;
     Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;

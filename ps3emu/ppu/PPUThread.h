@@ -119,8 +119,10 @@ class PPUThread {
     std::function<void(PPUThread*, PPUThreadEvent)> _eventHandler;
     boost::thread _thread;
     bool _init;
+#ifdef DEBUG
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
+#endif
     bool _isStackInfoSet;
     uint32_t _stackBase;
     uint32_t _stackSize;
@@ -166,8 +168,11 @@ public:
     uint32_t getStackSize();
     int priority();
     
+#ifdef DEBUG
     void singleStepBreakpoint();
     void dbgPause(bool val);
+#endif
+    
     void run();
     MainMemory* mm();
     Process* proc();

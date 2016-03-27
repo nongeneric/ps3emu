@@ -43,13 +43,14 @@ class GLTexture;
 class GLBuffer;
 class FragmentShader;
 struct RsxTextureInfo;
-class GLPersistentBuffer;
+class GLPersistentCpuBuffer;
 class Rsx {
     static RsxOperationMode _mode;
     uint32_t _get = 0;
     uint32_t _put = 0;
-    uint32_t _ref = 0xffffffff;
+    std::atomic<uint32_t> _ref;
     std::atomic<uint32_t> _ret;
+    std::atomic<bool> _isFlipInProgress;
     bool _shutdown = false;
     bool _initialized = false;
     MainMemory* _mm;
@@ -87,7 +88,7 @@ class Rsx {
     void updateViewPort();
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
-    GLBuffer* addBufferToCache(uint32_t va, uint32_t size, bool wordReversed);
+    GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
     FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size);
     FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size);
     
@@ -169,7 +170,7 @@ class Rsx {
     void VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset);
     void BeginEnd(uint32_t mode);
     void DrawArrays(unsigned first, unsigned count);
-    void TransformConstantLoad(uint32_t loadAt, uint32_t va, uint32_t count);
+    void TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count);
     void RestartIndexEnable(bool enable);
     void RestartIndex(uint32_t index);
     void IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type);
@@ -289,8 +290,7 @@ class Rsx {
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
     
     // Replay-specific
-    void syncBuffer(MemoryLocation location, uint32_t offset, uint32_t areaSize, bool wordReverse);
-    void UpdateBufferCache(MemoryLocation location, uint32_t offset);
+    void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);
     void UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format);
     void UpdateFragmentCache(uint32_t va, uint32_t size);
     inline void StopReplay() { }
@@ -322,7 +322,7 @@ public:
     void sendCommand(GcmCommandReplayInfo info);
     bool receiveCommandCompletion();
     RsxContext* context();
-    GLPersistentBuffer* getBuffer(MemoryLocation location);
+    GLPersistentCpuBuffer* getBuffer(MemoryLocation location);
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
