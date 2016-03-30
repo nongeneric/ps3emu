@@ -1484,6 +1484,24 @@ EMU(SRAWI, XForm_10) {
         update_CR0(res, TH);
 }
 
+PRINT(SRAW, XForm_6) {
+    *result = format_nnn(i->Rc.u() ? "sraw." : "sraw", i->RA, i->RS, i->RB);
+}
+
+EMU(SRAW, XForm_6) {
+    auto rb = TH->getGPR(i->RB);
+    auto n = rb & 0b11111;
+    auto rs = TH->getGPR(i->RS) & 0xffffffff;
+    uint32_t r = rs << (64 - n);
+    uint64_t m = (rb & 0b100000) == 0 ? mask<64>(n + 32, 63) : 0;
+    auto s = rs & (1ul << 31);
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
+    auto ca = s & (((r & ~m) & 0xffffffff) != 0);
+    TH->setGPR(i->RA, ra);
+    TH->setCA(ca);
+    if (i->Rc.u())
+        update_CR0(ra, TH);
+}
 
 PRINT(NEG, XOForm_3) {
     const char* mnemonics[][2] = {
@@ -3355,6 +3373,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 199: invoke(STVEWX);
                 case 854: invoke(EIEIO);
                 case 1014: invoke(DCBZ);
+                case 792: invoke(SRAW);
                 default: throw IllegalInstructionException();
             }
             break;

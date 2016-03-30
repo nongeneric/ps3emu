@@ -220,12 +220,9 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
     TRACE2(TransformTimeout, count, registerCount);
 }
 
-void Rsx::ShaderProgram(uint32_t locationOffset) {
-    TRACE1(ShaderProgram, locationOffset);
-    // loads fragment program byte code from locationOffset-1 up to the last command
-    // (with the "#last command" bit)
-    locationOffset -= CELL_GCM_LOCATION_MAIN;
-    auto ea = rsxOffsetToEa(MemoryLocation::Local, locationOffset);
+void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
+    TRACE2(ShaderProgram, offset, location);
+    auto ea = rsxOffsetToEa(gcmEnumToLocation(location), offset);
     _context->fragmentVa = ea;
     _context->fragmentShaderDirty = true;
 }
@@ -306,7 +303,6 @@ void Rsx::DepthFunc(uint32_t zf) {
 
 void Rsx::CullFaceEnable(bool enable) {
     TRACE1(CullFaceEnable, enable);
-    assert(!enable);
     _context->isCullFaceEnabled = enable;
     glEnableb(GL_CULL_FACE, enable);
 }
@@ -728,10 +724,10 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     if (_mode != RsxOperationMode::Replay) {
         va = rsxOffsetToEa(info.location, key.offset);
     }
+    auto size = (info.pitch == 0 ? info.width : info.pitch) * info.height;
     auto updater = new SimpleCacheItemUpdater<GLTexture> {
-        va, info.height * info.pitch,
+        va, size,
         [=](auto t) {
-            auto size = info.pitch * info.height;
             std::vector<uint8_t> buf(size);
             _mm->readMemory(va, &buf[0], size);
             t->update(buf);
@@ -1326,21 +1322,37 @@ void Rsx::setVBlankHandler(uint32_t descrEa) {
     _context->vBlankHandlerDescr = descrEa;
 }
 
-// Data Transfer
-
 void Rsx::OffsetDestin(uint32_t offset) {
     TRACE1(OffsetDestin, offset);
-    _context->transfer.surfaceOffsetDestin = offset;
+    _context->surface2d.destOffset = offset;
 }
 
-void Rsx::ColorFormat(uint32_t format, uint16_t dstPitch, uint16_t srcPitch) {
-    TRACE3(ColorFormat, format, dstPitch, srcPitch);
+void Rsx::ContextDmaImage(uint32_t location) {
+    TRACE1(ContextDmaImage, location);
+    _context->swizzle2d.location = gcmEnumToLocation(location);
+}
+
+void colorFormat(RsxContext* context, uint32_t format, uint16_t pitch) {
     assert(format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5 ||
            format == CELL_GCM_TRANSFER_SURFACE_FORMAT_A8R8G8B8 ||
            format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32);
-    _context->transfer.format = format;
-    _context->transfer.destPitch = dstPitch;
-    _context->transfer.sourcePitch = srcPitch;
+    context->surface2d.format = format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5
+                   ? ScaleSettingsFormat::r5g6b5
+                   : format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32
+                         ? ScaleSettingsFormat::y32
+                         : ScaleSettingsFormat::a8r8g8b8;
+    context->surface2d.pitch = pitch;
+}
+
+void Rsx::ColorFormat_3(uint32_t format, uint16_t pitch, uint32_t offset) {
+    TRACE3(ColorFormat_3, format, pitch, offset);
+    colorFormat(_context.get(), format, pitch);
+    _context->surface2d.offset = offset;
+}
+
+void Rsx::ColorFormat_2(uint32_t format, uint16_t pitch) {
+    TRACE2(ColorFormat_2, format, pitch);
+    colorFormat(_context.get(), format, pitch);
 }
 
 void Rsx::Point(uint16_t pointX, 
@@ -1351,16 +1363,14 @@ void Rsx::Point(uint16_t pointX,
                 uint16_t inSizeY)
 {
     TRACE6(Point, pointX, pointY, outSizeX, outSizeY, inSizeX, inSizeY);
-    _context->transfer.pointX = pointX;
-    _context->transfer.pointY = pointY;
-    _context->transfer.outSizeX = outSizeX;
-    _context->transfer.outSizeY = outSizeY;
-    _context->transfer.inSizeX = inSizeX;
-    _context->transfer.inSizeY = inSizeY;
     
-    assert(outSizeY <= 1);
-    assert(inSizeY <= 1);
-    assert(outSizeX == inSizeX);
+    InlineSettings& i = _context->inline2d;
+    i.pointX = pointX;
+    i.pointY = pointY;
+    i.destSizeX = outSizeX;
+    i.destSizeY = outSizeY;
+    i.srcSizeX = inSizeX;
+    i.srcSizeY = inSizeY;
 }
 
 void Rsx::Color(uint32_t ptr, uint32_t count) {
@@ -1369,10 +1379,15 @@ void Rsx::Color(uint32_t ptr, uint32_t count) {
     if (_mode == RsxOperationMode::Replay)
         return;
     
-    assert(_context->transfer.format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32);
-    auto dest = rsxOffsetToEa(_context->transfer.destTransferLocation,
-                              _context->transfer.surfaceOffsetDestin +
-                                  _context->transfer.pointX * 4);
+    assert(_context->inline2d.pointY == 0);
+    assert(_context->inline2d.destSizeY == 1);
+    assert(_context->inline2d.srcSizeY == 1);
+    
+    assert(_context->surface2d.format == ScaleSettingsFormat::y32);
+    auto dest = rsxOffsetToEa(_context->surface2d.destLocation,
+                              _context->surface2d.destOffset +
+                              _context->inline2d.pointX * 4);
+    
     assert(~(ptr & 0xfffff) > count && "mid page writes aren't supported");
     static std::vector<uint8_t> vec;
     vec.resize(count * 4);
@@ -1382,17 +1397,17 @@ void Rsx::Color(uint32_t ptr, uint32_t count) {
 
 void Rsx::ContextDmaImageDestin(uint32_t location) {
     TRACE1(ContextDmaImageDestin, location);
-    _context->transfer.destTransferLocation = gcmEnumToLocation(location);
+    _context->surface2d.destLocation = gcmEnumToLocation(location);
 }
 
 void Rsx::OffsetIn_1(uint32_t offset) {
     TRACE1(OffsetIn_1, offset);
-    _context->transfer.sourceOffset = offset;
+    _context->copy2d.srcOffset = offset;
 }
 
 void Rsx::OffsetOut(uint32_t offset) {
     TRACE1(OffsetOut, offset);
-    _context->transfer.destOffset = offset;
+    _context->copy2d.destOffset = offset;
 }
 
 void Rsx::PitchIn(int32_t inPitch,
@@ -1402,18 +1417,46 @@ void Rsx::PitchIn(int32_t inPitch,
                   uint8_t inFormat,
                   uint8_t outFormat) {
     TRACE6(PitchIn, inPitch, outPitch, lineLength, lineCount, inFormat, outFormat);
-    _context->transfer.sourcePitch = inPitch;
-    _context->transfer.destPitch = outPitch;
-    _context->transfer.lineLength = lineLength;
-    _context->transfer.lineCount = lineCount;
-    _context->transfer.sourceFormat = inFormat;
-    _context->transfer.destFormat = outFormat;
+    
+    CopySettings& c = _context->copy2d;
+    c.srcPitch = inPitch;
+    c.destPitch = outPitch;
+    c.lineLength = lineLength;
+    c.lineCount = lineCount;
+    c.srcFormat = inFormat;
+    c.destFormat = outFormat;
 }
 
 void Rsx::DmaBufferIn(uint32_t sourceLocation, uint32_t dstLocation) {
     TRACE2(DmaBufferIn, sourceLocation, dstLocation);
-    _context->transfer.sourceDataLocation = gcmEnumToLocation(sourceLocation);
-    _context->transfer.destDataLocation = gcmEnumToLocation(dstLocation);
+    _context->copy2d.srcLocation = gcmEnumToLocation(sourceLocation);
+    _context->copy2d.destLocation = gcmEnumToLocation(dstLocation);
+}
+
+void startCopy2d(RsxContext* context, MainMemory* mm) {
+    CopySettings& c = context->copy2d;
+    auto sourceEa = rsxOffsetToEa(c.srcLocation, c.srcOffset);
+    auto destEa = rsxOffsetToEa(c.destLocation, c.destOffset);
+    assert((~(sourceEa & 0xfffff) > c.srcPitch * c.lineCount) && "mid page writes aren't supported");
+    assert((~(destEa & 0xfffff) > c.destPitch * c.lineCount) && "mid page writes aren't supported");
+
+    assert(c.srcFormat == 1 || c.srcFormat == 2 || c.srcFormat == 4);
+    assert(c.destFormat == 1 || c.destFormat == 2 || c.destFormat == 4);
+    
+    uint32_t srcLine = sourceEa;
+    uint32_t destLine = destEa;
+    for (auto line = 0u; line < c.lineCount; ++line) {
+        uint8_t* src = mm->getMemoryPointer(srcLine, c.lineLength);
+        uint8_t* dest = mm->getMemoryPointer(destLine, c.lineLength);
+        auto srcLineEnd = src + c.lineLength;
+        while (src < srcLineEnd) {
+            *dest = *src;
+            src += c.srcFormat;
+            dest += c.destFormat;
+        }
+        srcLine += c.srcPitch;
+        destLine += c.destPitch;
+    }
 }
 
 void Rsx::OffsetIn_9(uint32_t inOffset, 
@@ -1435,51 +1478,40 @@ void Rsx::OffsetIn_9(uint32_t inOffset,
            inFormat, 
            outFormat, 
            notify);
+    assert(inFormat == 1 || inFormat == 2 || inFormat == 4);
+    assert(outFormat == 1 || outFormat == 2 || outFormat == 4);
     assert(notify == 0);
-    auto sourceEa = rsxOffsetToEa(_context->transfer.sourceDataLocation, inOffset);
-    auto destEa = rsxOffsetToEa(_context->transfer.destDataLocation, outOffset);
-    assert((~(sourceEa & 0xfffff) > inPitch * lineCount) && "mid page writes aren't supported");
-    assert((~(destEa & 0xfffff) > outPitch * lineCount) && "mid page writes aren't supported");
-
-    uint32_t srcLine = sourceEa;
-    uint32_t destLine = destEa;
-    for (auto line = 0u; line < lineCount; ++line) {
-        uint8_t* src = _mm->getMemoryPointer(srcLine, lineLength);
-        uint8_t* dest = _mm->getMemoryPointer(destLine, lineLength);
-        auto srcLineEnd = src + lineLength;
-        while (src < srcLineEnd) {
-            *dest = *src;
-            src += inFormat;
-            dest += outFormat;
-        }
-        srcLine += inPitch;
-        destLine += outPitch;
-    }
+    
+    CopySettings& c = _context->copy2d;
+    c.srcOffset = inOffset;
+    c.destOffset = outOffset;
+    c.srcPitch = inPitch;
+    c.destPitch = outPitch;
+    c.lineLength = lineLength;
+    c.lineCount = lineCount;
+    c.srcFormat = inFormat;
+    
+    startCopy2d(_context.get(), _mm);
 }
 
 void Rsx::BufferNotify(uint32_t notify) {
     TRACE1(BufferNotify, notify);
-    OffsetIn_9(_context->transfer.sourceOffset,
-               _context->transfer.destOffset,
-               _context->transfer.sourcePitch,
-               _context->transfer.destPitch,
-               _context->transfer.lineLength,
-               _context->transfer.lineCount,
-               _context->transfer.sourceFormat,
-               _context->transfer.destFormat,
-               notify);
+    assert(notify == 0);
+    startCopy2d(_context.get(), _mm);
 }
 
 void Rsx::Nv3089ContextDmaImage(uint32_t location) {
     TRACE1(Nv3089ContextDmaImage, location);
-    _context->transfer.sourceImageLocation = gcmEnumToLocation(location);
+    _context->scale2d.location = gcmEnumToLocation(location);
 }
 
 void Rsx::Nv3089ContextSurface(uint32_t surfaceType) {
     TRACE1(Nv3089ContextSurface, surfaceType);
-    if (surfaceType != CELL_GCM_CONTEXT_SURFACE2D)
-        throw std::runtime_error("swizzled surface is not supported");
-    _context->transfer.surfaceType = surfaceType;
+    assert(surfaceType == CELL_GCM_CONTEXT_SURFACE2D ||
+           surfaceType == CELL_GCM_CONTEXT_SWIZZLE2D);
+    _context->scale2d.type = surfaceType == CELL_GCM_CONTEXT_SURFACE2D
+                                 ? ScaleSettingsSurfaceType::Linear
+                                 : ScaleSettingsSurfaceType::Swizzle;
 }
 
 void Rsx::Nv3089SetColorConversion(uint32_t conv,
@@ -1498,9 +1530,22 @@ void Rsx::Nv3089SetColorConversion(uint32_t conv,
     TRACE13(Nv3089SetColorConversion, conv, fmt, op, x, y, w, h, outX, outY, outW, outH, dsdx, dtdy);
     assert(conv == CELL_GCM_TRANSFER_CONVERSION_TRUNCATE);
     assert(op == CELL_GCM_TRANSFER_OPERATION_SRCCOPY);
-    _context->transfer.conv = {fmt, x, y, w, h, outX, outY, outW, outH, dsdx, dtdy};
     assert(fmt == CELL_GCM_TRANSFER_SCALE_FORMAT_R5G6B5 ||
            fmt == CELL_GCM_TRANSFER_SCALE_FORMAT_A8R8G8B8);
+    ScaleSettings& s = _context->scale2d;
+    s.format = fmt == CELL_GCM_TRANSFER_SCALE_FORMAT_R5G6B5
+                   ? ScaleSettingsFormat::r5g6b5
+                   : ScaleSettingsFormat::a8r8g8b8;
+    s.inX = x;
+    s.inY = y;
+    s.inW = w;
+    s.inH = h;
+    s.outX = outX;
+    s.outY = outY;
+    s.outW = outW;
+    s.outH = outH;
+    s.dsdx = dsdx;
+    s.dtdy = dtdy;
 }
 
 void Rsx::ImageInSize(uint16_t inW,
@@ -1516,38 +1561,59 @@ void Rsx::ImageInSize(uint16_t inW,
     if (_mode == RsxOperationMode::Replay)
         return;
     
-    auto& conv = _context->transfer.conv;
-    if (conv.dsdx == 0 || conv.dtdy == 0)
-        return;
-    //assert(conv.dsdx == 1);
-    //assert(conv.dtdy == 1);
+    ScaleSettings& scale = _context->scale2d;
+    SurfaceSettings& surface = _context->surface2d;
     
-    auto sourceEa = rsxOffsetToEa(_context->transfer.sourceImageLocation, offset);
-    auto destEa = rsxOffsetToEa(_context->transfer.destTransferLocation,
-                                _context->transfer.surfaceOffsetDestin);
+    if (scale.dsdx == 0 || scale.dtdy == 0)
+        return;
+    assert(scale.dsdx == 1);
+    assert(scale.dtdy == 1);
+    
+    auto sourceEa = rsxOffsetToEa(scale.location, offset);
+    auto destEa = rsxOffsetToEa(surface.destLocation, surface.destOffset);
     auto sourcePitch = pitch;
-    auto destPitch = _context->transfer.destPitch;
-    auto destFormat = _context->transfer.format;
     
     //assert((~(sourceEa & 0xfffff) > sourcePitch * inH) &&
     //       "mid page writes aren't supported");
     //assert((~(destEa & 0xfffff) > destPitch * (conv.outH + conv.outY)) &&
     //       "mid page writes aren't supported");
     
-    auto sourcePixelSize = conv.fmt == CELL_GCM_TRANSFER_SCALE_FORMAT_R5G6B5 ? 2 : 4;
-    auto destPixelSize = destFormat == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5 ? 2 : 4;
-    assert(sourcePixelSize == destPixelSize && "not implemented");
+    auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
+    auto destPixelSize = surface.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     
+    union r6g6b5_t {
+        uint32_t val;
+        BitField<0, 5> r;
+        BitField<5, 11> g;
+        BitField<11, 16> b;
+    };
+   
     auto srcLine = sourceEa;
-    auto destLine = destEa + conv.outY * destPitch + conv.outX * destPixelSize;
-    for (auto i = 0u; i < conv.clipH; ++i) {
+    auto destLine = destEa + scale.outY * surface.pitch + scale.outX * destPixelSize;
+    for (auto i = 0u; i < scale.inH; ++i) {
         static std::vector<uint8_t> buf;
-        buf.resize(conv.clipW * sourcePixelSize);
+        buf.resize(scale.inW * sourcePixelSize);
         _mm->readMemory(srcLine, &buf[0], buf.size());
         _mm->writeMemory(destLine, &buf[0], buf.size());
         srcLine += sourcePitch;
-        destLine += destPitch;
+        destLine += surface.pitch;
     }
+}
+
+void Rsx::Nv309eSetFormat(uint16_t format,
+                          uint8_t width,
+                          uint8_t height,
+                          uint32_t offset) {
+    TRACE4(Nv309eSetFormat, format, width, height, offset);
+    assert(format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5 ||
+           format == CELL_GCM_TRANSFER_SURFACE_FORMAT_A8R8G8B8);
+    SwizzleSettings& s = _context->swizzle2d;
+    s.format = format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5
+                   ? ScaleSettingsFormat::r5g6b5
+                   : ScaleSettingsFormat::a8r8g8b8;
+    s.logWidth = width;
+    s.logHeight = height;
+    s.offset = offset;
 }
 
 void Rsx::BlendEnable(bool enable) {

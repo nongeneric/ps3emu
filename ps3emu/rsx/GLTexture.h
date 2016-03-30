@@ -54,7 +54,6 @@ public:
     void read(uint8_t* ptr, glm::vec4& tex);
 };
 
-// TODO: swizzle textures
 // remap order for 2x16 and 32 ...
 class TextureIterator : std::iterator<std::forward_iterator_tag, glm::vec4> {
     uint8_t* _ptr;
@@ -67,6 +66,23 @@ public:
     TextureIterator& operator++();
     bool operator==(TextureIterator const& other);
     uint8_t* operator*();
+};
+
+class SwizzledTextureIterator {
+    uint8_t* _ptr;
+    unsigned _lg2Width;
+    unsigned _lg2Height;
+    unsigned _lg2Depth;
+    unsigned _texelSize;
+    unsigned swizzleAddress(unsigned x, unsigned y, unsigned z);
+
+public:
+    SwizzledTextureIterator(uint8_t* buf,
+                            unsigned width,
+                            unsigned height,
+                            unsigned depth,
+                            unsigned texelSize);
+    uint8_t* at(unsigned x, unsigned y, unsigned z);
 };
 
 class GLSimpleTexture {
@@ -82,3 +98,10 @@ public:
     unsigned height();
     GLuint format();
 };
+
+template <typename BF>
+uint8_t ext8(BF bf) {
+    static_assert(BF::W < 8, "");
+    uint8_t val = bf.u();
+    return (val << (8 - BF::W)) | (val >> (2 * BF::W - 8));
+}

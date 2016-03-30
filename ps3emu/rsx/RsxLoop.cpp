@@ -443,10 +443,12 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x000008d0:
             name = "CELL_GCM_NV4097_SET_FOG_PARAMS";
             break;
-        case 0x000008e4:
+        case 0x000008e4: {
             //name = "CELL_GCM_NV4097_SET_SHADER_PROGRAM";
-            ShaderProgram(readarg(1));
+            auto arg = readarg(1);
+            ShaderProgram(arg & ~0b111ul, (arg & 0b111) - 1);
             break;
+        }
         case 0x00000904:
             name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FORMAT";
             break;
@@ -922,8 +924,18 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00006300: {
             //name = "CELL_GCM_NV3062_SET_COLOR_FORMAT";
-            auto arg = readarg(2);
-            ColorFormat(readarg(1), arg >> 16, arg & 0xffff);
+            auto format = readarg(1);
+            auto arg2 = readarg(2);
+            auto srcPitch = arg2 & 0xffff;
+            auto destPitch = arg2 >> 16;
+            if (count == 2) {
+                assert(srcPitch == destPitch);
+                ColorFormat_2(format, destPitch);
+            } else {
+                assert(count == 4);
+                assert(readarg(3) == 0);
+                ColorFormat_3(format, destPitch, readarg(4));
+            }
             break;
         }
         case 0x00006304:
@@ -943,11 +955,18 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV309E_SET_CONTEXT_DMA_NOTIFIES";
             break;
         case 0x00008184:
-            name = "CELL_GCM_NV309E_SET_CONTEXT_DMA_IMAGE";
+            //name = "CELL_GCM_NV309E_SET_CONTEXT_DMA_IMAGE";
+            ContextDmaImage(readarg(1));
             break;
-        case 0x00008300:
-            name = "CELL_GCM_NV309E_SET_FORMAT";
+        case 0x00008300: {
+            //name = "CELL_GCM_NV309E_SET_FORMAT";
+            auto arg = readarg(1);
+            Nv309eSetFormat(arg & 0xffff, 
+                            (arg >> 16) & 0xff, 
+                            (arg >> 24) & 0xff, 
+                            readarg(2));
             break;
+        }
         case 0x00008304:
             name = "CELL_GCM_NV309E_SET_OFFSET";
             break;

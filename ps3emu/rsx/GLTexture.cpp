@@ -7,13 +7,6 @@ using namespace glm;
 
 // rgba
 
-template <typename BF>
-uint8_t ext8(BF bf) {
-    static_assert(BF::W < 8, "");
-    uint8_t val = bf.u();
-    return (val << (8 - BF::W)) | (val >> (2 * BF::W - 8));
-}
-
 void read_A8R8G8B8(const uint8_t* raw, u8vec4& texel) {
     texel = { raw[1], raw[2], raw[3], raw[0] };
 }
@@ -297,16 +290,26 @@ GLTexture::GLTexture(const RsxTextureInfo& info): _info(info) {
 
 void GLTexture::update(std::vector<uint8_t>& blob) {
     std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
-
-    assert(_info.format & CELL_GCM_TEXTURE_LN);
-    
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     
     TextureReader reader(texelFormat, _info);
-    TextureIterator it(&blob[0], _info.pitch, getTexelSize(texelFormat));
-    for (auto i = 0; i < _info.width * _info.height; ++i) {
-        reader.read(*it, conv[i]);
-        ++it;
+    auto texelSize = getTexelSize(texelFormat);
+    if (_info.format & CELL_GCM_TEXTURE_LN) {
+        TextureIterator it(&blob[0], _info.pitch, texelSize);
+        for (auto i = 0; i < _info.width * _info.height; ++i) {
+            reader.read(*it, conv[i]);
+            ++it;
+        }
+    } else {
+        SwizzledTextureIterator it(
+            &blob[0], _info.width, _info.height, 1, texelSize);
+        auto i = 0u;
+        for (auto u = 0; u < _info.width; ++u) {
+            for (auto v = 0; v < _info.height; ++v) {
+                reader.read(it.at(u, v, 0), conv[i]);
+                i++;
+            }
+        }
     }
     
     glcall(glTextureSubImage2D(_handle,
@@ -462,4 +465,48 @@ GLuint GLSimpleTexture::format() {
 
 GLuint GLTexture::handle() {
     return _handle;
+}
+
+SwizzledTextureIterator::SwizzledTextureIterator(uint8_t* buf,
+                                                 unsigned width,
+                                                 unsigned height,
+                                                 unsigned depth,
+                                                 unsigned texelSize)
+    : _ptr(buf),
+      _lg2Width(log2l(width)),
+      _lg2Height(log2l(height)),
+      _lg2Depth(log2l(depth)),
+      _texelSize(texelSize) {}
+
+uint8_t* SwizzledTextureIterator::at(unsigned x, unsigned y, unsigned z) {
+    return &_ptr[swizzleAddress(x, y, z) * _texelSize];
+}
+
+unsigned SwizzledTextureIterator::swizzleAddress(unsigned x, unsigned y, unsigned z) {
+    auto offset = 0u;
+    auto shift = 0u;
+    auto w = _lg2Width;
+    auto h = _lg2Height;
+    auto d = _lg2Depth;
+    while (w | h | d) {
+        if (w) {
+            offset |= (x & 1) << shift;
+            x >>= 1;
+            ++shift;
+            --w;
+        }
+        if (h) {
+            offset |= (y & 1) << shift;
+            y >>= 1;
+            ++shift;
+            --h;
+        }
+        if (d) {
+            offset |= (z & 1) << shift;
+            z >>= 1;
+            ++shift;
+            --d;
+        }
+    }
+    return offset;
 }

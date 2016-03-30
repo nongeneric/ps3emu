@@ -79,7 +79,8 @@
     X(SemaphoreOffset) \
     X(BackEndWriteSemaphoreRelease) \
     X(OffsetDestin) \
-    X(ColorFormat) \
+    X(ColorFormat_2) \
+    X(ColorFormat_3) \
     X(Point) \
     X(Color) \
     X(ContextDmaImageDestin) \
@@ -93,6 +94,8 @@
     X(Nv3089ContextSurface) \
     X(Nv3089SetColorConversion) \
     X(ImageInSize) \
+    X(ContextDmaImage) \
+    X(Nv309eSetFormat) \
     X(BlendEnable) \
     X(BlendFuncSFactor) \
     X(LogicOpEnable) \
@@ -184,3 +187,5 @@ for z in range(1, 14): a(z)
 #define TRACE13(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11), ARG(a12) });
 
 const char* printCommandId(CommandId id);
+std::string printArgHex(GcmCommandArg const& arg);
+std::string printArgDecimal(GcmCommandArg const& arg);

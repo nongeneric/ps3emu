@@ -125,7 +125,7 @@ class Rsx {
     void TransformProgram(uint32_t locationOffset, unsigned size);
     void VertexAttribInputMask(uint16_t mask);
     void TransformTimeout(uint16_t count, uint16_t registerCount);
-    void ShaderProgram(uint32_t locationOffset);
+    void ShaderProgram(uint32_t offset, uint32_t location);
     void ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h);
     void ClipMin(float min, float max);
     void ViewportOffset(float offset0,
@@ -228,7 +228,8 @@ class Rsx {
     void SemaphoreOffset(uint32_t offset);
     void BackEndWriteSemaphoreRelease(uint32_t value);
     void OffsetDestin(uint32_t offset);
-    void ColorFormat(uint32_t format, uint16_t dstPitch, uint16_t srcPitch);
+    void ColorFormat_3(uint32_t format, uint16_t pitch, uint32_t offset);
+    void ColorFormat_2(uint32_t format, uint16_t pitch);
     void Point(uint16_t pointX, 
                uint16_t pointY, 
                uint16_t outSizeX, 
@@ -255,6 +256,10 @@ class Rsx {
                   uint8_t inFormat,
                   uint8_t outFormat,
                   uint32_t notify);
+    void Nv309eSetFormat(uint16_t format,
+                         uint8_t width,
+                         uint8_t height,
+                         uint32_t offset);
     void BufferNotify(uint32_t notify);
     void Nv3089ContextDmaImage(uint32_t location);
     void Nv3089ContextSurface(uint32_t surfaceType);
@@ -271,6 +276,7 @@ class Rsx {
                                   uint16_t outH,
                                   float dsdx,
                                   float dtdy);
+    void ContextDmaImage(uint32_t location);
     void ImageInSize(uint16_t inW,
                      uint16_t inH,
                      uint16_t pitch,

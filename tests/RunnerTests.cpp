@@ -731,3 +731,13 @@ TEST_CASE("ppu_float_cmp") {
         "1 1 1 0 0 0 1 0 "
     );
 }
+
+TEST_CASE("ppu_sraw") {
+    auto output = startWaitGetOutput({"./binaries/ppu_sraw/a.elf"});
+    REQUIRE( output == 
+        "1000\n"
+        "1000\n"
+        "250\n"
+        "4000\n"
+    );
+}

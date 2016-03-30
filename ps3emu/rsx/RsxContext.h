@@ -7,6 +7,7 @@
 #include "GLTexture.h"
 #include "GLFramebuffer.h"
 #include "Cache.h"
+#include "Rsx.h"
 #include "../shaders/ShaderGenerator.h"
 
 struct TextureSamplerInfo {
@@ -35,43 +36,66 @@ struct DisplayBufferInfo {
     uint32_t height;
 };
 
-struct ColorConvertionInfo {
-    uint32_t fmt;
-    int16_t clipX;
-    int16_t clipY;
-    uint16_t clipW;
-    uint16_t clipH;
-    int16_t outX;
-    int16_t outY;
-    uint16_t outW;
-    uint16_t outH;
-    float dsdx;
-    float dtdy;
+enum class ScaleSettingsSurfaceType {
+    Linear, Swizzle
 };
 
-struct TransferInfo {
-    uint32_t format;
-    uint32_t destOffset;
-    uint32_t sourceOffset;
-    uint32_t surfaceOffsetDestin;
-    int32_t destPitch;
-    int32_t sourcePitch;
-    uint32_t lineLength;
-    uint32_t lineCount;
-    uint32_t sourceFormat;
-    uint32_t destFormat;
-    uint16_t pointX; 
-    uint16_t pointY; 
-    uint16_t outSizeX;
-    uint16_t outSizeY; 
-    uint16_t inSizeX;
-    uint16_t inSizeY;
-    MemoryLocation destTransferLocation = MemoryLocation::Local;
-    MemoryLocation sourceDataLocation = MemoryLocation::Local;
-    MemoryLocation destDataLocation = MemoryLocation::Local;
-    MemoryLocation sourceImageLocation = MemoryLocation::Local;
-    uint32_t surfaceType;
-    ColorConvertionInfo conv;
+enum class ScaleSettingsFormat {
+    r5g6b5, a8r8g8b8, y32
+};
+
+struct ScaleSettings {
+    ScaleSettingsSurfaceType type = ScaleSettingsSurfaceType::Linear;
+    ScaleSettingsFormat format = ScaleSettingsFormat::r5g6b5;
+    uint16_t inX = 0;
+    uint16_t inY = 0;
+    uint16_t inW = 0;
+    uint16_t inH = 0;
+    uint16_t outX = 0;
+    uint16_t outY = 0;
+    uint16_t outW = 0;
+    uint16_t outH = 0;
+    float dsdx = 0;
+    float dtdy = 0;
+    MemoryLocation location = MemoryLocation::Local;
+};
+
+struct SwizzleSettings {
+    ScaleSettingsFormat format = ScaleSettingsFormat::r5g6b5;
+    uint8_t logWidth = 0;
+    uint8_t logHeight = 0;
+    uint32_t offset = 0;
+    MemoryLocation location = MemoryLocation::Local;
+};
+
+struct SurfaceSettings {
+    ScaleSettingsFormat format = ScaleSettingsFormat::r5g6b5;
+    int16_t pitch = 0;
+    uint32_t offset = 0;
+    uint32_t destOffset = 0;
+    MemoryLocation destLocation = MemoryLocation::Local;
+};
+
+struct CopySettings {
+    uint32_t srcOffset = 0;
+    uint32_t destOffset = 0;
+    MemoryLocation srcLocation = MemoryLocation::Local;
+    MemoryLocation destLocation = MemoryLocation::Local;
+    int32_t srcPitch = 0;
+    int32_t destPitch = 0;
+    uint32_t lineLength = 0;
+    uint32_t lineCount = 0;
+    uint8_t srcFormat = 0;
+    uint8_t destFormat = 0;
+};
+
+struct InlineSettings {
+    uint32_t pointX = 0;
+    uint32_t pointY = 0;
+    uint32_t srcSizeX = 0;
+    uint32_t srcSizeY = 0;
+    uint32_t destSizeX = 0;
+    uint32_t destSizeY = 0;
 };
 
 struct TextureCacheKey {
@@ -173,7 +197,6 @@ public:
     std::unique_ptr<GLFramebuffer> framebuffer;
     std::unique_ptr<TextureRenderer> textureRenderer;
     uint32_t semaphoreOffset = 0;
-    TransferInfo transfer;
     GLProgramPipeline pipeline;
     GLPersistentCpuBuffer mainMemoryBuffer;
     GLPersistentCpuBuffer localMemoryBuffer;
@@ -181,7 +204,13 @@ public:
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
     uint32_t vBlankHandlerDescr = 0;
-    MemoryLocation reportLocation = MemoryLocation::Local;
+    MemoryLocation reportLocation;
+    
+    ScaleSettings scale2d;
+    SwizzleSettings swizzle2d;
+    SurfaceSettings surface2d;
+    CopySettings copy2d;
+    InlineSettings inline2d;
     
     inline void trace(CommandId id, std::vector<GcmCommandArg> const& args) {
         tracer.trace(frame, commandNum++, id, args);
