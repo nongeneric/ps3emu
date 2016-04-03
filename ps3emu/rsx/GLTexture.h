@@ -74,7 +74,6 @@ class SwizzledTextureIterator {
     unsigned _lg2Height;
     unsigned _lg2Depth;
     unsigned _texelSize;
-    unsigned swizzleAddress(unsigned x, unsigned y, unsigned z);
 
 public:
     SwizzledTextureIterator(uint8_t* buf,
@@ -82,7 +81,13 @@ public:
                             unsigned height,
                             unsigned depth,
                             unsigned texelSize);
+    SwizzledTextureIterator(uint8_t* buf,
+                            unsigned lgWidth,
+                            unsigned lgHeight,
+                            unsigned texelSize);
     uint8_t* at(unsigned x, unsigned y, unsigned z);
+    unsigned swizzleAddress(unsigned x, unsigned y, unsigned z);
+    std::tuple<unsigned, unsigned> unswizzle(unsigned u, unsigned v);
 };
 
 class GLSimpleTexture {

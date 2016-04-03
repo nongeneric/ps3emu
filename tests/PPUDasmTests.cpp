@@ -17,7 +17,7 @@ TEST_CASE("common bitfield operations") {
     REQUIRE(_3bits.u() == 7);
 }
 
-TEST_CASE("bitfield write") {
+TEST_CASE("bitfield_write") {
     union {
         uint32_t val;
         BitField<0, 8> bf1;
@@ -29,6 +29,22 @@ TEST_CASE("bitfield write") {
     f.bf3.set(0xabcd);
     REQUIRE( f.val == 0x4f12abcd );
     REQUIRE( f.bf2.u() == 0x12 );
+}
+
+TEST_CASE("bitfield_write_2") {
+    union {
+        uint32_t val;
+        BitField<0, 5> r;
+        BitField<5, 11> g;
+        BitField<11, 16> b;
+    } f { 0 };
+    f.r.set(2);
+    f.g.set(4);
+    f.b.set(2);
+    REQUIRE( f.r.u() == 2 );
+    REQUIRE( f.g.u() == 4 );
+    REQUIRE( f.b.u() == 2 );
+    REQUIRE( f.val == 0x10820000 );
 }
 
 TEST_CASE("bl instruction") {

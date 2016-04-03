@@ -475,7 +475,17 @@ SwizzledTextureIterator::SwizzledTextureIterator(uint8_t* buf,
     : _ptr(buf),
       _lg2Width(log2l(width)),
       _lg2Height(log2l(height)),
-      _lg2Depth(log2l(depth)),
+      _lg2Depth(depth ? log2l(depth) : 0),
+      _texelSize(texelSize) {}
+      
+SwizzledTextureIterator::SwizzledTextureIterator(uint8_t* buf,
+                                                 unsigned lgWidth,
+                                                 unsigned lgHeight,
+                                                 unsigned texelSize)
+    : _ptr(buf),
+      _lg2Width(lgWidth),
+      _lg2Height(lgHeight),
+      _lg2Depth(0),
       _texelSize(texelSize) {}
 
 uint8_t* SwizzledTextureIterator::at(unsigned x, unsigned y, unsigned z) {
@@ -509,4 +519,18 @@ unsigned SwizzledTextureIterator::swizzleAddress(unsigned x, unsigned y, unsigne
         }
     }
     return offset;
+}
+
+std::tuple<unsigned, unsigned> SwizzledTextureIterator::unswizzle(unsigned u,
+                                                                  unsigned v) {
+    unsigned x = 0, y = 0;
+    unsigned offset = (v << _lg2Width) | u;
+    for (auto i = 0u; i < _lg2Width; i++) {
+        x |= ((offset >> (i * 2)) & 1) << i;
+    }
+    offset >>= 1;
+    for (auto i = 0u; i < _lg2Height; i++) {
+        y |= ((offset >> (i * 2)) & 1) << i;
+    }
+    return std::make_tuple(x, y);
 }

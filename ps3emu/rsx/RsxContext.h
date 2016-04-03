@@ -47,14 +47,21 @@ enum class ScaleSettingsFormat {
 struct ScaleSettings {
     ScaleSettingsSurfaceType type = ScaleSettingsSurfaceType::Linear;
     ScaleSettingsFormat format = ScaleSettingsFormat::r5g6b5;
-    uint16_t inX = 0;
-    uint16_t inY = 0;
-    uint16_t inW = 0;
-    uint16_t inH = 0;
-    uint16_t outX = 0;
-    uint16_t outY = 0;
+    int16_t clipX = 0;
+    int16_t clipY = 0;
+    uint16_t clipW = 0;
+    uint16_t clipH = 0;
+    int16_t outX = 0;
+    int16_t outY = 0;
     uint16_t outW = 0;
     uint16_t outH = 0;
+    uint16_t inW = 0;
+    uint16_t inH = 0;
+    uint16_t pitch = 0;
+    uint32_t offset = 0;
+    float inX = 0;
+    float inY = 0;
+    
     float dsdx = 0;
     float dtdy = 0;
     MemoryLocation location = MemoryLocation::Local;

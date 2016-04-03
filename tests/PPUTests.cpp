@@ -2,8 +2,43 @@
 #include "../ps3emu/ppu/ppu_dasm.h"
 #include "../ps3emu/ppu/PPUThread.h"
 #include "../ps3emu/InternalMemoryManager.h"
+#include "../ps3emu/rsx/GLTexture.h"
 #include <vector>
 #include <catch.hpp>
+
+TEST_CASE("swizzle_coord_convert") {
+    SwizzledTextureIterator it(nullptr, 3, 3, 0);
+    struct {
+        unsigned x;
+        unsigned y;
+        unsigned unswizzledX;
+        unsigned unswizzledY;
+    } in[] = {
+        { 0, 0, 0, 0 },
+        { 1, 0, 1, 0 },
+        { 2, 0, 0, 1 },
+        { 3, 0, 1, 1 },
+        { 4, 0, 2, 0 },
+        { 5, 0, 3, 0 },
+        { 6, 0, 2, 1 },
+        { 7, 0, 3, 1 },
+        { 0, 1, 0, 2 },
+        { 1, 1, 1, 2 },
+        { 2, 1, 0, 3 },
+        { 3, 1, 1, 3 },
+        { 4, 1, 2, 2 },
+        { 5, 1, 3, 2 },
+        { 6, 1, 2, 3 },
+        { 7, 1, 3, 3 },
+        { 0, 2, 4, 0 },
+    };
+    for (auto i = std::begin(in); i != std::end(in); ++i) {
+        unsigned x, y;
+        std::tie(x, y) = it.unswizzle(i->x, i->y);
+        REQUIRE( x == i->unswizzledX );
+        REQUIRE( y == i->unswizzledY );
+    }
+}
 
 TEST_CASE("read write memory") {
     MainMemory mm;

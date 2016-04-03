@@ -85,7 +85,7 @@ public:
     
     inline void set(uint32_t u) {
         uint32_t field = u << (32 - W - P);
-        _v = (_v & ~mask<32>(P, W)) | field;
+        _v = (_v & ~mask<32>(P, P + W - 1)) | field;
     }
 };
 
@@ -127,12 +127,12 @@ inline int32_t signed_rshift32(int32_t v, int n) {
 }
 
 inline unsigned count_ones32(uint32_t x) {
-        x -= ((x >> 1) & 0x55555555);
-        x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
-        x = (((x >> 4) + x) & 0x0f0f0f0f);
-        x += (x >> 8);
-        x += (x >> 16);
-        return x & 0x0000003f;
+    x -= ((x >> 1) & 0x55555555);
+    x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
+    x = (((x >> 4) + x) & 0x0f0f0f0f);
+    x += (x >> 8);
+    x += (x >> 16);
+    return x & 0x0000003f;
 }
 
 template <int Size, typename T>

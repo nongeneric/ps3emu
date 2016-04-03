@@ -15,6 +15,7 @@
 #include <vector>
 #include <fstream>
 #include <boost/log/trivial.hpp>
+#include <boost/algorithm/clamp.hpp>
 #include "../../libs/graphics/graphics.h"
 
 #include "FragmentShaderUpdateFunctor.h"
@@ -27,6 +28,8 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+using namespace boost::algorithm;
 
 typedef std::array<float, 4> glvec4_t;
 
@@ -1437,8 +1440,6 @@ void startCopy2d(RsxContext* context, MainMemory* mm) {
     CopySettings& c = context->copy2d;
     auto sourceEa = rsxOffsetToEa(c.srcLocation, c.srcOffset);
     auto destEa = rsxOffsetToEa(c.destLocation, c.destOffset);
-    assert((~(sourceEa & 0xfffff) > c.srcPitch * c.lineCount) && "mid page writes aren't supported");
-    assert((~(destEa & 0xfffff) > c.destPitch * c.lineCount) && "mid page writes aren't supported");
 
     assert(c.srcFormat == 1 || c.srcFormat == 2 || c.srcFormat == 4);
     assert(c.destFormat == 1 || c.destFormat == 2 || c.destFormat == 4);
@@ -1490,6 +1491,7 @@ void Rsx::OffsetIn_9(uint32_t inOffset,
     c.lineLength = lineLength;
     c.lineCount = lineCount;
     c.srcFormat = inFormat;
+    c.destFormat = outFormat;
     
     startCopy2d(_context.get(), _mm);
 }
@@ -1536,16 +1538,89 @@ void Rsx::Nv3089SetColorConversion(uint32_t conv,
     s.format = fmt == CELL_GCM_TRANSFER_SCALE_FORMAT_R5G6B5
                    ? ScaleSettingsFormat::r5g6b5
                    : ScaleSettingsFormat::a8r8g8b8;
-    s.inX = x;
-    s.inY = y;
-    s.inW = w;
-    s.inH = h;
+    s.clipX = x;
+    s.clipY = y;
+    s.clipW = w;
+    s.clipH = h;
     s.outX = outX;
     s.outY = outY;
     s.outW = outW;
     s.outH = outH;
     s.dsdx = dsdx;
     s.dtdy = dtdy;
+}
+
+union r6g6b5_t {
+    uint32_t val;
+    BitField<0, 5> r;
+    BitField<5, 11> g;
+    BitField<11, 16> b;
+};
+
+void transferImage(RsxContext* context, MainMemory* mm) {
+    ScaleSettings& scale = context->scale2d;
+    SurfaceSettings& surface = context->surface2d;
+    SwizzleSettings& swizzle = context->swizzle2d;
+    
+    bool isSwizzle = scale.type == ScaleSettingsSurfaceType::Swizzle;
+    
+    auto sourceEa = rsxOffsetToEa(scale.location, scale.offset);
+    auto destEa = isSwizzle
+                      ? rsxOffsetToEa(swizzle.location, swizzle.offset)
+                      : rsxOffsetToEa(surface.destLocation, surface.destOffset);
+    auto src = mm->getMemoryPointer(sourceEa, 1);
+    auto dest = mm->getMemoryPointer(destEa, 1);
+    
+    auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
+    auto destPixelSize = surface.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
+    
+    auto destX0 = std::max<int16_t>(scale.outX, scale.clipX);
+    auto destXn = std::min<int16_t>(scale.outX + scale.outW, scale.clipX + scale.clipW);
+    auto destY0 = std::max<int16_t>(scale.outY, scale.clipY);
+    auto destYn = std::min<int16_t>(scale.outY + scale.outH, scale.clipY + scale.clipH);
+    
+    assert(destX0 >= 0);
+    assert(destY0 >= 0);
+    
+    auto clipDiffX = scale.clipX > scale.outX ? scale.clipX - scale.outX : 0;
+    auto clipDiffY = scale.clipY > scale.outY ? scale.clipY - scale.outY : 0;
+    
+    SwizzledTextureIterator swizzleIter(dest, swizzle.logWidth, swizzle.logHeight, destPixelSize);
+    
+    for (auto destY = destY0; destY < destYn; ++destY) {
+        for (auto destX = destX0; destX < destXn; ++destX) {
+            int srcX = clamp(scale.inX + (destX - destX0 + clipDiffX) * scale.dsdx, 
+                             .0f, scale.inW - 1);
+            int srcY = clamp(scale.inY + (destY - destY0 + clipDiffY) * scale.dtdy, 
+                             .0f, scale.inH - 1);
+            auto srcPixelPtr = src + srcY * scale.pitch + srcX * sourcePixelSize;
+            auto destPixelPtr = dest +
+                (isSwizzle ? swizzleIter.swizzleAddress(destX, destY, 0) * destPixelSize
+                           : (destY * surface.pitch + destX * destPixelSize));
+            uint32_t srcPixel = *(big_uint32_t*)srcPixelPtr;
+            uint32_t destPixel = srcPixel;
+            if (sourcePixelSize != destPixelSize) {
+                if (sourcePixelSize == 2) {
+                    r6g6b5_t in { srcPixel };
+                    destPixel = (0xff << 24)
+                              | (ext8(in.r) << 16)
+                              | (ext8(in.g) << 8)
+                              | ext8(in.b);
+                } else {
+                    r6g6b5_t out { 0 };
+                    out.r.set(((srcPixel >> 16) & 0xff) * 32 / 255);
+                    out.g.set(((srcPixel >> 8) & 0xff) * 64 / 255);
+                    out.b.set((srcPixel & 0xff) * 32 / 255);
+                    destPixel = out.val;
+                }
+            }
+            if (destPixelSize == 2) {
+                *(big_uint16_t*)destPixelPtr = destPixel >> 16;
+            } else {
+                *(big_uint32_t*)destPixelPtr = destPixel;
+            }
+        }
+    }
 }
 
 void Rsx::ImageInSize(uint16_t inW,
@@ -1561,43 +1636,24 @@ void Rsx::ImageInSize(uint16_t inW,
     if (_mode == RsxOperationMode::Replay)
         return;
     
-    ScaleSettings& scale = _context->scale2d;
-    SurfaceSettings& surface = _context->surface2d;
+    ScaleSettings& s = _context->scale2d;
+    s.inW = inW;
+    s.inH = inH;
+    s.pitch = pitch;
+    s.offset = offset;
+    s.inX = inX;
+    s.inY = inY;
     
-    if (scale.dsdx == 0 || scale.dtdy == 0)
+    if (s.dsdx == 0 || s.dtdy == 0)
         return;
-    assert(scale.dsdx == 1);
-    assert(scale.dtdy == 1);
     
-    auto sourceEa = rsxOffsetToEa(scale.location, offset);
-    auto destEa = rsxOffsetToEa(surface.destLocation, surface.destOffset);
-    auto sourcePitch = pitch;
+    if (s.inW == 0 || s.inH == 0)
+        return;
     
-    //assert((~(sourceEa & 0xfffff) > sourcePitch * inH) &&
-    //       "mid page writes aren't supported");
-    //assert((~(destEa & 0xfffff) > destPitch * (conv.outH + conv.outY)) &&
-    //       "mid page writes aren't supported");
+    if (s.outW == 0 || s.outH == 0)
+        return;
     
-    auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
-    auto destPixelSize = surface.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
-    
-    union r6g6b5_t {
-        uint32_t val;
-        BitField<0, 5> r;
-        BitField<5, 11> g;
-        BitField<11, 16> b;
-    };
-   
-    auto srcLine = sourceEa;
-    auto destLine = destEa + scale.outY * surface.pitch + scale.outX * destPixelSize;
-    for (auto i = 0u; i < scale.inH; ++i) {
-        static std::vector<uint8_t> buf;
-        buf.resize(scale.inW * sourcePixelSize);
-        _mm->readMemory(srcLine, &buf[0], buf.size());
-        _mm->writeMemory(destLine, &buf[0], buf.size());
-        srcLine += sourcePitch;
-        destLine += surface.pitch;
-    }
+    transferImage(_context.get(), _mm);
 }
 
 void Rsx::Nv309eSetFormat(uint16_t format,
