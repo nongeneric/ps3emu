@@ -667,6 +667,7 @@ TEST_CASE("gcm_transfer") {
         "success 1700\n"
         "success 1800\n"
         "success 1900\n"
+        "success 2000\n"
         "completed\n"
     );
 }
