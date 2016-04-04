@@ -294,6 +294,7 @@ class Rsx {
     void BlendEquation(uint16_t color, uint16_t alpha);
     void ZStencilClearValue(uint32_t value);
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
+    void invokeHandler(uint32_t descrEa);
     
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);
@@ -324,6 +325,7 @@ public:
     void init(Process* proc);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
+    void setFlipHandler(uint32_t descrEa);
     void updateOffsetTableForReplay();
     void sendCommand(GcmCommandReplayInfo info);
     bool receiveCommandCompletion();

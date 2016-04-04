@@ -47,6 +47,17 @@ TEST_CASE("bitfield_write_2") {
     REQUIRE( f.val == 0x10820000 );
 }
 
+TEST_CASE("bitfield_write_3") {
+    union {
+        uint32_t val;
+        BitField<10, 13> f;
+    } f { 0 };
+    f.f.set(-1);
+    REQUIRE( f.f.u() == 0b111 );
+    REQUIRE( f.val == 0x380000 );
+}
+
+
 TEST_CASE("bl instruction") {
     uint8_t instr[] = { 0x48, 0x00, 0x01, 0x09 };
     std::string res;

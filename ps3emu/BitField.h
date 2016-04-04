@@ -84,7 +84,7 @@ public:
     }
     
     inline void set(uint32_t u) {
-        uint32_t field = u << (32 - W - P);
+        uint32_t field = (u & ((1 << W) - 1)) << (32 - W - P);
         _v = (_v & ~mask<32>(P, P + W - 1)) | field;
     }
 };

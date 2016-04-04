@@ -20,12 +20,12 @@ struct CallbackInfo {
 class CallbackThread {
     CallbackInfo _lastCallback;
     ConcurrentFifoQueue<CallbackInfo> _queue;
+    friend uint64_t callbackThreadQueueWait(PPUThread* ppuThread);
     
-    friend int callbackThreadQueueWait(uint64_t threadPtr, PPUThread* ppuThread);
 public:
     CallbackThread(Process* proc);
     std::future<void> schedule(std::vector<uint64_t> args, uint32_t toc, uint32_t ea);
     void terminate();
 };
 
-int callbackThreadQueueWait(uint64_t threadPtr, PPUThread* ppuThread);
+uint64_t callbackThreadQueueWait(PPUThread* ppuThread);

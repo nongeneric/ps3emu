@@ -211,6 +211,7 @@ public:
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
     uint32_t vBlankHandlerDescr = 0;
+    uint32_t flipHandlerDescr = 0;
     MemoryLocation reportLocation;
     
     ScaleSettings scale2d;

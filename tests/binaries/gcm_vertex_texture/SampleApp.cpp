@@ -301,14 +301,14 @@ bool SampleApp::onInit(int argc, char **ppArgv)
 
 	mModelViewProj
 		= cellGcmCgGetNamedParameter(mCGVertexProgram, "modelViewProj");
-	mCgAnimation
-		= cellGcmCgGetNamedParameter(mCGVertexProgram, "animation");
+	/*mCgAnimation
+		= cellGcmCgGetNamedParameter(mCGVertexProgram, "animation");*/
 	CGparameter position
 		= cellGcmCgGetNamedParameter(mCGVertexProgram, "position");
 	CGparameter texcoord
 		= cellGcmCgGetNamedParameter(mCGVertexProgram, "texcoord");
 	CELL_GCMUTIL_CG_PARAMETER_CHECK_ASSERT( mModelViewProj );
-	CELL_GCMUTIL_CG_PARAMETER_CHECK_ASSERT( mCgAnimation );
+	//CELL_GCMUTIL_CG_PARAMETER_CHECK_ASSERT( mCgAnimation );
 	CELL_GCMUTIL_CG_PARAMETER_CHECK_ASSERT( position );
 	CELL_GCMUTIL_CG_PARAMETER_CHECK_ASSERT( texcoord );
 
@@ -431,26 +431,28 @@ bool SampleApp::onUpdate()
 }
 
 void print_matrix(Matrix4 matrix) {
-	float* m = (float*)&matrix;
+	/*float* m = (float*)&matrix;
 	printf("matrix: %g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
 		m[0], m[1], m[2], m[3], 
 		m[4], m[5], m[6], m[7], 
 		m[8], m[9], m[10], m[11], 
 		m[12], m[13], m[14], m[15]);
-	fflush(stdout);
+	fflush(stdout);*/
 }
 
 void print_vector(Vector4 vector) {
-	float* m = (float*)&vector;
-	printf("vector: %g,%g,%g,%g\n", m[0], m[1], m[2], m[3]);
-	fflush(stdout);
+	//float* m = (float*)&vector;
+	//printf("vector: %g,%g,%g,%g\n", m[0], m[1], m[2], m[3]);
+	//fflush(stdout);
 }
 
 bool render = 0;
 void SampleApp::onRender()
 {
-	if (render++)
+	if (render++) {
+		cellGcmFinish(0x13131313);
 		exit(0);
+	}
 	// base implementation clears screen and sets up camera
 	FWGCMCamControlApplication::onRender();
 
@@ -523,7 +525,7 @@ void SampleApp::onRender()
 	}
 	
 	// set Animation parameter
-	cellGcmSetVertexProgramParameter(mCgAnimation, (float*)&mAnimationParameter);
+	//cellGcmSetVertexProgramParameter(mCgAnimation, (float*)&mAnimationParameter);
 
 	//cellGcmSetDrawArrays(CELL_GCM_PRIMITIVE_QUADS, 0, mVertexCount);
 	// Enable primitive restart

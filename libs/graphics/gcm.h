@@ -50,7 +50,7 @@ ps3_uintptr_t cellGcmGetControlRegister();
 ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index);
 uint32_t cellGcmGetFlipStatus(Process* proc);
 emu_void_t cellGcmResetFlipStatus(Process* proc);
-emu_void_t _cellGcmSetFlipCommand(Process* proc, uint32_t buffer);
+emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer, Process* proc);
 uint32_t cellGcmGetTiledPitchSize(uint32_t size);
 int32_t cellGcmSetTileInfo(uint8_t index,
                            uint8_t location,

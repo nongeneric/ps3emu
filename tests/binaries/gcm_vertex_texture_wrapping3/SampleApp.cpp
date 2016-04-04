@@ -403,8 +403,10 @@ int render = 0;
 //-----------------------------------------------------------------------------
 void SampleApp::onRender()
 {
-	if (render++)
+	if (render++) {
+		cellGcmFinish(0x13131313);
 		exit(0);
+	}
 	// base implementation clears screen and sets up camera
 	FWGCMCamControlApplication::onRender();
 

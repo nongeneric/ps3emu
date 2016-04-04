@@ -454,6 +454,13 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
     _gcmIoAddress = ioAddress;
 }
 
+void Rsx::invokeHandler(uint32_t descrEa) {
+    fdescr descr;
+    _mm->readMemory(descrEa, &descr, sizeof(descr));
+    auto future = _proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
+    future.get();
+}
+
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     TRACE3(EmuFlip, buffer, label, labelValue);
     auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
@@ -484,10 +491,11 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
 #endif
     
     if (_context->vBlankHandlerDescr) {
-        fdescr descr;
-        _mm->readMemory(_context->vBlankHandlerDescr, &descr, sizeof(descr));
-        auto future = _proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
-        future.get();
+        invokeHandler(_context->vBlankHandlerDescr);
+    }
+    
+    if (_context->flipHandlerDescr) {
+        invokeHandler(_context->flipHandlerDescr);
     }
     
     this->setLabel(1, 0);
@@ -1323,6 +1331,10 @@ void Rsx::watchCaches() {
 
 void Rsx::setVBlankHandler(uint32_t descrEa) {
     _context->vBlankHandlerDescr = descrEa;
+}
+
+void Rsx::setFlipHandler(uint32_t descrEa) {
+    _context->flipHandlerDescr = descrEa;
 }
 
 void Rsx::OffsetDestin(uint32_t offset) {

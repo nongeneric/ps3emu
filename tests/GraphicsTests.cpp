@@ -167,3 +167,12 @@ TEST_CASE("gcm_dice") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_dice/ps3frame0.png");
 }
+
+TEST_CASE("gcm_flip_handler") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_flip_handler/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_flip_handler/ps3frame0.png");
+}

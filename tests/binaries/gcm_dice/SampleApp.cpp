@@ -354,8 +354,10 @@ bool SampleApp::onUpdate()
 int frame = 0;
 void SampleApp::onRender()
 {
-	if (frame == 1)
+	if (frame == 1) {
+		cellGcmFinish(0x13131313);
 		exit(0);
+	}
 	// base implementation clears screen and sets up camera
 	FWGCMCamControlApplication::onRender();
 

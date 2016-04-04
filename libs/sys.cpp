@@ -198,11 +198,11 @@ public:
     CellSemaphore(unsigned val, unsigned max)
         : _val(val), _max(max) { }
         
-    bool post() {
+    bool post(uint32_t val) {
         boost::unique_lock<boost::mutex> lock(_m);
         if (_val == _max)
             return false;
-        _val++;
+        _val += val;
         _cv.notify_all();
         return true;
     }
@@ -248,7 +248,7 @@ int32_t sys_semaphore_trywait(sys_semaphore_t sem) {
 
 int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
     auto& csem = semaphores.get(sem);
-    if (csem->post())
+    if (csem->post(val))
         return CELL_OK;
     return CELL_EBUSY;
 }
