@@ -477,12 +477,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     if (framenum < 10 && _mode != RsxOperationMode::Replay) {
         auto& vec = _context->lastFrame;
         vec.resize(_window.width() * _window.height() * 3);
-        glGetTextureImage(tex->handle(), 
-                          0,
-                          GL_RGB,
-                          GL_UNSIGNED_BYTE, 
-                          vec.size(), 
-                          &vec[0]);
+        glGetTextureImage(
+            tex->handle(), 0, GL_RGB, GL_UNSIGNED_BYTE, vec.size(), &vec[0]);
         std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgb", framenum));
         assert(f.is_open());
         f.write((const char*)vec.data(), vec.size());
@@ -1317,6 +1313,10 @@ bool Rsx::isCallActive() {
 
 uint32_t Rsx::getGet() {
     return _get;
+}
+
+uint32_t Rsx::getPut() {
+    return _put;
 }
 
 void Rsx::watchCaches() {

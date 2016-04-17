@@ -309,6 +309,7 @@ public:
     void shutdown();
     void setPut(uint32_t put);
     void setGet(uint32_t get);
+    uint32_t getPut();
     uint32_t getGet();
     uint32_t getRef();
     void setRef(uint32_t ref);

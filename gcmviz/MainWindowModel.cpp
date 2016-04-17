@@ -289,6 +289,7 @@ public:
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
+        (void)_rsx;
         //auto cache = _rsx->context()->bufferCache.cacheSnapshot();
         //auto key = cache[index.row()].key;
         switch (index.column()) {

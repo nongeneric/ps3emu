@@ -118,12 +118,18 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
     }
     
     if (coversRsxRegsRange(va, len)) {
-        assert(len == 4);        
-        if (va == GcmControlRegisters + 8) {
+        assert(len == 4);
+        if (va == GcmControlRegisters) {
+            *(big_uint32_t*)buf = _rsx->getPut();
+            return;
+        } else if (va == GcmControlRegisters + 4) {
+            *(big_uint32_t*)buf = _rsx->getGet();
+            return;
+        } else if (va == GcmControlRegisters + 8) {
             *(big_uint32_t*)buf = _rsx->getRef();
             return;
         }
-        throw std::runtime_error("reading rsx registers not implemented");
+        throw std::runtime_error("unknown rsx register");
     }
 
     copy<true>(va, buf, len, allocate);
