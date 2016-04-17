@@ -78,7 +78,6 @@ struct SwizzleSettings {
 struct SurfaceSettings {
     ScaleSettingsFormat format = ScaleSettingsFormat::r5g6b5;
     int16_t pitch = 0;
-    uint32_t offset = 0;
     uint32_t destOffset = 0;
     MemoryLocation destLocation = MemoryLocation::Local;
 };
@@ -164,6 +163,15 @@ struct IndexArrayInfo {
     GLuint glType = 0;
 };
 
+struct SurfaceToFramebufferLink {
+    uint32_t surfaceEa;
+    uint32_t framebufferEa;
+    inline bool operator<(SurfaceToFramebufferLink const& other) const {
+        return std::tie(surfaceEa, framebufferEa) <
+               std::tie(other.surfaceEa, other.framebufferEa);
+    }
+};
+
 class FragmentShaderUpdateFunctor;
 class GLFramebuffer;
 class TextureRenderer;
@@ -200,7 +208,7 @@ public:
     IndexArrayInfo indexArray;
     TextureSamplerInfo vertexTextureSamplers[4];
     TextureSamplerInfo fragmentTextureSamplers[16];
-    DisplayBufferInfo displayBuffers[8];
+    std::array<DisplayBufferInfo, 8> displayBuffers;
     std::unique_ptr<GLFramebuffer> framebuffer;
     std::unique_ptr<TextureRenderer> textureRenderer;
     uint32_t semaphoreOffset = 0;
@@ -219,6 +227,8 @@ public:
     SurfaceSettings surface2d;
     CopySettings copy2d;
     InlineSettings inline2d;
+    
+    std::set<SurfaceToFramebufferLink> surfaceLinks;
     
     inline void trace(CommandId id, std::vector<GcmCommandArg> const& args) {
         tracer.trace(frame, commandNum++, id, args);

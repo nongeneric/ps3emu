@@ -314,7 +314,7 @@ public:
     uint32_t getRef();
     void setRef(uint32_t ref);
     bool isCallActive();
-    void setLabel(int index, uint32_t value);
+    void setLabel(int index, uint32_t value, bool waitForIdle = true);
     bool isFlipInProgress() const;
     void resetFlipStatus();
     void setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress);

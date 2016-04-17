@@ -16,6 +16,7 @@
 #include <fstream>
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/clamp.hpp>
+#include <boost/range/algorithm.hpp>
 #include "../../libs/graphics/graphics.h"
 
 #include "FragmentShaderUpdateFunctor.h"
@@ -30,6 +31,7 @@
 #include <GLFW/glfw3.h>
 
 using namespace boost::algorithm;
+namespace br = boost::range;
 
 typedef std::array<float, 4> glvec4_t;
 
@@ -57,9 +59,13 @@ MemoryLocation gcmEnumToLocation(uint32_t enumValue) {
     throw std::runtime_error("bad location");
 }
 
-void Rsx::setLabel(int index, uint32_t value) {
+void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
     if (_mode == RsxOperationMode::Replay)
         return;
+    
+    if (waitForIdle) {
+        this->waitForIdle();
+    }
     auto offset = index * 0x10;
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("setting rsx label at offset %x", offset);
     auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
@@ -421,7 +427,7 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     // It is possible to use a finer grained synchronization, only waiting inside
     // gcm commands that might modify buffers/constants and possibly textures, but
     // for now a less error-prone approach with glFinish is used.
-    glFinish();
+    waitForIdle();
     
     TRACE2(DrawArrays, first, count);
 }
@@ -465,6 +471,18 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     TRACE3(EmuFlip, buffer, label, labelValue);
     auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
     auto tex = _context->framebuffer->findTexture(va);
+    
+    if (!tex && _mode == RsxOperationMode::Replay)
+        return;
+    
+    if (!tex) {
+        auto it = br::find_if(_context->surfaceLinks, [&](auto& link) {
+            return link.framebufferEa == va;
+        });
+        assert(it != end(_context->surfaceLinks));
+        tex = _context->framebuffer->findTexture(it->surfaceEa);
+        assert(tex);
+    }
     _context->framebuffer->bindDefault();
     _context->textureRenderer->render(tex);
     _context->pipeline.bind();
@@ -602,7 +620,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     glcall(glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset));
     
     // see DrawArrays for rationale
-    glFinish();
+    waitForIdle();
     
     TRACE2(DrawIndexArray, first, count);
 }
@@ -1362,7 +1380,7 @@ void colorFormat(RsxContext* context, uint32_t format, uint16_t pitch) {
 void Rsx::ColorFormat_3(uint32_t format, uint16_t pitch, uint32_t offset) {
     TRACE3(ColorFormat_3, format, pitch, offset);
     colorFormat(_context.get(), format, pitch);
-    _context->surface2d.offset = offset;
+    _context->surface2d.destOffset = offset;
 }
 
 void Rsx::ColorFormat_2(uint32_t format, uint16_t pitch) {
@@ -1582,6 +1600,14 @@ void transferImage(RsxContext* context, MainMemory* mm) {
                       : rsxOffsetToEa(surface.destLocation, surface.destOffset);
     auto src = mm->getMemoryPointer(sourceEa, 1);
     auto dest = mm->getMemoryPointer(destEa, 1);
+    
+    if (context->framebuffer->findTexture(sourceEa)) {
+        auto it = br::find_if(context->displayBuffers,
+                              [&](auto& buf) { return buf.offset == surface.destOffset; });
+        if (it != end(context->displayBuffers)) {
+            context->surfaceLinks.insert({sourceEa, destEa});
+        }
+    }
     
     auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     auto destPixelSize = surface.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;

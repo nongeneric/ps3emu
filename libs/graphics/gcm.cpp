@@ -172,7 +172,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     emuGcmState.rsx->setGet(emuGcmState.defaultContext->begin - ioAddress);
     emuGcmState.rsx->setPut(emuGcmState.defaultContext->current - ioAddress);
     auto rsxPrimaryDmaLabel = 3;
-    emuGcmState.rsx->setLabel(rsxPrimaryDmaLabel, 1);
+    emuGcmState.rsx->setLabel(rsxPrimaryDmaLabel, 1, false);
     return CELL_OK;  
 }
 
