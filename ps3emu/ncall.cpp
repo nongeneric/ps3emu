@@ -370,6 +370,7 @@ STUB_4(_cellGcmSetFlipWithWaitLabel);
 STUB_1(cellGcmBindTile);
 STUB_1(cellGcmUnbindTile);
 STUB_12(cellGcmBindZcull);
+STUB_1(cellGcmUnbindZcull);
 STUB_4(cellGcmMapMainMemory);
 STUB_4(sys_event_queue_create);
 STUB_3(sys_event_port_create);
@@ -514,6 +515,7 @@ STUB_0(cellPadEnd);
 STUB_2(cellPadGetData);
 STUB_0(cellKbEnd);
 STUB_0(cellMouseEnd);
+STUB_4(cellVideoOutGetResolutionAvailability);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -556,6 +558,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmBindTile),
     ENTRY(cellGcmUnbindTile),
     ENTRY(cellGcmBindZcull),
+    ENTRY(cellGcmUnbindZcull),
     ENTRY(cellGcmMapMainMemory),
     ENTRY(cellGcmSetFlipHandler),
     ENTRY(cellPadInit),
@@ -645,6 +648,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellPadGetData),
     ENTRY(cellKbEnd),
     ENTRY(cellMouseEnd),
+    ENTRY(cellVideoOutGetResolutionAvailability)
 };
 
 void PPUThread::ncall(uint32_t index) {

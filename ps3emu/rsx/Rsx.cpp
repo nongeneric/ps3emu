@@ -419,9 +419,9 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     linkShaderProgram();
     glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
     
-    // Right after a gcm draw command completes, the user might immediately
+    // Right after a gcm draw command completes, the next command might immediately
     // update buffers or shader constants. OpenGL draw commands are asynchronous
-    // and as such need to be waited.
+    // and as such need to be synchronized.
     // OpenGL guarantees that all buffers are immediately available to change
     // after a draw command, but this isn't true for persistent buffers.
     // It is possible to use a finer grained synchronization, only waiting inside
@@ -652,7 +652,7 @@ FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size) {
     return shader;
 }
 
-void Rsx::updateShaders() {    
+void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
         _context->fragmentShader = getFragmentShaderFromCache(_context->fragmentVa, FragmentProgramSize);
@@ -1426,6 +1426,7 @@ void Rsx::Color(uint32_t ptr, uint32_t count) {
     vec.resize(count * 4);
     _mm->readMemory(ptr, &vec[0], count * 4);
     _mm->writeMemory(dest, &vec[0], count * 4);
+    memoryBreakHandler(dest, count * 4);
 }
 
 void Rsx::ContextDmaImageDestin(uint32_t location) {
@@ -1466,8 +1467,8 @@ void Rsx::DmaBufferIn(uint32_t sourceLocation, uint32_t dstLocation) {
     _context->copy2d.destLocation = gcmEnumToLocation(dstLocation);
 }
 
-void startCopy2d(RsxContext* context, MainMemory* mm) {
-    CopySettings& c = context->copy2d;
+void Rsx::startCopy2d() {
+    CopySettings& c = _context->copy2d;
     auto sourceEa = rsxOffsetToEa(c.srcLocation, c.srcOffset);
     auto destEa = rsxOffsetToEa(c.destLocation, c.destOffset);
 
@@ -1477,8 +1478,8 @@ void startCopy2d(RsxContext* context, MainMemory* mm) {
     uint32_t srcLine = sourceEa;
     uint32_t destLine = destEa;
     for (auto line = 0u; line < c.lineCount; ++line) {
-        uint8_t* src = mm->getMemoryPointer(srcLine, c.lineLength);
-        uint8_t* dest = mm->getMemoryPointer(destLine, c.lineLength);
+        uint8_t* src = _mm->getMemoryPointer(srcLine, c.lineLength);
+        uint8_t* dest = _mm->getMemoryPointer(destLine, c.lineLength);
         auto srcLineEnd = src + c.lineLength;
         while (src < srcLineEnd) {
             *dest = *src;
@@ -1487,6 +1488,7 @@ void startCopy2d(RsxContext* context, MainMemory* mm) {
         }
         srcLine += c.srcPitch;
         destLine += c.destPitch;
+        memoryBreakHandler(destLine, c.lineLength);
     }
 }
 
@@ -1523,13 +1525,13 @@ void Rsx::OffsetIn_9(uint32_t inOffset,
     c.srcFormat = inFormat;
     c.destFormat = outFormat;
     
-    startCopy2d(_context.get(), _mm);
+    startCopy2d();
 }
 
 void Rsx::BufferNotify(uint32_t notify) {
     TRACE1(BufferNotify, notify);
     assert(notify == 0);
-    startCopy2d(_context.get(), _mm);
+    startCopy2d();
 }
 
 void Rsx::Nv3089ContextDmaImage(uint32_t location) {
@@ -1587,10 +1589,10 @@ union r6g6b5_t {
     BitField<11, 16> b;
 };
 
-void transferImage(RsxContext* context, MainMemory* mm) {
-    ScaleSettings& scale = context->scale2d;
-    SurfaceSettings& surface = context->surface2d;
-    SwizzleSettings& swizzle = context->swizzle2d;
+void Rsx::transferImage() {
+    ScaleSettings& scale = _context->scale2d;
+    SurfaceSettings& surface = _context->surface2d;
+    SwizzleSettings& swizzle = _context->swizzle2d;
     
     bool isSwizzle = scale.type == ScaleSettingsSurfaceType::Swizzle;
     
@@ -1598,14 +1600,14 @@ void transferImage(RsxContext* context, MainMemory* mm) {
     auto destEa = isSwizzle
                       ? rsxOffsetToEa(swizzle.location, swizzle.offset)
                       : rsxOffsetToEa(surface.destLocation, surface.destOffset);
-    auto src = mm->getMemoryPointer(sourceEa, 1);
-    auto dest = mm->getMemoryPointer(destEa, 1);
+    auto src = _mm->getMemoryPointer(sourceEa, 1);
+    auto dest = _mm->getMemoryPointer(destEa, 1);
     
-    if (context->framebuffer->findTexture(sourceEa)) {
-        auto it = br::find_if(context->displayBuffers,
+    if (_context->framebuffer->findTexture(sourceEa)) {
+        auto it = br::find_if(_context->displayBuffers,
                               [&](auto& buf) { return buf.offset == surface.destOffset; });
-        if (it != end(context->displayBuffers)) {
-            context->surfaceLinks.insert({sourceEa, destEa});
+        if (it != end(_context->displayBuffers)) {
+            _context->surfaceLinks.insert({sourceEa, destEa});
         }
     }
     
@@ -1659,6 +1661,8 @@ void transferImage(RsxContext* context, MainMemory* mm) {
             }
         }
     }
+    
+    memoryBreakHandler(destEa, 1 << 20);
 }
 
 void Rsx::ImageInSize(uint16_t inW,
@@ -1691,7 +1695,7 @@ void Rsx::ImageInSize(uint16_t inW,
     if (s.outW == 0 || s.outH == 0)
         return;
     
-    transferImage(_context.get(), _mm);
+    transferImage();
 }
 
 void Rsx::Nv309eSetFormat(uint16_t format,

@@ -122,3 +122,14 @@ int32_t _sys_spu_printf_finalize() {
     return CELL_OK;
 }
 
+int32_t cellVideoOutGetResolutionAvailability(uint32_t videoOut,
+                                              uint32_t resolutionId,
+                                              uint32_t aspect,
+                                              uint32_t option) {
+    assert(option == 0);
+    return videoOut == CELL_VIDEO_OUT_PRIMARY &&
+           resolutionId == CELL_VIDEO_OUT_RESOLUTION_720 &&
+           (aspect == CELL_VIDEO_OUT_ASPECT_AUTO ||
+            aspect == CELL_VIDEO_OUT_ASPECT_16_9);
+}
+

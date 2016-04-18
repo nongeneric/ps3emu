@@ -167,8 +167,7 @@ struct SurfaceToFramebufferLink {
     uint32_t surfaceEa;
     uint32_t framebufferEa;
     inline bool operator<(SurfaceToFramebufferLink const& other) const {
-        return std::tie(surfaceEa, framebufferEa) <
-               std::tie(other.surfaceEa, other.framebufferEa);
+        return surfaceEa < other.surfaceEa;
     }
 };
 

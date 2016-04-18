@@ -27,10 +27,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    add_file_log(
-        keywords::file_name = "/tmp/ps3run.log",
-        keywords::auto_flush = true
-    );
+    core::get()->set_logging_enabled(false);
+    
+//     add_file_log(
+//         keywords::file_name = "/tmp/ps3run.log",
+//         keywords::auto_flush = true
+//     );
     
 //     core::get()->set_filter
 //     (

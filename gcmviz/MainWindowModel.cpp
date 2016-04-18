@@ -32,9 +32,10 @@ void execInRsxThread(Rsx* rsx, std::function<void()> action) {
 
 class CommandTableModel : public QAbstractItemModel {
     GcmDatabase* _db;
+    int _frame;
     
 public:
-    CommandTableModel(GcmDatabase* db) : _db(db) { }
+    CommandTableModel(GcmDatabase* db, int frame) : _db(db), _frame(frame) { }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 1;
@@ -47,12 +48,12 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        return _db->commands(0);
+        return _db->commands(_frame);
     }
     
     QVariant data(const QModelIndex& index,
                   int role = Qt::DisplayRole) const override {
-        auto command = _db->getCommand(0, index.row());
+        auto command = _db->getCommand(_frame, index.row());
         auto id = (CommandId)command.id;
         if (role == Qt::BackgroundColorRole) {
            if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
@@ -725,14 +726,14 @@ void MainWindowModel::changeFrame() {
     auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames());
     _window.labelFrame->setText(QString::fromStdString(text));
     
-    auto commandModel = new CommandTableModel(&_db);
+    auto commandModel = new CommandTableModel(&_db, _currentFrame);
     _window.commandTableView->setModel(commandModel);
     _window.commandTableView->resizeColumnsToContents();
     auto selectionModel = _window.commandTableView->selectionModel();
     QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=] (auto current) {
         if (current == QModelIndex())
             return;
-        auto command = _db.getCommand(0, current.row());
+        auto command = _db.getCommand(_currentFrame, current.row());
         _window.twArgs->setModel(new ArgumentTableModel(command));
     });
     

@@ -275,6 +275,11 @@ int32_t cellGcmBindZcull(uint8_t index,
     return CELL_OK;
 }
 
+int32_t cellGcmUnbindZcull(uint8_t index) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     emuGcmState.rsx->setFlipHandler(handler);

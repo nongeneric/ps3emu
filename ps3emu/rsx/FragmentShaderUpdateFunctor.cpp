@@ -9,8 +9,6 @@ void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
     std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
     auto text = GenerateFragmentShader(_newbytecode, sizes, _context->isFlatShadeMode);
     *shader = FragmentShader(text.c_str());
-    BOOST_LOG_TRIVIAL(trace) << "fragment shader log:\n" << shader->log();
-
     _bytecode = _newbytecode;
     _info = get_fragment_bytecode_info(&_bytecode[0]);
     updateConsts();

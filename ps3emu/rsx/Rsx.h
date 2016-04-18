@@ -301,6 +301,8 @@ class Rsx {
     void UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format);
     void UpdateFragmentCache(uint32_t va, uint32_t size);
     inline void StopReplay() { }
+    void transferImage();
+    void startCopy2d();
     
 public:
     Rsx();

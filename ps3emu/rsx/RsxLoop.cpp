@@ -926,7 +926,7 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV3062_SET_COLOR_FORMAT";
             auto format = readarg(1);
             auto arg2 = readarg(2);
-            auto srcPitch = arg2 & 0xffff;
+            auto srcPitch = arg2 & 0xffff; (void)srcPitch;
             auto destPitch = arg2 >> 16;
             if (count == 2) {
                 assert(srcPitch == destPitch);

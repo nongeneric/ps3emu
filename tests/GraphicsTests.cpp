@@ -176,3 +176,12 @@ TEST_CASE("gcm_flip_handler") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_flip_handler/ps3frame0.png");
 }
+
+TEST_CASE("opengl_createdevice") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_createdevice/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_createdevice/ps3frame1.png", 1);
+}

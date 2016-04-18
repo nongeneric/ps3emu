@@ -30,7 +30,7 @@ add_definitions(-DTESTS)
 set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
-#set(CMAKE_CXX_FLAGS "-flto -O3 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})

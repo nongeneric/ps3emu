@@ -75,6 +75,8 @@ int32_t cellGcmBindZcull(uint8_t index,
                          uint32_t sFunc,
                          uint32_t sRef,
                          uint32_t sMask);
+int32_t cellGcmUnbindZcull(uint8_t index);
+
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler);
 emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc);
 emu_void_t cellGcmSetGraphicsHandler(uint32_t handler);

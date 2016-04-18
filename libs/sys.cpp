@@ -127,6 +127,7 @@ constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_allocate(%x,...)", size);
+    (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
     *alloc_addr = thread->mm()->malloc(size);
