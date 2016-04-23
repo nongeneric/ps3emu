@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{76f7c2a9-748e-4d3f-bd0c-1246b1dad1e6}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;cc;s;asm</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{cbd27dd0-2bb6-4e77-9eb2-2821ac3e548b}</UniqueIdentifier>
+      <Extensions>h;hpp</Extensions>
+    </Filter>
+    <Filter Include="Cg Files">
+      <UniqueIdentifier>{67d1a11f-1cc9-4a97-9f04-9b0b25723870}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="SampleApp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SampleApp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="fpshader.cg">
+      <Filter>Cg Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="vpshader.cg">
+      <Filter>Cg Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

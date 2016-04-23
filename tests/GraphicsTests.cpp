@@ -194,3 +194,12 @@ TEST_CASE("gcm_duck") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_duck/ps3frame0.png");
 }
+
+TEST_CASE("gcm_video_texturing") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_video_texturing/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_video_texturing/ps3frame0.png");
+}
