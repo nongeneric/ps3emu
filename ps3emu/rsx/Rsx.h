@@ -294,6 +294,9 @@ class Rsx {
     void BlendEquation(uint16_t color, uint16_t alpha);
     void ZStencilClearValue(uint32_t value);
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
+    void CullFace(uint32_t cfm);
+    void FrontPolygonMode(uint32_t mode);
+    
     void invokeHandler(uint32_t descrEa);
     
     // Replay-specific

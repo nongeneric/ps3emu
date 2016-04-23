@@ -185,7 +185,10 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc) {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
     auto hostPath = proc->contentManager()->toHost(path.str.c_str());
-    auto elfPath = hostPath + ".elf";
+    auto elfPath = hostPath;
+    if (hostPath.substr(hostPath.size() - 4) != ".elf") {
+        elfPath += ".elf";
+    }
     std::ifstream f(elfPath);
     if (!f.is_open()) {
         auto message = ssnprintf("sys_spu_image_open: elf not found (\"%s\")", elfPath);
@@ -351,6 +354,15 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
 int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img) {
     auto rawSpu = rawSpus.get(id);
     initThread(rawSpu->thread, img->elf);
+    return CELL_OK;
+}
+
+int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* entry, Process* proc) {
+    auto rawSpu = rawSpus.get(id);
+    sys_spu_image_t img;
+    sys_spu_image_open(&img, path, proc);
+    *entry = img.elf->entryPoint();
+    initThread(rawSpu->thread, img.elf);
     return CELL_OK;
 }
 

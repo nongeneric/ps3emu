@@ -102,6 +102,8 @@
     X(BlendEquation) \
     X(ZStencilClearValue) \
     X(VertexData4fM) \
+    X(CullFace) \
+    X(FrontPolygonMode) \
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \

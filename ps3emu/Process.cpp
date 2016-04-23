@@ -48,9 +48,12 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threadIds.create(std::move(thread));
 }
 
-void Process::dbgPause(bool pause) {
+void Process::dbgPause(bool pause, bool takeMutex) {
 #ifdef DEBUG
-    boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
+    std::unique_ptr<boost::unique_lock<boost::mutex>> _;
+    if (takeMutex) {
+        _.reset(new boost::unique_lock<boost::mutex>(_ppuThreadMutex));
+    }
     for (auto& t : _threads) {
         t->dbgPause(pause);
     }
@@ -83,14 +86,16 @@ Event Process::run() {
         switch (ev->event) {
             case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
             case PPUThreadEvent::ProcessFinished: {
-#ifdef DEBUG
-                for (auto& t : _threads) {
-                    t->dbgPause(false);
+                dbgPause(false, false);
+                for (auto& t : _spuThreads) {
+                    t->cancel();
                 }
-#endif
                 _rsx->shutdown();
                 _callbackThread->terminate();
                 for (auto& t : _threads) {
+                    t->join();
+                }
+                for (auto& t : _spuThreads) {
                     t->join();
                 }
                 return ProcessFinishedEvent();

@@ -2519,6 +2519,14 @@ EMU(STVX, SIMDForm) {
     MM->store16(ea, TH->getV(i->vS));
 }
 
+PRINT(STVXL, SIMDForm) {
+    *result = format_nnn("stvxl", i->vS, i->rA, i->rB);
+}
+
+EMU(STVXL, SIMDForm) {
+    emulateSTVX(i, cia, thread);
+}
+
 PRINT(LVX, SIMDForm) {
     *result = format_nnn("lvx", i->vD, i->rA, i->rB);
 }
@@ -2527,6 +2535,14 @@ EMU(LVX, SIMDForm) {
     auto b = getB(i->rA, TH);
     auto ea = b + TH->getGPR(i->rB);
     TH->setV(i->vD, MM->load16(ea));
+}
+
+PRINT(LVXL, SIMDForm) {
+    *result = format_nnn("lvxl", i->vD, i->rA, i->rB);
+}
+
+EMU(LVXL, SIMDForm) {
+    emulateLVX(i, cia, thread);
 }
 
 PRINT(LVLX, SIMDForm) {
@@ -3354,7 +3370,9 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 73: invoke(MULHD);
                 case 598: invoke(SYNC);
                 case 231: invoke(STVX);
+                case 487: invoke(STVX);
                 case 103: invoke(LVX);
+                case 359: invoke(LVXL);
                 case 519: invoke(LVLX);
                 case 371: invoke(MFTB);
                 case 9: invoke(MULHDU);

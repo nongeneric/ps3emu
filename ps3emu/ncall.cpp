@@ -487,6 +487,7 @@ STUB_1(sceNpDrmVerifyUpgradeLicense2);
 STUB_3(sys_raw_spu_create);
 STUB_3(sys_spu_image_open);
 STUB_2(sys_raw_spu_image_load);
+STUB_4(sys_raw_spu_load);
 STUB_4(sys_raw_spu_create_interrupt_tag);
 STUB_5(sys_interrupt_thread_establish);
 STUB_3(sys_raw_spu_set_int_mask);
@@ -633,6 +634,7 @@ NCallEntry ncallTable[] {
     ENTRY(sys_spu_image_import),
     ENTRY(sys_spu_image_close),
     ENTRY(sys_raw_spu_image_load),
+    ENTRY(sys_raw_spu_load),
     ENTRY(cellGcmSetGraphicsHandler),
     ENTRY(cellGcmGetMaxIoMapSize),
     ENTRY(cellGcmGetOffsetTable),

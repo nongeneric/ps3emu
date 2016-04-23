@@ -111,6 +111,7 @@ int32_t sys_spu_thread_get_exit_status(sys_spu_thread_t id, big_int32_t* status,
 int32_t sys_raw_spu_create(sys_raw_spu_t* id, uint32_t unused, Process* proc);
 int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc);
 int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img);
+int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* entry, Process* proc);
 int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
                                          TagClassId class_id,
                                          uint32_t unused,

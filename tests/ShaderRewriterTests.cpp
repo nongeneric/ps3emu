@@ -371,3 +371,19 @@ TEST_CASE() {
     auto str = printStatements(st);
     REQUIRE(str == "v_out[1] = r[2];r[0] = r[2];");
 }
+
+TEST_CASE("fragment_shader_d2") {
+    unsigned char instr[] = {
+        0xa2, 0x00, 0x06, 0x00, 0xc8, 0x01, 0x1c, 0x9d, 0xc8, 0x02, 0x50, 0x01, 
+        0xc8, 0x00, 0x3f, 0xe1, 0x3e, 0x99, 0x99, 0x99, 0x00, 0x00, 0x00, 0x00, 
+        0x3f, 0x4c, 0xcc, 0xcc, 0x00, 0x00, 0x00, 0x00, 
+    };
+    
+    FragmentInstr fi;
+    auto pos = 0;
+    
+    pos += fragment_dasm_instr(instr + pos, fi);
+    auto st = MakeStatement(fi, 0);
+    auto str = printStatements(st);
+    REQUIRE( str == "r[0].x = (0.5 * dot(f_TEX1, fconst.c[0]).x);" );
+}

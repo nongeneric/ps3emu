@@ -248,6 +248,7 @@ public:
     void singleStepBreakpoint();
     void dbgPause(bool val);
     void run();
+    void cancel();
     SPUThreadExitInfo join();
     void setElfSource(uint32_t src);
     uint32_t getElfSource();

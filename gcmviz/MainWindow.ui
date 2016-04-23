@@ -29,13 +29,13 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QHBoxLayout" name="horizontalLayout_4">
+   <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>
      <widget class="QSplitter" name="splitter">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QLineEdit" name="leSearchCommand"/>
@@ -177,6 +177,29 @@
              <layout class="QHBoxLayout" name="horizontalLayout_6">
               <item>
                <widget class="QTextEdit" name="teFragmentAsm">
+                <property name="undoRedoEnabled">
+                 <bool>false</bool>
+                </property>
+                <property name="lineWrapMode">
+                 <enum>QTextEdit::NoWrap</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tab_9">
+             <attribute name="title">
+              <string>Bytecode</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_3">
+              <item>
+               <widget class="QTextEdit" name="teFragmentBytecode">
                 <property name="undoRedoEnabled">
                  <bool>false</bool>
                 </property>

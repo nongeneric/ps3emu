@@ -49,9 +49,11 @@ void TextureRenderer::render(GLSimpleTexture* tex) {
 
     glClearDepth(1);
     glClear(GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_CULL_FACE);
     glcall(glViewport(0, 0, tex->width(), tex->height()));
     glcall(glDepthRange(0, 1));
     glcall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
     // TODO: restore vertex attrib if required
+    // TODO: restore cullFace if required
 }

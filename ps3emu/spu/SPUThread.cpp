@@ -5,6 +5,7 @@
 #include "SPUDasm.h"
 #include <boost/log/trivial.hpp>
 #include <stdio.h>
+#include <signal.h>
 
 void SPUThread::run() {
     _thread = boost::thread([=] { loop(); });
@@ -21,6 +22,8 @@ void SPUThread::loop() {
     fwrite(ptr(0), LocalStorageSize, 1, f);
     fclose(f);
 #endif
+
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
     
     for (;;) {
         if (_singleStep) {
@@ -180,4 +183,8 @@ ConcurrentFifoQueue<uint32_t>& SPUThread::getFromSpuInterruptMailbox() {
 
 ConcurrentFifoQueue<uint32_t>& SPUThread::getToSpuMailbox() {
     return _toSpuMailbox;
+}
+
+void SPUThread::cancel() {
+    pthread_cancel(_thread.native_handle());
 }

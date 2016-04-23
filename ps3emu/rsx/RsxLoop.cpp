@@ -630,13 +630,15 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         }
         case 0x00001828:
-            name = "CELL_GCM_NV4097_SET_FRONT_POLYGON_MODE";
+            //name = "CELL_GCM_NV4097_SET_FRONT_POLYGON_MODE";
+            FrontPolygonMode(readarg(1));
             break;
         case 0x0000182c:
             name = "CELL_GCM_NV4097_SET_BACK_POLYGON_MODE";
             break;
         case 0x00001830:
-            name = "CELL_GCM_NV4097_SET_CULL_FACE";
+            //name = "CELL_GCM_NV4097_SET_CULL_FACE";
+            CullFace(readarg(1));
             break;
         case 0x00001834:
             name = "CELL_GCM_NV4097_SET_FRONT_FACE";

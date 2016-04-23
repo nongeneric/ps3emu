@@ -137,9 +137,9 @@ inline unsigned count_ones32(uint32_t x) {
 
 template <int Size, typename T>
 inline T rol(T n, unsigned sh) {
-    assert(sh < Size);
-    if (sh == 0)
+    if (sh == 0 || sh == Size)
         return n;
+    assert(sh < Size);
     auto right = n & mask<Size, T>(sh, Size - 1);
     auto left = n & mask<Size, T>(0, sh);
     left >>= Size - sh;

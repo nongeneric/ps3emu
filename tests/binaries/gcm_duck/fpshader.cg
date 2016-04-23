@@ -1,0 +1,19 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+void main
+(
+	float2 texcoord      : TEXCOORD0,
+	float4 normal        : TEXCOORD1,
+	uniform sampler2D texture,
+	uniform float4 light = {1.0, 1.0, 1.0, 1.0},
+	out float4 color_out : COLOR
+)
+{
+	float diffuse = min(0.6 + 0.5*dot(normal, light), 1.0);
+	float4 tex = tex2D(texture, texcoord);
+	color_out = tex*diffuse;
+	color_out.a = 0.5;
+}

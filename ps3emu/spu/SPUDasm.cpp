@@ -41,7 +41,7 @@ PRINT(lqd) {
 }
 
 EMU(lqd) {
-    auto lsa = th->r(i->RA).w<0>() + (i->I10 << 4);
+    auto lsa = (th->r(i->RA).w<0>() + (i->I10 << 4)) & LSLR & 0xfffffff0;
     th->r(i->RT).load(th->ptr(lsa));
 }
 
@@ -85,7 +85,7 @@ PRINT(stqd) {
 }
 
 EMU(stqd) {
-    auto lsa = th->r(i->RA).w<0>() + (i->I10 << 4);
+    auto lsa = (th->r(i->RA).w<0>() + (i->I10 << 4)) & LSLR & 0xfffffff0;
     th->r(i->RT).store(th->ptr(lsa));
 }
 
@@ -1266,7 +1266,7 @@ EMU(roti) {
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b11111;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = rol<16>(ra.w(i), sh);
+        rt.w(i) = rol<32>(ra.w(i), sh);
     }
 }
 
@@ -2524,6 +2524,9 @@ EMU(rchcnt) {
         rt.w<0>() = th->getToSpuMailbox().size();
     } else if (ch == MFC_RdTagStat) {
         rt.w<0>() = 1;
+    } else if (ch == MFC_WrTagUpdate) {
+        // dma complete immediately so it's always 1
+        rt.w<0>() = 1; 
     } else {
         throw std::runtime_error("rchcnt of unknown channel");
     }

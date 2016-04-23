@@ -342,10 +342,10 @@ void Rsx::ColorClearValue(uint32_t color) {
 
 void Rsx::ClearSurface(uint32_t mask) {
     TRACE1(ClearSurface, mask);
-    assert(mask & CELL_GCM_CLEAR_R);
-    assert(mask & CELL_GCM_CLEAR_G);
-    assert(mask & CELL_GCM_CLEAR_B);
-    assert(mask & CELL_GCM_CLEAR_A);
+    //assert(mask & CELL_GCM_CLEAR_R);
+    //assert(mask & CELL_GCM_CLEAR_G);
+    //assert(mask & CELL_GCM_CLEAR_B);
+    //assert(mask & CELL_GCM_CLEAR_A);
     auto glmask = GL_COLOR_BUFFER_BIT;
     if (mask & CELL_GCM_CLEAR_Z)
         glmask |= GL_DEPTH_BUFFER_BIT;
@@ -585,27 +585,35 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
     TRACE3(IndexArrayAddress, location, offset, type);
     _context->indexArray.location = gcmEnumToLocation(location);
     _context->indexArray.offset = offset;
-    _context->indexArray.glType = GL_UNSIGNED_INT; // no difference between 32 and 16 for rsx
+    _context->indexArray.glType = type == CELL_GCM_DRAW_INDEX_ARRAY_TYPE_16
+                                      ? GL_UNSIGNED_SHORT
+                                      : GL_UNSIGNED_INT;
 }
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     assert(first == 0);
     auto destBuffer = &_context->elementArrayIndexBuffer;
     auto sourceBuffer = getBuffer(_context->indexArray.location);
+    auto byteSize = _context->indexArray.glType == GL_UNSIGNED_SHORT ? 2 : 4;
+    assert(count * byteSize <= destBuffer->size());
     
-    assert(count * 4 <= destBuffer->size());
+    auto source = ((uintptr_t)sourceBuffer->mapped() + _context->indexArray.offset);
+    auto dest = destBuffer->mapped();
     
-    auto source = (big_uint32_t*)((uintptr_t)sourceBuffer->mapped() +
-                                  _context->indexArray.offset);
-    auto dest = (uint32_t*)destBuffer->mapped();
-    for (auto i = first; i < count; ++i) {
-        dest[i] = source[i];
+    if (byteSize == 2) {
+        for (auto i = first; i < count; ++i) {
+            *((uint16_t*)dest + i) = *((big_uint16_t*)source + i);
+        }
+    } else {
+        for (auto i = first; i < count; ++i) {
+            *((uint32_t*)dest + i) = *((big_uint32_t*)source + i);
+        }
     }
     
     if (_mode != RsxOperationMode::Replay) {
         UpdateBufferCache(_context->indexArray.location,
-                        _context->indexArray.offset + first * 4,
-                        count * 4);
+                          _context->indexArray.offset + first * byteSize,
+                          count * byteSize);
     }
 
     updateVertexDataArrays(first, count);
@@ -616,7 +624,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     
     glcall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, destBuffer->handle()));
     
-    auto offset = (void*)(uintptr_t)(first * 4);
+    auto offset = (void*)(uintptr_t)(first * byteSize);
     glcall(glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset));
     
     // see DrawArrays for rationale
@@ -1786,6 +1794,34 @@ void Rsx::ZStencilClearValue(uint32_t value) {
 void Rsx::VertexData4fM(unsigned index, float x, float y, float z, float w) {
     TRACE5(VertexData4fM, index, x, y, z, w);
     glVertexAttrib4f(index, x, y, z, w);
+}
+
+GLenum gcmCullFaceToOpengl(uint32_t cfm) {
+    switch (cfm) {
+        case CELL_GCM_FRONT: return GL_BACK;
+        case CELL_GCM_BACK: return GL_FRONT;
+        case CELL_GCM_FRONT_AND_BACK: return GL_FRONT_AND_BACK;
+    }
+    throw std::runtime_error("unsupported cull face");
+}
+
+void Rsx::CullFace(uint32_t cfm) {
+    TRACE1(CullFace, cfm);
+    glCullFace(gcmCullFaceToOpengl(cfm));
+}
+
+GLenum gcmPolygonModeToOpengl(uint32_t mode) {
+    switch (mode) {
+        case CELL_GCM_POLYGON_MODE_POINT: return GL_POINT;
+        case CELL_GCM_POLYGON_MODE_LINE: return GL_LINE;
+        case CELL_GCM_POLYGON_MODE_FILL: return GL_FILL;
+    }
+    throw std::runtime_error("unsupported polygon mode");
+}
+
+void Rsx::FrontPolygonMode(uint32_t mode) {
+    TRACE1(FrontPolygonMode, mode);
+    glPolygonMode(GL_FRONT_AND_BACK, gcmPolygonModeToOpengl(mode));
 }
 
 void Rsx::setOperationMode(RsxOperationMode mode) {

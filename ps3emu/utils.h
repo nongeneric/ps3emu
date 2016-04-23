@@ -99,7 +99,7 @@ inline void split128(uint128_t i, float* fs) {
 }
 
 void ums_sleep(uint64_t microseconds);
-std::string print_hex(const void* buf, int len);
+std::string print_hex(const void* buf, int len, bool cArray = false);
 
 template <typename T, typename Iter, typename IsEmptyPred>
 Iter findGap(Iter begin, Iter end, unsigned width, IsEmptyPred isEmpty) {

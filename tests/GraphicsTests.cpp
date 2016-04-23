@@ -185,3 +185,12 @@ TEST_CASE("opengl_createdevice") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/opengl_createdevice/ps3frame1.png", 1);
 }
+
+TEST_CASE("gcm_duck") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_duck/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_duck/ps3frame0.png");
+}

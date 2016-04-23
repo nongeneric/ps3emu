@@ -595,6 +595,21 @@ void MainWindowModel::onRun() {
     runTo(_db.commands(_currentFrame) - 1, _currentFrame);
 }
 
+std::string printFragmentBytecode(std::vector<uint8_t> const& bytecode,
+                                  FragmentProgramInfo const& info) {
+    std::string res;
+    unsigned pos = 0;
+    FragmentInstr fi;
+    do {
+        auto len = fragment_dasm_instr(&bytecode[pos], fi);
+        auto hex = print_hex(&bytecode[pos], len, true);
+        res += ssnprintf("%03d: %s\n", pos / 16, hex);
+        pos += len;
+        
+    } while(!fi.is_last);
+    return res;
+}
+
 void MainWindowModel::update() {
     auto context = _rsx->context();
     if (context->vertexShader) {
@@ -640,6 +655,8 @@ void MainWindowModel::update() {
             _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
             
             auto info = get_fragment_bytecode_info(&bytecode[0]);
+            auto bytecodeText = printFragmentBytecode(bytecode, info);
+            _window.teFragmentBytecode->setText(QString::fromStdString(bytecodeText));
             
             std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
             auto buffer = updater->constBuffer();

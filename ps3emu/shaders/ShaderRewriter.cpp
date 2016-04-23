@@ -706,6 +706,21 @@ namespace ShaderRewriter {
         
         rhs = new ComponentMask(rhs, i.dest_mask);
         
+        if (i.scale != scale_t::None) {
+            auto mul = [&] {
+                switch (i.scale) {
+                    case scale_t::D2: return 1.0f / 2.0f;
+                    case scale_t::D4: return 1.0f / 4.0f;
+                    case scale_t::D8: return 1.0f / 8.0f;
+                    case scale_t::M2: return 2.0f;
+                    case scale_t::M4: return 4.0f;
+                    case scale_t::M8: return 8.0f;
+                    default: throw std::runtime_error("illegal scale");
+                }
+            }();
+            rhs = new BinaryOperator(FunctionName::mul, new FloatLiteral(mul), rhs);
+        }
+        
         int regnum;
         const char* regname;
         if (i.is_reg_c) {
