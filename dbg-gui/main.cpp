@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "ps3emu/log.h"
 #include <boost/program_options.hpp>
 #include <string>
 #include <QApplication>
@@ -7,6 +8,9 @@
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
+    log_init(false);
+    log_set_thread_name("dbg_main");
+    
     std::string elfPath;
     options_description consoleDescr("Allowed options");
     try {

@@ -721,7 +721,7 @@ vertex_opcode_t vertex_opcodes_1[] = {
     { 2, 0, 0, 0, 1, OP(ADD), OUT(v), IN2(v, v) },
     { 3, 0, 0, 0, 1, OP(MAD), OUT(v), IN3(v, v, v) },
     { 2, 0, 0, 0, 1, OP(DP3), OUT(s), IN2(v, v) },
-    { 2, 0, 0, 0, 1, OP(DPH) },
+    { 2, 0, 0, 0, 1, OP(DPH), OUT(s), IN2(v, v) },
     { 2, 0, 0, 0, 1, OP(DP4), OUT(s), IN2(v, v) },
     { 2, 0, 0, 0, 1, OP(DST), OUT(v), IN2(v, v) },
     { 2, 0, 0, 0, 1, OP(MIN), OUT(v), IN2(v, v) },

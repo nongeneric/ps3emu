@@ -2975,7 +2975,7 @@ EMU(LVSR, SIMDForm) {
     auto b = getB(i->rA, TH);
     auto ea = b + TH->getGPR(i->rB);
     auto sh = ea & 15;
-    unsigned __int128 vd;
+    unsigned __int128 vd = 0;
     switch (sh) {
         case 0: vd = make128(0x1011121314151617ull, 0x18191A1B1C1D1E1Full); break;
         case 1: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break;
@@ -3005,7 +3005,7 @@ EMU(LVSL, SIMDForm) {
     auto b = getB(i->rA, TH);
     auto ea = b + TH->getGPR(i->rB);
     auto sh = ea & 15;
-    unsigned __int128 vd;
+    unsigned __int128 vd = 0;
     switch (sh) {
         case 0: vd = make128(0x0001020304050607ull, 0x08090A0B0C0D0E0Full); break;
         case 1: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break;
@@ -3514,7 +3514,7 @@ BranchMnemonicType getExtBranchMnemonic(
     std::string m;
     if (bo >> 2 == 3 || bo >> 2 == 1) { // table 4
         bool crbiSet = ((bo >> 2) & 3) == 3;
-        const char* f;
+        const char* f = nullptr;
         switch (bi.u() % 4) {
         case 0:
             f = crbiSet ? "lt" : "ge";
@@ -3582,7 +3582,7 @@ BranchMnemonicType getExtBranchMnemonic(
 }
 
 std::string formatCRbit(BI_t bi) {
-    const char* crbit;
+    const char* crbit = nullptr;
     switch (bi.u() % 4) {
     case 0:
         crbit = "lt";

@@ -39,6 +39,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threadInitInfo.reset(new ThreadInitInfo());
     *_threadInitInfo = _elf->getThreadInitInfo(_mainMemory.get());
     auto thread = _threads.back().get();
+    thread->setId(0);
     initNewThread(thread,
                   _threadInitInfo->entryPointDescriptorVa,
                   _threadInitInfo->primaryStackSize);
@@ -145,6 +146,7 @@ uint64_t Process::createThread(uint32_t stackSize,
     t->setGPR(3, arg);
     auto id = _threadIds.create(std::move(t));
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread %d created", id);
+    t->setId(id);
     t->run();
     return id;
 }

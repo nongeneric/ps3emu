@@ -5,6 +5,7 @@
 #include "../MainMemory.h"
 #include "../../libs/graphics/graphics.h"
 #include "Tracer.h"
+#include "../log.h"
 
 #include <vector>
 #include <boost/log/trivial.hpp>
@@ -334,13 +335,16 @@ int64_t Rsx::interpret(uint32_t get) {
             ColorMask(readarg(1));
             break;
         case 0x00000328:
-            name = "CELL_GCM_NV4097_SET_STENCIL_TEST_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_STENCIL_TEST_ENABLE";
+            StencilTestEnable(readarg(1));
             break;
         case 0x0000032c:
-            name = "CELL_GCM_NV4097_SET_STENCIL_MASK";
+            //name = "CELL_GCM_NV4097_SET_STENCIL_MASK";
+            StencilMask(readarg(1));
             break;
         case 0x00000330:
-            name = "CELL_GCM_NV4097_SET_STENCIL_FUNC";
+            //name = "CELL_GCM_NV4097_SET_STENCIL_FUNC";
+            StencilFunc(readarg(1), readarg(2), readarg(3));
             break;
         case 0x00000334:
             name = "CELL_GCM_NV4097_SET_STENCIL_FUNC_REF";
@@ -349,7 +353,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_STENCIL_FUNC_MASK";
             break;
         case 0x0000033c:
-            name = "CELL_GCM_NV4097_SET_STENCIL_OP_FAIL";
+            //name = "CELL_GCM_NV4097_SET_STENCIL_OP_FAIL";
+            StencilOpFail(readarg(1), readarg(2), readarg(3));
             break;
         case 0x00000340:
             name = "CELL_GCM_NV4097_SET_STENCIL_OP_ZFAIL";
@@ -1546,6 +1551,7 @@ void Rsx::loop() {
     _ret = 0;
     _ref = 0xffffffff;
     _isFlipInProgress = false;
+    log_set_thread_name("rsx_loop");
     BOOST_LOG_TRIVIAL(trace) << "rsx loop started, waiting for updates";
     if (_mode == RsxOperationMode::Replay) {
         replayLoop();

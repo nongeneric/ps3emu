@@ -277,13 +277,11 @@ uint32_t ELFLoader::getSymbolValue(std::string name) {
     foreachGlobalSymbol([&](auto sym) {
         if (sym->st_shndx != std::distance(_sections, bssfSection))
             return;
-        if (getString(sym->st_name) == name)
+        if (this->getString(sym->st_name) == name)
             value = sym->st_value;
     });
     return value;
 }
-
-
 
 struct sys_process_param_t {
     big_uint32_t size;

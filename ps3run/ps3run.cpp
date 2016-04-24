@@ -1,8 +1,7 @@
-#include "../ps3emu/Process.h"
-#include "../ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/log.h"
 #include "stdio.h"
-#include <boost/log/utility/setup/file.hpp>
-#include <boost/log/trivial.hpp>
 
 using namespace boost::log;
 
@@ -12,8 +11,7 @@ void emulate(const char* path, std::vector<std::string> args) {
     for (;;) {
         auto untyped = proc.run();
         if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
-            BOOST_LOG_TRIVIAL(error)
-                << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
+            LOG << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
             return;
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             return;
@@ -27,17 +25,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    core::get()->set_logging_enabled(false);
-    
-//     add_file_log(
-//         keywords::file_name = "/tmp/ps3run.log",
-//         keywords::auto_flush = true
-//     );
-    
-//     core::get()->set_filter
-//     (
-//         trivial::severity >= trivial::info
-//     );
+    log_init(true);
     
     auto path = argv[1];
     try {

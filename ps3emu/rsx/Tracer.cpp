@@ -1,7 +1,7 @@
 #include "Tracer.h"
 
 #include "string.h"
-#include <boost/log/trivial.hpp>
+#include "../log.h"
 
 void Tracer::enable() {
     _enabled = true;
@@ -26,7 +26,7 @@ void Tracer::trace(uint32_t frame,
     for (auto& arg : args) {
         argStr += ssnprintf("%s:%s ", arg.name, printArgHex(arg));
     }
-    BOOST_LOG_TRIVIAL(trace) << printCommandId(command) + argStr;
+    LOG << printCommandId(command) + argStr;
     
     GcmCommand gcmCommand;
     gcmCommand.frame = frame;

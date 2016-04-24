@@ -104,6 +104,10 @@
     X(VertexData4fM) \
     X(CullFace) \
     X(FrontPolygonMode) \
+    X(StencilTestEnable) \
+    X(StencilMask) \
+    X(StencilFunc) \
+    X(StencilOpFail) \
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \

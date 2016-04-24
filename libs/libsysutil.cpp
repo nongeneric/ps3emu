@@ -97,7 +97,7 @@ int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
 }
 
 int32_t cellSysCacheClear(Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellSysCacheClear(id = %s)");
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellSysCacheClear");
     auto cacheDir = proc->contentManager()->cacheDir();
     auto hostCacheDir = proc->contentManager()->toHost(cacheDir.c_str());
     system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());

@@ -296,6 +296,10 @@ class Rsx {
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
     void CullFace(uint32_t cfm);
     void FrontPolygonMode(uint32_t mode);
+    void StencilTestEnable(bool enable);
+    void StencilMask(uint32_t sm);
+    void StencilFunc(uint32_t func, int32_t ref, uint32_t mask);
+    void StencilOpFail(uint32_t fail, uint32_t depthFail, uint32_t depthPass);
     
     void invokeHandler(uint32_t descrEa);
     

@@ -3,6 +3,7 @@
 #include "../MainMemory.h"
 #include "ppu_dasm.h"
 #include <boost/log/trivial.hpp>
+#include "../log.h"
 
 #ifdef DEBUG
 #define dbgpause(value) _dbgPaused = value
@@ -19,7 +20,8 @@ PPUThread::PPUThread(Process* proc,
       _init(false),
       _isStackInfoSet(false),
       _threadFinishedGracefully(primaryThread),
-      _priority(1000) {
+      _priority(1000),
+      _id(-1) {
           
 #ifdef DEBUG
     _singleStep = false;
@@ -83,6 +85,7 @@ void PPUThread::innerLoop() {
 }
 
 void PPUThread::loop() {
+    log_set_thread_name(ssnprintf("ppu_%d", (unsigned)_id));
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
     _eventHandler(this, PPUThreadEvent::Started);
     dbgpause(true);
@@ -160,4 +163,8 @@ void PPUThread::setArg(uint64_t arg) { }
 
 void PPUThread::yield() {
     boost::this_thread::yield();
+}
+
+void PPUThread::setId(unsigned id) {
+    _id = id;
 }

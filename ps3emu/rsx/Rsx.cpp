@@ -1824,6 +1824,60 @@ void Rsx::FrontPolygonMode(uint32_t mode) {
     glPolygonMode(GL_FRONT_AND_BACK, gcmPolygonModeToOpengl(mode));
 }
 
+void Rsx::StencilTestEnable(bool enable) {
+    TRACE1(StencilTestEnable, enable);
+    glEnableb(GL_STENCIL_TEST, enable);
+}
+
+void Rsx::StencilMask(uint32_t sm) {
+    TRACE1(StencilMask, sm);
+    glStencilMask(sm);
+}
+
+GLenum gcmStencilFuncToOpengl(uint32_t mode) {
+#define X(x) case CELL_GCM_##x: return GL_##x;
+    switch (mode) {
+        X(NEVER)
+        X(LESS)
+        X(LEQUAL)
+        X(GREATER)
+        X(GEQUAL)
+        X(EQUAL)
+        X(NOTEQUAL)
+        X(ALWAYS)
+        default: throw std::runtime_error("bad stencil func");
+    }
+#undef X
+}
+
+void Rsx::StencilFunc(uint32_t func, int32_t ref, uint32_t mask) {
+    TRACE3(StencilFunc, func, ref, mask);
+    glStencilFunc(gcmStencilFuncToOpengl(func), ref, mask);
+}
+
+GLenum gcmStencilOpToOpengl(uint32_t mode) {
+#define X(x) case CELL_GCM_##x: return GL_##x;
+    switch (mode) {
+        X(KEEP)
+        X(ZERO)
+        X(REPLACE)
+        X(INCR)
+        X(INCR_WRAP)
+        X(DECR)
+        X(DECR_WRAP)
+        X(INVERT)
+        default: throw std::runtime_error("bad stencil op");
+    }
+#undef X
+}
+
+void Rsx::StencilOpFail(uint32_t fail, uint32_t depthFail, uint32_t depthPass) {
+    TRACE3(StencilOpFail, fail, depthFail, depthPass);
+    glStencilOp(gcmStencilOpToOpengl(fail), 
+                gcmStencilOpToOpengl(depthFail), 
+                gcmStencilOpToOpengl(depthPass));
+}
+
 void Rsx::setOperationMode(RsxOperationMode mode) {
     _mode = mode;
 }

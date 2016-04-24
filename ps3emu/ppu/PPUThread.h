@@ -129,6 +129,7 @@ class PPUThread {
     uint64_t _exitCode;
     bool _threadFinishedGracefully;
     int _priority;
+    std::atomic<unsigned> _id;
     
     uint64_t _NIP;
     uint64_t _LR = 0;
@@ -379,6 +380,7 @@ public:
         return _NIP;
     }
     
+    void setId(unsigned id);
     void ncall(uint32_t index);
     void scall();
     void yield();

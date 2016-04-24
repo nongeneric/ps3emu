@@ -4,8 +4,10 @@
 #include "../ELFLoader.h"
 #include "../Process.h"
 #include "../MainMemory.h"
+#include "../log.h"
 
 void InterruptPPUThread::innerLoop() {
+    log_set_thread_name("ppu_interrupt");
     for (;;) {
         auto ev = _queue.receive(0);
         if (ev.type == InterruptType::Disestablish)

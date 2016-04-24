@@ -1,6 +1,7 @@
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.4)
 
-include_directories(${pdfshrink_SOURCE_DIR})
+project(root)
+include_directories(${root_SOURCE_DIR})
 
 add_definitions(-DBOOST_ALL_DYN_LINK)
 add_definitions(-DBOOST_LOG_DYN_LINK)
@@ -27,7 +28,7 @@ set(CMAKE_CXX_FLAGS "-Wno-unknown-pragmas ${CMAKE_CXX_FLAGS}")
 
 add_definitions(-DDEBUG)
 add_definitions(-DTESTS)
-set(CMAKE_CXX_FLAGS "-ggdb -O0 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-ggdb3 -Og -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
 #set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")

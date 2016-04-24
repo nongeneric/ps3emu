@@ -43,6 +43,7 @@ namespace ShaderRewriter {
         { FunctionName::sin, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::lg2, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::pow, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::normalize, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::inversesqrt, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse3f, { ExprType::vec4, ExprType::vec4 } },
@@ -184,6 +185,7 @@ namespace ShaderRewriter {
                 case FunctionName::cos: name = "cos"; break;
                 case FunctionName::inversesqrt: name = "inversesqrt"; break;
                 case FunctionName::sin: name = "sin"; break;
+                case FunctionName::normalize: name = "normalize"; break;
                 case FunctionName::reverse4f: name = "reverse4f"; break;
                 case FunctionName::reverse3f: name = "reverse3f"; break;
                 case FunctionName::txl0: name = "txl0"; break;
@@ -673,7 +675,7 @@ namespace ShaderRewriter {
                 break;
             }
             case fragment_op_t::SIN: {
-                rhs = new Invocation(FunctionName::sin, { args[0], args[1] });
+                rhs = new Invocation(FunctionName::sin, { args[0] });
                 break;
             }
             case fragment_op_t::SLE: {
@@ -699,6 +701,10 @@ namespace ShaderRewriter {
                 // TODO: txp
                 assert(dynamic_cast<IntegerLiteral*>(args[1]));
                 rhs = new Invocation(FunctionName::ftex, { args[1], args[0] });
+                break;
+            }
+            case fragment_op_t::NRM: {
+                rhs = new Invocation(FunctionName::normalize, { args[0] });
                 break;
             }
             default: assert(false);
@@ -880,6 +886,15 @@ namespace ShaderRewriter {
             }
             case vertex_op_t::DP4: {
                 rhs = new Invocation(FunctionName::dot4, { arg(1), arg(2) });
+                break;
+            }
+            case vertex_op_t::DPH: {
+                auto x = new ComponentMask(arg(1), { 1, 0, 0, 0 });
+                auto y = new ComponentMask(arg(1), { 0, 1, 0, 0 });
+                auto z = new ComponentMask(arg(1), { 0, 0, 1, 0 });
+                auto w = new FloatLiteral(1);
+                auto xyz1 = new Invocation(FunctionName::vec4, { x, y, z, w });
+                rhs = new Invocation(FunctionName::dot4, { xyz1, arg(1) });
                 break;
             }
             case vertex_op_t::DST: {

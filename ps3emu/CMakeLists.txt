@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 2.8.11)
-
 project(ps3emu)
 
 set(SRC
@@ -15,6 +13,7 @@ set(SRC
     MainMemory.cpp
     Process.h
     Process.cpp
+    log.cpp
     ppu/PPUThread.h
     ppu/PPUThread.cpp
     ppu/InterruptPPUThread.h
