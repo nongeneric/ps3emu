@@ -342,11 +342,10 @@ void Rsx::ColorClearValue(uint32_t color) {
 
 void Rsx::ClearSurface(uint32_t mask) {
     TRACE1(ClearSurface, mask);
-    //assert(mask & CELL_GCM_CLEAR_R);
-    //assert(mask & CELL_GCM_CLEAR_G);
-    //assert(mask & CELL_GCM_CLEAR_B);
-    //assert(mask & CELL_GCM_CLEAR_A);
-    auto glmask = GL_COLOR_BUFFER_BIT;
+    auto glmask = 0;
+    if (mask & CELL_GCM_CLEAR_R || mask & CELL_GCM_CLEAR_G ||
+        mask & CELL_GCM_CLEAR_B || mask & CELL_GCM_CLEAR_A)
+        glmask |= GL_COLOR_BUFFER_BIT;
     if (mask & CELL_GCM_CLEAR_Z)
         glmask |= GL_DEPTH_BUFFER_BIT;
     if (mask & CELL_GCM_CLEAR_S)
@@ -467,6 +466,39 @@ void Rsx::invokeHandler(uint32_t descrEa) {
     future.get();
 }
 
+void Rsx::resetContext() {
+    AlphaFunc(CELL_GCM_ALWAYS, 0);
+    AlphaTestEnable(CELL_GCM_FALSE);
+    //BackStencilFunc(CELL_GCM_ALWAYS, 0, 0xff);
+    //BackStencilMask(0xff);
+    //BackStencilOpFail(CELL_GCM_KEEP, CELL_GCM_KEEP, CELL_GCM_KEEP);
+    //BlendColor(0, 0);
+    BlendEnable(CELL_GCM_FALSE);
+    //BlendEnableMrt(CELL_GCM_FALSE, CELL_GCM_FALSE, CELL_GCM_FALSE);
+    BlendEquation(CELL_GCM_FUNC_ADD, CELL_GCM_FUNC_ADD);
+    BlendFuncSFactor(CELL_GCM_ONE, CELL_GCM_ZERO, CELL_GCM_ONE, CELL_GCM_ZERO);
+    ZStencilClearValue(0xffffff00);
+    ColorClearValue(0);
+    ColorMask(CELL_GCM_COLOR_MASK_A | CELL_GCM_COLOR_MASK_R | CELL_GCM_COLOR_MASK_G |
+              CELL_GCM_COLOR_MASK_B);
+    CullFaceEnable(CELL_GCM_FALSE);
+    CullFace(CELL_GCM_BACK);
+    //DepthBounds(0.0f, 1.0f);
+    //DepthBoundsTestEnable(CELL_GCM_FALSE);
+    DepthFunc(CELL_GCM_LESS);
+    //DepthMask(CELL_GCM_TRUE);
+    DepthTestEnable(CELL_GCM_FALSE);
+    //DitherEnable(CELL_GCM_FALSE);
+    StencilFunc(CELL_GCM_ALWAYS, 0, 0xff);
+    StencilMask(0xff);
+    StencilOpFail(CELL_GCM_KEEP, CELL_GCM_KEEP, CELL_GCM_KEEP);
+    StencilTestEnable(CELL_GCM_FALSE);
+    for (auto i = 0u; i < _context->vertexInputs.size(); ++i) {
+        _context->vertexInputs[i].enabled = false;
+        glDisableVertexAttribArray(i);
+    }
+}
+
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     TRACE3(EmuFlip, buffer, label, labelValue);
     auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
@@ -521,6 +553,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     
     // PlatformDevice.cpp of jsgcm says so
     _context->reportLocation = MemoryLocation::Local;
+    
+    resetContext();
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count) {
@@ -693,7 +727,6 @@ void Rsx::updateShaders() {
                                              samplerSizes,
                                              0); // TODO: loadAt
             shader = new VertexShader(text.c_str());
-            BOOST_LOG_TRIVIAL(trace) << "vertex shader log:\n" << shader->log();
             auto updater = new SimpleCacheItemUpdater<VertexShader> {
                 uint32_t(), (uint32_t)key.bytecode.size(), [](auto){}
             };
@@ -1908,7 +1941,7 @@ void Rsx::UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width,
 }
 
 void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size) {
-    auto tuple = _context->fragmentShaderCache.retrieveWithUpdater( { va, size });
+    auto tuple = _context->fragmentShaderCache.retrieveWithUpdater({va, size});
     auto program = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
     updater->updateWithBlob(program, _currentReplayBlob);

@@ -1,0 +1,39 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+void main
+(
+	float3 position	: POSITION,
+	float3 normal   : NORMAL,
+	float4 color	: COLOR,
+
+    uniform float4x4 ViewProjMatrix,
+    uniform float4x4 ModelMatrix,
+    uniform float4   clipPlane,
+
+	out float4 ePosition : POSITION,
+	out float3 oNormal   : TEXCOORD0,
+	out float4 oColor    : TEXCOORD1,
+	out float3 oPosition : TEXCOORD2,
+
+	out float oClip0      : CLP0
+)
+{
+	float4 vertexEye;
+
+	// transpose matrices
+	ViewProjMatrix = transpose(ViewProjMatrix);
+	ModelMatrix    = transpose(ModelMatrix);
+
+	vertexEye = mul(ModelMatrix, float4(position,1.f));
+
+	//
+	ePosition = mul(mul(ViewProjMatrix, ModelMatrix), float4(position,1.f));
+	oNormal   = normal;
+	oColor    = color;
+	oPosition = position;
+
+	oClip0 = dot(vertexEye, clipPlane);
+}

@@ -3,18 +3,22 @@
 #include "RsxContext.h"
 #include "Tracer.h"
 #include "../MainMemory.h"
+#include "../log.h"
 
 void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
+    LOG << ssnprintf("updating fragment bytecode at %x", va);
+    
     // TODO: handle sizes
     std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
     auto text = GenerateFragmentShader(_newbytecode, sizes, _context->isFlatShadeMode);
     *shader = FragmentShader(text.c_str());
-    _bytecode = _newbytecode;
-    _info = get_fragment_bytecode_info(&_bytecode[0]);
+    _info = get_fragment_bytecode_info(&_newbytecode[0]);
     updateConsts();
 }
 
 void FragmentShaderUpdateFunctor::updateConsts() {
+    LOG << ssnprintf("updating fragment consts at %x", va);
+    _bytecode = _newbytecode;
     auto fconst = (std::array<float, 4>*)_constBuffer.mapped();
     for (auto i = 0u; i < _info.length; i += 16) {
         if (_info.constMap[i / 16]) {
@@ -28,7 +32,8 @@ FragmentShaderUpdateFunctor::FragmentShaderUpdateFunctor(uint32_t va, uint32_t s
     : _constBuffer(size / 2),
       _context(rsxContext),
       _mm(mm),
-      va(va), size(size)
+      va(va),
+      size(size)
 {
     assert(size % 16 == 0);
 }
@@ -60,6 +65,7 @@ void FragmentShaderUpdateFunctor::updateWithBlob(FragmentShader* shader, std::ve
                 constsChanged = true;
             } else {
                 bytecodeChanged = true;
+                break;
             }
         }
     }

@@ -203,3 +203,13 @@ TEST_CASE("gcm_video_texturing") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/gcm_video_texturing/ps3frame0.png");
 }
+
+TEST_CASE("gcm_stencil_reflect") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_stencil_reflect/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame1.png", 1);
+}

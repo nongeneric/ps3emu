@@ -894,7 +894,7 @@ namespace ShaderRewriter {
                 auto z = new ComponentMask(arg(1), { 0, 0, 1, 0 });
                 auto w = new FloatLiteral(1);
                 auto xyz1 = new Invocation(FunctionName::vec4, { x, y, z, w });
-                rhs = new Invocation(FunctionName::dot4, { xyz1, arg(1) });
+                rhs = new Invocation(FunctionName::dot4, { xyz1, arg(2) });
                 break;
             }
             case vertex_op_t::DST: {

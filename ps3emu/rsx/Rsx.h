@@ -91,6 +91,7 @@ class Rsx {
     GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
     FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size);
     FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size);
+    void resetContext();
     
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);

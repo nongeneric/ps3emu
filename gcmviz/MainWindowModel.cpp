@@ -610,6 +610,23 @@ std::string printFragmentBytecode(std::vector<uint8_t> const& bytecode,
     return res;
 }
 
+std::string printVertexBytecode(const uint8_t* bytecode) {
+    bool isLast = false;
+    std::array<VertexInstr, 2> instr;
+    std::string res;
+    const uint8_t* initial = bytecode;
+    while (!isLast) {
+        int count = vertex_dasm_instr(bytecode, instr);
+        for (int n = 0; n < count; ++n) {
+            auto hex = print_hex(bytecode, 16, true);
+            res += ssnprintf("%03d: %s\n", (bytecode - initial) / 16, hex);
+            isLast |= instr[n].is_last;
+        }
+        bytecode += 16;
+    }
+    return res;
+}
+
 void MainWindowModel::update() {
     auto context = _rsx->context();
     if (context->vertexShader) {
@@ -638,6 +655,9 @@ void MainWindowModel::update() {
         }
         auto vertexConstModel = new ConstTableModel(values);
         _window.twVertexConsts->setModel(vertexConstModel);
+        
+        auto vertexBytecodeText = printVertexBytecode(&context->vertexInstructions[0]);
+        _window.teVertexBytecode->setText(QString::fromStdString(vertexBytecodeText));
     }
     
     if (context->fragmentShader) {

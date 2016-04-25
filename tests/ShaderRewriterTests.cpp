@@ -387,3 +387,17 @@ TEST_CASE("fragment_shader_d2") {
     auto str = printStatements(st);
     REQUIRE( str == "r[0].x = (0.5 * dot(f_TEX1, fconst.c[0]).x);" );
 }
+
+TEST_CASE("vertex_shader_dph") {
+    // DPH R0.y, v[0].xyzx, R4;
+    unsigned char instr[] = {
+        0x00, 0x00, 0x1c, 0x6c, 0x01, 0x80, 0x00, 0x0c, 0x01, 0x06, 0xc4, 0x43, 
+        0x60, 0x40, 0x9f, 0xfc, 
+    };
+    
+    std::array<VertexInstr, 2> res;
+    auto count = vertex_dasm_instr(instr, res);
+    auto st = MakeStatement(res[0], 0);
+    auto str = printStatements(st);
+    REQUIRE( str == "r[0].y = dot(vec4((v_in[0].xyzx).x, (v_in[0].xyzx).y, (v_in[0].xyzx).z, 1), r[4]).x;" );
+}
