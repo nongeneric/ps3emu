@@ -1079,8 +1079,6 @@ void Rsx::SurfaceFormat(uint8_t colorFormat,
     assert(type == CELL_GCM_SURFACE_PITCH);
     _context->surface.width = 1 << (width + 1);
     _context->surface.height = 1 << (height + 1);
-    assert(_context->surface.width == 2048);
-    assert(_context->surface.height == 1024);
     _context->surface.colorPitch[0] = pitchA;
     _context->surface.colorPitch[1] = pitchB;
     _context->surface.colorOffset[0] = offsetA;
@@ -1123,6 +1121,10 @@ void Rsx::WindowOffset(uint16_t x, uint16_t y) {
 
 void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
     TRACE4(SurfaceClipHorizontal, x, w, y, h);
+    assert(x == 0);
+    assert(y == 0);
+    _context->surfaceClipWidth = w;
+    _context->surfaceClipHeight = h;
 }
 
 // assume cellGcmSetSurface is always used and not its subcommands
@@ -1132,9 +1134,9 @@ void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
     assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
     assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
     waitForIdle();
-    assert(_context->surface.width >= _window.width());
-    assert(_context->surface.height >= _window.height());
-    _context->framebuffer->setSurface(_context->surface, _window.width(), _window.height());
+    _context->framebuffer->setSurface(
+        _context->surface, _context->surfaceClipWidth, _context->surfaceClipHeight);
+    updateViewPort();
 }
 
 void Rsx::Control0(uint32_t format) {
@@ -1289,7 +1291,7 @@ void Rsx::updateViewPort() {
     auto h = _context->viewPort.height;
     auto x = _context->viewPort.x;
     auto y = _context->viewPort.y;
-    glcall(glViewport(x, _window.height() - (y + h), w, h));
+    glcall(glViewport(x, _context->surfaceClipHeight - (y + h), w, h));
     glcall(glDepthRange(n, f));
     
     float s, b;

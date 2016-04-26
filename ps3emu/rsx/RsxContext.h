@@ -220,6 +220,8 @@ public:
     uint32_t vBlankHandlerDescr = 0;
     uint32_t flipHandlerDescr = 0;
     MemoryLocation reportLocation;
+    uint32_t surfaceClipWidth = 0;
+    uint32_t surfaceClipHeight = 0;
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

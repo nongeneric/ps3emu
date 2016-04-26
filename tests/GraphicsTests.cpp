@@ -213,3 +213,13 @@ TEST_CASE("gcm_stencil_reflect") {
     compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame0.png", 0);
     compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame1.png", 1);
 }
+
+TEST_CASE("gcm_render_to_texture") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_render_to_texture/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/gcm_render_to_texture/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_render_to_texture/ps3frame1.png", 1);
+}
