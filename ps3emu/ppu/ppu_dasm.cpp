@@ -3496,7 +3496,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
             }
             break;
         }
-        default: throw std::runtime_error("unknown opcode");
+        default: throw std::runtime_error(ssnprintf("unknown opcode at %08x", cia));
     }
 }
 
