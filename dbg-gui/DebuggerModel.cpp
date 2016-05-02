@@ -53,10 +53,8 @@ QString printHex(void* ptr, int len) {
 class MemoryDumpModel : public MonospaceGridModel {
     PPUThread* _thread;
     SPUThread* _spuThread;
-    GridModelChangeTracker _tracker;
 public:
-    MemoryDumpModel() : _thread(nullptr), _spuThread(nullptr), _tracker(this, 16) {
-        _tracker.reset();
+    MemoryDumpModel() : _thread(nullptr), _spuThread(nullptr) {
     }
     
     void setThread(PPUThread* thread) {
@@ -113,7 +111,6 @@ public:
     }
     
     virtual void update() override {
-        _tracker.track();
         MonospaceGridModel::update();
     }
     
@@ -460,55 +457,70 @@ void DebuggerModel::stepIn() {
     run();
 }
 
-void DebuggerModel::stepOver() {}
+void DebuggerModel::stepOver() {
+    exec("runto : nip + 4");
+}
+
+void DebuggerModel::switchThread(PPUThread* ppu) {
+    _activeThread = ppu;
+    _activeSPUThread = nullptr;
+}
+
+void DebuggerModel::switchThread(SPUThread* spu) {
+    _activeThread = nullptr;
+    _activeSPUThread = spu;
+}
 
 void DebuggerModel::run() {
     bool cont = true;
     while (cont) {
         auto untyped = _proc->run();
-        if (boost::get<PPUThreadFailureEvent>(&untyped)) {
+        if (auto ev = boost::get<PPUThreadFailureEvent>(&untyped)) {
             emit message("failure");
             cont = false;
+            switchThread(ev->thread);
         } else if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
             emit message(QString("invalid instruction at %1")
                              .arg(ev->thread->getNIP(), 8, 16, QChar('0')));
             cont = false;
+            switchThread(ev->thread);
         } else if (auto ev = boost::get<MemoryAccessErrorEvent>(&untyped)) {
             emit message(QString("memory access error at %1")
                              .arg(ev->thread->getNIP(), 8, 16, QChar('0')));
             cont = false;
+            switchThread(ev->thread);
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             emit message("process finished");
             cont = false;
         } else if (boost::get<PPUThreadStartedEvent>(&untyped)) {
-            emit message("thread created");
+            emit message("thread started");
         } else if (boost::get<PPUThreadFinishedEvent>(&untyped)) {
             emit message("thread finished");
         } else if (auto ev = boost::get<PPUBreakpointEvent>(&untyped)) {
             emit message("breakpoint");
-            _activeThread = ev->thread;
-            _activeSPUThread = nullptr;
+            switchThread(ev->thread);
             clearSoftBreak(ev->thread->getNIP());
             cont = false;
-        } else if (boost::get<PPUSingleStepBreakpointEvent>(&untyped)) {
+        } else if (auto ev = boost::get<PPUSingleStepBreakpointEvent>(&untyped)) {
             cont = false;
+            switchThread(ev->thread);
         } else if (auto ev = boost::get<SPUInvalidInstructionEvent>(&untyped)) {
             emit message(QString("invalid spu instruction at %1")
                              .arg(ev->thread->getNip(), 8, 16, QChar('0')));
             cont = false;
+            switchThread(ev->thread);
         } else if (auto ev = boost::get<SPUBreakpointEvent>(&untyped)) {
-            _activeThread = nullptr;
-            _activeSPUThread = ev->thread;
+            switchThread(ev->thread);
             emit message("spu breakpoint");
             clearSPUSoftBreak(ev->thread->getNip());
             cont = false;
-        } else if (boost::get<SPUSingleStepBreakpointEvent>(&untyped)) {
+        } else if (auto ev = boost::get<SPUSingleStepBreakpointEvent>(&untyped)) {
             cont = false;
+            switchThread(ev->thread);
         } else if (auto ev = boost::get<SPUThreadStartedEvent>(&untyped)) {
             trySetPendingSPUBreaks();
             cont = false;
-            _activeThread = nullptr;
-            _activeSPUThread = ev->thread;
+            switchThread(ev->thread);
         }
     }
     updateUI();
@@ -644,6 +656,7 @@ void DebuggerModel::updateUI() {
     }
     _gprModel->update();
     _dasmModel->update();
+    _memoryDumpModel->update();
 }
 
 void DebuggerModel::runto(ps3_uintptr_t va) {

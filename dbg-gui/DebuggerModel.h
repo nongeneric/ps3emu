@@ -43,6 +43,8 @@ class DebuggerModel : public QWidget {
     void setSPUSoftBreak(uint32_t elfSource, ps3_uintptr_t va);
     void clearSPUSoftBreak(ps3_uintptr_t va);
     void trySetPendingSPUBreaks();
+    void switchThread(PPUThread* ppu);
+    void switchThread(SPUThread* spu);
 
 public:
     DebuggerModel();

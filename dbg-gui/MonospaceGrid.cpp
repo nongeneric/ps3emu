@@ -79,7 +79,8 @@ bool MonospaceGridModel::isHighlighted(uint64_t row, int col) {
 }
 
 void MonospaceGrid::navigate(uint64_t row) {
-    if (row < _curRow || row > _lastRow) {
+    if (_navigationMode == NavigationMode::Strict ||
+        (row < _curRow || row > _lastRow)) {
         _curRow = row;
     }
     update();
@@ -162,4 +163,8 @@ void MonospaceGrid::drawArrows(std::vector<ArrowInfo> arrows, QPainter& painter)
             drawArrow(arrow, pair.first, painter);
         }   
     }
+}
+
+void MonospaceGrid::setNavigationMode(NavigationMode mode) {
+    _navigationMode = mode;
 }

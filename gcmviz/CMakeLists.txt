@@ -11,6 +11,7 @@ qt5_wrap_ui(ImageView_ui_moc ${PROJECT_SOURCE_DIR}/ImageView.ui)
 
 set(SRC
     main.cpp
+    ContextTables.cpp
     MainWindowModel.cpp
     ${MainWindow_ui_moc}
     ${ImageView_ui_moc}

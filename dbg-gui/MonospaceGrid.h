@@ -26,6 +26,15 @@ signals:
     void updated();
 };
 
+enum class NavigationMode {
+    // just navigate ignoring the current position
+    Strict,
+    // don't navigate if already on screen, works well for disassembly
+    // where every address is always aligned and there is no need to
+    // to change the starting address of a current line
+    Fuzzy
+};
+
 struct ColumnInfo {
     int charsWidth;
 };
@@ -52,6 +61,7 @@ class MonospaceGrid : public QWidget {
     int _charWidth;
     int _charHeight;
     int _arrowsColumn = -1;
+    NavigationMode _navigationMode = NavigationMode::Strict;
     
     virtual void paintEvent(QPaintEvent*) override;
     void navigate(uint64_t row);
@@ -63,6 +73,7 @@ public:
     void setColumnWidth(int col, int chars);
     void setScrollable(bool value);
     void setArrowsColumn(int col);
+    void setNavigationMode(NavigationMode mode);
 protected:
     virtual void wheelEvent(QWheelEvent *) override;
 };

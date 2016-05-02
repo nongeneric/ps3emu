@@ -58,6 +58,7 @@ void MainWindow::setupDocks() {
     addDockWidget(Qt::BottomDockWidgetArea, memoryDock);
     
     auto dasmGrid = new MonospaceGrid();
+    dasmGrid->setNavigationMode(NavigationMode::Fuzzy);
     dasmGrid->setModel(_model.getDasmModel());
     dasmGrid->setColumnWidth(0, 9);
     dasmGrid->setColumnWidth(1, 12);

@@ -1,5 +1,6 @@
 #include "MainWindowModel.h"
 
+#include "ContextTables.h"
 #include "ui_ImageView.h"
 #include <QAbstractItemModel>
 #include <QItemSelectionModel>
@@ -504,82 +505,6 @@ public:
     }
 };
 
-class ContextTableModel : public QAbstractItemModel {
-    Rsx* _rsx;
-public:
-    ContextTableModel(Rsx* rsx) : _rsx(rsx) { }
-    
-    QVariant headerData(int section,
-                        Qt::Orientation orientation,
-                        int role = Qt::DisplayRole) const override {
-        if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
-            return QVariant();
-        switch (section) {
-            case 0: return "Name";
-            case 1: return "Value";
-        }
-        return QVariant();
-    }
-    
-    int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 2;
-    }
-    
-    const char* printVertexArrayMode() const {
-        switch (_rsx->context()->glVertexArrayMode) {
-            case GL_QUADS: return "GL_QUADS";
-            case GL_QUAD_STRIP: return "GL_QUAD_STRIP";
-            case GL_POLYGON: return "GL_POLYGON";
-            case GL_POINTS: return "GL_POINTS";
-            case GL_LINES: return "GL_LINES";
-            case GL_LINE_LOOP: return "GL_LINE_LOOP";
-            case GL_LINE_STRIP: return "GL_LINE_STRIP";
-            case GL_TRIANGLES: return "GL_TRIANGLES";
-            case GL_TRIANGLE_STRIP: return "GL_TRIANGLE_STRIP";
-            case GL_TRIANGLE_FAN: return "GL_TRIANGLE_FAN";
-        }
-        return "unknown";
-    }
-    
-    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
-        if (role != Qt::DisplayRole)
-            return QVariant();
-        
-        if (index.column() == 0) {
-            switch (index.row()) {
-                case 0: return "glVertexArrayMode";
-            }   
-        }
-        
-        switch (index.row()) {
-            case 0: return printVertexArrayMode();
-        }
-        
-        return QVariant();
-    }
-    
-    QModelIndex parent(const QModelIndex& child) const override {
-        return QModelIndex();
-    }
-    
-    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
-        return createIndex(row, column);
-    }
-    
-    int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 1;
-    }
-};
-
-MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _currentFrame(0) {
-    _window.setupUi(&_qwindow);
-    QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
-    Rsx::setOperationMode(RsxOperationMode::Replay);
-    QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
-        this->runTo(index.row(), _currentFrame);
-    });
-}
-
 MainWindowModel::~MainWindowModel() = default;
 
 QMainWindow* MainWindowModel::window() {
@@ -716,10 +641,7 @@ void MainWindowModel::update() {
         _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
     });
     _window.twVertexDataArrays->setModel(vdaModel);
-    
-    auto contextModel = new ContextTableModel(_rsx.get());
-    _window.twContext->setModel(contextModel);
-    _window.twContext->resizeColumnsToContents();
+    updateContextTable();
 }
 
 void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
@@ -778,4 +700,31 @@ void MainWindowModel::changeFrame() {
     QObject::connect(_window.leSearchCommand, &QLineEdit::textChanged, [=] (auto text) {
         
     });
+}
+
+MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _currentFrame(0) {
+    _window.setupUi(&_qwindow);
+    QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
+    Rsx::setOperationMode(RsxOperationMode::Replay);
+    QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
+        this->runTo(index.row(), _currentFrame);
+    });
+    _window.contextTree->setColumnCount(1);
+    QList<QTreeWidgetItem*> items;
+    items.append(new SurfaceContextTreeItem());
+    _window.contextTree->insertTopLevelItems(0, items);
+    QObject::connect(_window.contextTree, &QTreeWidget::currentItemChanged, [=] (auto item) {
+        this->updateContextTable();
+    });
+}
+
+void MainWindowModel::updateContextTable() {
+    if (!_rsx)
+        return;
+    auto item = _window.contextTree->currentItem();
+    auto typed = dynamic_cast<ContextTreeItem*>(item);
+    if (typed) {
+        _window.contextTable->setModel(typed->getTable(_rsx->context()));
+        _window.contextTable->resizeColumnsToContents();
+    }
 }

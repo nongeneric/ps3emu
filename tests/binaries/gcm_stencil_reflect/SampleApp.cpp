@@ -553,9 +553,9 @@ void SampleApp::onRender()
 	static float AngleZ = 0.0f;
 
 	if( mObjectRotation ) {
-		AngleX += 0.01f;
-		AngleY += 0.01f;
-		AngleZ += 0.000f;
+		AngleX += 0.1f;
+		AngleY += 0.1f;
+		AngleZ += 0.00f;
 	}
 
 	Matrix4 mat; // model matrix
@@ -698,7 +698,8 @@ void SampleApp::onRender()
 		FWDebugFont::setColor(0.f, 0.f, 0.f, 1.0f);
 
 		FWDebugFont::print("Userclip Sample Application\n\n");
-		FWDebugFont::printf("FPS: %.2f\n\n", fFPS);
+		//FWDebugFont::printf("FPS: %.2f\n\n", fFPS);
+		FWDebugFont::printf("FPS: ?");
 		FWDebugFont::printf("Clip Plane\n\n");
 
 		// restore color

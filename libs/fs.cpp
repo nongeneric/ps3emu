@@ -163,9 +163,9 @@ CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsLseek(%d, %x, %d, ...)", fd, offset, whence);
     auto stdWhence = toStdWhence(whence);
     auto file = fileMap.get(fd);
-    *pos = ftell(file);
     if (fseek(file, offset, stdWhence))
         return toCellErrno(errno);
+    *pos = ftell(file);
     return CELL_FS_SUCCEEDED;
 }
 

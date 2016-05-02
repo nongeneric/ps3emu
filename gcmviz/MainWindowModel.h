@@ -18,6 +18,7 @@ class MainWindowModel {
     unsigned _currentCommand;
     unsigned _currentFrame;
     void changeFrame();
+    void updateContextTable();
     
 public:
     MainWindowModel();
