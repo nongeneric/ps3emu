@@ -148,7 +148,7 @@ TEST_CASE() {
     );
 }
 
-TEST_CASE() {
+TEST_CASE("vertex_dasm_test_1") {
     unsigned char instr[] = {
         0x40, 0x1f, 0x9c, 0x6c, 0x00, 0xdd, 0x23, 0x55, 0x01, 0x86, 0xc0, 0x83,
         0x60, 0x41, 0xff, 0x84, 0x00, 0x00, 0x9c, 0x6c, 0x00, 0x5d, 0x20, 0x00,
@@ -192,7 +192,7 @@ TEST_CASE() {
     REQUIRE( count == 2 );
     st = MakeStatement(res[0], 0);
     str = printStatements(st);
-    REQUIRE(str == "r[1].xy = cos((constants.c[467].xxxx)).xy;");
+    REQUIRE(str == "r[1].xy = vec2(cos((constants.c[467].xxxx).x).x);");
     st = MakeStatement(res[1], 0);
     str = printStatements(st);
     REQUIRE(str == "v_out[7] = v_in[0];");
@@ -207,7 +207,7 @@ TEST_CASE() {
     REQUIRE( count == 1 );
     st = MakeStatement(res[0], 0);
     str = printStatements(st);
-    REQUIRE(str == "r[0].x = sin((constants.c[467].xxxx)).x;");
+    REQUIRE(str == "r[0].x = sin((constants.c[467].xxxx).x).x;");
     
     count = vertex_dasm_instr(instr + 16 * 5, res);
     REQUIRE( count == 1 );

@@ -36,15 +36,15 @@ namespace ShaderRewriter {
         { FunctionName::dot3, { ExprType::fp32, ExprType::vec3, ExprType::vec3 } },
         { FunctionName::dot4, { ExprType::fp32, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::abs, { ExprType::notype, ExprType::notype } },
-        { FunctionName::cos, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::cos, { ExprType::fp32, ExprType::fp32 } },
         { FunctionName::min, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::max, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::exp2, { ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::sin, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::sin, { ExprType::fp32, ExprType::fp32 } },
         { FunctionName::lg2, { ExprType::fp32, ExprType::fp32 } },
         { FunctionName::pow, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
         { FunctionName::normalize, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::inversesqrt, { ExprType::vec4, ExprType::vec4 } },
+        { FunctionName::inversesqrt, { ExprType::fp32, ExprType::fp32 } },
         { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::reverse3f, { ExprType::vec4, ExprType::vec4 } },
         { FunctionName::txl0, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
@@ -648,8 +648,8 @@ namespace ShaderRewriter {
                 break;
             }
             case fragment_op_t::RCP: {
-                rhs = new Invocation(FunctionName::pow, { args[0], new FloatLiteral(-1) });
-                break;
+                auto mask = new ComponentMask(args[0], { 1, 0, 0, 0 });
+                rhs = new Invocation(FunctionName::pow, { mask, new FloatLiteral(-1) });
             }
             case fragment_op_t::RSQ: {
                 rhs = new Invocation(FunctionName::inversesqrt, { args[0] });
