@@ -89,8 +89,8 @@ class Rsx {
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
     GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
-    FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size);
-    FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size);
+    FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size, bool mrt);
+    FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size, bool mrt);
     void resetContext();
     
     void ChannelSetContextDmaSemaphore(uint32_t handle);

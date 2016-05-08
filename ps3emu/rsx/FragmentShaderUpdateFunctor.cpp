@@ -4,13 +4,19 @@
 #include "Tracer.h"
 #include "../MainMemory.h"
 #include "../log.h"
+#include <boost/range/numeric.hpp>
+
+bool isMrt(SurfaceInfo const& surface) {
+    return boost::accumulate(surface.colorTarget, 0) > 1;
+}
 
 void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
     LOG << ssnprintf("updating fragment bytecode at %x", va);
     
     // TODO: handle sizes
     std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
-    auto text = GenerateFragmentShader(_newbytecode, sizes, _context->isFlatShadeMode);
+    auto text = GenerateFragmentShader(
+        _newbytecode, sizes, _context->isFlatShadeMode, isMrt(_context->surface));
     *shader = FragmentShader(text.c_str());
     _info = get_fragment_bytecode_info(&_newbytecode[0]);
     updateConsts();

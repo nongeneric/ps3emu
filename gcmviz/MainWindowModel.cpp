@@ -10,6 +10,7 @@
 #include <QSize>
 #include <QPainter>
 #include <boost/endian/conversion.hpp>
+#include <boost/range/numeric.hpp>
 #include "../ps3emu/utils.h"
 #include "../ps3emu/rsx/Rsx.h"
 #include "../ps3emu/rsx/RsxContext.h"
@@ -595,7 +596,8 @@ void MainWindowModel::update() {
             // TODO: handle sizes
             std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
             auto asmText = PrintFragmentProgram(&bytecode[0]);
-            auto glslText = GenerateFragmentShader(bytecode, sizes, context->isFlatShadeMode);
+            bool mrt = boost::accumulate(context->surface.colorTarget, 0) > 1;
+            auto glslText = GenerateFragmentShader(bytecode, sizes, context->isFlatShadeMode, mrt);
             _window.teFragmentAsm->setText(QString::fromStdString(asmText));
             _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
             

@@ -6,6 +6,7 @@
 
 class MainMemory;
 class RsxContext;
+class SurfaceInfo;
 class FragmentShaderUpdateFunctor {
     GLPersistentCpuBuffer _constBuffer;
     std::vector<uint8_t> _bytecode;
@@ -29,3 +30,5 @@ public:
     std::vector<uint8_t> const& bytecode();
     GLPersistentCpuBuffer* constBuffer();
 };
+
+bool isMrt(SurfaceInfo const& surface);

@@ -29,7 +29,8 @@ const char* flipIndex(int n) {
 
 std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    std::array<int, 16> const& samplerSizes,
-                                   bool isFlatColorShading) {
+                                   bool isFlatColorShading,
+                                   bool isMrt) {
     std::vector<std::unique_ptr<Statement>> sts;
     auto pos = 0u;
     int lastReg = 0;
@@ -100,14 +101,15 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         auto str = PrintStatement(st.get());
         line(str);
     }
-    // MRT
-    // if MRT is disabled either color[0] or color[1] is used
-    // color[0] is handled in the loop below (color[0] = r[0])
-    // but color[1] must be handled separately
-    line("    color[1] = r[0];");
-    int regs[] = { 0, 2, 3, 4 };
-    for (int i = 0; i < 4 && regs[i] <= lastReg; ++i) {
-        line(ssnprintf("    color[%d] = r[%d];", i, regs[i]));
+    
+    if (isMrt) {
+        int regs[] = { 0, 2, 3, 4 };
+        for (int i = 0; i < 4 && regs[i] <= lastReg; ++i) {
+            line(ssnprintf("    color[%d] = r[%d];", i, regs[i]));
+        }
+    } else {
+        line("    color[0] = r[0];");
+        line("    color[1] = r[0];");
     }
     line("}");
     return res;

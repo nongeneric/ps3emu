@@ -691,9 +691,9 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     TRACE2(DrawIndexArray, first, count);
 }
 
-FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size) {
-    TRACE2(addFragmentShaderToCache, va, size);
-    FragmentShaderCacheKey key { va, size };
+FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size, bool mrt) {
+    TRACE3(addFragmentShaderToCache, va, size, mrt);
+    FragmentShaderCacheKey key { va, size, mrt };
     auto shader = new FragmentShader();
     auto updater = new FragmentShaderUpdateFunctor(
         _context->fragmentVa,
@@ -705,13 +705,13 @@ FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size) {
     return shader;
 }
 
-FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size) {
-    FragmentShaderCacheKey key { va, size };
+FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size, bool mrt) {
+    FragmentShaderCacheKey key { va, size, mrt };
     FragmentShaderUpdateFunctor* updater;
     FragmentShader* shader;
     std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
     if (!shader) {
-        shader = addFragmentShaderToCache(va, size);
+        shader = addFragmentShaderToCache(va, size, mrt);
         std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
     }
     updater->bindConstBuffer();
@@ -721,7 +721,8 @@ FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size) {
 void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
-        _context->fragmentShader = getFragmentShaderFromCache(_context->fragmentVa, FragmentProgramSize);
+        _context->fragmentShader = getFragmentShaderFromCache(
+            _context->fragmentVa, FragmentProgramSize, isMrt(_context->surface));
     }
     
     if (_context->vertexShaderDirty) {

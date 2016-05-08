@@ -232,3 +232,21 @@ TEST_CASE("opengl_1_basiccg") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/opengl_1_basiccg/ps3frame1.png", 1);
 }
+
+TEST_CASE("opengl_2_basic_vertex_lighting") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_2_basic_vertex_lighting/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_2_basic_vertex_lighting/ps3frame1.png", 1);
+}
+
+TEST_CASE("opengl_3_basic_fragment_lighting") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_3_basic_fragment_lighting/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_3_basic_fragment_lighting/ps3frame1.png", 1);
+}

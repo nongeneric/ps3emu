@@ -7,7 +7,8 @@
 
 std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    std::array<int, 16> const& samplerSizes,
-                                   bool isFlatColorShading);
+                                   bool isFlatColorShading,
+                                   bool isMrt);
 
 struct VertexShaderInputFormat {
     bool enabled = false;

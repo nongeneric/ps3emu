@@ -130,9 +130,10 @@ struct VertexShaderCacheKey {
 struct FragmentShaderCacheKey {
     uint32_t va;
     uint32_t size;
+    bool mrt;
     inline bool operator<(FragmentShaderCacheKey const& other) const {
-        return std::tie(va, size)
-             < std::tie(other.va, other.size);
+        return std::tie(va, size, mrt)
+             < std::tie(other.va, other.size, other.mrt);
     }
 };
 
