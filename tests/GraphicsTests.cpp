@@ -223,3 +223,12 @@ TEST_CASE("gcm_render_to_texture") {
     compareLastFrame("./binaries/gcm_render_to_texture/ps3frame0.png", 0);
     compareLastFrame("./binaries/gcm_render_to_texture/ps3frame1.png", 1);
 }
+
+TEST_CASE("opengl_1_basiccg") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_1_basiccg/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_1_basiccg/ps3frame1.png", 1);
+}

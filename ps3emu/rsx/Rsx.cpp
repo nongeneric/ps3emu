@@ -367,13 +367,30 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
     format.stride = stride;
     format.size = size;
     format.type = type;
-    assert(type == CELL_GCM_VERTEX_UB || type == CELL_GCM_VERTEX_F);
-    auto gltype = type == CELL_GCM_VERTEX_UB ? GL_UNSIGNED_BYTE
-                : type == CELL_GCM_VERTEX_F ? GL_FLOAT
-                : 0;
-    auto normalize = gltype == GL_UNSIGNED_BYTE;
+    
+    GLenum gltype;
+    int typeSize;
+    bool normalize;
+    switch (type) {
+        case CELL_GCM_VERTEX_UB:
+            gltype = GL_UNSIGNED_BYTE;
+            typeSize = 1;
+            normalize = true;
+            break;
+        case CELL_GCM_VERTEX_F:
+            gltype = GL_FLOAT;
+            typeSize = 4;
+            normalize = false;
+            break;
+        case CELL_GCM_VERTEX_SF:
+            gltype = GL_HALF_FLOAT;
+            typeSize = 2;
+            normalize = false;
+            break;
+        default: throw std::runtime_error("not implemented array type");
+    }
     auto& vinput = _context->vertexInputs[index];
-    vinput.typeSize = gltype == GL_FLOAT ? 4 : 1; // TODO: other types
+    vinput.typeSize = typeSize;
     vinput.rank = size;
     vinput.enabled = size != 0;
     if (vinput.enabled) {
@@ -497,6 +514,13 @@ void Rsx::resetContext() {
         _context->vertexInputs[i].enabled = false;
         glDisableVertexAttribArray(i);
     }
+    for (auto& s : _context->vertexTextureSamplers) {
+        s.enable = false;
+    }
+    for (auto& s : _context->fragmentTextureSamplers) {
+        s.enable = false;
+    }
+    glDisable(GL_MULTISAMPLE);
 }
 
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
@@ -783,14 +807,15 @@ void Rsx::VertexTextureFilter(unsigned int index, float bias) {
 
 GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     TRACE2(addTextureToCache, samplerId, isFragment);
-    auto& info = isFragment ? _context->fragmentTextureSamplers[samplerId].texture
-                            : _context->vertexTextureSamplers[samplerId].texture;
+    auto& info = isFragment ? _context->fragmentTextureSamplers.at(samplerId).texture
+                            : _context->vertexTextureSamplers.at(samplerId).texture;
     TextureCacheKey key { info.offset, (uint32_t)info.location, info.width, info.height, info.format };
     uint32_t va = 0;
     if (_mode != RsxOperationMode::Replay) {
         va = rsxOffsetToEa(info.location, key.offset);
     }
-    auto size = (info.pitch == 0 ? info.width : info.pitch) * info.height;
+    auto texelByteSize = 16; // TODO: calculate from format
+    auto size = (info.pitch == 0 ? (info.width * texelByteSize) : info.pitch) * info.height;
     auto updater = new SimpleCacheItemUpdater<GLTexture> {
         va, size,
         [=](auto t) {
@@ -980,6 +1005,7 @@ void Rsx::TextureOffset(unsigned index,
                         uint8_t location)
 {
     TRACE8(TextureOffset, index, offset, mipmap, format, dimension, border, cubemap, location);
+    _context->fragmentTextureSamplers[index].enable = true;
     auto& t = _context->fragmentTextureSamplers[index].texture;
     t.offset = offset;
     t.mipmap = mipmap;
@@ -1067,7 +1093,7 @@ void Rsx::SurfaceFormat(uint8_t colorFormat,
             offsetB,
             pitchB
     );
-    assert(colorFormat == CELL_GCM_SURFACE_A8R8G8B8);
+    //assert(colorFormat == CELL_GCM_SURFACE_A8R8G8B8);
     if (depthFormat == CELL_GCM_SURFACE_Z16) {
         _context->surface.depthFormat = SurfaceDepthFormat::z16;
     } else if (depthFormat == CELL_GCM_SURFACE_Z24S8) {
@@ -1655,7 +1681,8 @@ void Rsx::transferImage() {
     }
     
     auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
-    auto destPixelSize = surface.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
+    auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;
+    auto destPixelSize = destPixelFormat == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     
     auto destX0 = std::max<int16_t>(scale.outX, scale.clipX);
     auto destXn = std::min<int16_t>(scale.outX + scale.outW, scale.clipX + scale.clipW);

@@ -34,12 +34,6 @@ class Cache {
     std::map<K, ValueInfo<T, U>> _store;
     std::set<K> _dirty;
     
-    bool intersects(ValueInfo<T, U>& info, uint32_t va, uint32_t size) {
-        auto itemVa = info.updater->va;
-        auto itemSize = info.updater->size;
-        return !(itemVa > va + size || itemVa + itemSize < va);
-    }
-    
 public:
     T* retrieve(K const& key) {
         return std::get<0>(retrieveWithUpdater(key));
@@ -61,7 +55,7 @@ public:
     void invalidate(uint32_t va, uint32_t size) {
         BOOST_LOG_TRIVIAL(trace) << ssnprintf("invalidating cache %x, %x", va, size);
         for (auto& p : _store) {
-            if (!intersects(p.second, va, size))
+            if (!intersects(p.second.updater->va, p.second.updater->size, va, size))
                 continue;
             _dirty.insert(p.first);
         }

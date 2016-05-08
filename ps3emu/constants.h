@@ -8,7 +8,7 @@ typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
 static constexpr emu_void_t emu_void = 0;
 
-static constexpr ps3_uintptr_t EmuInternalArea = 0x100000;
+static constexpr ps3_uintptr_t EmuInternalArea = 0x1000000;
 static constexpr ps3_uintptr_t EmuInternalAreaSize = 0x1000000;
 
 static constexpr ps3_uintptr_t HeapArea = 0x30000000;

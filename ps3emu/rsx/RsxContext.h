@@ -205,8 +205,8 @@ public:
     std::array<uint8_t, 512 * 16> vertexInstructions;
     uint32_t vertexLoadOffset = 0;
     IndexArrayInfo indexArray;
-    TextureSamplerInfo vertexTextureSamplers[4];
-    TextureSamplerInfo fragmentTextureSamplers[16];
+    std::array<TextureSamplerInfo, 4> vertexTextureSamplers;
+    std::array<TextureSamplerInfo, 16> fragmentTextureSamplers;
     std::array<DisplayBufferInfo, 8> displayBuffers;
     std::unique_ptr<GLFramebuffer> framebuffer;
     std::unique_ptr<TextureRenderer> textureRenderer;

@@ -712,10 +712,37 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     _window.contextTree->setColumnCount(1);
     QList<QTreeWidgetItem*> items;
     items.append(new SurfaceContextTreeItem());
+    
+    auto vertexSamplers = new QTreeWidgetItem();
+    vertexSamplers->setText(0, "Vertex Samplers");
+    vertexSamplers->addChild(new SamplerContextTreeItem(false, 0));
+    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 0));
+    vertexSamplers->addChild(new SamplerContextTreeItem(false, 1));
+    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 1));
+    vertexSamplers->addChild(new SamplerContextTreeItem(false, 2));
+    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 2));
+    vertexSamplers->addChild(new SamplerContextTreeItem(false, 3));
+    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 3));
+    
+    auto fragmentSamplers = new QTreeWidgetItem();
+    fragmentSamplers->setText(0, "Fragment Samplers");
+    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 0));
+    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 0));
+    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 1));
+    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 1));
+    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 2));
+    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 2));
+    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 3));
+    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 3));
+    
+    items.append(vertexSamplers);
+    items.append(fragmentSamplers);
+    
     _window.contextTree->insertTopLevelItems(0, items);
     QObject::connect(_window.contextTree, &QTreeWidget::currentItemChanged, [=] (auto item) {
         this->updateContextTable();
     });
+    _window.contextTree->expandAll();
 }
 
 void MainWindowModel::updateContextTable() {

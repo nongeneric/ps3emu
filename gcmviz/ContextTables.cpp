@@ -4,6 +4,10 @@
 
 SurfaceContextTreeItem::SurfaceContextTreeItem() : ContextTreeItem("Surface") {}
 
+ContextTreeItem::ContextTreeItem(std::string name)
+    : QTreeWidgetItem((QTreeWidget*)nullptr,
+                      QStringList(QString::fromStdString(name))) {}
+
 template <typename T> std::string printHex(T num) {
     return ssnprintf("#%08x", num);
 }
@@ -13,7 +17,11 @@ template <typename T> std::string printDec(T num) {
 }
 
 std::string printLocation(MemoryLocation location) {
-    return location == MemoryLocation::Local ? "Local" : "Main";
+    return location == MemoryLocation::Local ? "LOCAL" : "MAIN";
+}
+
+std::string printBool(bool value) {
+    return value ? "TRUE" : "FALSE";
 }
 
 GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
@@ -136,3 +144,103 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
             },
         });
 }
+
+#define DECHEX(x, p) {\
+    #p, [=](auto) { return printDec(x. p); },\
+        [=](auto) { return printHex(x. p); },\
+},
+
+#define HEX(x, p) {\
+    #p, [=](auto) { return printHex(x. p); },\
+        [=](auto) { return ""; },\
+},
+
+#define DEC(x, p) {\
+    #p, [=](auto) { return printDec(x. p); },\
+        [=](auto) { return ""; },\
+},
+
+#define BOOL(x, p) {\
+    #p, [=](auto) { return printBool(x. p); },\
+        [=](auto) { return ""; },\
+},
+
+#define FLOAT(x, p) {\
+    #p, [=](auto) { return ssnprintf("%g", x. p); },\
+        [=](auto) { return ""; },\
+},
+
+SamplerContextTreeItem::SamplerContextTreeItem(bool fragment, int index)
+    : ContextTreeItem(ssnprintf("s[%d]", index)),
+      _fragment(fragment),
+      _index(index) {}
+
+GenericTableModel<RsxContext>* SamplerContextTreeItem::getTable(
+    RsxContext* context) {
+    auto i = [=]() -> TextureSamplerInfo& {
+        return _fragment ? context->fragmentTextureSamplers[_index]
+                         : context->vertexTextureSamplers[_index];
+    };
+    return new GenericTableModel<RsxContext>(
+        context,
+        {
+            BOOL(i(), enable)
+            FLOAT(i(), minlod)
+            FLOAT(i(), maxlod)
+            HEX(i(), wraps)
+            HEX(i(), wrapt)
+            HEX(i(), fragmentWrapr)
+            HEX(i(), fragmentZfunc)
+            HEX(i(), fragmentAnisoBias)
+            FLOAT(i(), bias)
+            HEX(i(), fragmentMin)
+            HEX(i(), fragmentMag)
+            HEX(i(), fragmentConv)
+            HEX(i(), fragmentAlphaKill)
+            FLOAT(i(), borderColor[0])
+            FLOAT(i(), borderColor[1])
+            FLOAT(i(), borderColor[2])
+            FLOAT(i(), borderColor[3])
+        });
+}
+
+SamplerTextureContextTreeItem::SamplerTextureContextTreeItem(bool fragment, int index)
+    : ContextTreeItem(ssnprintf("t[%d]", index)),
+      _fragment(fragment),
+      _index(index) {}
+      
+GenericTableModel<RsxContext>* SamplerTextureContextTreeItem::getTable(
+    RsxContext* context) {
+    auto t = [=]() -> RsxTextureInfo& {
+        return _fragment ? context->fragmentTextureSamplers[_index].texture
+                         : context->vertexTextureSamplers[_index].texture;
+    };
+    return new GenericTableModel<RsxContext>(
+        context,
+        {
+            DECHEX(t(), pitch)
+            DECHEX(t(), width)
+            DECHEX(t(), height)
+            HEX(t(), offset)
+            DEC(t(), mipmap)
+            DECHEX(t(), format)
+            DEC(t(), dimension)
+            {
+                "location",
+                [=](auto) { return printLocation(t().location); },
+                [=](auto) { return ""; },
+            },
+            BOOL(t(), fragmentBorder)
+            BOOL(t(), fragmentCubemap)
+            HEX(t(), fragmentDepth)
+            HEX(t(), fragmentRemapCrossbarSelect)
+            HEX(t(), fragmentGamma)
+            HEX(t(), fragmentUnsignedRemap)
+            HEX(t(), fragmentSignedRemap)
+            HEX(t(), fragmentAs)
+            HEX(t(), fragmentRs)
+            HEX(t(), fragmentGs)
+            HEX(t(), fragmentGs)
+        });
+}
+    

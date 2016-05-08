@@ -5,7 +5,7 @@
 
 using namespace glm;
 
-// rgba
+// return rgba
 
 void read_A8R8G8B8(const uint8_t* raw, u8vec4& texel) {
     texel = { raw[1], raw[2], raw[3], raw[0] };
@@ -195,7 +195,6 @@ FormatInfo getFormat(uint32_t format) {
         case CELL_GCM_TEXTURE_Y16_X16:
         case CELL_GCM_TEXTURE_X32_FLOAT:
         case CELL_GCM_TEXTURE_Y16_X16_FLOAT:
-        case CELL_GCM_TEXTURE_W16_Z16_Y16_X16_FLOAT:
         case CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT:
         case CELL_GCM_TEXTURE_COMPRESSED_DXT1:
         case CELL_GCM_TEXTURE_COMPRESSED_DXT23:
@@ -355,6 +354,11 @@ std::function<glm::vec4(uint8_t*)> TextureReader::make_read(uint32_t texelFormat
             auto fp = (float*)p;
             return vec4(fp[0], fp[1], fp[2], fp[3]);
         };
+    } else if (texelFormat == CELL_GCM_TEXTURE_W16_Z16_Y16_X16_FLOAT) {
+        return [](uint8_t* p) {
+            auto u = (uint32_t*)p;
+            return vec4(glm::unpackHalf2x16(u[0]), glm::unpackHalf2x16(u[1]));
+        };
     } else {
         auto format = getFormat(texelFormat);
         if (format.type == FormatType::u8x4) {
@@ -373,38 +377,34 @@ std::function<glm::vec4(uint8_t*)> TextureReader::make_read(uint32_t texelFormat
             return [=](uint8_t* p) {
                 u8vec4 readout;
                 format.u8read(p, readout);
-                vec4 tex = {
-                    remap(readout.r,
-                    info.fragmentSignedRemap,
-                    info.fragmentUnsignedRemap,
-                    info.fragmentRs,
-                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_R),
-                    remap(readout.g,
-                    info.fragmentSignedRemap,
-                    info.fragmentUnsignedRemap,
-                    info.fragmentGs,
-                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_G),
-                    remap(readout.b,
-                    info.fragmentSignedRemap,
-                    info.fragmentUnsignedRemap,
-                    info.fragmentBs,
-                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_B),
-                    remap(readout.a,
-                    info.fragmentSignedRemap,
-                    info.fragmentUnsignedRemap,
-                    info.fragmentAs,
-                    info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_A)
-                };
-                tex = { crossbar(tex, remapParams.inR.u()),
-                        crossbar(tex, remapParams.inG.u()),
-                        crossbar(tex, remapParams.inB.u()),
-                        crossbar(tex, remapParams.inA.u())
-                      };
-                tex = { select(tex.r, remapParams.outR.u()),
-                        select(tex.g, remapParams.outG.u()),
-                        select(tex.b, remapParams.outB.u()),
-                        select(tex.a, remapParams.outA.u())
-                      };
+                vec4 tex = {remap(readout.r,
+                                  info.fragmentSignedRemap,
+                                  info.fragmentUnsignedRemap,
+                                  info.fragmentRs,
+                                  info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_R),
+                            remap(readout.g,
+                                  info.fragmentSignedRemap,
+                                  info.fragmentUnsignedRemap,
+                                  info.fragmentGs,
+                                  info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_G),
+                            remap(readout.b,
+                                  info.fragmentSignedRemap,
+                                  info.fragmentUnsignedRemap,
+                                  info.fragmentBs,
+                                  info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_B),
+                            remap(readout.a,
+                                  info.fragmentSignedRemap,
+                                  info.fragmentUnsignedRemap,
+                                  info.fragmentAs,
+                                  info.fragmentGamma & CELL_GCM_TEXTURE_GAMMA_A)};
+                tex = {crossbar(tex, remapParams.inR.u()),
+                       crossbar(tex, remapParams.inG.u()),
+                       crossbar(tex, remapParams.inB.u()),
+                       crossbar(tex, remapParams.inA.u())};
+                tex = {select(tex.r, remapParams.outR.u()),
+                       select(tex.g, remapParams.outG.u()),
+                       select(tex.b, remapParams.outB.u()),
+                       select(tex.a, remapParams.outA.u())};
                 return tex;
             };
         }

@@ -119,3 +119,8 @@ Iter findGap(Iter begin, Iter end, unsigned width, IsEmptyPred isEmpty) {
     assert(count == width);
     return current;
 }
+
+template <typename T>
+bool intersects(T a, T alen, T b, T blen) {
+    return !(a + alen < b || b + blen < a);
+}
