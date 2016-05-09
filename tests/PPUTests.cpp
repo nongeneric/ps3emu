@@ -1306,7 +1306,7 @@ TEST_CASE("mtocrf 8,r17") {
     REQUIRE( th.getCR() == 0x28008082 );
 }
 
-TEST_CASE("arithmetic shifts") {
+TEST_CASE("arithmetic_shifts") {
 /*
 11808:       7c a0 fe 70     srawi   r0,r5,31                # 1f
 11824:       7c a5 07 b4     extsw   r5,r5

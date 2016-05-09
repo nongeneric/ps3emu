@@ -1,0 +1,57 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+//--------------------------------------------
+// basicSample5Vertex Shader
+// Performs basic vertex transform with fog
+// passes the texture coordinate through
+// also ouputs the local space position and 
+// normal to the rasterization stage
+//--------------------------------------------
+void main (float4                  position : POSITION,     // Local-space position
+           float3                  normal   : NORMAL,       // Local-space normal
+           float2                  texCoord : TEXCOORD0,    // Diffuse texture coordinate
+           float                   counter : TEXCOORD1,     // A counter used for simple animation
+
+           uniform float4x4        modelViewProj,           // Local-to-clip matrix
+           uniform float4x4        modelView,				// Local-to-view matrix
+
+			out float4        ePosition     : POSITION,      // Clip-space position
+			out float         oFogFactor    : TEXCOORD3,     // fog exponent
+            out float3        oposition     : TEXCOORD1,     // Local-space position
+            out float3        onormal       : TEXCOORD2,     // Local-space normal
+			out float2        oTexCoord     : TEXCOORD0)     // Diffuse texture coordinate
+			
+{
+
+float fogEnd = -25.0f;	// fog ends at this distance
+float fogStart = -6.0f;	// fog starts at this distance
+
+float scaler = 1.5f *(sin(counter/(20))+1); // a value between 0 and 1
+float localScale = 0.5f+ 0.5f*(scaler);		// a value between 0.5 and 1
+
+float4 tposition;
+tposition.x  = position.x * localScale;
+tposition.y  = position.y * localScale;
+tposition.z  = position.z * localScale;
+tposition.w  = 1.0f;
+
+
+// Compute the clip-space position
+    ePosition   = mul (modelViewProj, tposition);  
+
+//Compute the eye space position	
+	float4	viewPos = mul (modelView, position);
+
+//Now create a fog 
+	oFogFactor = (fogEnd-viewPos.z)/(fogEnd-fogStart);	// linear fog
+    oFogFactor = clamp(oFogFactor, 0.f, 1.f); // clamp fog factor to 0-1
+
+// Transfer data as-is to next stage
+    oposition   = position.xyz;
+    oTexCoord   = texCoord;
+    onormal     = normal;
+}

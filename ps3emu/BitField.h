@@ -93,7 +93,7 @@ template <typename N>
 inline uint8_t bit_test(uint64_t number, int width, N pos) {
     auto n = getUValue(pos);
     auto sh = width - n - 1;
-    return (number & (1u << sh)) >> sh;
+    return (number & (1ull << sh)) >> sh;
 }
 
 template <typename T, int Pos, int Next>
@@ -139,7 +139,7 @@ template <int Size, typename T>
 inline T rol(T n, unsigned sh) {
     if (sh == 0 || sh == Size)
         return n;
-    assert(sh < Size);
+    sh %= Size;
     auto right = n & mask<Size, T>(sh, Size - 1);
     auto left = n & mask<Size, T>(0, sh);
     left >>= Size - sh;

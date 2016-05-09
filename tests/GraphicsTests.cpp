@@ -250,3 +250,12 @@ TEST_CASE("opengl_3_basic_fragment_lighting") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/opengl_3_basic_fragment_lighting/ps3frame1.png", 1);
 }
+
+TEST_CASE("opengl_4_proc_anim") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_4_proc_anim/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_4_proc_anim/ps3frame1.png", 1);
+}

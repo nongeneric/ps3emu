@@ -1459,13 +1459,15 @@ PRINT(SRADI, XSForm) {
 EMU(SRADI, XSForm) {
     auto n =  getNBE(i->sh04, i->sh5);
     auto rs = TH->getGPR(i->RS);
-    auto sign = rs & (1ul << 63);
-    auto ca = n == 0 ? 0 : (sign && (rs & mask<64>(64 - n, 63)));
-    auto res = (rs >> n) | (sign ? mask<64>(0, n) : 0);
-    TH->setGPR(i->RA, res);
+    auto r = rol<64>(rs, 64 - n);
+    auto m = mask<64>(n, 63);
+    auto s = bit_test(rs, 64, 0);
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
+    auto ca = s & ((r & ~m) != 0);
+    TH->setGPR(i->RA, ra);
     TH->setCA(ca);
     if (i->Rc.u())
-        update_CR0(res, TH);
+        update_CR0(ra, TH);
 }
 
 PRINT(SRAWI, XForm_10) {
@@ -1475,13 +1477,15 @@ PRINT(SRAWI, XForm_10) {
 EMU(SRAWI, XForm_10) {
     auto n =  i->SH.u();
     auto rs = TH->getGPR(i->RS) & 0xffffffff;
-    auto sign = rs & (1ul << 31);
-    auto ca = n == 0 ? 0 : (sign && (rs & mask<64>(64 - n, 63)));
-    auto res = (int32_t)((rs >> n) | (sign ? mask<32>(0, n) : 0));
-    TH->setGPR(i->RA, res);
+    auto r = rol<32>(rs, 64 - n);
+    auto m = mask<64>(n + 32, 63);
+    auto s = bit_test(rs, 64, 32);
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
+    auto ca = s & ((r & ~m) != 0);
+    TH->setGPR(i->RA, ra);
     TH->setCA(ca);
     if (i->Rc.u())
-        update_CR0(res, TH);
+        update_CR0(ra, TH);
 }
 
 PRINT(SRAW, XForm_6) {
@@ -1492,9 +1496,9 @@ EMU(SRAW, XForm_6) {
     auto rb = TH->getGPR(i->RB);
     auto n = rb & 0b11111;
     auto rs = TH->getGPR(i->RS) & 0xffffffff;
-    uint32_t r = rs << (64 - n);
+    auto r = rol<32>(rs, 64 - n);
     uint64_t m = (rb & 0b100000) == 0 ? mask<64>(n + 32, 63) : 0;
-    auto s = rs & (1ul << 31);
+    auto s = bit_test(rs, 64, 32);
     auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
     auto ca = s & (((r & ~m) & 0xffffffff) != 0);
     TH->setGPR(i->RA, ra);
