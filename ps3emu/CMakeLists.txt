@@ -1,5 +1,8 @@
 project(ps3emu)
 
+include_directories($ENV{NVIDIA_TEXTURE_TOOLS}/src)
+include_directories(SYSTEM $ENV{NVIDIA_TEXTURE_TOOLS}/extern/poshlib)
+
 set(SRC
     ELFLoader.cpp
     ELFLoader.h
@@ -45,7 +48,20 @@ set(SRC
     rsx/Tracer.cpp
     rsx/TextureRenderer.cpp
     rsx/FragmentShaderUpdateFunctor.cpp
+    rsx/DXT.cpp
     gcmviz/GcmDatabase.cpp
 )
+
 add_library(ps3emu ${SRC})
-target_link_libraries(ps3emu libs ${Boost_LIBRARIES} glfw pthread crypto sqlite3)
+target_link_libraries(ps3emu libs
+    ${Boost_LIBRARIES}
+    ${GLFW3_LIBRARIES}
+    ${CRYPTO_LIBRARIES}
+    ${SQLITE3_LIBRARIES}
+    $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvimage/libnvimage.a
+    $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc7/libbc7.a
+    $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc6h/libbc6h.a
+    $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvmath/libnvmath.a
+    $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvcore/libnvcore.a
+    pthread
+)

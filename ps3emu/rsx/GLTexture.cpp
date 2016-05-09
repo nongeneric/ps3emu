@@ -1,4 +1,5 @@
 #include "GLTexture.h"
+#include "DXT.h"
 #include "../MainMemory.h"
 #include <boost/log/trivial.hpp>
 #include <gcm_tool.h>
@@ -291,22 +292,44 @@ void GLTexture::update(std::vector<uint8_t>& blob) {
     std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     
-    TextureReader reader(texelFormat, _info);
-    auto texelSize = getTexelSize(texelFormat);
-    if (_info.format & CELL_GCM_TEXTURE_LN) {
-        TextureIterator it(&blob[0], _info.pitch, texelSize);
-        for (auto i = 0; i < _info.width * _info.height; ++i) {
-            reader.read(*it, conv[i]);
-            ++it;
+    if (texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT1 ||
+        texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT23 ||
+        texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT45) {
+        unsigned blockWidth = _info.width / 4;
+        unsigned blockHeight = _info.height / 4;
+        std::array<glm::vec4, 16> decoded;
+        for (auto by = 0u; by < blockHeight; ++by) {
+            for (auto bx = 0u; bx < blockWidth; ++bx) {
+                auto block = &blob[(bx + by * blockWidth) * 16];
+                decodeDXT23(block, &decoded[0]);
+                auto x = bx * 4;
+                auto line = by * 4;
+                for (int i = 0; i < 4; ++i) {
+                    memcpy(&conv[line * _info.width + x],
+                           &decoded[4 * i],
+                           4 * 4 * sizeof(float));
+                    line++;
+                }
+            }
         }
     } else {
-        SwizzledTextureIterator it(
-            &blob[0], _info.width, _info.height, 1, texelSize);
-        auto i = 0u;
-        for (auto u = 0; u < _info.width; ++u) {
+        TextureReader reader(texelFormat, _info);
+        auto texelSize = getTexelSize(texelFormat);
+        if (_info.format & CELL_GCM_TEXTURE_LN) {
+            TextureIterator it(&blob[0], _info.pitch, texelSize);
+            for (auto i = 0; i < _info.width * _info.height; ++i) {
+                reader.read(*it, conv[i]);
+                ++it;
+            }
+        } else {
+            SwizzledTextureIterator it(
+                &blob[0], _info.width, _info.height, 1, texelSize);
+            auto i = 0u;
             for (auto v = 0; v < _info.height; ++v) {
-                reader.read(it.at(u, v, 0), conv[i]);
-                i++;
+                for (auto u = 0; u < _info.width; ++u) {
+                    reader.read(it.at(u, v, 0), conv[i]);
+                    i++;
+                }
             }
         }
     }
