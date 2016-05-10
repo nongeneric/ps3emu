@@ -1,0 +1,34 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+//--------------------------------------------
+// Simple vertex shader
+// transforms the vertex into clip space
+// passes the texture coordinate through
+// also ouputs the local space position and 
+// normal to the rasterization stage
+//--------------------------------------------
+void main (float4                  position : POSITION,     // Local-space position
+           float3                  normal   : NORMAL,       // Local-space normal
+           float2                  texCoord : TEXCOORD0,    // Diffuse texture coordinate
+
+           uniform float4x4        modelViewProj,           // Local-to-clip matrix
+
+			out float4        ePosition     : POSITION,      // Clip-space position
+            out float3        oposition     : TEXCOORD1,     // Local-space position
+            out float3        onormal       : TEXCOORD2,     // Local-space normal
+			out float2        oTexCoord     : TEXCOORD0)     // Diffuse texture coordinate
+			
+{
+
+// Compute the clip-space position
+    ePosition   = mul (modelViewProj, position);  
+
+// Transfer data as-is to the fragment shader
+    oposition   = position.xyz;
+    oTexCoord   = texCoord;
+    onormal     = normal;
+}

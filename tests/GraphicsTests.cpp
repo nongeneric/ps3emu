@@ -268,3 +268,12 @@ TEST_CASE("opengl_5_mipmap") {
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/opengl_5_mipmap/ps3frame1.png", 1);
 }
+
+TEST_CASE("opengl_6_gloss_map") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_6_gloss_map/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_6_gloss_map/ps3frame1.png", 1);
+}
