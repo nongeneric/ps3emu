@@ -70,6 +70,89 @@ int64_t Rsx::interpret(uint32_t get) {
         assert(n != 0);\
         return _mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get) + 4 * n);\
     })(x)
+    
+    auto parseTextureAddress = [&](int argi, int index) {
+        union {
+            uint32_t val;
+            BitField<0, 4> zfunc;
+            BitField<4, 8> signedRemap;
+            BitField<8, 12> gamma;
+            BitField<12, 16> wrapr;
+            BitField<16, 20> unsignedRemap;
+            BitField<20, 24> wrapt;
+            BitField<24, 28> anisoBias;
+            BitField<28, 32> wraps;
+        } arg = { readarg(argi) };
+        TextureAddress(
+            index,
+            arg.wraps.u(),
+            arg.wrapt.u(),
+            arg.wrapr.u(),
+            arg.unsignedRemap.u(),
+            arg.zfunc.u(),
+            arg.gamma.u(),
+            arg.anisoBias.u(),
+            arg.signedRemap.u()
+        );
+    };
+    
+    auto parseTextureControl0 = [&](int argi, int index) {
+        union {
+            uint32_t val;
+            BitField<0, 1> enable;
+            BitField<1, 5> minlod_i;
+            BitField<5, 13> minlod_d;
+            BitField<13, 17> maxlod_i;
+            BitField<17, 25> maxlod_d;
+            BitField<25, 28> maxaniso;
+            BitField<28, 30> alphakill;
+        } arg = { readarg(argi) };
+        TextureControl0(
+            index,
+            arg.alphakill.u(),
+            arg.maxaniso.u(),
+            arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f,
+            arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
+            arg.enable.u()
+        );
+    };
+    
+    auto parseTextureFilter = [&](int argi, int index) {
+        union {
+            uint32_t val;
+            BitField<0, 1> bs;
+            BitField<1, 2> gs;
+            BitField<2, 3> rs;
+            BitField<3, 4> as;
+            BitField<4, 8> mag;
+            BitField<8, 16> min;
+            BitField<16, 19> conv;
+            BitField<19, 24> biasInteger;
+            BitField<24, 32> biasDecimal;
+        } arg = { readarg(argi) };
+        TextureFilter(
+            index,
+            arg.biasInteger.s() + arg.biasDecimal.u() / 255.f,
+            arg.min.u(),
+            arg.mag.u(),
+            arg.conv.u(),
+            arg.as.u(),
+            arg.rs.u(),
+            arg.gs.u(),
+            arg.bs.u()
+        );
+    };
+    
+    auto parseTextureBorderColor = [&](int argi, int index) {
+        auto c = parseColor(readarg(argi));
+        TextureBorderColor(index, c[0], c[1], c[2], c[3]);
+    };
+    
+    auto parseTextureImageRect = [&](int argi, int index) {
+        auto arg = readarg(argi);
+        TextureImageRect(index, arg >> 16, arg & 0xffff);
+    };
+    
     if (header.val == 0) {
         BOOST_LOG_TRIVIAL(trace) << "rsx nop";
         return 4;
@@ -1155,8 +1238,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT";
-                auto arg = readarg(1);
-                TextureImageRect(index, arg >> 16, arg & 0xffff);
+                parseTextureImageRect(1, index);
                 break;
             }
             if (isScale(offset,
@@ -1165,8 +1247,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR";
-                auto c = parseColor(readarg(1));
-                TextureBorderColor(index, c[0], c[1], c[2], c[3]);
+                parseTextureBorderColor(1, index);
                 break;
             }
             if (isScale(offset,
@@ -1175,24 +1256,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL0";
-                union {
-                    uint32_t val;
-                    BitField<0, 1> enable;
-                    BitField<1, 5> minlod_i;
-                    BitField<5, 13> minlod_d;
-                    BitField<13, 17> maxlod_i;
-                    BitField<17, 25> maxlod_d;
-                    BitField<25, 28> maxaniso;
-                    BitField<28, 30> alphakill;
-                } arg = { readarg(1) };
-                TextureControl0(
-                    index,
-                    arg.alphakill.u(),
-                    arg.maxaniso.u(),
-                    arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f,
-                    arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
-                    arg.enable.u()
-                );
+                parseTextureControl0(1, index);
                 break;
             }
             if (isScale(offset,
@@ -1210,29 +1274,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_FILTER";
-                union {
-                    uint32_t val;
-                    BitField<0, 1> bs;
-                    BitField<1, 2> gs;
-                    BitField<2, 3> rs;
-                    BitField<3, 4> as;
-                    BitField<4, 8> mag;
-                    BitField<8, 16> min;
-                    BitField<16, 19> conv;
-                    BitField<19, 24> biasInteger;
-                    BitField<24, 32> biasDecimal;
-                } arg = { readarg(1) };
-                TextureFilter(
-                    index,
-                    arg.biasInteger.s() + arg.biasDecimal.u() / 255.f,
-                    arg.min.u(),
-                    arg.mag.u(),
-                    arg.conv.u(),
-                    arg.as.u(),
-                    arg.rs.u(),
-                    arg.gs.u(),
-                    arg.bs.u()
-                );
+                parseTextureFilter(1, index);
                 break;
             }
             if (isScale(offset,
@@ -1241,28 +1283,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_ADDRESS";
-                union {
-                    uint32_t val;
-                    BitField<0, 4> zfunc;
-                    BitField<4, 8> signedRemap;
-                    BitField<8, 12> gamma;
-                    BitField<12, 16> wrapr;
-                    BitField<16, 20> unsignedRemap;
-                    BitField<20, 24> wrapt;
-                    BitField<24, 28> anisoBias;
-                    BitField<28, 32> wraps;
-                } arg = { readarg(1) };
-                TextureAddress(
-                    index,
-                    arg.wraps.u(),
-                    arg.wrapt.u(),
-                    arg.wrapr.u(),
-                    arg.unsignedRemap.u(),
-                    arg.zfunc.u(),
-                    arg.gamma.u(),
-                    arg.anisoBias.u(),
-                    arg.signedRemap.u()
-                );
+                parseTextureAddress(1, index);
                 break;
             }
             if (isScale(offset,
@@ -1366,6 +1387,7 @@ int64_t Rsx::interpret(uint32_t get) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_OFFSET";
+                assert(count == 2 || count == 8);
                 union {
                     uint32_t val;
                     BitField<8, 16> mipmap;
@@ -1375,7 +1397,7 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<29, 30> cubemap;
                     BitField<30, 32> location;
                 } f = { readarg(2) };
-                TextureOffset(index, 
+                TextureOffset(index,
                               readarg(1),
                               f.mipmap.u(),
                               f.format.u(),
@@ -1383,6 +1405,14 @@ int64_t Rsx::interpret(uint32_t get) {
                               f.border.u(),
                               f.cubemap.u(),
                               f.location.u() - 1);
+                if (count == 8) {
+                    parseTextureAddress(3, index);
+                    parseTextureControl0(4, index);
+                    TextureControl1(index, readarg(5));
+                    parseTextureFilter(6, index);
+                    parseTextureImageRect(7, index);
+                    parseTextureBorderColor(8, index);
+                }
                 break;
             }
             if (isScale(offset,

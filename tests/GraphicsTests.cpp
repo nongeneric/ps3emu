@@ -6,7 +6,7 @@ static const char* runnerPath = "../ps3run/ps3run";
 
 int comparisonNum = 0;
 
-void compareLastFrame(const char* expected, int n = 0) {
+void compareLastFrame(const char* expected, int n = 0, int tolerance = 5) {
     comparisonNum++;
     QProcess proc;
     auto args = QStringList() << "-depth" << "8"
@@ -20,7 +20,7 @@ void compareLastFrame(const char* expected, int n = 0) {
     REQUIRE( proc.exitCode() == 0 );
     
     args = QStringList() << "-metric" << "AE"
-                         << "-fuzz" << "2%"
+                         << "-fuzz" << QString("%1%%").arg(tolerance)
                          << QString("/tmp/ps3frame%1.png").arg(n)
                          << expected
                          << QString("/tmp/ps3frame-diff%1.png").arg(n);
@@ -258,4 +258,13 @@ TEST_CASE("opengl_4_proc_anim") {
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/opengl_4_proc_anim/ps3frame1.png", 1);
+}
+
+TEST_CASE("opengl_5_mipmap") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/opengl_5_mipmap/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    compareLastFrame("./binaries/opengl_5_mipmap/ps3frame1.png", 1);
 }

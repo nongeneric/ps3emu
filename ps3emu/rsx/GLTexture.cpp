@@ -288,55 +288,106 @@ GLTexture::GLTexture(const RsxTextureInfo& info): _info(info) {
     glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
 }
 
+class LinearTextureIterator {
+    uint8_t* _buf;
+    uint32_t _pitch;
+    uint32_t _width;
+    uint32_t _height;
+    uint32_t _texelSize;
+    uint32_t _level;
+    bool _paddedLevels;
+    uint32_t _levelOffset;
+    uint32_t _levelWidth;
+    uint32_t _levelHeight;
+    uint32_t _levelPitch;
+    
+public:
+    LinearTextureIterator(void* buf,
+                          uint32_t pitch,
+                          uint32_t level0width,
+                          uint32_t level0height,
+                          uint32_t texelSize,
+                          uint32_t level,
+                          bool paddedLevels = false)
+        : _buf((uint8_t*)buf),
+          _pitch(pitch == 0 ? level0width * texelSize : pitch),
+          _width(level0width),
+          _height(level0height),
+          _texelSize(texelSize),
+          _level(level),
+          _paddedLevels(paddedLevels),
+          _levelWidth(level0width),
+          _levelHeight(level0height)
+    {
+        _levelOffset = 0;
+        _levelPitch = _pitch;
+        for (auto i = 0u; i < level; ++i) {
+            _levelOffset += _levelWidth * _levelHeight * texelSize;
+            _levelWidth = std::max<uint32_t>(_levelWidth / 2, 1);
+            _levelHeight = std::max<uint32_t>(_levelHeight / 2, 1);
+            _levelPitch = std::max<uint32_t>(_levelPitch / 2, 1);
+        }
+    }
+
+    uint8_t* at(uint32_t x, uint32_t y) {
+        return &_buf[y * _levelPitch + x * _texelSize] + _levelOffset;
+    }
+    
+    uint32_t w() { return _levelWidth; }
+    uint32_t h() { return _levelHeight; }
+};
+
 void GLTexture::update(std::vector<uint8_t>& blob) {
     std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
-    
-    if (texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT1 ||
-        texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT23 ||
-        texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT45) {
-        unsigned blockWidth = _info.width / 4;
-        unsigned blockHeight = _info.height / 4;
-        std::array<glm::vec4, 16> decoded;
-        for (auto by = 0u; by < blockHeight; ++by) {
-            for (auto bx = 0u; bx < blockWidth; ++bx) {
-                auto block = &blob[(bx + by * blockWidth) * 16];
-                decodeDXT23(block, &decoded[0]);
-                auto x = bx * 4;
-                auto line = by * 4;
-                for (int i = 0; i < 4; ++i) {
-                    memcpy(&conv[line * _info.width + x],
-                           &decoded[4 * i],
-                           4 * 4 * sizeof(float));
-                    line++;
+    for (auto level = 0u; level < _info.mipmap; ++level) {
+        LinearTextureIterator srcDecoded(nullptr, 0, _info.width, _info.height, 16, level);
+        if (texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT1 ||
+            texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT23 ||
+            texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT45) {
+            unsigned blockWidth = _info.width / 4;
+            unsigned blockHeight = _info.height / 4;
+            std::array<glm::vec4, 16> decoded;
+            LinearTextureIterator src(&blob[0], 0, blockWidth, blockHeight, 16, level);
+            LinearTextureIterator dest(&conv[0], 0, srcDecoded.w(), srcDecoded.h(), 16, 0);
+            for (auto by = 0u; by < src.h(); ++by) {
+                for (auto bx = 0u; bx < src.w(); ++bx) {
+                    auto block = src.at(bx, by);
+                    decodeDXT23(block, &decoded[0]);
+                    for (int i = 0; i < 4; ++i) {
+                        memcpy(dest.at(bx * 4, by * 4 + i),
+                               &decoded[4 * i],
+                               4 * 4 * sizeof(float));
+                    }
                 }
-            }
-        }
-    } else {
-        TextureReader reader(texelFormat, _info);
-        auto texelSize = getTexelSize(texelFormat);
-        if (_info.format & CELL_GCM_TEXTURE_LN) {
-            TextureIterator it(&blob[0], _info.pitch, texelSize);
-            for (auto i = 0; i < _info.width * _info.height; ++i) {
-                reader.read(*it, conv[i]);
-                ++it;
             }
         } else {
-            SwizzledTextureIterator it(
-                &blob[0], _info.width, _info.height, 1, texelSize);
-            auto i = 0u;
-            for (auto v = 0; v < _info.height; ++v) {
-                for (auto u = 0; u < _info.width; ++u) {
-                    reader.read(it.at(u, v, 0), conv[i]);
-                    i++;
+            TextureReader reader(texelFormat, _info);
+            auto texelSize = getTexelSize(texelFormat);
+            LinearTextureIterator it(
+                &blob[0], _info.pitch, _info.width, _info.height, texelSize, level);
+            if (_info.format & CELL_GCM_TEXTURE_LN) {
+                for (auto y = 0u; y < _info.height; ++y) {
+                    for (auto x = 0u; x < _info.width; ++x) {
+                        reader.read(it.at(x, y), conv[_info.width * y + x]);
+                    }
+                }
+            } else {
+                SwizzledTextureIterator it(
+                    &blob[0], _info.width, _info.height, 1, texelSize);
+                auto i = 0u;
+                for (auto v = 0; v < _info.height; ++v) {
+                    for (auto u = 0; u < _info.width; ++u) {
+                        reader.read(it.at(u, v, 0), conv[i]);
+                        i++;
+                    }
                 }
             }
         }
+        glTextureSubImage2D(_handle,
+            level, 0, 0, srcDecoded.w(), srcDecoded.h(), GL_RGBA, GL_FLOAT, conv.get()
+        );
     }
-    
-    glcall(glTextureSubImage2D(_handle,
-        0, 0, 0, _info.width, _info.height, GL_RGBA, GL_FLOAT, conv.get()
-    ));
 }
 
 GLTexture::~GLTexture() {
@@ -437,26 +488,6 @@ std::function<glm::vec4(uint8_t*)> TextureReader::make_read(uint32_t texelFormat
 
 void TextureReader::read(uint8_t* ptr, vec4& tex) {
     tex = _read(ptr);
-}
-
-TextureIterator::TextureIterator(uint8_t* buf, unsigned int pitch, unsigned size)
-    : _ptr(buf), _pitch(pitch), _size(size) { }
-    
-TextureIterator& TextureIterator::operator++() {
-    _pos += _size;
-    if (_pos >= _pitch) {
-        _pos = 0;
-        _ptr += _pitch;
-    }
-    return *this;
-}
-
-bool TextureIterator::operator==(const TextureIterator& other) {
-    return _ptr == other._ptr;
-}
-
-uint8_t* TextureIterator::operator*() {
-    return _ptr + _pos;
 }
 
 GLSimpleTexture::GLSimpleTexture ( unsigned int width, unsigned int height, GLuint format )

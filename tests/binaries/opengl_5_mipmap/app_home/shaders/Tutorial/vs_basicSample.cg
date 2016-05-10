@@ -1,0 +1,25 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+//--------------------------------------------
+// Simple vertex shader
+// transforms the vertex into clip space
+// passes the texture coordinate through
+//--------------------------------------------
+void main (float4                  position : POSITION,     // Local-space position
+           float2                  texCoord : TEXCOORD0,    // Diffuse texture coordinate
+
+           uniform float4x4        modelViewProj,           // Local-to-clip matrix
+
+           out float4              oPosition : POSITION,    // Output clip-space position
+           out float2              oTexCoord : TEXCOORD0   // Output diffuse texture coordinate
+			)
+{
+
+    oPosition = mul (modelViewProj, position);
+    oTexCoord = texCoord;
+
+}

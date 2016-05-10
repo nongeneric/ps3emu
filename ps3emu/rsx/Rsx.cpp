@@ -519,7 +519,10 @@ void Rsx::resetContext() {
     }
     for (auto& s : _context->fragmentTextureSamplers) {
         s.enable = false;
+        s.fragmentMin = CELL_GCM_TEXTURE_NEAREST_LINEAR;
+        s.fragmentMag = CELL_GCM_TEXTURE_LINEAR;
     }
+    _context->reportLocation = MemoryLocation::Local;
     glDisable(GL_MULTISAMPLE);
 }
 
@@ -574,9 +577,6 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
     
     _isFlipInProgress = false;
-    
-    // PlatformDevice.cpp of jsgcm says so
-    _context->reportLocation = MemoryLocation::Local;
     
     resetContext();
 }
@@ -857,6 +857,21 @@ GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
     return texture;
 }
 
+GLenum gcmTextureFilterToOpengl(uint8_t filter) {
+    static_assert(CELL_GCM_TEXTURE_LINEAR_NEAREST ==
+                  CELL_GCM_TEXTURE_CONVOLUTION_MAG, "");
+    switch (filter) {
+        case CELL_GCM_TEXTURE_CONVOLUTION_MIN:
+        case CELL_GCM_TEXTURE_NEAREST: return GL_NEAREST;
+        case CELL_GCM_TEXTURE_LINEAR: return GL_LINEAR;
+        case CELL_GCM_TEXTURE_NEAREST_NEAREST: return GL_NEAREST_MIPMAP_NEAREST;
+        case CELL_GCM_TEXTURE_LINEAR_NEAREST: return GL_LINEAR_MIPMAP_NEAREST;
+        case CELL_GCM_TEXTURE_NEAREST_LINEAR: return GL_NEAREST_MIPMAP_LINEAR;
+        case CELL_GCM_TEXTURE_LINEAR_LINEAR: return GL_LINEAR_MIPMAP_LINEAR;
+        default: throw std::runtime_error("bad filter value");
+    }
+}
+
 void Rsx::updateTextures() {
     int i = 0;
     auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
@@ -908,8 +923,12 @@ void Rsx::updateTextures() {
             glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD, sampler.minlod);
             glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD, sampler.maxlod);
             glSamplerParameterf(handle, GL_TEXTURE_LOD_BIAS, sampler.bias);
-            glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glSamplerParameteri(handle,
+                                GL_TEXTURE_MIN_FILTER,
+                                gcmTextureFilterToOpengl(sampler.fragmentMin));
+            glSamplerParameteri(handle,
+                                GL_TEXTURE_MAG_FILTER,
+                                gcmTextureFilterToOpengl(sampler.fragmentMag));
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
@@ -1279,16 +1298,11 @@ void Rsx::initGcm() {
         RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemoryBuffer.mapped());
     
     _context->elementArrayIndexBuffer = GLPersistentCpuBuffer(10 * (1u << 20));
-    
-    for (auto& s : _context->vertexTextureSamplers) {
-        s.enable = false;
-    }
-    for (auto& s : _context->fragmentTextureSamplers) {
-        s.enable = false;
-    }
-    
+        
     _context->framebuffer.reset(new GLFramebuffer());
     _context->textureRenderer.reset(new TextureRenderer());
+    
+    resetContext();
     
     boost::lock_guard<boost::mutex> lock(_initMutex);
     BOOST_LOG_TRIVIAL(trace) << "rsx initialized";
