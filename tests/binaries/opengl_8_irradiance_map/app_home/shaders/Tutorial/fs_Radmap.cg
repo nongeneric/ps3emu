@@ -1,0 +1,30 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+
+//-------------------------------------------------
+// Fragment shader for simple irradiance mapping.
+//-------------------------------------------------
+void main (float2               texCoord   : TEXCOORD0,	// Lerped texture coordinate from vtx sdr
+           float3               oNormalW : TEXCOORD1,	// Lerped world space normal
+
+           uniform sampler2D    diffuseMap,				// Diffuse texture map
+           uniform samplerCUBE  envMap,					// Environment map texture
+
+           out float4           color      : COLOR)		// Final fragment color
+{
+    
+    // normalize the world space normal
+    oNormalW = normalize (oNormalW);
+        
+    // Sample the environment map using the reflection vector
+    float4 reflectionColor = texCUBE (envMap, oNormalW);
+    float4 diffuseColor = tex2D (diffuseMap, texCoord);
+
+    // Compute the final fragment color.  
+    color = diffuseColor*reflectionColor;
+    
+}

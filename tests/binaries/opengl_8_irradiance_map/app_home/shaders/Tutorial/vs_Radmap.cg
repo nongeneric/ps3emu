@@ -1,0 +1,29 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+
+//-----------------------------------------------
+// Vertex shader for simple irradiance mapping.
+//-----------------------------------------------
+void main (float4            position      : POSITION,  // Local-space position
+           float3            normal        : NORMAL,    // Local-space normal
+           float2            texCoord      : TEXCOORD0, // Diffuse texture coordinate
+
+           uniform float4x4  modelViewProj,             // Local-to-clip matrix
+           uniform float4x4  modelToWorld,              // Local-to-world matrix
+
+           out float4        oPosition     : POSITION,  // Output clip-space position
+           out float2        otexCoord     : TEXCOORD0, // Diffuse texture coordinate
+           out float3        oNormalW      : TEXCOORD1) // Normal in world space
+{
+    // Compute world-space normal
+    oNormalW = mul ((float3x3)modelToWorld, normal);
+
+    // Compute the clip-space position, and keep the texture coordinate as-is
+    oPosition   = mul (modelViewProj, position);  
+    otexCoord   = texCoord;
+}
+ 
