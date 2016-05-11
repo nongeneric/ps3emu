@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{115e8ad0-e2d5-49ea-b65c-bd1261ade296}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;cc;s;asm</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{791952a7-d229-47f3-9e86-97e580be9309}</UniqueIdentifier>
+      <Extensions>h;hpp</Extensions>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{7e338972-3566-4dec-8807-b03374dde947}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\..\..\sample_data\graphics\shaders\Tutorial\fs_Envmap.cg">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\..\..\sample_data\graphics\shaders\Tutorial\vs_Envmap.cg">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

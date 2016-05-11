@@ -10,11 +10,20 @@ bool isMrt(SurfaceInfo const& surface) {
     return boost::accumulate(surface.colorTarget, 0) > 1;
 }
 
+std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context) {
+    std::array<int, 16> sizes = { 0 };
+    for (int i = 0; i < 16; ++i) {
+        auto& s = context->fragmentTextureSamplers[i];
+        if (!s.enable)
+            continue;
+        sizes[i] = s.texture.fragmentCubemap ? 6 : s.texture.dimension;
+    }
+    return sizes;
+}
+
 void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
     LOG << ssnprintf("updating fragment bytecode at %x", va);
-    
-    // TODO: handle sizes
-    std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
+    auto sizes = getFragmentSamplerSizes(_context);
     auto text = GenerateFragmentShader(
         _newbytecode, sizes, _context->isFlatShadeMode, isMrt(_context->surface));
     *shader = FragmentShader(text.c_str());

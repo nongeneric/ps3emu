@@ -1,0 +1,26 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+
+//-------------------------------------------------
+// Fragment shader for simple environment mapping.
+//-------------------------------------------------
+void main (float2               texCoord   : TEXCOORD0,	// Lerped texture coordinate from vtx sdr
+           float3               reflection : TEXCOORD1,	// Lerped reflection vector from vtx sdr
+
+           uniform sampler2D    diffuseMap,				// Diffuse texture map
+           uniform samplerCUBE  envMap,					// Environment map texture
+
+           out float4           color      : COLOR)		// Final fragment color
+{
+    // Sample the environment map using the reflection vector
+    float4 reflectionColor = texCUBE (envMap, reflection);
+    float4 diffuseColor = tex2D (diffuseMap, texCoord);
+
+    // Compute the final fragment color.  
+    color = lerp (diffuseColor, reflectionColor, 0.9f);   
+
+}

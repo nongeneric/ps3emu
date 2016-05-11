@@ -124,3 +124,9 @@ template <typename T>
 bool intersects(T a, T alen, T b, T blen) {
     return !(a + alen < b || b + blen < a);
 }
+
+template <typename T>
+T align(T n, unsigned alignment) {
+    assert(alignment > 0 && (alignment & (alignment - 1)) == 0);
+    return (n + alignment - 1) & (~(alignment - 1));
+}

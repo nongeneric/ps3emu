@@ -41,6 +41,9 @@ public:
     ~GLTexture();
     RsxTextureInfo const& info() const;
     void update(std::vector<uint8_t>& blob);
+    uint32_t read2d(
+        uint8_t* raw,
+        std::function<void(unsigned, unsigned, unsigned, glm::vec4*)> handler);
     void bind(GLuint samplerIndex);
     GLuint handle();
 };

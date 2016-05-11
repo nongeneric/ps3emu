@@ -78,13 +78,23 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("    ivec4 flip[4];");
     line("} fragmentSamplersInfo;");
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
-        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
-                       i + FragmentTextureUnit, samplerSizes[i], i));
-        line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
-        line(ssnprintf("    uvp = fragmentSamplersInfo.flip%s == 0 ? uvp : vec4(uvp.x, 1 - uvp.y, uvp.zw);",
-                       flipIndex(i)));
-        line(ssnprintf("    return texture(s%d, uvp.xy);", i));
-        line("}");
+        if (samplerSizes[i] == 0)
+            continue;
+        if (samplerSizes[i] == 6) {
+            line(ssnprintf("layout (binding = %d) uniform samplerCube s%d;",
+                        i + FragmentTextureUnit, i));
+            line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
+            line(ssnprintf("    return texture(s%d, uvp.xyz);", i));
+            line("}");
+        } else {
+            line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
+                        i + FragmentTextureUnit, samplerSizes[i], i));
+            line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
+            line(ssnprintf("    uvp = fragmentSamplersInfo.flip%s == 0 ? uvp : vec4(uvp.x, 1 - uvp.y, uvp.zw);",
+                        flipIndex(i)));
+            line(ssnprintf("    return texture(s%d, uvp.xy);", i));
+            line("}");
+        }
     }
     line("void main(void) {");
     line("    vec4 f_WPOS = gl_FragCoord;");

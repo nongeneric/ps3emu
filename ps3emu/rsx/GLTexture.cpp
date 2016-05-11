@@ -283,8 +283,19 @@ public:
     }
 };
 
+GLenum gcmTextureFormatToOpengl(uint32_t dimension, bool cube) {
+    if (dimension == 2) {
+        if (cube)
+            return GL_TEXTURE_CUBE_MAP;
+        return GL_TEXTURE_2D;
+    }
+    throw std::runtime_error("unsupported texture format");
+}
+
 GLTexture::GLTexture(const RsxTextureInfo& info): _info(info) {
-    glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
+    // TODO: make sure cube is only checked for fragment textures
+    auto target = gcmTextureFormatToOpengl(info.dimension, info.fragmentCubemap);
+    glcall(glCreateTextures(target, 1, &_handle));
     glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
 }
 
@@ -335,10 +346,15 @@ public:
     
     uint32_t w() { return _levelWidth; }
     uint32_t h() { return _levelHeight; }
+    uint32_t size() { return at(0, h()) - _buf; }
 };
 
-void GLTexture::update(std::vector<uint8_t>& blob) {
-    std::unique_ptr<vec4[]> conv(new vec4[_info.width * _info.height]);
+uint32_t GLTexture::read2d(
+    uint8_t* raw,
+    std::function<void(unsigned, unsigned, unsigned, glm::vec4*)> handler) 
+{
+    auto size = 0ul;
+    std::vector<vec4> conv(_info.width * _info.height);
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     for (auto level = 0u; level < _info.mipmap; ++level) {
         LinearTextureIterator srcDecoded(nullptr, 0, _info.width, _info.height, 16, level);
@@ -348,7 +364,7 @@ void GLTexture::update(std::vector<uint8_t>& blob) {
             unsigned blockWidth = _info.width / 4;
             unsigned blockHeight = _info.height / 4;
             std::array<glm::vec4, 16> decoded;
-            LinearTextureIterator src(&blob[0], 0, blockWidth, blockHeight, 16, level);
+            LinearTextureIterator src(raw, 0, blockWidth, blockHeight, 16, level);
             LinearTextureIterator dest(&conv[0], 0, srcDecoded.w(), srcDecoded.h(), 16, 0);
             for (auto by = 0u; by < src.h(); ++by) {
                 for (auto bx = 0u; bx < src.w(); ++bx) {
@@ -361,20 +377,22 @@ void GLTexture::update(std::vector<uint8_t>& blob) {
                     }
                 }
             }
+            size = src.size();
         } else {
             TextureReader reader(texelFormat, _info);
             auto texelSize = getTexelSize(texelFormat);
-            LinearTextureIterator it(
-                &blob[0], _info.pitch, _info.width, _info.height, texelSize, level);
             if (_info.format & CELL_GCM_TEXTURE_LN) {
+                LinearTextureIterator it(
+                    raw, _info.pitch, _info.width, _info.height, texelSize, level);
                 for (auto y = 0u; y < _info.height; ++y) {
                     for (auto x = 0u; x < _info.width; ++x) {
                         reader.read(it.at(x, y), conv[_info.width * y + x]);
                     }
                 }
+                size = it.size();
             } else {
                 SwizzledTextureIterator it(
-                    &blob[0], _info.width, _info.height, 1, texelSize);
+                    raw, _info.width, _info.height, 1, texelSize);
                 auto i = 0u;
                 for (auto v = 0; v < _info.height; ++v) {
                     for (auto u = 0; u < _info.width; ++u) {
@@ -382,11 +400,27 @@ void GLTexture::update(std::vector<uint8_t>& blob) {
                         i++;
                     }
                 }
+                // TODO: implement mipmaps and size calculation
             }
         }
-        glTextureSubImage2D(_handle,
-            level, 0, 0, srcDecoded.w(), srcDecoded.h(), GL_RGBA, GL_FLOAT, conv.get()
-        );
+        handler(level, srcDecoded.w(), srcDecoded.h(), &conv[0]);
+    }
+    return size;
+}
+
+void GLTexture::update(std::vector<uint8_t>& blob) {
+    if (_info.fragmentCubemap) {
+        auto pos = 0ul;
+        for (int layer = 0; layer < 6; ++layer) {
+            pos += read2d(&blob[pos], [&](unsigned level, unsigned w, unsigned h, glm::vec4* ptr) {
+                glTextureSubImage3D(_handle, level, 0, 0, layer, w, h, 1, GL_RGBA, GL_FLOAT, ptr);
+            });
+            pos = ::align(pos, 128);
+        }
+    } else {
+        read2d(&blob[0], [&](unsigned level, unsigned w, unsigned h, glm::vec4* ptr) {
+            glTextureSubImage2D(_handle, level, 0, 0, w, h, GL_RGBA, GL_FLOAT, ptr);
+        });
     }
 }
 

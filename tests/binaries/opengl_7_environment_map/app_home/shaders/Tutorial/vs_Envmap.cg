@@ -1,0 +1,42 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)3 Programmer Tool Runtime Library 360.001
+ *                Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *                                               All Rights Reserved.
+ */
+
+
+//-----------------------------------------------
+// Vertex shader for simple environment mapping.
+//-----------------------------------------------
+void main (float4            position      : POSITION,  // Local-space position
+           float3            normal        : NORMAL,    // Local-space normal
+           float2            texCoord      : TEXCOORD0, // Diffuse texture coordinate
+
+           uniform float4x4  modelViewProj,             // Local-to-clip matrix
+           uniform float4x4  modelToWorld,              // Local-to-world matrix
+           uniform float3    eyePositionW,              // World-space eye position
+
+           out float4        oPosition     : POSITION,  // Output clip-space position
+           out float2        otexCoord     : TEXCOORD0, // Diffuse texture coordinate
+           out float3        oReflection   : TEXCOORD1) // World-space reflection vector
+{
+    // Compute world-space position and normal
+    float3 positionWorld = mul (modelToWorld, position).xyz;
+    
+    
+    float3 normalWorld   = mul ((float3x3)modelToWorld, normal);
+    normalWorld = normalize (normalWorld);
+       
+        
+    // Compute the incident and reflected vectors
+    float3 incidentRay = positionWorld-eyePositionW;
+    incidentRay = normalize (incidentRay);
+    
+    oReflection = reflect (incidentRay, normalWorld); 
+	//oReflection = normalWorld;
+
+
+    // Compute the clip-space position, and keep the texture coordinate as-is
+    oPosition   = mul (modelViewProj, position);  
+    otexCoord   = texCoord;
+}

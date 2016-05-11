@@ -32,3 +32,4 @@ public:
 };
 
 bool isMrt(SurfaceInfo const& surface);
+std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context);

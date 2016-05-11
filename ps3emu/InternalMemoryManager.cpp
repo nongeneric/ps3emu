@@ -8,7 +8,7 @@ void* InternalMemoryManager::allocInternalMemory(uint32_t* ea,
                                                  uint32_t size,
                                                  uint32_t alignment) {
     assert(_current + size <= EmuInternalArea + EmuInternalAreaSize);
-    _current = (_current + alignment - 1) & (~(alignment - 1));
+    _current = align(_current, alignment);
     _mm->setMemory(_current, 0, size, true);
     *ea = _current;
     _current += size;

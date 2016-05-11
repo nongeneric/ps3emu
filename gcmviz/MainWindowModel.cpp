@@ -593,8 +593,7 @@ void MainWindowModel::update() {
         std::tie(shader, updater) = context->fragmentShaderCache.retrieveWithUpdater(key);
         if (updater) {
             auto const& bytecode = updater->bytecode();
-            // TODO: handle sizes
-            std::array<int, 16> sizes = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
+            auto sizes = getFragmentSamplerSizes(context);
             auto asmText = PrintFragmentProgram(&bytecode[0]);
             bool mrt = boost::accumulate(context->surface.colorTarget, 0) > 1;
             auto glslText = GenerateFragmentShader(bytecode, sizes, context->isFlatShadeMode, mrt);
