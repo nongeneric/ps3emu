@@ -25,6 +25,8 @@ typedef struct CellPadInfo2 {
 int32_t cellPadInit(uint32_t max_connect);
 int32_t cellPadEnd();
 int32_t cellPadGetInfo2(CellPadInfo2* info);
+int32_t cellPadClearBuf(uint32_t port_no);
+int32_t cellPadSetPortSetting(uint32_t port_no, uint32_t port_setting);
 
 #define CELL_KB_MAX_KEYBOARDS  127
 typedef struct CellKbInfo{

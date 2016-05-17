@@ -64,3 +64,11 @@ int32_t cellKbEnd() {
 int32_t cellMouseEnd() {
     return CELL_OK;
 }
+
+int32_t cellPadClearBuf(uint32_t port_no) {
+    return CELL_OK;
+}
+
+int32_t cellPadSetPortSetting(uint32_t port_no, uint32_t port_setting) {
+    return CELL_OK;
+}

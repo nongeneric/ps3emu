@@ -414,6 +414,21 @@ uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMem
     return mm->load<4>(ea);
 }
 
+emu_void_t cellGcmSetZcull(uint8_t index,
+                           uint32_t offset,
+                           uint32_t width,
+                           uint32_t height,
+                           uint32_t cullStart,
+                           uint32_t zFormat,
+                           uint32_t aaFormat,
+                           uint32_t zCullDir,
+                           uint32_t zCullFormat,
+                           uint32_t sFunc,
+                           uint32_t sRef,
+                           uint32_t sMask) {
+    return emu_void;
+}
+
 }}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset) {

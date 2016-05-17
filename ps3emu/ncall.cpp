@@ -17,6 +17,7 @@
 #include "../libs/sync/rwlock.h"
 #include "../libs/sync/queue.h"
 #include "../libs/cellSpurs.h"
+#include "../libs/libpngdec.h"
 #include "ppu/CallbackThread.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
@@ -89,18 +90,6 @@ uint32_t calcFnid(const char* name) {
     } md;
     SHA1_Final(md.b, &ctx);
     return md.u32[0];
-}
-
-void readString(MainMemory* mm, uint32_t va, std::string& str) {
-    constexpr size_t chunk = 16;
-    str.resize(0);
-    auto pos = 0u;
-    do {
-        str.resize(str.size() + chunk);
-        mm->readMemory(va + pos, &str[0] + pos, chunk);
-        pos += chunk;
-    } while (std::find(begin(str), end(str), 0) == end(str));
-    str = str.c_str();
 }
 
 template <int ArgN, class T, class Enable = void>
@@ -369,6 +358,7 @@ STUB_8(cellGcmSetTileInfo);
 STUB_4(_cellGcmSetFlipWithWaitLabel);
 STUB_1(cellGcmBindTile);
 STUB_1(cellGcmUnbindTile);
+STUB_12(cellGcmSetZcull);
 STUB_12(cellGcmBindZcull);
 STUB_1(cellGcmUnbindZcull);
 STUB_4(cellGcmMapMainMemory);
@@ -382,12 +372,15 @@ STUB_4(sys_event_port_send);
 STUB_1(sys_event_queue_drain);
 STUB_1(cellGcmSetFlipHandler);
 STUB_1(cellPadInit);
+STUB_1(cellPadClearBuf);
+STUB_2(cellPadSetPortSetting);
 STUB_1(cellKbInit);
 STUB_2(cellKbSetCodeType);
 STUB_1(cellMouseInit);
 STUB_1(sys_time_get_timebase_frequency);
 STUB_1(cellGcmSetDefaultCommandBuffer);
 STUB_3(cellSysutilRegisterCallback);
+STUB_1(cellSysutilUnregisterCallback);
 STUB_0(cellSysutilCheckCallback);
 STUB_1(cellPadGetInfo2);
 STUB_1(cellKbGetInfo);
@@ -517,6 +510,13 @@ STUB_2(cellPadGetData);
 STUB_0(cellKbEnd);
 STUB_0(cellMouseEnd);
 STUB_4(cellVideoOutGetResolutionAvailability);
+STUB_3(cellPngDecCreate);
+STUB_6(cellPngDecDecodeData);
+STUB_2(cellPngDecClose);
+STUB_1(cellPngDecDestroy);
+STUB_3(cellPngDecReadHeader);
+STUB_5(cellPngDecOpen);
+STUB_4(cellPngDecSetParameter);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -555,20 +555,25 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmIoOffsetToAddress),
     ENTRY(cellGcmGetTiledPitchSize),
     ENTRY(cellGcmSetTileInfo),
+    { "cellGcmSetTile", calcFnid("cellGcmSetTile"), nstub_cellGcmSetTileInfo },
     ENTRY(_cellGcmSetFlipWithWaitLabel),
     ENTRY(cellGcmBindTile),
     ENTRY(cellGcmUnbindTile),
+    ENTRY(cellGcmSetZcull),
     ENTRY(cellGcmBindZcull),
     ENTRY(cellGcmUnbindZcull),
     ENTRY(cellGcmMapMainMemory),
     ENTRY(cellGcmSetFlipHandler),
     ENTRY(cellPadInit),
+    ENTRY(cellPadClearBuf),
+    ENTRY(cellPadSetPortSetting),
     ENTRY(cellPadEnd),
     ENTRY(cellKbInit),
     ENTRY(cellKbSetCodeType),
     ENTRY(cellMouseInit),
     ENTRY(cellGcmSetDefaultCommandBuffer),
     ENTRY(cellSysutilRegisterCallback),
+    ENTRY(cellSysutilUnregisterCallback),
     ENTRY(cellSysutilCheckCallback),
     ENTRY(cellPadGetInfo2),
     ENTRY(cellKbGetInfo),
@@ -650,7 +655,14 @@ NCallEntry ncallTable[] {
     ENTRY(cellPadGetData),
     ENTRY(cellKbEnd),
     ENTRY(cellMouseEnd),
-    ENTRY(cellVideoOutGetResolutionAvailability)
+    ENTRY(cellVideoOutGetResolutionAvailability),
+    ENTRY(cellPngDecCreate),
+    ENTRY(cellPngDecDecodeData),
+    ENTRY(cellPngDecClose),
+    ENTRY(cellPngDecDestroy),
+    ENTRY(cellPngDecReadHeader),
+    ENTRY(cellPngDecOpen),
+    ENTRY(cellPngDecSetParameter),
 };
 
 void PPUThread::ncall(uint32_t index) {

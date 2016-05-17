@@ -314,3 +314,15 @@ uint32_t MainMemory::readSpuAddress(ps3_uintptr_t va) {
     auto th = findRawSpuThread(id);
     return *(big_uint32_t*)th->ptr(offset);
 }
+
+void readString(MainMemory* mm, uint32_t va, std::string& str) {
+    constexpr size_t chunk = 16;
+    str.resize(0);
+    auto pos = 0u;
+    do {
+        str.resize(str.size() + chunk);
+        mm->readMemory(va + pos, &str[0] + pos, chunk);
+        pos += chunk;
+    } while (std::find(begin(str), end(str), 0) == end(str));
+    str = str.c_str();
+}

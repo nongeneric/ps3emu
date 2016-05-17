@@ -18,6 +18,8 @@ find_package(PkgConfig REQUIRED)
 pkg_search_module(GLFW3 REQUIRED glfw3)
 pkg_search_module(SQLITE3 REQUIRED sqlite3)
 pkg_search_module(CRYPTO REQUIRED libcrypto)
+pkg_search_module(PNG REQUIRED libpng)
+pkg_search_module(ZLIB REQUIRED zlib)
 
 # glad --profile compatibility --api gl=4.5 --generator=c --spec gl --no-loader --out-path GL --extensions=""
 include_directories(SYSTEM libs/graphics/GL/include)
@@ -28,10 +30,11 @@ set(CMAKE_CXX_FLAGS "-Wno-unknown-pragmas ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-format-security ${CMAKE_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wno-unused-const-variable ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-missing-braces ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
 
 add_definitions(-DDEBUG)
 add_definitions(-DTESTS)
-set(CMAKE_CXX_FLAGS "-ggdb3 -Og -Wall -Werror -Wno-comment -std=c++1z ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-ggdb3 -O0 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
 #set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror -std=c++1z ${CMAKE_CXX_FLAGS}")

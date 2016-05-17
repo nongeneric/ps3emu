@@ -39,8 +39,10 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
 }
 
 int32_t sys_cond_signal(sys_cond_t cond) {
-    auto info = cvs.get(cond);
-    info->cv.notify_one();
+    auto info = cvs.try_get(cond);
+    if (!info) // noop
+        return CELL_OK;
+    info.value()->cv.notify_one();
     return CELL_OK;
 }
 

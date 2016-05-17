@@ -237,7 +237,7 @@ int32_t sys_semaphore_destroy(sys_semaphore_t sem) {
 }
 
 int32_t sys_semaphore_wait(sys_semaphore_t sem, usecond_t timeout) {
-    auto& csem = semaphores.get(sem);
+    const auto& csem = semaphores.get(sem);
     if (csem->wait(timeout))
         return CELL_OK;
     return CELL_ETIMEDOUT;
@@ -248,7 +248,7 @@ int32_t sys_semaphore_trywait(sys_semaphore_t sem) {
 }
 
 int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
-    auto& csem = semaphores.get(sem);
+    const auto& csem = semaphores.get(sem);
     if (csem->post(val))
         return CELL_OK;
     return CELL_EBUSY;

@@ -75,6 +75,18 @@ int32_t cellGcmBindZcull(uint8_t index,
                          uint32_t sFunc,
                          uint32_t sRef,
                          uint32_t sMask);
+emu_void_t cellGcmSetZcull(uint8_t index,
+                           uint32_t offset,
+                           uint32_t width,
+                           uint32_t height,
+                           uint32_t cullStart,
+                           uint32_t zFormat,
+                           uint32_t aaFormat,
+                           uint32_t zCullDir,
+                           uint32_t zCullFormat,
+                           uint32_t sFunc,
+                           uint32_t sRef,
+                           uint32_t sMask);
 int32_t cellGcmUnbindZcull(uint8_t index);
 
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler);

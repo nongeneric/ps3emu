@@ -7,6 +7,7 @@
 class MainMemory;
 
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata);
+int32_t cellSysutilUnregisterCallback(int32_t slot);
 int32_t cellSysutilCheckCallback();
 emu_void_t cellGcmSetDebugOutputLevel(int32_t level);
 int32_t cellVideoOutGetResolutionAvailability(uint32_t videoOut,

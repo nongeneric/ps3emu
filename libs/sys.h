@@ -1,3 +1,5 @@
+#pragma once
+
 #include "sys_defs.h"
 #include "../ps3emu/constants.h"
 #include "../ps3emu/ELFLoader.h"

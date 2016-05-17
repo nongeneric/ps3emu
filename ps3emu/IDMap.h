@@ -5,6 +5,7 @@
 #include <memory>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/optional.hpp>
 
 template <typename ID, typename T, int InitialID = 1>
 class IDMap {
@@ -24,8 +25,15 @@ public:
     }
     
     T& get(ID id) {
+        auto v = try_get(id);
+        assert(v);
+        return v.value();
+    }
+    
+    boost::optional<T&> try_get(ID id) {
         auto it = _map.find(id);
-        assert(it != end(_map));
+        if (it == end(_map))
+            return boost::none;
         return it->second;
     }
     
@@ -53,6 +61,11 @@ public:
         boost::lock_guard<boost::mutex> lock(_m);
         return _map.get(id);
     }
+    
+    boost::optional<T&> try_get(ID id) {
+        boost::lock_guard<boost::mutex> lock(_m);
+        return _map.try_get(id);
+    }   
     
     std::map<ID, T>& map() {
         return _map.map();

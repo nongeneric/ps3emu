@@ -133,3 +133,7 @@ int32_t cellVideoOutGetResolutionAvailability(uint32_t videoOut,
             aspect == CELL_VIDEO_OUT_ASPECT_16_9);
 }
 
+int32_t cellSysutilUnregisterCallback(int32_t slot) {
+    return CELL_OK;
+}
+

@@ -33,12 +33,15 @@ int sys_mutex_destroy(sys_mutex_t mutex_id) {
 }
 
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
-    auto mutex = mutexes.get(mutex_id);
+    auto mutex = mutexes.try_get(mutex_id);
+    // using a destroyed mutex is a noop
+    if (!mutex)
+        return 0;
     if (timeout == 0) {
-        mutex->lock();
+        mutex.value()->lock();
         return CELL_OK;
     } else {
-        return mutex->lock(timeout) ? CELL_OK : CELL_ETIMEDOUT;
+        return mutex.value()->lock(timeout) ? CELL_OK : CELL_ETIMEDOUT;
     }
 }
 
@@ -49,7 +52,10 @@ int sys_mutex_trylock(sys_mutex_t mutex_id) {
 }
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
-    mutexes.get(mutex_id)->unlock();
+    auto mutex = mutexes.try_get(mutex_id);
+    if (!mutex) // noop
+        return CELL_OK;
+    mutex.value()->unlock();
     return CELL_OK;
 }
 

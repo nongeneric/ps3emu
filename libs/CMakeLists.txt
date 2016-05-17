@@ -11,6 +11,7 @@ set(SRC
     cellSpurs.cpp
     sysSpu.cpp
     heap.cpp
+    libpngdec.cpp
     sync/lwmutex.cpp
     sync/mutex.cpp
     sync/cond.cpp

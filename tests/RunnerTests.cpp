@@ -840,3 +840,44 @@ TEST_CASE("ppu_fs") {
         "content(10): #v4.0:GCC:\n"
     );
 }
+
+TEST_CASE("pngdec_ppu") {
+    auto output = startWaitGetOutput({"./binaries/pngdec_ppu/a.elf"});
+    REQUIRE( output == 
+        "* displayInit: displayInit: create display ... WIDTH=1280, HEIGHT=720\n"
+        "* createModules: cellPngDecCreate() returned CELL_OK\n"
+        "* openStream: open filename = /app_home/SampleStream.png\n"
+        "* openStream: cellPngDecOpen() returned CELL_OK\n"
+        "* setDecodeParam: cellPngDecReadHeader() returned CELL_OK\n"
+        "* setDecodeParam: info.imageWidth       = 1024\n"
+        "* setDecodeParam: info.imageHeight      = 681\n"
+        "* setDecodeParam: info.numComponents    = 3\n"
+        "* setDecodeParam: info.bitDepth         = 8\n"
+        "* setDecodeParam: info.colorSpace       = 2\n"
+        "* setDecodeParam: info.interlaceMethod  = 0\n"
+        "* setDecodeParam: info.chunkInformation = 80\n"
+        "\n"
+        "* setDecodeParam: cellPngDecSetParameter() returned CELL_OK\n"
+        "* setDecodeParam: pngdecOutParam.outputWidthByte         = 4096\n"
+        "* setDecodeParam: pngdecOutParam.outputWidth             = 1024\n"
+        "* setDecodeParam: pngdecOutParam.outputHeight            = 681\n"
+        "* setDecodeParam: pngdecOutParam.outputComponents        = 4\n"
+        "* setDecodeParam: pngdecOutParam.outputBitDepth          = 8\n"
+        "* setDecodeParam: pngdecOutParam.outputMode              = 0\n"
+        "* setDecodeParam: pngdecOutParam.outputColorSpace        = 10\n"
+        "* setDecodeParam: pngdecOutParam.useMemorySpace          = 512\n"
+        "\n"
+        "* decodeStream: cellPngDecDecodeData() returned CELL_OK\n"
+        "* decodeStream: pngdecDataOutInfo.chunkInformation  = 8080\n"
+        "* decodeStream: pngdecDataOutInfo.numText           = 0\n"
+        "* decodeStream: pngdecDataOutInfo.numUnknownChunk   = 0\n"
+        "* decodeStream: pngdecDataOutInfo.status            = 0\n"
+        "\n"
+        "* closeStream: cellPngDecClose() returned CELL_OK\n"
+        "* destoryModules: cellPngDecDestroy() returned CELL_OK\n"
+        "disp_destroy> cellGcmFinish done ...\n"
+        "* main: Call Malloc Function = 0\n"
+        "* main: Call Free Function = 0\n"
+        "* errorLog: Finished decoding \n"
+    );
+}
