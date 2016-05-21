@@ -18,6 +18,7 @@ namespace ShaderRewriter {
         virtual void visit(Invocation* invocation) override;
         virtual void visit(SwitchStatement* sw) override;
         virtual void visit(BreakStatement* sw) override;
+        virtual void visit(DiscardStatement* sw) override;
         virtual void visit(WhileStatement* sw) override;
         virtual void visit(TernaryOperator* ternary) override;
     };

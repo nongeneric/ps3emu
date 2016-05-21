@@ -126,6 +126,7 @@ struct fragment_instr_t {
         BitField<0, 6> Op2RegNum;
         BitField<6, 8> Op2Type;
         BitField<15, 16> Op2RegType;
+        BitField<18, 21> InputModifier;
         BitField<22, 23> Op2Neg;
         BitField<26, 27> Op2Abs;
         
@@ -437,11 +438,13 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             res += ssnprintf("%d", i.reg_num);
         }
         res += print_dest_mask(i.dest_mask);
-        if (i.condition.relation != cond_t::TR && !i.opcode.nop) {
-            auto swizzle = print_swizzle(i.condition.swizzle, false);
-            auto creg = i.condition.is_C1 ? "1" : "";
-            res += ssnprintf("(%s%s%s)", print_cond(i.condition.relation), creg, swizzle.c_str());
-        }
+    }
+    if (i.condition.relation != cond_t::TR && !i.opcode.nop) {
+        if (i.opcode.control)
+            res += " ";
+        auto swizzle = print_swizzle(i.condition.swizzle, false);
+        auto creg = i.condition.is_C1 ? "1" : "";
+        res += ssnprintf("(%s%s%s)", print_cond(i.condition.relation), creg, swizzle.c_str());
     }
     // TODO: LOOP, REP, RET, CAL
     for (int n = 0; n < i.opcode.op_count; ++n) {
@@ -475,6 +478,14 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
             auto r = arg.reg_type == reg_type_t::H ? "H" : "R";
             res += ssnprintf("%s%lu", r, arg.reg_num);
         }
+        switch (i.input_modifier) {
+            case input_modifier_t::_R: break;
+            case input_modifier_t::_H: res += "_h";
+            case input_modifier_t::_X: res += "_x";
+            case input_modifier_t::_B: res += "_b";
+            case input_modifier_t::_S: res += "_s";
+            case input_modifier_t::_N: res += "_n";
+        }
         res += print_swizzle(arg.swizzle, false);
         if (arg.is_abs)
             res += "|";
@@ -499,30 +510,29 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
    
     res.opcode = opcode;
     res.clamp = i->Clamp();
+    res.input_modifier = (input_modifier_t)i->b2.InputModifier.u();
     res.control = i->Control();
     res.tex_num = i->b0.TexNum.u();
-    if (!opcode.control) {
-        res.scale = i->Scale();
-        res.is_bx2 = i->b0.Bx2.u();
-        res.is_sat = i->b0.Sat.u();
-        res.reg = i->RegType();
-        res.is_reg_c = i->b0.RegC.u();
-        res.reg_num = i->b0.RegNum.u();
-        res.dest_mask.val[0] = i->b0.Op0xMask.u();
-        res.dest_mask.val[1] = i->b0.Op0yMask.u();
-        res.dest_mask.val[2] = i->b0.Op0zMask.u();
-        res.dest_mask.val[3] = i->b0.Op0wMask.u();
-        res.condition.relation = i->Cond();
-        res.condition.is_C1 = i->b1.CondC1.u();
-        res.condition.swizzle.comp[0] = static_cast<swizzle2bit_t>(i->b1.CxMask.u());
-        res.condition.swizzle.comp[1] = static_cast<swizzle2bit_t>(i->CyMask());
-        res.condition.swizzle.comp[2] = static_cast<swizzle2bit_t>(i->b1.CzMask.u());
-        res.condition.swizzle.comp[3] = static_cast<swizzle2bit_t>(i->b1.CwMask.u());
-        res.persp_corr = i->PerspCorr();
-        res.is_al = i->b3.AL.u();
-        res.al_index = i->ALIndex();
-        res.input_attr = i->InputAttr();
-    }
+    res.scale = i->Scale();
+    res.is_bx2 = i->b0.Bx2.u();
+    res.is_sat = i->b0.Sat.u();
+    res.reg = i->RegType();
+    res.is_reg_c = i->b0.RegC.u();
+    res.reg_num = i->b0.RegNum.u();
+    res.dest_mask.val[0] = i->b0.Op0xMask.u();
+    res.dest_mask.val[1] = i->b0.Op0yMask.u();
+    res.dest_mask.val[2] = i->b0.Op0zMask.u();
+    res.dest_mask.val[3] = i->b0.Op0wMask.u();
+    res.condition.relation = i->Cond();
+    res.condition.is_C1 = i->b1.CondC1.u();
+    res.condition.swizzle.comp[0] = static_cast<swizzle2bit_t>(i->b1.CxMask.u());
+    res.condition.swizzle.comp[1] = static_cast<swizzle2bit_t>(i->CyMask());
+    res.condition.swizzle.comp[2] = static_cast<swizzle2bit_t>(i->b1.CzMask.u());
+    res.condition.swizzle.comp[3] = static_cast<swizzle2bit_t>(i->b1.CwMask.u());
+    res.persp_corr = i->PerspCorr();
+    res.is_al = i->b3.AL.u();
+    res.al_index = i->ALIndex();
+    res.input_attr = i->InputAttr();
     res.is_last = i->b0.LastInstr.u();
     bool has_const = false;
     for (int n = 0; n < opcode.op_count; ++n) {

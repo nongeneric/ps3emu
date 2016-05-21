@@ -26,6 +26,7 @@
 #include "GLProgramPipeline.h"
 #include "GLSampler.h"
 #include "Tracer.h"
+#include "../log.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -124,7 +125,7 @@ void Rsx::VertexAttribOutputMask(uint32_t mask) {
 
 void Rsx::FrequencyDividerOperation(uint16_t op) {
     TRACE1(FrequencyDividerOperation, op);
-    //TODO: implement
+    _context->frequencyDividerOperation = op;
 }
 
 void Rsx::TexCoordControl(unsigned int index, uint32_t control) {
@@ -528,9 +529,10 @@ void Rsx::resetContext() {
 
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     TRACE3(EmuFlip, buffer, label, labelValue);
-    auto va = _context->displayBuffers[buffer].offset + RsxFbBaseAddr;
-    auto tex = _context->framebuffer->findTexture(va);
-    
+    auto& fb = _context->displayBuffers[buffer];
+    auto va = fb.offset + RsxFbBaseAddr;
+    FramebufferTextureKey key{va, fb.width, fb.height, GL_RGB32F};
+    auto tex = _context->framebuffer->findTexture(key);
     if (!tex && _mode == RsxOperationMode::Replay)
         return;
     
@@ -539,7 +541,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
             return link.framebufferEa == va;
         });
         assert(it != end(_context->surfaceLinks));
-        tex = _context->framebuffer->findTexture(it->surfaceEa);
+        key.offset = it->surfaceEa;
+        tex = _context->framebuffer->findTexture(key);
         assert(tex);
     }
     _context->framebuffer->bindDefault();
@@ -698,6 +701,7 @@ FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size, bool m
     auto updater = new FragmentShaderUpdateFunctor(
         _context->fragmentVa,
         size,
+        mrt,
         _context.get(),
         _mm
     );
@@ -906,7 +910,8 @@ void Rsx::updateTextures() {
         if (sampler.enable && sampler.texture.width && sampler.texture.height) {
             auto textureUnit = i + FragmentTextureUnit;
             auto va = rsxOffsetToEa(sampler.texture.location, sampler.texture.offset);
-            auto surfaceTex = _context->framebuffer->findTexture(va);
+            FramebufferTextureKey key{va, sampler.texture.width, sampler.texture.height, GL_RGB32F};
+            auto surfaceTex = _context->framebuffer->findTexture(key);
             if (surfaceTex) {
                 glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
             } else {
@@ -1173,7 +1178,7 @@ void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) 
     _context->surfaceClipHeight = h;
 }
 
-// assume cellGcmSetSurface is always used and not its subcommands
+// assuming cellGcmSetSurface is always used and not its subcommands
 // then this command is always set last
 void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
     TRACE3(ShaderWindow, height, origin, pixelCenters);
@@ -1254,10 +1259,7 @@ void glDebugCallbackFunction(GLenum source,
                    : source == GL_DEBUG_SOURCE_THIRD_PARTY ? "ThirdParty"
                    : source == GL_DEBUG_SOURCE_APPLICATION ? "Application"
                    : "Other";
-    //if (type == GL_DEBUG_TYPE_ERROR) {
-        auto text = ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
-        BOOST_LOG_TRIVIAL(error) << text;
-    //}
+    LOG << ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
     if (severity == GL_DEBUG_SEVERITY_HIGH)
         exit(1);
 }
@@ -1378,8 +1380,8 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
         auto bufferOffset = format.offset + first * format.stride;
         auto handle = getBuffer(format.location)->handle();
         
-        glcall(glVertexAttribBinding(i, format.binding));
-        glcall(glBindVertexBuffer(format.binding, handle, bufferOffset, format.stride));
+        glVertexAttribBinding(i, format.binding);
+        glBindVertexBuffer(format.binding, handle, bufferOffset, format.stride);
         
         if (_mode != RsxOperationMode::Replay) {
             UpdateBufferCache(format.location, bufferOffset, count * format.stride);
@@ -1687,13 +1689,14 @@ void Rsx::transferImage() {
     auto src = _mm->getMemoryPointer(sourceEa, 1);
     auto dest = _mm->getMemoryPointer(destEa, 1);
     
-    if (_context->framebuffer->findTexture(sourceEa)) {
-        auto it = br::find_if(_context->displayBuffers,
-                              [&](auto& buf) { return buf.offset == surface.destOffset; });
-        if (it != end(_context->displayBuffers)) {
-            _context->surfaceLinks.insert({sourceEa, destEa});
-        }
-    }
+//     if (_context->framebuffer->findTexture(sourceEa)) {
+//         auto it =
+//             br::find_if(_context->displayBuffers,
+//                         [&](auto& buf) { return buf.offset == surface.destOffset; });
+//         if (it != end(_context->displayBuffers)) {
+//             _context->surfaceLinks.insert({sourceEa, destEa});
+//         }
+//     }
     
     auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;
@@ -1984,8 +1987,8 @@ void Rsx::UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width,
     updater->updateWithBlob(texture, _currentReplayBlob);
 }
 
-void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size) {
-    auto tuple = _context->fragmentShaderCache.retrieveWithUpdater({va, size});
+void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size, bool mrt) {
+    auto tuple = _context->fragmentShaderCache.retrieveWithUpdater({va, size, mrt});
     auto program = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
     updater->updateWithBlob(program, _currentReplayBlob);

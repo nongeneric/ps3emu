@@ -30,13 +30,28 @@ struct SurfaceInfo {
     std::array<bool, 4> colorTarget;
 };
 
+struct FramebufferTextureKey {
+    ps3_uintptr_t offset;
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    inline bool operator<(FramebufferTextureKey const& other) const {
+        return std::tie(offset, width, width, height, format) <
+               std::tie(other.offset,
+                        other.width,
+                        other.width,
+                        other.height,
+                        other.format);
+    }
+};
+
 struct GLFramebufferCacheEntry {
-    ps3_uintptr_t va;
+    FramebufferTextureKey key;
     GLSimpleTexture* texture;
 };
 
 class GLFramebuffer {
-    std::map<ps3_uintptr_t, std::unique_ptr<GLSimpleTexture>> _cache;
+    std::map<FramebufferTextureKey, std::unique_ptr<GLSimpleTexture>> _cache;
     GLuint _id;
     SurfaceInfo _info;
     
@@ -54,6 +69,6 @@ public:
     void setSurface(SurfaceInfo const& info, unsigned width, unsigned height);
     void dumpTextures();
     void updateTexture();
-    GLSimpleTexture* findTexture(ps3_uintptr_t va);
+    GLSimpleTexture* findTexture(FramebufferTextureKey key);
     std::vector<GLFramebufferCacheEntry> cacheSnapshot();
 };

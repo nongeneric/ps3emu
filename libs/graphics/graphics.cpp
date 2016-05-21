@@ -14,7 +14,9 @@ void Window::init() {
         throw std::runtime_error("window creation failed");
     }
     glfwMakeContextCurrent(_window);
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        throw std::runtime_error("opengl function loading failed");
+    }
 }
 
 void Window::shutdown() {

@@ -39,6 +39,7 @@ namespace ShaderRewriter {
     void SwitchStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void BreakStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void DiscardStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void WhileStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void TernaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
 

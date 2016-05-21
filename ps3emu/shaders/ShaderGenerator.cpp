@@ -83,9 +83,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         if (samplerSizes[i] == 6) {
             line(ssnprintf("layout (binding = %d) uniform samplerCube s%d;",
                         i + FragmentTextureUnit, i));
-            line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
-            line(ssnprintf("    return texture(s%d, uvp.xyz);", i));
-            line("}");
+            line(ssnprintf("vec4 tex%d(vec4 uvp) { return texture(s%d, uvp.xyz); }", i, i));
         } else {
             line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
                         i + FragmentTextureUnit, samplerSizes[i], i));
@@ -94,6 +92,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                         flipIndex(i)));
             line(ssnprintf("    return texture(s%d, uvp.xy);", i));
             line("}");
+            line(ssnprintf("vec4 tex%dProj(vec4 uvp) { return textureProj(s%d, uvp.xyzw); }", i, i));
         }
     }
     line("void main(void) {");
@@ -440,6 +439,37 @@ std::string PrintVertexProgram(const uint8_t* instr, bool verbose) {
         }
         instr += 16;
         num++;
+    }
+    return res;
+}
+
+std::string PrintFragmentBytecode(const uint8_t* bytecode) {
+    std::string res;
+    unsigned pos = 0;
+    FragmentInstr fi;
+    do {
+        auto len = fragment_dasm_instr(&bytecode[pos], fi);
+        auto hex = print_hex(&bytecode[pos], len, true);
+        res += ssnprintf("%03d: %s\n", pos / 16, hex);
+        pos += len;
+        
+    } while(!fi.is_last);
+    return res;
+}
+
+std::string PrintVertexBytecode(const uint8_t* bytecode) {
+    bool isLast = false;
+    std::array<VertexInstr, 2> instr;
+    std::string res;
+    const uint8_t* initial = bytecode;
+    while (!isLast) {
+        int count = vertex_dasm_instr(bytecode, instr);
+        for (int n = 0; n < count; ++n) {
+            auto hex = print_hex(bytecode, 16, true);
+            res += ssnprintf("%03d: %s\n", (bytecode - initial) / 16, hex);
+            isLast |= instr[n].is_last;
+        }
+        bytecode += 16;
     }
     return res;
 }

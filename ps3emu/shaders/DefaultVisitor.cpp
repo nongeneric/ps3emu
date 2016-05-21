@@ -52,6 +52,7 @@ namespace ShaderRewriter {
     }
     
     void DefaultVisitor::visit(BreakStatement* sw) { }
+    void DefaultVisitor::visit(DiscardStatement* sw) { }
     
     void DefaultVisitor::visit(WhileStatement* sw) {
         sw->condition()->accept(this);

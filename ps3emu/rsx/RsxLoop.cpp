@@ -895,7 +895,7 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT";
             break;
         case 0x00001fc0:
-            name = "CELL_GCM_NV4097_SET_FREQUENCY_DIVIDER_OPERATION";
+            //name = "CELL_GCM_NV4097_SET_FREQUENCY_DIVIDER_OPERATION";
             FrequencyDividerOperation(readarg(1));
             break;
         case 0x00001fc4:

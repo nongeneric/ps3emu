@@ -21,7 +21,6 @@ pkg_search_module(CRYPTO REQUIRED libcrypto)
 pkg_search_module(PNG REQUIRED libpng)
 pkg_search_module(ZLIB REQUIRED zlib)
 
-# glad --profile compatibility --api gl=4.5 --generator=c --spec gl --no-loader --out-path GL --extensions=""
 include_directories(SYSTEM libs/graphics/GL/include)
 #-fsanitize=undefined
 #-fsanitize=thread

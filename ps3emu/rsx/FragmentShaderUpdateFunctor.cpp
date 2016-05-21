@@ -24,9 +24,13 @@ std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context) {
 void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
     LOG << ssnprintf("updating fragment bytecode at %x", va);
     auto sizes = getFragmentSamplerSizes(_context);
+    LOG << ssnprintf("Updated fragment shader:\n%s\n%s",
+                     PrintFragmentBytecode(&_newbytecode[0]),
+                     PrintFragmentProgram(&_newbytecode[0]));
     auto text = GenerateFragmentShader(
         _newbytecode, sizes, _context->isFlatShadeMode, isMrt(_context->surface));
     *shader = FragmentShader(text.c_str());
+    LOG << ssnprintf("Updated fragment shader (2):\n%s\n%s", text, shader->log());
     _info = get_fragment_bytecode_info(&_newbytecode[0]);
     updateConsts();
 }
@@ -43,13 +47,14 @@ void FragmentShaderUpdateFunctor::updateConsts() {
     }
 }
 
-FragmentShaderUpdateFunctor::FragmentShaderUpdateFunctor(uint32_t va, uint32_t size, RsxContext* rsxContext, MainMemory* mm)
+FragmentShaderUpdateFunctor::FragmentShaderUpdateFunctor(
+    uint32_t va, uint32_t size, bool mrt, RsxContext* rsxContext, MainMemory* mm)
     : _constBuffer(size / 2),
       _context(rsxContext),
       _mm(mm),
       va(va),
-      size(size)
-{
+      size(size),
+      mrt(mrt) {
     assert(size % 16 == 0);
 }
 
@@ -64,7 +69,7 @@ void FragmentShaderUpdateFunctor::updateWithBlob(FragmentShader* shader, std::ve
     }
 
     _context->tracer.pushBlob(&_newbytecode[0], size);
-    TRACE2(UpdateFragmentCache, va, size);
+    TRACE3(UpdateFragmentCache, va, size, mrt);
 
     if (_bytecode.empty()) { // first update
         updateBytecode(shader);

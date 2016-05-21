@@ -20,8 +20,10 @@ class FragmentShaderUpdateFunctor {
 public:
     uint32_t va;
     uint32_t size;
+    bool mrt;
     FragmentShaderUpdateFunctor(uint32_t va, 
                                 uint32_t size,
+                                bool mrt,
                                 RsxContext* rsxContext,
                                 MainMemory* mm);
     void updateWithBlob(FragmentShader* shader, std::vector<uint8_t>& blob);

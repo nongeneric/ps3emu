@@ -131,6 +131,8 @@ struct FragmentShaderCacheKey {
     uint32_t va;
     uint32_t size;
     bool mrt;
+    inline FragmentShaderCacheKey(uint32_t va, uint32_t size, bool mrt)
+        : va(va), size(size), mrt(mrt) {}
     inline bool operator<(FragmentShaderCacheKey const& other) const {
         return std::tie(va, size, mrt)
              < std::tie(other.va, other.size, other.mrt);
@@ -223,6 +225,7 @@ public:
     MemoryLocation reportLocation;
     uint32_t surfaceClipWidth = 0;
     uint32_t surfaceClipHeight = 0;
+    uint16_t frequencyDividerOperation = 0;
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

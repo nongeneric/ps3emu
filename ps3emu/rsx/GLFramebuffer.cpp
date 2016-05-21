@@ -1,4 +1,5 @@
 #include "GLFramebuffer.h"
+#include "../log.h"
 
 void GLFramebuffer::dumpTexture(GLSimpleTexture* tex, ps3_uintptr_t va) {
     // TODO:
@@ -9,17 +10,18 @@ GLSimpleTexture* GLFramebuffer::searchCache(GLuint format,
         unsigned int width,
         unsigned int height)
 {
-    auto itTex = _cache.find(offset);
+    FramebufferTextureKey key{offset, width, height, format};
+    auto itTex = _cache.find(key);
     GLSimpleTexture* tex;
     if (itTex == end(_cache)) {
         tex = new GLSimpleTexture(width, height, format);
-        _cache[offset].reset(tex);
+        _cache[key].reset(tex);
     } else {
         tex = itTex->second.get();
     }
-    assert(tex->width() == width &&
-           tex->height() == height &&
-           tex->format() == format);
+    assert(tex->width() == width);
+    assert(tex->height() == height);
+    assert(tex->format() == format);
     return tex;
 }
 
@@ -50,15 +52,19 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
                    texHandle,
                    0));
     }
+    glNamedFramebufferTexture(_id, GL_DEPTH_STENCIL_ATTACHMENT, 0, 0);
+    glNamedFramebufferTexture(_id, GL_STENCIL_ATTACHMENT, 0, 0);
+    glNamedFramebufferTexture(_id, GL_DEPTH_ATTACHMENT, 0, 0);
+    
     auto offset = rsxOffsetToEa(info.depthLocation, info.depthOffset);
-    auto format = info.depthFormat == SurfaceDepthFormat::z16 ?
-                  GL_DEPTH_COMPONENT16 : GL_DEPTH24_STENCIL8;
+    auto format = GL_DEPTH24_STENCIL8;
+    auto attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+    if (info.depthFormat == SurfaceDepthFormat::z16) {
+        format = GL_DEPTH_COMPONENT16;
+        attachment = GL_DEPTH_ATTACHMENT;
+    }
     auto tex = searchCache(format, offset, width, height);
-    glcall(glNamedFramebufferTexture(
-               _id,
-               GL_DEPTH_STENCIL_ATTACHMENT,
-               tex->handle(),
-               0));
+    glNamedFramebufferTexture(_id, attachment, tex->handle(), 0);
 
     GLenum enabled[] = {
         info.colorTarget[0] ? GL_COLOR_ATTACHMENT0 : (GLenum) GL_NONE,
@@ -66,28 +72,46 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
         info.colorTarget[2] ? GL_COLOR_ATTACHMENT2 : (GLenum) GL_NONE,
         info.colorTarget[3] ? GL_COLOR_ATTACHMENT3 : (GLenum) GL_NONE
     };
-    glcall(glNamedFramebufferDrawBuffers(_id, 4, enabled));
-    assert(glCheckNamedFramebufferStatus(_id, GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-    glcall(glBindFramebuffer(GL_FRAMEBUFFER, _id));
+    glNamedFramebufferDrawBuffers(_id, 4, enabled);
+    glBindFramebuffer(GL_FRAMEBUFFER, _id);
+#if DEBUG
+    auto status = glCheckNamedFramebufferStatus(_id, GL_FRAMEBUFFER);
+#define X(x) status == x ? #x
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        LOG << "framebuffer incomplete " <<
+            (status == 0x8cd9 ? "GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT" :
+            X(GL_FRAMEBUFFER_UNDEFINED) :
+            X(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT) :
+            X(GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT) :
+            X(GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER) :
+            X(GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER) :
+            X(GL_FRAMEBUFFER_UNSUPPORTED) :
+            X(GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE) :
+            X(GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS) : "");
+        LOG << status;
+        exit(0);
+#undef X
+    }
+#endif
 }
 
 void GLFramebuffer::dumpTextures() {
-    for (int i = 0; i < 4; ++i) {
-        if (_info.colorTarget[i]) {
-            auto offset = rsxOffsetToEa(_info.colorLocation[i], _info.colorOffset[i]);
-            dumpTexture(_cache[offset].get(), offset);
-        }
-    }
-    auto offset = rsxOffsetToEa(_info.depthLocation, _info.depthOffset);
-    dumpTexture(_cache[offset].get(), offset);
+//     for (int i = 0; i < 4; ++i) {
+//         if (_info.colorTarget[i]) {
+//             auto offset = rsxOffsetToEa(_info.colorLocation[i], _info.colorOffset[i]);
+//             dumpTexture(_cache[offset].get(), offset);
+//         }
+//     }
+//     auto offset = rsxOffsetToEa(_info.depthLocation, _info.depthOffset);
+//     dumpTexture(_cache[offset].get(), offset);
 }
 
 void GLFramebuffer::updateTexture() {
     // TODO: draw -> dump -> cpu updates texture -> (update) -> flip
 }
 
-GLSimpleTexture* GLFramebuffer::findTexture(ps3_uintptr_t va) {
-    auto it = _cache.find(va);
+GLSimpleTexture* GLFramebuffer::findTexture(FramebufferTextureKey key) {
+    auto it = _cache.find(key);
     if (it == end(_cache))
         return nullptr;
     return it->second.get();

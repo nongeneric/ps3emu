@@ -15,7 +15,8 @@ namespace ShaderRewriter {
         reverse4f, reverse3f, reverse2f,
         call, ret,
         txl0, txl1, txl2, txl3,
-        ftex, ftxb, ftxd, ftxl,
+        ftex, ftxp, ftxb, ftxd, ftxl,
+        floatBitsToUint, unpackUnorm4x8,
         none
     };
     
@@ -99,6 +100,11 @@ namespace ShaderRewriter {
     };
     
     class BreakStatement : public Statement {
+    public:
+        virtual void accept(IExpressionVisitor* visitor) override;
+    };
+    
+    class DiscardStatement : public Statement {
     public:
         virtual void accept(IExpressionVisitor* visitor) override;
     };
@@ -191,6 +197,7 @@ namespace ShaderRewriter {
         virtual void visit(IfStatement* mask) = 0;
         virtual void visit(SwitchStatement* sw) = 0;
         virtual void visit(BreakStatement* be) = 0;
+        virtual void visit(DiscardStatement* be) = 0;
         virtual void visit(WhileStatement* we) = 0;
         virtual void visit(TernaryOperator* we) = 0;
     };

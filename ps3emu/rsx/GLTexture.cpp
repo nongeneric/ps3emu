@@ -1,7 +1,7 @@
 #include "GLTexture.h"
 #include "DXT.h"
 #include "../MainMemory.h"
-#include <boost/log/trivial.hpp>
+#include "../log.h"
 #include <gcm_tool.h>
 
 using namespace glm;
@@ -200,7 +200,7 @@ FormatInfo getFormat(uint32_t format) {
         case CELL_GCM_TEXTURE_COMPRESSED_DXT1:
         case CELL_GCM_TEXTURE_COMPRESSED_DXT23:
         case CELL_GCM_TEXTURE_COMPRESSED_DXT45:
-        default: assert(false);
+        default: LOG << "unsupported texture format " << format; assert(false);
     }
     return {};
 }
@@ -466,6 +466,16 @@ std::function<glm::vec4(uint8_t*)> TextureReader::make_read(uint32_t texelFormat
         return [](uint8_t* p) {
             auto u = (uint32_t*)p;
             return vec4(glm::unpackHalf2x16(u[0]), glm::unpackHalf2x16(u[1]));
+        };
+    } else if (texelFormat == CELL_GCM_TEXTURE_Y16_X16_FLOAT) {
+        return [](uint8_t* p) {
+            auto u = (uint32_t*)p;
+            return vec4(glm::unpackHalf2x16(u[0]), vec2(0, 0));
+        };
+    } else if (texelFormat == CELL_GCM_TEXTURE_DEPTH16) {
+        return [](uint8_t* p) {
+            auto u = (big_uint16_t*)p;
+            return vec4(*u, 0, 0, 0);
         };
     } else {
         auto format = getFormat(texelFormat);

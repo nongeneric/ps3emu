@@ -184,7 +184,7 @@ public:
                         : entry.texture->format() == GL_RGB32F ? "GL_RGB32F"
                         : "unknown";
             switch (index.column()) {
-                case 0: return QString::fromStdString(ssnprintf("#%08x", entry.va));
+                case 0: return QString::fromStdString(ssnprintf("#%08x", entry.key.offset));
                 case 1: return "Local";
                 case 2: return QString::fromStdString(ssnprintf("%d", entry.texture->width()));
                 case 3: return QString::fromStdString(ssnprintf("%d", entry.texture->height()));
@@ -399,12 +399,13 @@ public:
             case 4: return "Stride";
             case 5: return "Size";
             case 6: return "Type";
+            case 7: return "Divider Op";
         }
         return QVariant();
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 7;
+        return 8;
     }
     
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
@@ -412,6 +413,7 @@ public:
             return QVariant();
         auto vda = _rsx->context()->vertexDataArrays[index.row()];
         auto input = _rsx->context()->vertexInputs[index.row()];
+        auto op = _rsx->context()->frequencyDividerOperation & (1 << index.row());
         switch (index.column()) {
             case 0: return QString::fromStdString(ssnprintf("%d", input.enabled));
             case 1: return QString::fromStdString(ssnprintf("#%08x", vda.offset));
@@ -422,6 +424,7 @@ public:
             case 6: return vda.type == CELL_GCM_VERTEX_UB ? "uint8_t"
                          : vda.type == CELL_GCM_VERTEX_F ? "float"
                          : "unknown";
+            case 7: return op ? "MODULO" : "DIVIDE";
         }
         return QVariant();
     }
@@ -521,38 +524,6 @@ void MainWindowModel::onRun() {
     runTo(_db.commands(_currentFrame) - 1, _currentFrame);
 }
 
-std::string printFragmentBytecode(std::vector<uint8_t> const& bytecode,
-                                  FragmentProgramInfo const& info) {
-    std::string res;
-    unsigned pos = 0;
-    FragmentInstr fi;
-    do {
-        auto len = fragment_dasm_instr(&bytecode[pos], fi);
-        auto hex = print_hex(&bytecode[pos], len, true);
-        res += ssnprintf("%03d: %s\n", pos / 16, hex);
-        pos += len;
-        
-    } while(!fi.is_last);
-    return res;
-}
-
-std::string printVertexBytecode(const uint8_t* bytecode) {
-    bool isLast = false;
-    std::array<VertexInstr, 2> instr;
-    std::string res;
-    const uint8_t* initial = bytecode;
-    while (!isLast) {
-        int count = vertex_dasm_instr(bytecode, instr);
-        for (int n = 0; n < count; ++n) {
-            auto hex = print_hex(bytecode, 16, true);
-            res += ssnprintf("%03d: %s\n", (bytecode - initial) / 16, hex);
-            isLast |= instr[n].is_last;
-        }
-        bytecode += 16;
-    }
-    return res;
-}
-
 void MainWindowModel::update() {
     auto context = _rsx->context();
     if (context->vertexShader) {
@@ -582,12 +553,13 @@ void MainWindowModel::update() {
         auto vertexConstModel = new ConstTableModel(values);
         _window.twVertexConsts->setModel(vertexConstModel);
         
-        auto vertexBytecodeText = printVertexBytecode(&context->vertexInstructions[0]);
+        auto vertexBytecodeText = PrintVertexBytecode(&context->vertexInstructions[0]);
         _window.teVertexBytecode->setText(QString::fromStdString(vertexBytecodeText));
     }
     
     if (context->fragmentShader) {
-        FragmentShaderCacheKey key { context->fragmentVa, FragmentProgramSize };
+        FragmentShaderCacheKey key{
+            context->fragmentVa, FragmentProgramSize, isMrt(context->surface)};
         FragmentShaderUpdateFunctor* updater;
         FragmentShader* shader;
         std::tie(shader, updater) = context->fragmentShaderCache.retrieveWithUpdater(key);
@@ -601,7 +573,7 @@ void MainWindowModel::update() {
             _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
             
             auto info = get_fragment_bytecode_info(&bytecode[0]);
-            auto bytecodeText = printFragmentBytecode(bytecode, info);
+            auto bytecodeText = PrintFragmentBytecode(&bytecode[0]);
             _window.teFragmentBytecode->setText(QString::fromStdString(bytecodeText));
             
             std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
@@ -716,25 +688,17 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     
     auto vertexSamplers = new QTreeWidgetItem();
     vertexSamplers->setText(0, "Vertex Samplers");
-    vertexSamplers->addChild(new SamplerContextTreeItem(false, 0));
-    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 0));
-    vertexSamplers->addChild(new SamplerContextTreeItem(false, 1));
-    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 1));
-    vertexSamplers->addChild(new SamplerContextTreeItem(false, 2));
-    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 2));
-    vertexSamplers->addChild(new SamplerContextTreeItem(false, 3));
-    vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, 3));
+    for (auto i = 0u; i < 4; ++i) {
+        vertexSamplers->addChild(new SamplerContextTreeItem(false, i));
+        vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, i));
+    }
     
     auto fragmentSamplers = new QTreeWidgetItem();
     fragmentSamplers->setText(0, "Fragment Samplers");
-    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 0));
-    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 0));
-    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 1));
-    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 1));
-    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 2));
-    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 2));
-    fragmentSamplers->addChild(new SamplerContextTreeItem(true, 3));
-    fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, 3));
+    for (auto i = 0u; i < 16; ++i) {
+        fragmentSamplers->addChild(new SamplerContextTreeItem(true, i));
+        fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, i));
+    }
     
     items.append(vertexSamplers);
     items.append(fragmentSamplers);

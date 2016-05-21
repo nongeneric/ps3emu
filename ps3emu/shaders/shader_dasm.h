@@ -36,6 +36,10 @@ enum class swizzle2bit_t {
     X, Y, Z, W
 };
 
+enum class input_modifier_t {
+    _R, _H, _X, _B, _S, _N
+};
+
 enum class input_attr_t {
    WPOS, COL0, COL1, FOGC,
    TEX0, TEX1, TEX2, TEX3,
@@ -117,6 +121,7 @@ struct dest_mask_t {
 struct FragmentInstr {
     fragment_opcode_t opcode;
     condition_t condition;
+    input_modifier_t input_modifier;
     clamp_t clamp;
     control_mod_t control;
     scale_t scale;

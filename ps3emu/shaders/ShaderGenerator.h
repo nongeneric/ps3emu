@@ -28,3 +28,5 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
 
 std::string PrintFragmentProgram(const uint8_t* instr);
 std::string PrintVertexProgram(const uint8_t* instr, bool verbose = false);
+std::string PrintFragmentBytecode(const uint8_t* bytecode);
+std::string PrintVertexBytecode(const uint8_t* bytecode);

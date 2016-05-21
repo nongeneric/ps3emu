@@ -52,6 +52,9 @@ namespace ShaderRewriter {
         { FunctionName::txl2, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
         { FunctionName::txl3, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
         { FunctionName::ftex, { ExprType::vec4, ExprType::int32, ExprType::vec4 } },
+        { FunctionName::ftxp, { ExprType::vec4, ExprType::int32, ExprType::vec4 } },
+        { FunctionName::unpackUnorm4x8, { ExprType::vec4, ExprType::int32 } },
+        { FunctionName::floatBitsToUint, { ExprType::int32, ExprType::fp32 } },
     };
     
     int getSingleComponent(swizzle_t s) {
@@ -153,6 +156,12 @@ namespace ShaderRewriter {
                 return;
             }
             
+            if (invocation->name() == FunctionName::ftxp) {
+                assert(invocation->args().size() == 2);
+                _ret = ssnprintf("tex%sProj(%s)", accept(args[0]), accept(args[1]));
+                return;
+            }
+            
             std::string str;
             for (auto i = 0u; i < args.size(); ++i) {
                 if (i > 0)
@@ -195,6 +204,8 @@ namespace ShaderRewriter {
                 case FunctionName::lg2: name = "log2"; break;
                 case FunctionName::pow: name = "pow"; break;
                 case FunctionName::exp2: name = "exp2"; break;
+                case FunctionName::unpackUnorm4x8: name = "unpackUnorm4x8"; break;
+                case FunctionName::floatBitsToUint: name = "floatBitsToUint"; break;
                 default: assert(false);
             }
             _ret = ssnprintf("%s(%s)", name, str.c_str());
@@ -230,6 +241,10 @@ namespace ShaderRewriter {
         
         virtual void visit(BreakStatement* sw) override {
             _ret = "break;";
+        }
+        
+        virtual void visit(DiscardStatement* sw) override {
+            _ret = "discard;";
         }
         
         virtual void visit(WhileStatement* ws) override {
@@ -472,6 +487,7 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(BreakStatement* br) override { }
+        virtual void visit(DiscardStatement* br) override { }
     };
     
     class InfoCollectorVisitor : public DefaultVisitor {
@@ -698,13 +714,26 @@ namespace ShaderRewriter {
                 break;
             }
             case fragment_op_t::TEX: {
-                // TODO: txp
                 assert(dynamic_cast<IntegerLiteral*>(args[1]));
                 rhs = new Invocation(FunctionName::ftex, { args[1], args[0] });
                 break;
             }
+            case fragment_op_t::TXP: {
+                assert(dynamic_cast<IntegerLiteral*>(args[1]));
+                rhs = new Invocation(FunctionName::ftxp, { args[1], args[0] });
+                break;
+            }
             case fragment_op_t::NRM: {
                 rhs = new Invocation(FunctionName::normalize, { args[0] });
+                break;
+            }
+            case fragment_op_t::UPB: {
+                rhs = new Invocation(
+                    FunctionName::unpackUnorm4x8,
+                    {new Invocation(FunctionName::floatBitsToUint, { args[0] })});
+                break;
+            }
+            case fragment_op_t::KIL: {
                 break;
             }
             default: assert(false);
@@ -736,12 +765,15 @@ namespace ShaderRewriter {
             regnum = i.reg_num;
             regname = i.reg == reg_type_t::H ? "h" : "r";
         }
-        auto dest = new Variable(regname, new IntegerLiteral(regnum));
-        auto mask = new ComponentMask(dest, i.dest_mask);
-        auto assign = new Assignment(mask, rhs);
-        
         std::vector<std::unique_ptr<Statement>> res;
-        res.emplace_back(assign);
+        if (i.opcode.instr == fragment_op_t::KIL) {
+            res.emplace_back(new DiscardStatement());
+        } else {
+            auto dest = new Variable(regname, new IntegerLiteral(regnum));
+            auto mask = new ComponentMask(dest, i.dest_mask);
+            auto assign = new Assignment(mask, rhs);
+            res.emplace_back(assign);
+        }
         
         appendCAssignment(i.control, i.is_reg_c, i.dest_mask, regname, regnum, res);
         appendCondition(i.condition, res);
