@@ -10,9 +10,12 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    bool isFlatColorShading,
                                    bool isMrt);
 
+enum class VertexInputType {
+    float32, float16, u8
+};
+
 struct VertexShaderInputFormat {
-    bool enabled = false;
-    int typeSize = 4;
+    VertexInputType type = VertexInputType::float32;
     int rank = 4;
     //int mask;
     // TODO: use dest_mask_t instead of int everywhere

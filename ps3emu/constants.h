@@ -48,8 +48,9 @@ static constexpr unsigned FragmentShaderConstantCount = 512 / 2;
 static constexpr unsigned VertexTextureUnit = 1;
 static constexpr unsigned FragmentTextureUnit = 5;
 
-static constexpr unsigned VertexShaderConstantBinding = 1;
-static constexpr unsigned FragmentShaderConstantBinding = 2;
-static constexpr unsigned VertexShaderSamplesInfoBinding = 3;
-static constexpr unsigned FragmentShaderSamplesInfoBinding = 4;
-static constexpr unsigned VertexShaderViewportMatrixBinding = 5;
+static constexpr unsigned VertexInputsBinding = 1;
+static constexpr unsigned VertexShaderConstantBinding = VertexInputsBinding + 16;
+static constexpr unsigned FragmentShaderConstantBinding = VertexShaderConstantBinding + 1;
+static constexpr unsigned VertexShaderSamplesInfoBinding = FragmentShaderConstantBinding + 1;
+static constexpr unsigned FragmentShaderSamplesInfoBinding = VertexShaderSamplesInfoBinding + 1;
+static constexpr unsigned VertexShaderViewportMatrixBinding =  FragmentShaderSamplesInfoBinding + 1;

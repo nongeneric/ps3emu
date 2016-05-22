@@ -415,7 +415,7 @@ public:
         auto input = _rsx->context()->vertexInputs[index.row()];
         auto op = _rsx->context()->frequencyDividerOperation & (1 << index.row());
         switch (index.column()) {
-            case 0: return QString::fromStdString(ssnprintf("%d", input.enabled));
+            case 0: return QString::fromStdString(ssnprintf("%d", input.rank != 0));
             case 1: return QString::fromStdString(ssnprintf("#%08x", vda.offset));
             case 2: return vda.location == MemoryLocation::Local ? "Local" : "Main";
             case 3: return QString::fromStdString(ssnprintf("%d", vda.frequency));
@@ -605,7 +605,7 @@ void MainWindowModel::update() {
     QObject::disconnect(_window.twVertexDataArrays, &QTableView::clicked, 0, 0);
     QObject::connect(_window.twVertexDataArrays, &QTableView::clicked, [&] (auto index) {
         auto input = _rsx->context()->vertexInputs[index.row()];
-        if (!input.enabled)
+        if (input.rank != 0)
             return;
         auto info = _rsx->context()->vertexDataArrays[index.row()];
         auto buffer = _rsx->getBuffer(info.location);

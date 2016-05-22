@@ -131,9 +131,44 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                                  std::vector<unsigned>* usedConsts)
 {   
     std::string res;
-    auto line = [&](std::string s) { res += s + "\n"; };
+    auto line = [&](auto&& s) { res += s; res += "\n"; };
     line("#version 450 core");
-    line(ssnprintf("layout (location = 0) in vec4 v_in_be[16];"));
+    line(ssnprintf(
+        "layout (std430, binding = %d) buffer Inputs {\n"
+        "    readonly uint us[];\n"
+        "} inputs[16];", VertexInputsBinding));
+    // note the uint that is read is LE
+    line(
+        "uint readbyte(uint input_idx, uint offset) {\n"
+        "    uint v = inputs[input_idx].us[offset / 4];\n"
+        "    uint mod = offset % 4;\n"
+        "    return (v >> (mod * 8)) & 0xff;\n"
+        "}");
+    line(
+        "uint readuint(uint input_idx, uint offset) {\n"
+        "    return (readbyte(input_idx, offset) << 24)\n"
+        "         | (readbyte(input_idx, offset + 1) << 16)\n"
+        "         | (readbyte(input_idx, offset + 2) << 8)\n"
+        "         | readbyte(input_idx, offset + 3);\n"
+        "}");
+    line(
+        "float readfloat(uint input_idx, uint offset) {\n"
+        "    return uintBitsToFloat(readuint(input_idx, offset));\n"
+        "}");
+    line(
+        "vec4 read_f32vec(uint rank, uint input_idx, uint offset) {\n"
+        "    return vec4(readfloat(input_idx, offset),\n"
+        "                rank > 1 ? readfloat(input_idx, offset + 4) : 0,\n"
+        "                rank > 2 ? readfloat(input_idx, offset + 8) : 0,\n"
+        "                rank > 3 ? readfloat(input_idx, offset + 12) : 1);\n"
+        "}");
+    line(
+        "vec4 read_u8vec(uint rank, uint input_idx, uint offset) {\n"
+        "    return vec4(readbyte(input_idx, offset),\n"
+        "                rank > 1 ? readbyte(input_idx, offset + 1) : 0,\n"
+        "                rank > 2 ? readbyte(input_idx, offset + 2) : 0,\n"
+        "                rank > 3 ? readbyte(input_idx, offset + 3) : 255) / 255.0;\n"
+        "}");
     line(ssnprintf("layout(std140, binding = %d) uniform VertexConstants {", 
                    VertexShaderConstantBinding));
     line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
@@ -142,6 +177,10 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                    VertexShaderSamplesInfoBinding));
     line("    ivec4 wrapMode[4];");
     line("    vec4 borderColor[4];");
+    line("    vec4 disabledInputValues[16];");
+    line("    uint enabledInputs[16];");
+    line("    uint inputBufferBases[16];");
+    line("    uint inputBufferStrides[16];");
     line("} samplersInfo;");
     
     line(ssnprintf("layout (std140, binding = %d) uniform ViewportInfo {",
@@ -172,6 +211,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("out vec4 f_TEX8;");
     line("out vec4 f_TEX9;");
     line("out vec4 f_SSA;");
+    line("");
     line("float reverse(float f) {");
     line("    uint bits = floatBitsToUint(f);");
     line("    uint rev = ((bits & 0xff) << 24)");
@@ -185,28 +225,6 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("                  reverse(v.y),");
     line("                  reverse(v.z),");
     line("                  reverse(v.w) );");
-    line("}");
-    line("vec4 reverse3f(vec4 v) {");
-    line("    return vec4 ( reverse(v.x),");
-    line("                  reverse(v.y),");
-    line("                  reverse(v.z),");
-    line("                  v.w );");
-    line("}");
-    line("vec4 reverse2f(vec4 v) {");
-    line("    return vec4 ( reverse(v.x),");
-    line("                  reverse(v.y),");
-    line("                  v.z,");
-    line("                  v.w );");
-    line("}");
-    line("vec4 reverse1f(vec4 v) {");
-    line("    return vec4 ( reverse(v.x),");
-    line("                  v.y,");
-    line("                  v.z,");
-    line("                  v.w );");
-    line("}");
-    line("vec4 reverse4b(vec4 v) {");
-    line("    return v;"); // each component representation is in the wrong order,
-                           // not the order of components
     line("}");
     line("int wrap(float x, int type, float size) {");
     line("    int i = int(floor(x * size));");
@@ -286,12 +304,15 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         line(ssnprintf("    v_out[%d] = vec4(0,0,0,1);", i));
     }
     for (size_t i = 0; i < inputs.size(); ++i) {
-        if (inputs[i].enabled) {
-            auto suffix = inputs[i].typeSize == 4 ? "f" : "b";
-            line(ssnprintf("    v_in[%d] = reverse%d%s(v_in_be[%d]);", i, inputs[i].rank, suffix, i));
-        } else {
-            line(ssnprintf("    v_in[%d] = v_in_be[%d];", i, i));
-        }
+        auto type = inputs[i].type == VertexInputType::float32 ? "f32" 
+                    : inputs[i].type == VertexInputType::float16 ? "f16"
+                    : "u8";
+        line(ssnprintf(
+                "if (samplersInfo.enabledInputs[%d] == 1) {\n"
+                "    v_in[%d] = read_%svec(%d, %d, samplersInfo.inputBufferBases[%d] +\n"
+                "                             samplersInfo.inputBufferStrides[%d] * gl_VertexID);\n"
+                "} else { v_in[%d] = samplersInfo.disabledInputValues[%d]; }",
+                i, i, type, inputs[i].rank, i, i, i, i, i));
     }
     std::vector<std::unique_ptr<Statement>> sts;
     std::array<VertexInstr, 2> instr;

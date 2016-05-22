@@ -369,36 +369,19 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
     format.size = size;
     format.type = type;
     
-    GLenum gltype;
-    int typeSize;
-    bool normalize;
+    auto& vinput = _context->vertexInputs[index];
+    vinput.rank = size;
     switch (type) {
         case CELL_GCM_VERTEX_UB:
-            gltype = GL_UNSIGNED_BYTE;
-            typeSize = 1;
-            normalize = true;
+            vinput.type = VertexInputType::u8;
             break;
         case CELL_GCM_VERTEX_F:
-            gltype = GL_FLOAT;
-            typeSize = 4;
-            normalize = false;
+            vinput.type = VertexInputType::float32;
             break;
         case CELL_GCM_VERTEX_SF:
-            gltype = GL_HALF_FLOAT;
-            typeSize = 2;
-            normalize = false;
+            vinput.type = VertexInputType::float16;
             break;
         default: throw std::runtime_error("not implemented array type");
-    }
-    auto& vinput = _context->vertexInputs[index];
-    vinput.typeSize = typeSize;
-    vinput.rank = size;
-    vinput.enabled = size != 0;
-    if (vinput.enabled) {
-        glcall(glEnableVertexAttribArray(index));
-        glcall(glVertexAttribFormat(index, size, gltype, normalize, 0));
-    } else {
-        glcall(glDisableVertexAttribArray(index));
     }
 }
 
@@ -460,6 +443,10 @@ void Rsx::resetFlipStatus() {
 struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
     std::array<uint32_t, 4> wraps[4];
     std::array<float, 4> borderColor[4];
+    std::array<float, 4> disabledInputValues[16];
+    std::array<uint32_t, 4> enabledInputs[16];
+    std::array<uint32_t, 4> inputBufferBases[16];
+    std::array<uint32_t, 4> inputBufferStrides[16];
 };
 
 struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
@@ -512,7 +499,7 @@ void Rsx::resetContext() {
     StencilOpFail(CELL_GCM_KEEP, CELL_GCM_KEEP, CELL_GCM_KEEP);
     StencilTestEnable(CELL_GCM_FALSE);
     for (auto i = 0u; i < _context->vertexInputs.size(); ++i) {
-        _context->vertexInputs[i].enabled = false;
+        _context->vertexInputs[i].rank = 0;
         glDisableVertexAttribArray(i);
     }
     for (auto& s : _context->vertexTextureSamplers) {
@@ -751,11 +738,16 @@ void Rsx::updateShaders() {
             arraySizes};
         auto shader = _context->vertexShaderCache.retrieve(key);
         if (!shader) {
-            auto text = GenerateVertexShader(_context->vertexInstructions.data(),
+            LOG << ssnprintf("updating vertex shader");
+            LOG << ssnprintf("updated vertex shader:\n%s\n%s",
+                     PrintVertexBytecode(&_context->vertexInstructions[0]),
+                     PrintVertexProgram(&_context->vertexInstructions[0]));
+            auto text = GenerateVertexShader(&_context->vertexInstructions[0],
                                              _context->vertexInputs,
                                              samplerSizes,
                                              0); // TODO: loadAt
             shader = new VertexShader(text.c_str());
+            LOG << ssnprintf("updated vertex shader (2):\n%s\n%s", text, shader->log());
             auto updater = new SimpleCacheItemUpdater<VertexShader> {
                 uint32_t(), (uint32_t)key.bytecode.size(), [](auto){}
             };
@@ -1371,18 +1363,23 @@ GLPersistentCpuBuffer* Rsx::getBuffer(MemoryLocation location) {
 }
 
 void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
+    auto uniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
     for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
         auto& format = _context->vertexDataArrays[i];
         auto& input = _context->vertexInputs[i];
-        if (!input.enabled)
+        
+        uniform->enabledInputs[i][0] = input.rank > 0;
+        
+        if (input.rank == 0)
             continue;
    
         auto bufferOffset = format.offset + first * format.stride;
         auto handle = getBuffer(format.location)->handle();
         
-        glVertexAttribBinding(i, format.binding);
-        glBindVertexBuffer(format.binding, handle, bufferOffset, format.stride);
+        uniform->inputBufferBases[i][0] = bufferOffset;
+        uniform->inputBufferStrides[i][0] = format.stride;
         
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VertexInputsBinding + i, handle);
         if (_mode != RsxOperationMode::Replay) {
             UpdateBufferCache(format.location, bufferOffset, count * format.stride);
         }
@@ -1873,7 +1870,8 @@ void Rsx::ZStencilClearValue(uint32_t value) {
 
 void Rsx::VertexData4fM(unsigned index, float x, float y, float z, float w) {
     TRACE5(VertexData4fM, index, x, y, z, w);
-    glVertexAttrib4f(index, x, y, z, w);
+    auto uniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
+    uniform->disabledInputValues[index] = { x, y, z, w };
 }
 
 GLenum gcmCullFaceToOpengl(uint32_t cfm) {
