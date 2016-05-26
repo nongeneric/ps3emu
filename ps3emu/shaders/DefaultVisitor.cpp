@@ -26,9 +26,16 @@ namespace ShaderRewriter {
     
     void DefaultVisitor::visit(IfStatement* ifst) {
         ifst->condition()->accept(this);
-        for (auto& st : ifst->statements()) {
+        for (auto& st : ifst->trueBlock()) {
             st->accept(this);
         }
+        for (auto& st : ifst->falseBlock()) {
+            st->accept(this);
+        }
+    }
+    
+    void DefaultVisitor::visit(IfStubFragmentStatement* ifst) {
+        visit(static_cast<IfStatement*>(ifst));
     }
     
     void DefaultVisitor::visit(Assignment* assignment) {

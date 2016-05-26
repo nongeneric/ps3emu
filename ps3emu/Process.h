@@ -7,6 +7,7 @@
 #include "IDMap.h"
 #include "../libs/ConcurrentQueue.h"
 
+#include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/variant.hpp>
@@ -132,6 +133,7 @@ class Process {
     void dbgPause(bool pause, bool takeMutex = true);
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
+    boost::chrono::high_resolution_clock::time_point _systemStart;
     
 public:
     Process();
@@ -156,4 +158,8 @@ public:
     void destroySpuThread(SPUThread* thread);
     std::vector<PPUThread*> dbgPPUThreads();
     std::vector<SPUThread*> dbgSPUThreads();
+    uint64_t getFrequency();
+    uint64_t getTimeBase();
+    boost::chrono::microseconds getTimeBaseMicroseconds();
+    boost::chrono::nanoseconds getTimeBaseNanoseconds();
 };

@@ -7,6 +7,7 @@
 #include "../../ps3emu/rsx/RsxContext.h"
 #include "../../ps3emu/ELFLoader.h"
 #include "../../ps3emu/InternalMemoryManager.h"
+#include "../../ps3emu/log.h"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -17,6 +18,22 @@ using namespace boost::endian;
 namespace emu {
 namespace Gcm {
 
+struct CellGcmTileInfo {
+    big_uint32_t tile;
+    big_uint32_t limit;
+    big_uint32_t pitch;
+    big_uint32_t format;
+};
+
+struct CellGcmZcullInfo {
+    big_uint32_t region;
+    big_uint32_t size;
+    big_uint32_t start;
+    big_uint32_t offset;
+    big_uint32_t status0;
+    big_uint32_t status1;
+};
+  
 struct OffsetTable;
 struct {
     Process* proc;
@@ -29,9 +46,12 @@ struct {
     OffsetTable* offsetTable = nullptr;
     ps3_uintptr_t offsetTableEmuEa;
     uint32_t ioSize;
+    std::array<CellGcmTileInfo, 16>* tileInfos = nullptr;
+    ps3_uintptr_t tileInfosOffset = 0;
+    std::array<CellGcmZcullInfo, 8>* zcullInfos = nullptr;
+    ps3_uintptr_t zcullInfosOffset = 0;
 } emuGcmState;
 
-  
 struct OffsetTable {
     OffsetTable() {
         for (auto& i : ioAddress) {
@@ -129,6 +149,14 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     emuGcmState.offsetTable = internalMemory->internalAlloc<128, OffsetTable>(&emuGcmState.offsetTableEmuEa);
     emuGcmState.ioSize = ioSize;
     
+    emuGcmState.tileInfos =
+        internalMemory->internalAlloc<128, std::array<CellGcmTileInfo, 16>>(
+            &emuGcmState.tileInfosOffset);
+        
+    emuGcmState.zcullInfos =
+        internalMemory->internalAlloc<128, std::array<CellGcmZcullInfo, 8>>(
+            &emuGcmState.zcullInfosOffset);
+    
     proc->rsx()->setGcmContext(ioSize, ioAddress);
     proc->rsx()->init(proc);
     proc->mm()->setMemory(GcmLabelBaseOffset, 0, 1, true);
@@ -176,6 +204,11 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     return CELL_OK;  
 }
 
+uint32_t cellGcmGetTileInfo() {
+    assert(emuGcmState.tileInfosOffset);
+    return emuGcmState.tileInfosOffset;
+}
+
 int32_t cellGcmSetDisplayBuffer(const uint8_t id,
                                 const uint32_t offset,
                                 const uint32_t pitch,
@@ -199,6 +232,11 @@ uint32_t cellGcmGetFlipStatus(Process* proc) {
     return proc->rsx()->isFlipInProgress() ?
         CELL_GCM_DISPLAY_FLIP_STATUS_WAITING :
         CELL_GCM_DISPLAY_FLIP_STATUS_DONE;
+}
+
+emu_void_t cellGcmSetFlipStatus(Process* proc) {
+    proc->rsx()->setFlipStatus();
+    return emu_void;
 }
 
 emu_void_t cellGcmResetFlipStatus(Process* proc) {
@@ -239,6 +277,11 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint8_t bank)
 {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    auto& info = (*emuGcmState.tileInfos)[index];
+    info.tile = (location + 1) | (bank << 4) | ((offset / 0x10000) << 16) | (location << 31);
+    info.limit = (((offset + size - 1) / 0x10000) << 16) | (location << 31);
+    info.pitch = (pitch / 0x100) << 8;
+    info.format = (base | (base + ((size - 1) / 0x10000)) << 13) | (comp << 26) | (1 << 30);
     return CELL_OK;
 }
 
@@ -402,16 +445,13 @@ emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc) {
 }
 
 uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMemory* mm) {
-    auto locationEnum = gcmEnumToLocation(location);
-    if (locationEnum == MemoryLocation::Local) {
-        assert(index < 2048);
-    } else {
-        assert(index < 1024 * 1024);
-    }
     const auto valueOffset = 8;
-    auto offset = 0x0e000000 + 16 * index + valueOffset;
-    auto ea = rsxOffsetToEa(locationEnum, offset);
-    return mm->load<4>(ea);
+    auto ea = cellGcmGetReportDataAddressLocation(index, location);
+    return mm->load<4>(ea + valueOffset);
+}
+
+uint32_t cellGcmGetReportDataAddressLocation(uint32_t index, uint32_t location) {
+    return getReportDataAddressLocation(index, gcmEnumToLocation(location));
 }
 
 emu_void_t cellGcmSetZcull(uint8_t index,
@@ -426,7 +466,29 @@ emu_void_t cellGcmSetZcull(uint8_t index,
                            uint32_t sFunc,
                            uint32_t sRef,
                            uint32_t sMask) {
+    auto& info = (*emuGcmState.zcullInfos)[index];
+    info.region = (1 << 0) | (zFormat << 4) | (aaFormat << 8);
+    info.size = ((width >> 6) << 22) | ((height >> 6) << 6);
+    info.start = cullStart & ~0xFFF;
+    info.offset = offset;
+    info.status0 = (zCullDir << 1) | (zCullFormat << 2) 
+                 | ((sFunc & 0xF) << 12) | (sRef << 16) | (sMask << 24);
+    info.status1 = 0x2000 | (0x20 << 16);
     return emu_void;
+}
+
+uint32_t cellGcmGetZcullInfo() {
+    assert(emuGcmState.zcullInfosOffset);
+    return emuGcmState.zcullInfosOffset;
+}
+
+int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
+    LOG << "NOT IMPLEMENTED: cellGcmInitDefaultFifoMode";
+    return CELL_OK;
+}
+
+uint32_t cellGcmGetLastFlipTime(Process* proc) {
+    return proc->rsx()->getLastFlipTime();
 }
 
 }}

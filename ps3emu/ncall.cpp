@@ -517,6 +517,13 @@ STUB_1(cellPngDecDestroy);
 STUB_3(cellPngDecReadHeader);
 STUB_5(cellPngDecOpen);
 STUB_4(cellPngDecSetParameter);
+STUB_1(cellGcmInitDefaultFifoMode);
+STUB_0(cellGcmGetTileInfo);
+STUB_0(cellGcmGetZcullInfo);
+STUB_1(cellGcmSetFlipStatus);
+STUB_2(cellGcmGetReportDataAddressLocation);
+STUB_1(cellGcmGetLastFlipTime);
+STUB_2(_sys_heap_delete_heap);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -663,6 +670,13 @@ NCallEntry ncallTable[] {
     ENTRY(cellPngDecReadHeader),
     ENTRY(cellPngDecOpen),
     ENTRY(cellPngDecSetParameter),
+    ENTRY(cellGcmInitDefaultFifoMode),
+    ENTRY(cellGcmGetTileInfo),
+    ENTRY(cellGcmGetZcullInfo),
+    ENTRY(cellGcmSetFlipStatus),
+    ENTRY(cellGcmGetReportDataAddressLocation),
+    ENTRY(cellGcmGetLastFlipTime),
+    ENTRY(_sys_heap_delete_heap),
 };
 
 void PPUThread::ncall(uint32_t index) {

@@ -358,18 +358,21 @@ uint32_t GLTexture::read2d(
     auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     for (auto level = 0u; level < _info.mipmap; ++level) {
         LinearTextureIterator srcDecoded(nullptr, 0, _info.width, _info.height, 16, level);
-        if (texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT1 ||
-            texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT23 ||
-            texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT45) {
+        auto isDX1 = texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT1;
+        auto isDX23 = texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT23;
+        auto isDX45 = texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT45;
+        if (isDX1 || isDX23 || isDX45) {
+            auto decode = isDX1 ? decodeDXT1 : isDX23 ? decodeDXT23 : decodeDXT45;
+            auto blockSize = isDX1 ? 8 : 16;
             unsigned blockWidth = _info.width / 4;
             unsigned blockHeight = _info.height / 4;
             std::array<glm::vec4, 16> decoded;
-            LinearTextureIterator src(raw, 0, blockWidth, blockHeight, 16, level);
+            LinearTextureIterator src(raw, 0, blockWidth, blockHeight, blockSize, level);
             LinearTextureIterator dest(&conv[0], 0, srcDecoded.w(), srcDecoded.h(), 16, 0);
             for (auto by = 0u; by < src.h(); ++by) {
                 for (auto bx = 0u; bx < src.w(); ++bx) {
                     auto block = src.at(bx, by);
-                    decodeDXT23(block, &decoded[0]);
+                    decode(block, &decoded[0]);
                     for (int i = 0; i < 4; ++i) {
                         memcpy(dest.at(bx * 4, by * 4 + i),
                                &decoded[4 * i],

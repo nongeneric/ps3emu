@@ -30,7 +30,7 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
 
 cell_system_time_t sys_time_get_system_time(PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    auto sec = (float)thread->mm()->getTimeBase() / (float)thread->mm()->getFrequency();
+    auto sec = (float)thread->proc()->getTimeBase() / (float)thread->proc()->getFrequency();
     return sec * 1000000;
 }
 
@@ -147,7 +147,7 @@ int sys_timer_usleep(usecond_t sleep_time) {
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
-    return thread->mm()->getFrequency();
+    return thread->proc()->getFrequency();
 }
 
 uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec) {

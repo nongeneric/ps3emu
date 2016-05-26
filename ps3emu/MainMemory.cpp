@@ -160,7 +160,6 @@ void MainMemory::reset() {
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
-    _systemStart = boost::chrono::high_resolution_clock::now();
 }
 
 ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
@@ -247,17 +246,6 @@ void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
         page.ptr = (uintptr_t)memoryPtr;
         _providedMemoryPages[firstPage + i] = true;
     }
-}
-
-uint64_t MainMemory::getFrequency() {
-    return 79800000;
-}
-
-uint64_t MainMemory::getTimeBase() {
-    auto now = boost::chrono::high_resolution_clock::now();
-    auto diff = now - _systemStart;
-    auto us = boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
-    return (us * getFrequency() / 1000000).count();
 }
 
 void MainMemory::memoryBreak(uint32_t va, uint32_t size) {

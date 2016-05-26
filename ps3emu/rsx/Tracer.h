@@ -54,6 +54,7 @@
     X(VertexDataArrayOffset) \
     X(BeginEnd) \
     X(DrawArrays) \
+    X(InlineArray) \
     X(TransformConstantLoad) \
     X(RestartIndexEnable) \
     X(RestartIndex) \
@@ -108,6 +109,8 @@
     X(StencilMask) \
     X(StencilFunc) \
     X(StencilOpFail) \
+    X(ContextDmaReport) \
+    X(GetReport) \
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \

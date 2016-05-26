@@ -3,8 +3,9 @@
 #include "nvimage/BlockDXT.h"
 #include "nvimage/ColorBlock.h"
 
-void decodeDXT23(const uint8_t* block, glm::vec4* data16) {
-    auto dxt = reinterpret_cast<const nv::BlockDXT3*>(block);
+template <typename BlockType>
+void decodeDXT(const uint8_t* block, glm::vec4* data16) {
+    auto dxt = reinterpret_cast<const BlockType*>(block);
     nv::ColorBlock color;
     dxt->decodeBlock(&color);
     auto c = color.colors();
@@ -15,4 +16,16 @@ void decodeDXT23(const uint8_t* block, glm::vec4* data16) {
                      (float)c->a / 255.f};
         c++;
     }
+}
+
+void decodeDXT1(const uint8_t* block, glm::vec4* data16) {
+    decodeDXT<nv::BlockDXT1>(block, data16);
+}
+
+void decodeDXT23(const uint8_t* block, glm::vec4* data16) {
+    decodeDXT<nv::BlockDXT3>(block, data16);
+}
+
+void decodeDXT45(const uint8_t* block, glm::vec4* data16) {
+    decodeDXT<nv::BlockDXT5>(block, data16);
 }

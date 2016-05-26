@@ -280,5 +280,26 @@ CallbackThread* Process::getCallbackThread() {
 Process::~Process() = default;
 
 Process::Process() {
-    _mainMemory.reset(new MainMemory());   
+    _mainMemory.reset(new MainMemory());
+    _systemStart = boost::chrono::high_resolution_clock::now();
+}
+
+uint64_t Process::getFrequency() {
+    return 79800000;
+}
+
+uint64_t Process::getTimeBase() {
+    auto us = getTimeBaseMicroseconds();
+    return (us * getFrequency() / 1000000).count();
+}
+
+boost::chrono::microseconds Process::getTimeBaseMicroseconds() {
+    return boost::chrono::duration_cast<boost::chrono::microseconds>(
+        getTimeBaseNanoseconds());
+}
+
+boost::chrono::nanoseconds Process::getTimeBaseNanoseconds() {
+    auto now = boost::chrono::high_resolution_clock::now();
+    auto diff = now - _systemStart;
+    return boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
 }

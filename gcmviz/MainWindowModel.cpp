@@ -505,6 +505,8 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
+        if (_info.frequency != 0)
+            return _info.frequency;
         return _size;
     }
 };
@@ -605,7 +607,7 @@ void MainWindowModel::update() {
     QObject::disconnect(_window.twVertexDataArrays, &QTableView::clicked, 0, 0);
     QObject::connect(_window.twVertexDataArrays, &QTableView::clicked, [&] (auto index) {
         auto input = _rsx->context()->vertexInputs[index.row()];
-        if (input.rank != 0)
+        if (input.rank == 0)
             return;
         auto info = _rsx->context()->vertexDataArrays[index.row()];
         auto buffer = _rsx->getBuffer(info.location);

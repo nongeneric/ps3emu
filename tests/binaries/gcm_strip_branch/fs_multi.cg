@@ -1,0 +1,112 @@
+/*  SCE CONFIDENTIAL
+ *  PlayStation(R)3 Programmer Tool Runtime Library 400.001
+ *  Copyright (C) 2008 Sony Computer Entertainment Inc.
+ *  All Rights Reserved.
+ */
+
+void main
+(
+	float4 color_in	: COLOR,
+	float2 texcoord	: TEXCOORD0,
+	
+	float4 position : TEXCOORD1,
+	float3 normal : TEXCOORD2,
+	float4 lightDir_and_wAmbient : TEXCOORD3,
+
+	uniform sampler2D texture : TEXUNIT0,
+	
+	uniform float4 branchLightMode, 
+	uniform float4 branchAreaLight, 
+	uniform float4 colorAreaLight[4], 
+	uniform float3 atAreaLight[4], 
+	uniform float3 posAreaLight[4], 
+
+	out float4 color : COLOR
+)
+{
+	float ambient = lightDir_and_wAmbient.w;
+	float inv_ambient = 1.0f - lightDir_and_wAmbient.w;
+	float diffuse = max(0.0f, dot(normalize(normal), lightDir_and_wAmbient.xyz));
+	diffuse = diffuse * inv_ambient + ambient;
+	
+	[branch] if(branchLightMode.x){
+		float3 light_at;
+		float4 light_color;
+		float3 light_pos;
+
+		[branch] if(branchAreaLight.x){
+			light_at = atAreaLight[0];
+			light_color = colorAreaLight[0];
+			light_pos = posAreaLight[0];
+		}else [branch] if(branchAreaLight.y){
+			light_at = atAreaLight[1];
+			light_color = colorAreaLight[1];
+			light_pos = posAreaLight[1];
+		}else [branch] if(branchAreaLight.z){
+			light_at = atAreaLight[2];
+			light_color = colorAreaLight[2];
+			light_pos = posAreaLight[2];
+		}else [branch] if(branchAreaLight.w){
+			light_at = atAreaLight[3];
+			light_color = colorAreaLight[3];
+			light_pos = posAreaLight[3];
+		}else{
+			// for floor
+			light_at = float3(0.0f, 0.0f, 0.0f);
+			light_color = float4(0.0f, 0.0f, 0.0f, 1.0f);
+			light_pos = float3(0.0f, 80.0f, 0.0f);
+			if(position.x > 0.0f && position.z > 0.0f){
+				light_at = atAreaLight[0];
+				light_color = colorAreaLight[0];
+				light_pos = posAreaLight[0];
+			}
+			if(position.x < 0.0f && position.z > 0.0f){
+				light_at = atAreaLight[1];
+				light_color = colorAreaLight[1];
+				light_pos = posAreaLight[1];
+			}
+			if(position.x > 0.0f && position.z < 0.0f){
+				light_at = atAreaLight[2];
+				light_color = colorAreaLight[2];
+				light_pos = posAreaLight[2];
+			}
+			if(position.x < 0.0f && position.z < 0.0f){
+				light_at = atAreaLight[3];
+				light_color = colorAreaLight[3];
+				light_pos = posAreaLight[3];
+			}
+		}
+		
+		float3 light_dir = normalize(light_at - light_pos);
+		
+		float light_obj_dist = dot(light_dir, position.xyz - light_pos);
+		
+		float light_range = 20.0f * light_obj_dist / length(light_at - light_pos);		
+		float light_distance = length(light_obj_dist * light_dir + light_pos - position.xyz);
+		float light_damp = 5.0f;
+		float light_power = 1.0f - max(0.0f, min(1.0f, (light_distance - light_range) / light_damp));
+		
+		[branch] if(branchLightMode.y){
+			// paint light
+			float4 base = float4(1,1,1,1);
+			color = light_power * light_color + (1.0f - light_power) * base;
+			color = tex2D(texture, texcoord) * diffuse * color;
+			color.w = color_in.w;
+		}else [branch] if(branchLightMode.z){
+			// fluor light
+			color = light_power * light_color + (1.0f - light_power) * diffuse;
+			color = tex2D(texture, texcoord) * color;
+			color.w = color_in.w;
+		}else{
+			// spot light
+			float4 base = float4(0,0,0,1);
+			color = light_power * light_color * diffuse + (1.0f - light_power) * base;
+			color = tex2D(texture, texcoord) * color;
+			color.w = color_in.w;
+		}
+	}else{
+		// default light
+		color = tex2D(texture, texcoord) * diffuse * color_in;
+		color.w = 1.0f;
+	}
+}

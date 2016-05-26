@@ -28,9 +28,13 @@ ThreadSafeIDMap<uint32_t, SysHeap*> map;
 }
 
 uint32_t _sys_heap_create_heap(uint64_t unk1, uint32_t size, uint64_t unk2, uint64_t unk3, MainMemory* mm) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     auto heap = new SysHeap(size, mm);
     return map.create(heap);
+}
+
+uint32_t _sys_heap_delete_heap(uint32_t heap_id, uint64_t unk) {
+    map.destroy(heap_id);
+    return CELL_OK;
 }
 
 uint32_t _sys_heap_malloc(uint32_t heap_id, uint32_t size, big_uint32_t* ptr) {

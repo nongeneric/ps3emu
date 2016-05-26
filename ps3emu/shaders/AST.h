@@ -10,7 +10,7 @@ namespace ShaderRewriter {
         vec4, vec3, vec2, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
         mul, div, add, abs, neg, exp2, lg2, min, max, pow, inversesqrt,
         fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
-        cast_float, cast_int, clamp4i, sign, normalize,
+        cast_float, cast_int, clamp4i, clamp, sign, normalize,
         gt, ge, eq, ne, lt, le,
         reverse4f, reverse3f, reverse2f,
         call, ret,
@@ -63,12 +63,33 @@ namespace ShaderRewriter {
     
     class IfStatement : public Statement {
         std::unique_ptr<Expression> _expr;
-        std::vector<std::unique_ptr<Statement>> _statements;
+        std::vector<std::unique_ptr<Statement>> _trueBlock;
+        std::vector<std::unique_ptr<Statement>> _falseBlock;
     public:
         IfStatement(Expression* expr, 
-                    std::vector<Statement*> statements);
-        std::vector<Statement*> statements();
+                    std::vector<Statement*> trueBlock,
+                    std::vector<Statement*> falseBlock,
+                    unsigned address);
+        std::vector<Statement*> trueBlock();
+        std::vector<Statement*> falseBlock();
+        void setTrueBlock(std::vector<Statement*> block);
+        void setFalseBlock(std::vector<Statement*> block);
         Expression* condition();
+        virtual void accept(IExpressionVisitor* visitor) override;
+    };
+    
+    class IfStubFragmentStatement : public IfStatement {
+        unsigned _elseLabel;
+        unsigned _endifLabel;
+    public:
+        inline IfStubFragmentStatement(Expression* expr,
+                                       unsigned elseLabel,
+                                       unsigned endifLabel)
+            : IfStatement(expr, {}, {}, 0),
+              _elseLabel(elseLabel),
+              _endifLabel(endifLabel) {}
+        inline unsigned elseLabel() { return _elseLabel; }
+        inline unsigned endifLabel() { return _endifLabel; }
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
@@ -178,11 +199,6 @@ namespace ShaderRewriter {
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
-    class BasicBlock {
-    public:
-        std::vector<Statement*> statements;
-    };
-    
     class IExpressionVisitor {
     public:
         virtual void visit(FloatLiteral* literal) = 0;
@@ -194,7 +210,8 @@ namespace ShaderRewriter {
         virtual void visit(Variable* ref) = 0;
         virtual void visit(Invocation* invocation) = 0;
         virtual void visit(ComponentMask* mask) = 0;
-        virtual void visit(IfStatement* mask) = 0;
+        virtual void visit(IfStatement* st) = 0;
+        virtual void visit(IfStubFragmentStatement* st) = 0;
         virtual void visit(SwitchStatement* sw) = 0;
         virtual void visit(BreakStatement* be) = 0;
         virtual void visit(DiscardStatement* be) = 0;

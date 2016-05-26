@@ -2506,7 +2506,7 @@ PRINT(MFTB, XFXForm_2) {
 
 EMU(MFTB, XFXForm_2) {
     auto tbr = i->tbr.u();
-    auto tb = MM->getTimeBase();
+    auto tb = TH->proc()->getTimeBase();
     assert(tbr == 392 || tbr == 424);
     if (tbr == 424)
         tb &= 0xffffffff;
@@ -2800,7 +2800,7 @@ EMU(VCMPEQUW, SIMDForm) {
     TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
         auto d128 = TH->getV(i->vD);
-        auto t = d128 == ~make128(0, 0);
+        auto t = ~d128 == 0;
         auto f = d128 == 0;
         auto c = t << 3 | f << 1;
         TH->setCRF(6, c);  
@@ -2821,7 +2821,7 @@ EMU(VCMPGTFP, SIMDForm) {
     TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
         auto d128 = TH->getV(i->vD);
-        auto t = d128 == ~make128(0, 0);
+        auto t = ~d128 == 0;
         auto f = d128 == 0;
         auto c = t << 3 | f << 1;
         TH->setCRF(6, c);
@@ -2842,7 +2842,7 @@ EMU(VCMPGTUW, SIMDForm) {
     TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
         auto d128 = TH->getV(i->vD);
-        auto t = d128 == ~make128(0, 0);
+        auto t = ~d128 == 0;
         auto f = d128 == 0;
         auto c = t << 3 | f << 1;
         TH->setCRF(6, c);
@@ -2863,7 +2863,7 @@ EMU(VCMPGTSW, SIMDForm) {
     TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
         auto d128 = TH->getV(i->vD);
-        auto t = d128 == ~make128(0, 0);
+        auto t = ~d128 == 0;
         auto f = d128 == 0;
         auto c = t << 3 | f << 1;
         TH->setCRF(6, c);
@@ -2884,7 +2884,7 @@ EMU(VCMPEQFP, SIMDForm) {
     TH->setVuw(i->vD, d);
     if (i->Rc.u()) {
         auto d128 = TH->getV(i->vD);
-        auto t = d128 == ~make128(0, 0);
+        auto t = ~d128 == 0;
         auto f = d128 == 0;
         auto c = t << 3 | f << 1;
         TH->setCRF(6, c);
@@ -2964,7 +2964,7 @@ EMU(VPERM, SIMDForm) {
     uint8_t cbe[16];
     TH->getV(i->vC, cbe);
     uint8_t dbe[16] = { 0 };
-    for (int i = 0; i < 15; ++i) {
+    for (int i = 0; i < 16; ++i) {
         auto b = cbe[i] & 31;
         dbe[i] = be[b];
     }

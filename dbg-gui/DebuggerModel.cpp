@@ -624,11 +624,27 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
         std::string name;
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
         counts[name]++;
-        fprintf(f, "%08x  %s\n", nip, str.c_str());
+        
+        fprintf(f, "pc:%08x;", nip);
+        for (auto i = 0u; i < 32; ++i) {
+            auto r = _activeThread->getGPR(i);
+            fprintf(f, "r%d:%08x%08x;", i, (uint32_t)(r >> 32), (uint32_t)r);
+        }
+        for (auto i = 0u; i < 32; ++i) {
+            auto v = _activeThread->getV(i);
+            fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
+                    (uint32_t)(v >> 96),
+                    (uint32_t)(v >> 64),
+                    (uint32_t)(v >> 32),
+                    (uint32_t)v);
+        }
+        fprintf(f, " #%s\n", str.c_str());
+        
+        fflush(f);
         _activeThread->singleStepBreakpoint();
         _proc->run();
     }
-    fprintf(f, "\ninstruction frequencies:\n");
+    fprintf(f, "#\n#instruction frequencies:\n");
     std::vector<std::pair<std::string, int>> sorted;
     for (auto p : counts) {
         sorted.push_back(p);
@@ -637,7 +653,7 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
         return b.second < a.second;
     });
     for (auto p : sorted) {
-        fprintf(f, "%-10s%-5d\n", p.first.c_str(), p.second);
+        fprintf(f, "#%-10s%-5d\n", p.first.c_str(), p.second);
     }
     fclose(f);
 }

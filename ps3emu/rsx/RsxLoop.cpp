@@ -159,7 +159,9 @@ int64_t Rsx::interpret(uint32_t get) {
     }
     if (header.prefix.u() == 1) {
         auto offset = header.jumpoffset.u();
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx jump to %x", offset);
+        if (offset != get) { // don't log on busy wait
+            BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx jump to %x", offset);
+        }
         return offset - get;
     }
     if (header.callsuffix.u() == 2) {
@@ -259,7 +261,8 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_SEMAPHORE";
             break;
         case 0x000001a8:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_REPORT";
+            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_REPORT";
+            ContextDmaReport(readarg(1));
             break;
         case 0x000001ac:
             name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_CLIP_ID";
@@ -656,9 +659,12 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x000017cc:
             name = "CELL_GCM_NV4097_SET_ZPASS_PIXEL_COUNT_ENABLE";
             break;
-        case 0x00001800:
-            name = "CELL_GCM_NV4097_GET_REPORT";
+        case 0x00001800: {
+            //name = "CELL_GCM_NV4097_GET_REPORT";
+            auto arg = readarg(1);
+            GetReport(arg >> 24, arg & 0xffffff);
             break;
+        }
         case 0x00001804:
             name = "CELL_GCM_NV4097_SET_ZCULL_STATS_ENABLE";
             break;
@@ -696,7 +702,8 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         }
         case 0x00001818:
-            name = "CELL_GCM_NV4097_INLINE_ARRAY";
+            //name = "CELL_GCM_NV4097_INLINE_ARRAY";
+            InlineArray(get + 4, count);
             break;
         case 0x0000181c: {
             //name = "CELL_GCM_NV4097_SET_INDEX_ARRAY_ADDRESS";
@@ -778,7 +785,8 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         }
         case 0x00001d74:
-            name = "CELL_GCM_NV4097_TEXTURE_READ_SEMAPHORE_RELEASE";
+            //name = "CELL_GCM_NV4097_TEXTURE_READ_SEMAPHORE_RELEASE";
+            TextureReadSemaphoreRelease(readarg(1));
             break;
         case 0x00001d78:
             name = "CELL_GCM_NV4097_SET_ZMIN_MAX_CONTROL";

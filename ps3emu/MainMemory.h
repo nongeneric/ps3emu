@@ -5,7 +5,6 @@
 #include "spinlock.h"
 #include "utils.h"
 #include <boost/endian/arithmetic.hpp>
-#include <boost/chrono.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <functional>
@@ -71,7 +70,6 @@ class MainMemory {
     std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;    
     std::unique_ptr<MemoryPage[]> _pages;
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
-    boost::chrono::high_resolution_clock::time_point _systemStart;
     Rsx* _rsx;
     Process* _proc;
     boost::mutex _pageMutex;
@@ -104,8 +102,6 @@ public:
     void map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size);
     void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
-    uint64_t getFrequency();
-    uint64_t getTimeBase();
     void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
     void memoryBreak(uint32_t va, uint32_t size);
     void setRsx(Rsx* rsx);

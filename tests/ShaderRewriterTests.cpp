@@ -136,7 +136,7 @@ TEST_CASE("shader_rewriter_0") {
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi, 0);
     str = printStatements(st);
-    REQUIRE( str == "" );
+    REQUIRE( str == "while (false) { }" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi, 0);
@@ -414,7 +414,7 @@ TEST_CASE("shader_rewriter_slexc_norm_kilr") {
     pos += fragment_dasm_instr(instr + pos, fi);
     auto st = MakeStatement(fi, 0);
     auto str = printStatements(st);
-    REQUIRE( str == "c[0].w = float(lessThanEqual((r[1].xxxx), (fconst.c[0].xxxx)).w);" );
+    REQUIRE( str == "c[0].w = clamp(lessThanEqual((r[1].xxxx), (fconst.c[0].xxxx)).w, -2, 2);" );
     
     pos += fragment_dasm_instr(instr + pos, fi);
     st = MakeStatement(fi, 0);

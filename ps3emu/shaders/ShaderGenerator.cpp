@@ -2,6 +2,7 @@
 #include "ShaderRewriter.h"
 #include "../utils.h"
 #include "../constants.h"
+#include <map>
 
 using namespace ShaderRewriter;
 
@@ -38,16 +39,19 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     while (pos < bytecode.size()) {
         FragmentInstr fi;
         auto len = fragment_dasm_instr(&bytecode[0] + pos, fi);
-        pos += len;
         for (auto& st : MakeStatement(fi, constIndex)) {
-            lastReg = std::max(lastReg, GetLastRegisterNum(st.get()));   
+            lastReg = std::max(lastReg, GetLastRegisterNum(st.get())); 
+            st->address(pos);
             sts.emplace_back(std::move(st));
         }
+        pos += len;
         if (len == 32)
             constIndex++;
         if (fi.is_last)
             break;
     }
+    
+    sts = RewriteIfStubs(std::move(sts));
     
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
@@ -137,6 +141,21 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "layout (std430, binding = %d) buffer Inputs {\n"
         "    readonly uint us[];\n"
         "} inputs[16];", VertexInputsBinding));
+    line(ssnprintf("layout(std140, binding = %d) uniform VertexConstants {", 
+                   VertexShaderConstantBinding));
+    line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
+    line("} constants;");
+    line(ssnprintf("layout (std140, binding = %d) uniform SamplersInfo {",
+                   VertexShaderSamplesInfoBinding));
+    line("    ivec4 wrapMode[4];");
+    line("    vec4 borderColor[4];");
+    line("    vec4 disabledInputValues[16];");
+    line("    uint enabledInputs[16];");
+    line("    uint inputBufferBases[16];");
+    line("    uint inputBufferStrides[16];");
+    line("    uint inputBufferOps[16];");
+    line("    uint inputBufferFrequencies[16];");
+    line("} samplersInfo;");
     // note the uint that is read is LE
     line(
         "uint readbyte(uint input_idx, uint offset) {\n"
@@ -169,19 +188,19 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "                rank > 2 ? readbyte(input_idx, offset + 2) : 0,\n"
         "                rank > 3 ? readbyte(input_idx, offset + 3) : 255) / 255.0;\n"
         "}");
-    line(ssnprintf("layout(std140, binding = %d) uniform VertexConstants {", 
-                   VertexShaderConstantBinding));
-    line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
-    line("} constants;");
-    line(ssnprintf("layout (std140, binding = %d) uniform SamplersInfo {",
-                   VertexShaderSamplesInfoBinding));
-    line("    ivec4 wrapMode[4];");
-    line("    vec4 borderColor[4];");
-    line("    vec4 disabledInputValues[16];");
-    line("    uint enabledInputs[16];");
-    line("    uint inputBufferBases[16];");
-    line("    uint inputBufferStrides[16];");
-    line("} samplersInfo;");
+    line(ssnprintf(
+        "uint get_input_offset(uint i) {\n"
+        "    uint index = gl_VertexID;\n"
+        "    uint freq = samplersInfo.inputBufferFrequencies[i];\n"
+        "    if (freq != 0) {\n"
+        "        if (samplersInfo.inputBufferOps[i] == 0) {\n"
+        "            index /= freq;\n"
+        "        } else {\n"
+        "            index %= freq;\n"
+        "        }\n"
+        "    }\n"
+        "    return samplersInfo.inputBufferBases[i] + samplersInfo.inputBufferStrides[i] * index;\n"
+        "}"));
     
     line(ssnprintf("layout (std140, binding = %d) uniform ViewportInfo {",
                    VertexShaderViewportMatrixBinding));
@@ -309,10 +328,9 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                     : "u8";
         line(ssnprintf(
                 "if (samplersInfo.enabledInputs[%d] == 1) {\n"
-                "    v_in[%d] = read_%svec(%d, %d, samplersInfo.inputBufferBases[%d] +\n"
-                "                             samplersInfo.inputBufferStrides[%d] * gl_VertexID);\n"
+                "    v_in[%d] = read_%svec(%d, %d, get_input_offset(%d));\n"
                 "} else { v_in[%d] = samplersInfo.disabledInputValues[%d]; }",
-                i, i, type, inputs[i].rank, i, i, i, i, i));
+                i, i, type, inputs[i].rank, i, i, i, i));
     }
     std::vector<std::unique_ptr<Statement>> sts;
     std::array<VertexInstr, 2> instr;
@@ -383,15 +401,26 @@ std::string PrintFragmentProgram(const uint8_t* instr) {
     std::string res;
     unsigned pos = 0;
     FragmentInstr fi;
+    std::map<unsigned, int> elses;
+    std::map<unsigned, int> endifs;
     do {
         auto len = fragment_dasm_instr(instr, fi);
         static std::string line;
         line.clear();
         fragment_dasm(fi, line);
-        res += ssnprintf("%03d: %s\n", pos / 16, line);
+        for (auto i = 0; i < endifs[pos]; ++i) {
+            res += "         ENDIF\n";
+        }
+        if (elses[pos]) {
+            res += "         ELSE\n";
+        }
+        res += ssnprintf("%03d|%03x: %s\n", pos / 16, pos / 16, line);
+        if (fi.opcode.instr == fragment_op_t::IFE) {
+            elses[fi.elseLabel * 16]++;
+            endifs[fi.endifLabel * 16]++;
+        }
         instr += len;
         pos += len;
-        
     } while(!fi.is_last);
     return res;
 }

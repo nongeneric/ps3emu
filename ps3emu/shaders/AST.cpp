@@ -36,6 +36,7 @@ namespace ShaderRewriter {
     void BinaryOperator::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void ComponentMask::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IfStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
+    void IfStubFragmentStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void SwitchStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void IntegerLiteral::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void BreakStatement::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
@@ -88,14 +89,29 @@ namespace ShaderRewriter {
         : Invocation(FunctionName::none, { cond, trueExpr, falseExpr }) { }
     
     IfStatement::IfStatement(Expression* expr,
-                             std::vector<Statement*> statements)
-        : _expr(expr), _statements(pack_unique(statements))
-    {
-        address(statements.front()->address());
+                             std::vector<Statement*> trueBlock,
+                             std::vector<Statement*> falseBlock,
+                             unsigned address)
+        : _expr(expr),
+          _trueBlock(pack_unique(trueBlock)),
+          _falseBlock(pack_unique(falseBlock)) {
+        this->address(address);
     }
     
-    std::vector<Statement*> IfStatement::statements() {
-        return unpack_unique(_statements);
+    std::vector<Statement*> IfStatement::trueBlock() {
+        return unpack_unique(_trueBlock);
+    }
+    
+    std::vector<Statement*> IfStatement::falseBlock() {
+        return unpack_unique(_falseBlock);
+    }
+    
+    void IfStatement::setTrueBlock(std::vector<Statement*> block) {
+        _trueBlock = pack_unique(block);
+    }
+    
+    void IfStatement::setFalseBlock(std::vector<Statement*> block) {
+        _falseBlock = pack_unique(block);
     }
     
     Expression* IfStatement::condition() {

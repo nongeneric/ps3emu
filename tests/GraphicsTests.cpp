@@ -1,6 +1,7 @@
 #include <catch.hpp>
 
 #include <QProcess>
+#include "../ps3emu/utils.h"
 
 static const char* runnerPath = "../ps3run/ps3run";
 
@@ -12,6 +13,7 @@ void compareLastFrame(const char* expected, int n = 0, int tolerance = 5) {
     auto args = QStringList() << "-depth" << "8"
                               << "-size" << "1280x720"
                               << "-flip"
+                              << "-quality" << "11"
                               << QString("/tmp/ps3frame%1.rgb").arg(n)
                               << QString("/tmp/ps3frame%1.png").arg(n);
     proc.start("convert", args);
@@ -303,4 +305,17 @@ TEST_CASE("pngdec_ppu_graphics") {
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() == 0 );
     compareLastFrame("./binaries/pngdec_ppu/ps3frame0.png", 0);
+}
+
+TEST_CASE("gcm_strip_branch") {
+    QProcess proc;
+    auto args = QStringList() << "./binaries/gcm_strip_branch/a.elf";
+    proc.start(runnerPath, args);
+    proc.waitForFinished(-1);
+    REQUIRE( proc.exitCode() == 0 );
+    for (int i = 0; i <= 18; ++i) {
+        compareLastFrame(
+            ssnprintf("./binaries/gcm_strip_branch/ps3frame%d.png", i).c_str(),
+            i);
+    }
 }

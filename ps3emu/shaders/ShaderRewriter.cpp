@@ -5,6 +5,8 @@
 #include <set>
 #include <vector>
 #include <algorithm>
+#include <boost/range/algorithm.hpp>
+#include <boost/log/trivial.hpp>
 
 namespace ShaderRewriter {
     
@@ -55,6 +57,7 @@ namespace ShaderRewriter {
         { FunctionName::ftxp, { ExprType::vec4, ExprType::int32, ExprType::vec4 } },
         { FunctionName::unpackUnorm4x8, { ExprType::vec4, ExprType::int32 } },
         { FunctionName::floatBitsToUint, { ExprType::int32, ExprType::fp32 } },
+        { FunctionName::clamp, { ExprType::notype, ExprType::notype, ExprType::fp32, ExprType::fp32 } },
     };
     
     int getSingleComponent(swizzle_t s) {
@@ -80,6 +83,10 @@ namespace ShaderRewriter {
     
     class PrintVisitor : public IExpressionVisitor {
         std::string _ret;
+        unsigned level = 0;
+        std::string indent(unsigned level) {
+            return std::string(level * 4, ' ');
+        }
         
         std::string printOperatorName(FunctionName name) {
             switch (name) {
@@ -100,6 +107,10 @@ namespace ShaderRewriter {
         std::string accept(Expression* st) {
             st->accept(this);
             return _ret;
+        }
+        
+        virtual void visit(IfStubFragmentStatement* st) {
+            return visit((IfStatement*)st);
         }
         
         virtual void visit(FloatLiteral* literal) override {
@@ -135,7 +146,7 @@ namespace ShaderRewriter {
         virtual void visit(Assignment* assignment) override {
             auto var = accept(assignment->dest());
             auto expr = accept(assignment->expr());
-            _ret = ssnprintf("%s = %s;", var.c_str(), expr.c_str());
+            _ret = ssnprintf("%s%s = %s;", indent(level), var.c_str(), expr.c_str());
         }
         
         virtual void visit(Variable* var) override {
@@ -206,6 +217,7 @@ namespace ShaderRewriter {
                 case FunctionName::exp2: name = "exp2"; break;
                 case FunctionName::unpackUnorm4x8: name = "unpackUnorm4x8"; break;
                 case FunctionName::floatBitsToUint: name = "floatBitsToUint"; break;
+                case FunctionName::clamp: name = "clamp"; break;
                 default: assert(false);
             }
             _ret = ssnprintf("%s(%s)", name, str.c_str());
@@ -217,13 +229,21 @@ namespace ShaderRewriter {
             _ret = ssnprintf("%s%s", expr.c_str(), strMask.c_str());
         }
         
-        virtual void visit(IfStatement* invocation) override {
-            auto cond = accept(invocation->condition());
-            std::string res = "if (" + cond + ") {\n";
-            for (auto& st : invocation->statements()) {
-                res += "    " + accept(st) + "\n";
+        virtual void visit(IfStatement* ifst) override {
+            auto cond = accept(ifst->condition());
+            std::string res = indent(level) + "if (" + cond + ") {\n";
+            level++;
+            for (auto& st : ifst->trueBlock()) {
+                res += accept(st) + "\n";
             }
-            res += "}";
+            if (!ifst->falseBlock().empty()) {
+                res += indent(level - 1) + "} else {\n";
+                for (auto& st : ifst->falseBlock()) {
+                    res += accept(st) + "\n";
+                }
+            }
+            level--;
+            res += indent(level) + "}";
             _ret = res;
         }
         
@@ -240,19 +260,24 @@ namespace ShaderRewriter {
         }
         
         virtual void visit(BreakStatement* sw) override {
-            _ret = "break;";
+            _ret = indent(level) + "break;";
         }
         
         virtual void visit(DiscardStatement* sw) override {
-            _ret = "discard;";
+            _ret = indent(level) + "discard;";
         }
         
         virtual void visit(WhileStatement* ws) override {
+            auto cond = accept(ws->condition());
+            if (ws->body().empty()) {
+                _ret = ssnprintf("%swhile (%s) { }", indent(level), cond);
+                return;
+            }
             std::string body;
             for (auto st : ws->body()) {
                 body += accept(st) + "\n";
             }
-            _ret = ssnprintf("while (%s) {\n%s}", accept(ws->condition()), body);
+            _ret = ssnprintf("%swhile (%s) {\n%s}", indent(level), cond, body);
         }
         
         virtual void visit(TernaryOperator* ternary) override {
@@ -548,9 +573,9 @@ namespace ShaderRewriter {
         return expr;
     }
     
-    void appendCondition(condition_t cond, std::vector<std::unique_ptr<Statement>>& res) {
+    Expression* makeCondition(condition_t cond) {
         if (cond.relation == cond_t::TR)
-            return;
+            return nullptr;
         auto func = relationToFunction(cond.relation);
 //         auto sw = cond.swizzle;
 //         assert(sw.comp[0] == sw.comp[1] && 
@@ -560,11 +585,17 @@ namespace ShaderRewriter {
         auto reg = new Variable("c", new IntegerLiteral(regnum));
         auto swexpr = new Swizzle(reg, cond.swizzle);
         auto maskExpr = new ComponentMask(swexpr, { 1, 0, 0, 0 });
-        auto expr = new BinaryOperator(func, maskExpr, new FloatLiteral(0));
+        return new BinaryOperator(func, maskExpr, new FloatLiteral(0));
+    }
+    
+    void appendCondition(condition_t cond, std::vector<std::unique_ptr<Statement>>& res) {
+        auto expr = makeCondition(cond);
+        if (!expr)
+            return;
         std::vector<Statement*> sts;
         for (auto& st : res)
             sts.push_back(st.release());
-        auto ifstat = new IfStatement(expr, sts);
+        auto ifstat = new IfStatement(expr, sts, {}, sts.front()->address());
         res.clear();
         res.emplace_back(ifstat);
     }
@@ -584,17 +615,25 @@ namespace ShaderRewriter {
         }
     }
     
-    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i, unsigned constIndex) {
+    Expression* clamp(Expression* expr, float min, float max) {
+        return new Invocation(FunctionName::clamp,
+                              {expr, new FloatLiteral(min), new FloatLiteral(max)});
+    }
+    
+    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i,
+                                                          unsigned constIndex) {
         Expression* rhs = nullptr;
         Expression* args[4];
         for (int n = 0; n < i.opcode.op_count; ++n) {
             args[n] = ConvertArgument(i, n, constIndex);
         }
+        std::vector<std::unique_ptr<Statement>> res;
         switch (i.opcode.instr) {
             case fragment_op_t::NOP:
             case fragment_op_t::FENCB:
             case fragment_op_t::FENCT:
-                return { };
+                res.emplace_back(std::unique_ptr<Statement>(new WhileStatement(new Variable("false", nullptr), {})));
+                return res;
             case fragment_op_t::ADD: {
                 rhs = new BinaryOperator(FunctionName::add, args[0], args[1]);
                 break;
@@ -736,6 +775,9 @@ namespace ShaderRewriter {
             case fragment_op_t::KIL: {
                 break;
             }
+            case fragment_op_t::IFE: {
+                break;
+            }
             default: assert(false);
         }
         
@@ -756,6 +798,18 @@ namespace ShaderRewriter {
             rhs = new BinaryOperator(FunctionName::mul, new FloatLiteral(mul), rhs);
         }
         
+        if (i.is_sat || i.is_bx2) {
+            rhs = clamp(rhs, 0.0f, 1.0f);
+        } else {
+            if (i.clamp == clamp_t::X) {
+                rhs = clamp(rhs, -2.0f, 2.0f);
+            } else if (i.clamp == clamp_t::B) {
+                rhs = clamp(rhs, -1.0f, 1.0f);
+            }
+        }
+        
+        assert(!i.is_bx2);
+        
         int regnum;
         const char* regname;
         if (i.is_reg_c) {
@@ -765,18 +819,23 @@ namespace ShaderRewriter {
             regnum = i.reg_num;
             regname = i.reg == reg_type_t::H ? "h" : "r";
         }
-        std::vector<std::unique_ptr<Statement>> res;
-        if (i.opcode.instr == fragment_op_t::KIL) {
-            res.emplace_back(new DiscardStatement());
-        } else {
-            auto dest = new Variable(regname, new IntegerLiteral(regnum));
-            auto mask = new ComponentMask(dest, i.dest_mask);
-            auto assign = new Assignment(mask, rhs);
-            res.emplace_back(assign);
-        }
         
-        appendCAssignment(i.control, i.is_reg_c, i.dest_mask, regname, regnum, res);
-        appendCondition(i.condition, res);
+        if (i.opcode.instr == fragment_op_t::IFE) {
+            auto cond = makeCondition(i.condition);
+            assert(cond);
+            res.emplace_back(new IfStubFragmentStatement(cond, i.elseLabel, i.endifLabel));
+        } else {
+            if (i.opcode.instr == fragment_op_t::KIL) {
+                res.emplace_back(new DiscardStatement());
+            } else {
+                auto dest = new Variable(regname, new IntegerLiteral(regnum));
+                auto mask = new ComponentMask(dest, i.dest_mask);
+                auto assign = new Assignment(mask, rhs);
+                res.emplace_back(assign);
+            }
+            appendCAssignment(i.control, i.is_reg_c, i.dest_mask, regname, regnum, res);
+            appendCondition(i.condition, res);
+        }
         
         TypeFixerVisitor typeFixer;
         for (auto& st : res) {
@@ -1183,7 +1242,46 @@ namespace ShaderRewriter {
         }
     }
     
-    const std::set< unsigned int >& UsedConstsVisitor::consts() {
+    const std::set<unsigned>& UsedConstsVisitor::consts() {
         return _consts;
+    }
+    
+    bool fixFirstIfStub(std::vector<Statement*>& statements) {
+        auto it = boost::find_if(statements, [](auto s) {
+            auto stub = dynamic_cast<IfStubFragmentStatement*>(s);
+            if (!stub)
+                return false;
+            return stub->trueBlock().empty();
+        });
+        if (it == end(statements))
+            return false;
+        auto stub = (IfStubFragmentStatement*)*it;
+        auto trueStart = it + 1;
+        auto trueEnd = boost::find_if(statements, [&](auto s) {
+            return s->address() / 16 == stub->elseLabel();
+        });
+        auto falseEnd = boost::find_if(statements, [&](auto s) {
+            return s->address() / 16 == stub->endifLabel();
+        });
+        if (falseEnd == end(statements)) {
+            assert(stub->endifLabel() > statements.back()->address() / 16);
+        }
+        assert(trueEnd != end(statements));
+        std::vector<Statement*> trueBlock(trueStart, trueEnd);
+        std::vector<Statement*> falseBlock(trueEnd, falseEnd);
+        
+        statements.erase(trueStart, falseEnd);
+        while (fixFirstIfStub(trueBlock)) {}
+        while (fixFirstIfStub(falseBlock)) {}
+        stub->setTrueBlock(trueBlock);
+        stub->setFalseBlock(falseBlock);
+        return true;
+    }
+    
+    std::vector<std::unique_ptr<Statement>> RewriteIfStubs(
+        std::vector<std::unique_ptr<Statement>> statements) {
+        auto unpacked = release_unique(statements);
+        while (fixFirstIfStub(unpacked)) { }
+        return pack_unique(unpacked);
     }
 }

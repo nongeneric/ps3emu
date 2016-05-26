@@ -103,6 +103,16 @@ void Rsx::SemaphoreRelease(uint32_t value) {
     atomic->store(boost::endian::native_to_big(value));
 }
 
+void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
+    auto offset = _context->semaphoreOffset;
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
+        _activeSemaphoreHandle, offset, value
+    );
+    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto atomic = (std::atomic<uint32_t>*)ptr;
+    atomic->store(boost::endian::native_to_big(value));
+}
+
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
     TRACE4(ClearRectHorizontal, x, w, y, h);
     //TODO: implement
@@ -417,7 +427,7 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     updateTextures();
     watchCaches();
     linkShaderProgram();
-    glcall(glDrawArrays(_context->glVertexArrayMode, 0, count));
+    glDrawArrays(_context->glVertexArrayMode, 0, count);
     
     // Right after a gcm draw command completes, the next command might immediately
     // update buffers or shader constants. OpenGL draw commands are asynchronous
@@ -432,8 +442,35 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     TRACE2(DrawArrays, first, count);
 }
 
+unsigned vertexDataArrayTypeSize(unsigned type) {
+    switch (type) {
+        case CELL_GCM_VERTEX_F: return 4;
+        case CELL_GCM_VERTEX_UB: return 1;
+        default: throw std::runtime_error("unsupported vertex data array type");
+    }
+}
+
+void Rsx::InlineArray(uint32_t offset, unsigned count) {
+    TRACE2(InlineArray, offset, count);
+    auto stride = 0u;
+    for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
+        auto& format = _context->vertexDataArrays[i];
+        auto& input = _context->vertexInputs[i];
+        if (input.rank) {
+            format.offset = offset + stride;
+            format.location = MemoryLocation::Main;
+            stride += format.size * vertexDataArrayTypeSize(format.type);
+        }
+    }
+    DrawArrays(0, count * 4 / stride);
+}
+
 bool Rsx::isFlipInProgress() const {
     return _isFlipInProgress;
+}
+
+void Rsx::setFlipStatus() {
+    _isFlipInProgress = false;
 }
 
 void Rsx::resetFlipStatus() {
@@ -447,6 +484,8 @@ struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
     std::array<uint32_t, 4> enabledInputs[16];
     std::array<uint32_t, 4> inputBufferBases[16];
     std::array<uint32_t, 4> inputBufferStrides[16];
+    std::array<uint32_t, 4> inputBufferOps[16];
+    std::array<uint32_t, 4> inputBufferFrequencies[16];
 };
 
 struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
@@ -514,6 +553,10 @@ void Rsx::resetContext() {
     glDisable(GL_MULTISAMPLE);
 }
 
+uint32_t Rsx::getLastFlipTime() {
+    return _lastFlipTime;
+}
+
 void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     TRACE3(EmuFlip, buffer, label, labelValue);
     auto& fb = _context->displayBuffers[buffer];
@@ -527,21 +570,28 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
         auto it = br::find_if(_context->surfaceLinks, [&](auto& link) {
             return link.framebufferEa == va;
         });
-        assert(it != end(_context->surfaceLinks));
-        key.offset = it->surfaceEa;
-        tex = _context->framebuffer->findTexture(key);
-        assert(tex);
+        //assert(it != end(_context->surfaceLinks));
+        if (it != end(_context->surfaceLinks)) {
+            key.offset = it->surfaceEa;
+            tex = _context->framebuffer->findTexture(key);
+        }
     }
     _context->framebuffer->bindDefault();
-    _context->textureRenderer->render(tex);
+    if (tex) {
+        _context->textureRenderer->render(tex);
+    }
     _context->pipeline.bind();
+    
+    _isFlipInProgress = true;
+    
     _window.swapBuffers();
+    _lastFlipTime = _proc->getTimeBaseMicroseconds().count();
     _context->frame++;
     _context->commandNum = 0;
     
 #if TESTS
     static int framenum = 0;
-    if (framenum < 10 && _mode != RsxOperationMode::Replay) {
+    if (framenum < 22 && _mode != RsxOperationMode::Replay && tex) {
         auto& vec = _context->lastFrame;
         vec.resize(_window.width() * _window.height() * 3);
         glGetTextureImage(
@@ -868,6 +918,21 @@ GLenum gcmTextureFilterToOpengl(uint8_t filter) {
     }
 }
 
+GLenum gcmFragmentTextureWrapToOpengl(unsigned wrap) {
+    switch (wrap) {
+        case 0:
+        case CELL_GCM_TEXTURE_WRAP: return GL_REPEAT;
+        case CELL_GCM_TEXTURE_MIRROR: return GL_MIRRORED_REPEAT;
+        case CELL_GCM_TEXTURE_BORDER:
+        case CELL_GCM_TEXTURE_CLAMP:
+        case CELL_GCM_TEXTURE_MIRROR_ONCE_BORDER:
+        case CELL_GCM_TEXTURE_MIRROR_ONCE_CLAMP:
+        case CELL_GCM_TEXTURE_MIRROR_ONCE_CLAMP_TO_EDGE:
+        case CELL_GCM_TEXTURE_CLAMP_TO_EDGE: return GL_CLAMP_TO_EDGE;
+        default: throw std::runtime_error("unknown wrap mode");
+    }
+}
+
 void Rsx::updateTextures() {
     int i = 0;
     auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
@@ -926,8 +991,12 @@ void Rsx::updateTextures() {
             glSamplerParameteri(handle,
                                 GL_TEXTURE_MAG_FILTER,
                                 gcmTextureFilterToOpengl(sampler.fragmentMag));
-            glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(handle,
+                                GL_TEXTURE_WRAP_S,
+                                gcmFragmentTextureWrapToOpengl(sampler.wraps));
+            glSamplerParameteri(handle,
+                                GL_TEXTURE_WRAP_T,
+                                gcmFragmentTextureWrapToOpengl(sampler.wrapt));
             
             // TODO: handle viewport CELL_GCM_WINDOW_ORIGIN_TOP
             fragmentSamplerUniform->flip[i] = surfaceTex != nullptr;
@@ -1378,6 +1447,9 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
         
         uniform->inputBufferBases[i][0] = bufferOffset;
         uniform->inputBufferStrides[i][0] = format.stride;
+        uniform->inputBufferOps[i][0] =
+            _context->frequencyDividerOperation & (1u << i);
+        uniform->inputBufferFrequencies[i][0] = format.frequency;
         
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VertexInputsBinding + i, handle);
         if (_mode != RsxOperationMode::Replay) {
@@ -1956,6 +2028,22 @@ void Rsx::StencilOpFail(uint32_t fail, uint32_t depthFail, uint32_t depthPass) {
                 gcmStencilOpToOpengl(depthPass));
 }
 
+void Rsx::ContextDmaReport(uint32_t handle) {
+    TRACE1(ContextDmaReport, handle);
+    _context->reportLocation = handle == CELL_GCM_CONTEXT_DMA_REPORT_LOCATION_MAIN 
+        ? MemoryLocation::Main : MemoryLocation::Local;
+    waitForIdle();
+}
+
+void Rsx::GetReport(uint8_t type, uint32_t offset) {
+    TRACE2(GetReport, type, offset);
+    // TODO: report zpass/zcull
+    auto ea = getReportDataAddressLocation(offset / 16, _context->reportLocation);
+    _mm->store<8>(ea, _proc->getTimeBaseNanoseconds().count());
+    _mm->store<8>(ea + 8 + 4, 0);
+    __sync_synchronize();
+}
+
 void Rsx::setOperationMode(RsxOperationMode mode) {
     _mode = mode;
 }
@@ -2009,4 +2097,14 @@ void Rsx::updateOffsetTableForReplay() {
         memcpy(&vec[0], &_currentReplayBlob[0], _currentReplayBlob.size());
         deserializeOffsetTable(vec);
     }
+}
+
+uint32_t getReportDataAddressLocation(uint32_t index, MemoryLocation location) {
+    if (location == MemoryLocation::Local) {
+        assert(index < 2048);
+    } else {
+        assert(index < 1024 * 1024);
+    }
+    auto offset = 0x0e000000 + 16 * index;
+    return rsxOffsetToEa(location, offset);
 }

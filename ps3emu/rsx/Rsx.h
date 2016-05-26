@@ -51,6 +51,7 @@ class Rsx {
     std::atomic<uint32_t> _ref;
     std::atomic<uint32_t> _ret;
     std::atomic<bool> _isFlipInProgress;
+    std::atomic<uint32_t> _lastFlipTime;
     bool _shutdown = false;
     bool _initialized = false;
     MainMemory* _mm;
@@ -96,6 +97,7 @@ class Rsx {
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
+    void TextureReadSemaphoreRelease(uint32_t value);
     void SemaphoreRelease(uint32_t value);
     void SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h);
     void SurfacePitchC(uint32_t pitchC, uint32_t pitchD, uint32_t offsetC, uint32_t offsetD);
@@ -171,6 +173,7 @@ class Rsx {
     void VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset);
     void BeginEnd(uint32_t mode);
     void DrawArrays(unsigned first, unsigned count);
+    void InlineArray(uint32_t offset, unsigned count);
     void TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count);
     void RestartIndexEnable(bool enable);
     void RestartIndex(uint32_t index);
@@ -301,6 +304,8 @@ class Rsx {
     void StencilMask(uint32_t sm);
     void StencilFunc(uint32_t func, int32_t ref, uint32_t mask);
     void StencilOpFail(uint32_t fail, uint32_t depthFail, uint32_t depthPass);
+    void ContextDmaReport(uint32_t handle);
+    void GetReport(uint8_t type, uint32_t offset);
     
     void invokeHandler(uint32_t descrEa);
     
@@ -326,6 +331,7 @@ public:
     bool isCallActive();
     void setLabel(int index, uint32_t value, bool waitForIdle = true);
     bool isFlipInProgress() const;
+    void setFlipStatus();
     void resetFlipStatus();
     void setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress);
     void setDisplayBuffer(uint8_t id,
@@ -342,6 +348,8 @@ public:
     bool receiveCommandCompletion();
     RsxContext* context();
     GLPersistentCpuBuffer* getBuffer(MemoryLocation location);
+    uint32_t getLastFlipTime();
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
+uint32_t getReportDataAddressLocation(uint32_t index, MemoryLocation location);

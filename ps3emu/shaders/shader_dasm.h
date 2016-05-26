@@ -119,6 +119,8 @@ struct dest_mask_t {
 };
 
 struct FragmentInstr {
+    uint32_t elseLabel;
+    uint32_t endifLabel;
     fragment_opcode_t opcode;
     condition_t condition;
     input_modifier_t input_modifier;

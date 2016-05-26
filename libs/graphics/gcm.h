@@ -49,6 +49,7 @@ int32_t cellGcmSetDisplayBuffer(const uint8_t id,
 ps3_uintptr_t cellGcmGetControlRegister();
 ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index);
 uint32_t cellGcmGetFlipStatus(Process* proc);
+emu_void_t cellGcmSetFlipStatus(Process* proc);
 emu_void_t cellGcmResetFlipStatus(Process* proc);
 emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer, Process* proc);
 uint32_t cellGcmGetTiledPitchSize(uint32_t size);
@@ -103,6 +104,11 @@ int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big
 int32_t cellGcmUnmapEaIoAddress(uint32_t ea);
 int32_t cellGcmUnmapIoAddress(uint32_t io);
 uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMemory* mm);
+uint32_t cellGcmGetReportDataAddressLocation(uint32_t index, uint32_t location);
+int32_t cellGcmInitDefaultFifoMode(int32_t mode);
+uint32_t cellGcmGetTileInfo();
+uint32_t cellGcmGetZcullInfo();
+uint32_t cellGcmGetLastFlipTime(Process* proc);
 
 emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
 

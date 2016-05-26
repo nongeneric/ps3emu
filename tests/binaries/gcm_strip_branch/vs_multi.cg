@@ -1,0 +1,46 @@
+/*  SCE CONFIDENTIAL
+ *  PlayStation(R)3 Programmer Tool Runtime Library 400.001
+ *  Copyright (C) 2008 Sony Computer Entertainment Inc.
+ *  All Rights Reserved.
+ */
+
+void main
+(
+	float4 position	: POSITION,
+	float3 normal   : NORMAL,
+	float2 texcoord	: TEXCOORD0,
+	float  index	: TEXCOORD1,
+	
+	uniform float4x4 ViewMatrix  : C4,
+	uniform float4x4 ProjMatrix  : C8,
+	
+	uniform float4 lightDir_and_wAmbient : C12,
+	uniform float4 modelColor            : C13,
+	
+	uniform float4 MatrixList[4] : C16,
+	
+	out float4 oPosition : POSITION,
+	out float2 oTexCoord : TEXCOORD0,
+	out float4 oColor    : COLOR,
+	
+	out float4 oObjPos : TEXCOORD1,
+	out float3 oNormal : TEXCOORD2,
+	out float4 oLightParam : TEXCOORD3
+)
+{
+	float4x4 ModelMatrix;
+	ModelMatrix[0] = MatrixList[index * 3 + 0];
+	ModelMatrix[1] = MatrixList[index * 3 + 1];
+	ModelMatrix[2] = MatrixList[index * 3 + 2];
+	ModelMatrix[3] = float4(0.0f, 0.0f, 0.0f, 1.0f);
+	
+	float4x4 ModelViewProjMatrix = mul(ProjMatrix, mul(ViewMatrix, ModelMatrix));
+	
+	oPosition = mul(ModelViewProjMatrix, position);
+	oTexCoord = texcoord;
+	oColor = modelColor;
+	
+	oNormal = normalize(mul((float3x3)ModelMatrix, normal));
+	oObjPos = mul(ModelMatrix, position);
+	oLightParam = lightDir_and_wAmbient;
+}

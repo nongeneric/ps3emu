@@ -14,6 +14,7 @@ namespace ShaderRewriter {
         virtual void visit(IntegerLiteral* ref) override;
         virtual void visit(ComponentMask* mask) override;
         virtual void visit(IfStatement* ifst) override;
+        virtual void visit(IfStubFragmentStatement* ifst) override;
         virtual void visit(Assignment* assignment) override;
         virtual void visit(Invocation* invocation) override;
         virtual void visit(SwitchStatement* sw) override;

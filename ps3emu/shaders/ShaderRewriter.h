@@ -13,6 +13,8 @@ namespace ShaderRewriter {
     std::vector<std::unique_ptr<Statement>> MakeStatement(VertexInstr const& i, unsigned address);
     std::vector<std::unique_ptr<Statement>> RewriteBranches(
         std::vector<std::unique_ptr<Statement>> statements);
+    std::vector<std::unique_ptr<Statement>> RewriteIfStubs(
+        std::vector<std::unique_ptr<Statement>> statements);
     std::string PrintStatement(Statement* stat);
     int GetLastRegisterNum(Expression* expr);
     

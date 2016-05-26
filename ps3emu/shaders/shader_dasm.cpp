@@ -120,21 +120,19 @@ struct fragment_instr_t {
         BitField<23, 24> Op1wMask23;
     } b1;
     union {
-        BitField<24, 25> Opcode0;
-        BitField<25, 28> Scale;
-        
         BitField<0, 6> Op2RegNum;
         BitField<6, 8> Op2Type;
-        BitField<15, 16> Op2RegType;
-        BitField<18, 21> InputModifier;
-        BitField<22, 23> Op2Neg;
-        BitField<26, 27> Op2Abs;
-        
+        BitField<8, 9> Op2wMask8;
         BitField<9, 11> Op2zMask;
         BitField<11, 13> Op2yMask;
         BitField<13, 15> Op2xMask;
-        BitField<8, 9> Op2wMask8;
+        BitField<15, 16> Op2RegType;
+        BitField<18, 21> InputModifier;
+        BitField<22, 23> Op2Neg;
         BitField<23, 24> Op2wMask23;
+        BitField<24, 25> Opcode0;
+        BitField<25, 28> Scale;
+        BitField<26, 27> Op2Abs;
     } b2;
     union {
         BitField<24, 25> PerspCorr;
@@ -490,6 +488,9 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
         if (arg.is_abs)
             res += "|";
     }
+    if (i.opcode.instr == fragment_op_t::IFE) {
+        res += ssnprintf(" [%03x, %03x]", i.elseLabel, i.endifLabel);
+    }
     res += ";";
     if (i.is_last) {
         res += " # last instruction";
@@ -507,7 +508,21 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
     
     auto i = (fragment_instr_t*)buf;
     auto opcode = fragment_opcodes[i->Opcode()];
-   
+
+    if (opcode.instr == fragment_op_t::IFE) {
+        uint8_t buf[16];
+        for (auto i = 8u; i < sizeof(buf); i += 4) {
+            buf[i + 0] = instr[i + 1];
+            buf[i + 1] = instr[i + 0];
+            buf[i + 2] = instr[i + 3];
+            buf[i + 3] = instr[i + 2];
+        }
+        
+        auto dw = (uint32_t*)&buf[0];
+        res.elseLabel = (dw[2] >> 2) & 0x1ffff;
+        res.endifLabel = (dw[3] >> 2) & 0x1ffff;
+    }
+    
     res.opcode = opcode;
     res.clamp = i->Clamp();
     res.input_modifier = (input_modifier_t)i->b2.InputModifier.u();
