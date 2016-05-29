@@ -2,7 +2,7 @@
 
 #include <map>
 #include <memory>
-#include "../../ps3emu/utils.h"
+#include "../../utils.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/log/trivial.hpp>

@@ -17,7 +17,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/range/algorithm.hpp>
-#include "../../libs/graphics/graphics.h"
+#include "../libs/graphics/graphics.h"
 
 #include "FragmentShaderUpdateFunctor.h"
 #include "RsxContext.h"

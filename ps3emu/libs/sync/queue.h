@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../sys_defs.h"
-#include "../../ps3emu/ppu/PPUThread.h"
+#include "../../ppu/PPUThread.h"
 
 typedef struct sys_event_queue_attr {
     sys_protocol_t attr_protocol;

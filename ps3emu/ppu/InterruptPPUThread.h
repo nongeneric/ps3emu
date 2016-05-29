@@ -1,7 +1,7 @@
 #pragma once
 
 #include "PPUThread.h"
-#include "../../libs/ConcurrentQueue.h"
+#include "../libs/ConcurrentQueue.h"
 
 class SPUThread;
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "sys_defs.h"
-#include "../ps3emu/constants.h"
-#include "../ps3emu/MainMemory.h"
+#include "../constants.h"
+#include "../MainMemory.h"
 
 typedef big_int32_t CellFsMode;
 typedef int32_t CellFsErrno;

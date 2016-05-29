@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../libs/graphics/graphics.h"
+#include "../libs/graphics/graphics.h"
 #include "../constants.h"
-#include "../../libs/graphics/gcm.h"
-#include "../../libs/ConcurrentQueue.h"
+#include "../libs/graphics/gcm.h"
+#include "../libs/ConcurrentQueue.h"
 #include "../gcmviz/GcmDatabase.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>

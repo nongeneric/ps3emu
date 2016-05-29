@@ -1,8 +1,8 @@
 #pragma once
 
 #include "sys_defs.h"
-#include "../ps3emu/constants.h"
-#include "../ps3emu/ELFLoader.h"
+#include "../constants.h"
+#include "../ELFLoader.h"
 
 class Process;
 class PPUThread;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "sys_defs.h"
-#include "../ps3emu/Process.h"
+#include "../Process.h"
 #include <array>
 
 struct CellGameContentSize {

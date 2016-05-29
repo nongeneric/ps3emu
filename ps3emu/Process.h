@@ -5,7 +5,7 @@
 #include "spu/SPUThread.h"
 #include "MemoryBlockManager.h"
 #include "IDMap.h"
-#include "../libs/ConcurrentQueue.h"
+#include "libs/ConcurrentQueue.h"
 
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>

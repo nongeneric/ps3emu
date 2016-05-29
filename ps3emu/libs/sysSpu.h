@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ps3emu/Process.h"
+#include "../Process.h"
 #include "sys_defs.h"
 
 class SpuImage;

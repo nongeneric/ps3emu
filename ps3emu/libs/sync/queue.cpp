@@ -1,8 +1,8 @@
 #include "queue.h"
 
 #include "../ConcurrentQueue.h"
-#include "../../ps3emu/IDMap.h"
-#include "../../ps3emu/MainMemory.h"
+#include "../../IDMap.h"
+#include "../../MainMemory.h"
 #include <boost/thread.hpp>
 #include <boost/log/trivial.hpp>
 

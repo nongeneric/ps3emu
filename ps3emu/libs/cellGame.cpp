@@ -1,7 +1,7 @@
 #include "cellGame.h"
 
-#include "../ps3emu/ContentManager.h"
-#include "../ps3emu/MainMemory.h"
+#include "../ContentManager.h"
+#include "../MainMemory.h"
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
 

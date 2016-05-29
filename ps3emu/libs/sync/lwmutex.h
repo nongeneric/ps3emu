@@ -2,7 +2,7 @@
 
 #include "../sys_defs.h"
 #include "mutex.h"
-#include "../../ps3emu/MainMemory.h"
+#include "../../MainMemory.h"
 #include <memory>
 
 struct sys_lwmutex_lock_info_t {

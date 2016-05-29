@@ -21,7 +21,7 @@ pkg_search_module(CRYPTO REQUIRED libcrypto)
 pkg_search_module(PNG REQUIRED libpng)
 pkg_search_module(ZLIB REQUIRED zlib)
 
-include_directories(SYSTEM libs/graphics/GL/include)
+include_directories(SYSTEM ps3emu/libs/graphics/GL/include)
 #-fsanitize=undefined
 #-fsanitize=thread
 
@@ -44,7 +44,6 @@ include_directories(SYSTEM $ENV{PS3_TARGET_COMMON_INCLUDE})
 
 add_subdirectory(ps3emu)
 add_subdirectory(dbg-gui)
-add_subdirectory(libs)
 add_subdirectory(ps3run)
 add_subdirectory(unsce)
 add_subdirectory(tests)

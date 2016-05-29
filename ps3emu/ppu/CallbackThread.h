@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../constants.h"
-#include "../../libs/ConcurrentQueue.h"
+#include "../libs/ConcurrentQueue.h"
 #include <future>
 #include <vector>
 #include <memory>

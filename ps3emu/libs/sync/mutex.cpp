@@ -1,7 +1,7 @@
 #include "mutex.h"
 
-#include "../../ps3emu/utils.h"
-#include "../../ps3emu/IDMap.h"
+#include "../../utils.h"
+#include "../../IDMap.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/log/trivial.hpp>

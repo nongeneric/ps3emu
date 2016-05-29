@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../ps3emu/MainMemory.h"
+#include "../../MainMemory.h"
 #include "../sys_defs.h"
 
 struct sys_lwcond_attribute_t {

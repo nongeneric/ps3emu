@@ -50,10 +50,36 @@ set(SRC
     rsx/FragmentShaderUpdateFunctor.cpp
     rsx/DXT.cpp
     gcmviz/GcmDatabase.cpp
+    
+    libs/sys.cpp
+    libs/fs.cpp
+    libs/Controller.cpp
+    libs/libsysutil.cpp
+    libs/cellGame.cpp
+    libs/sceNp2.cpp
+    libs/sceNp.cpp
+    libs/cellSpurs.cpp
+    libs/sysSpu.cpp
+    libs/heap.cpp
+    libs/libpngdec.cpp
+    libs/libl10n.cpp
+    libs/audio/configuration.cpp
+    libs/audio/libaudio.cpp
+    libs/sync/lwmutex.cpp
+    libs/sync/mutex.cpp
+    libs/sync/cond.cpp
+    libs/sync/lwcond.cpp
+    libs/sync/rwlock.cpp
+    libs/sync/queue.cpp
+    libs/graphics/gcm.cpp
+    libs/graphics/gcm_buffers.cpp
+    libs/graphics/sysutil_sysparam.cpp
+    libs/graphics/graphics.cpp
+    libs/graphics/GL/src/glad.c
 )
 
-add_library(ps3emu ${SRC})
-target_link_libraries(ps3emu libs
+add_library(ps3emu SHARED ${SRC})
+target_link_libraries(ps3emu
     ${Boost_LIBRARIES}
     ${GLFW3_LIBRARIES}
     ${CRYPTO_LIBRARIES}

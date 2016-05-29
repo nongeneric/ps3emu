@@ -1,9 +1,9 @@
 #include "fs.h"
 
-#include "../ps3emu/utils.h"
-#include "../ps3emu/Process.h"
-#include "../ps3emu/IDMap.h"
-#include "../ps3emu/ContentManager.h"
+#include "../utils.h"
+#include "../Process.h"
+#include "../IDMap.h"
+#include "../ContentManager.h"
 #include <stdexcept>
 #include "string.h"
 #include <string>

@@ -1,6 +1,6 @@
 #include "sceNp.h"
 
-#include "../ps3emu/utils.h"
+#include "../utils.h"
 #include <boost/log/trivial.hpp>
 #include <vector>
 

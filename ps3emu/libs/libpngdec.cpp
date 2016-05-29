@@ -1,9 +1,9 @@
 #include "libpngdec.h"
 
-#include "../ps3emu/utils.h"
-#include "../ps3emu/IDMap.h"
-#include "../ps3emu/Process.h"
-#include "../ps3emu/ContentManager.h"
+#include "../utils.h"
+#include "../IDMap.h"
+#include "../Process.h"
+#include "../ContentManager.h"
 
 #include <png.h>
 #include <stdio.h>

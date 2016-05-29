@@ -1,6 +1,6 @@
 #include "cellSpurs.h"
 
-#include "../ps3emu/utils.h"
+#include "../utils.h"
 #include <boost/log/trivial.hpp>
 
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,

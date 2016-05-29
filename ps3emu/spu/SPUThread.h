@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../libs/ConcurrentQueue.h"
+#include "../libs/ConcurrentQueue.h"
 #include "../constants.h"
 #include "../BitField.h"
 #include <boost/thread.hpp>

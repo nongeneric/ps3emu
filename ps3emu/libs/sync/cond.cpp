@@ -1,7 +1,7 @@
 #include "cond.h"
 
-#include "../../ps3emu/utils.h"
-#include "../../ps3emu/IDMap.h"
+#include "../../utils.h"
+#include "../../IDMap.h"
 #include <boost/thread/condition_variable.hpp>
 #include <boost/log/trivial.hpp>
 

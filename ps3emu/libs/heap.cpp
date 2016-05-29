@@ -1,7 +1,7 @@
 #include "heap.h"
-#include "../ps3emu/MainMemory.h"
-#include "../ps3emu/IDMap.h"
-#include "../ps3emu/utils.h"
+#include "../MainMemory.h"
+#include "../IDMap.h"
+#include "../utils.h"
 #include <boost/log/trivial.hpp>
 
 namespace {

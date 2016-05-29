@@ -1,6 +1,6 @@
 #include "MainMemory.h"
 
-#include "../libs/sysSpu.h"
+#include "libs/sysSpu.h"
 #include "rsx/Rsx.h"
 #include <boost/log/trivial.hpp>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ps3emu/MainMemory.h"
+#include "../MainMemory.h"
 #include "sys_defs.h"
 
 int32_t sceNpBasicSetPresence(ps3_uintptr_t data, size_t size, MainMemory* mm);

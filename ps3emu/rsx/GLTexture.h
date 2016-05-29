@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include "GLBuffer.h"
 #include "../constants.h"
-#include "../../libs/graphics/gcm.h"
+#include "../libs/graphics/gcm.h"
 #include <stdint.h>
 #include <functional>
 

@@ -1,11 +1,11 @@
 #include "ConcurrentQueue.h"
-#include "../ps3emu/utils.h"
+#include "../utils.h"
 #include "sys.h"
 #include <time.h>
 #include <stdio.h>
 #include <stdexcept>
-#include "../ps3emu/Process.h"
-#include "../ps3emu/IDMap.h"
+#include "../Process.h"
+#include "../IDMap.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>

@@ -2,7 +2,7 @@
 
 #include "../utils.h"
 #include "../gcmviz/GcmDatabase.h"
-#include "../../libs/graphics/gcm.h"
+#include "../libs/graphics/gcm.h"
 #include <vector>
 
 #define X(x) x,

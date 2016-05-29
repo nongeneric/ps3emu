@@ -1,5 +1,5 @@
 #include "rwlock.h"
-#include "../../ps3emu/IDMap.h"
+#include "../../IDMap.h"
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/mutex.hpp>
 #include <memory>

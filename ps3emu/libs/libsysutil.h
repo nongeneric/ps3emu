@@ -1,8 +1,8 @@
 #pragma once
 
 #include "sys_defs.h"
-#include "../ps3emu/Process.h"
-#include "../ps3emu/ELFLoader.h"
+#include "../Process.h"
+#include "../ELFLoader.h"
 
 class MainMemory;
 

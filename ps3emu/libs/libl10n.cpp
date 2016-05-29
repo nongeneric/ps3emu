@@ -1,8 +1,8 @@
 #include "libl10n.h"
 
-#include "../ps3emu/IDMap.h"
-#include "../ps3emu/ppu/PPUThread.h"
-#include "../ps3emu/MainMemory.h"
+#include "../IDMap.h"
+#include "../ppu/PPUThread.h"
+#include "../MainMemory.h"
 
 #include <iconv.h>
 #include <errno.h>
