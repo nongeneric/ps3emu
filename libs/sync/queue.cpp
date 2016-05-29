@@ -55,7 +55,8 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                uint32_t size) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     assert(1 <= size && size < 128);
-    assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
+    // TODO: handle unique key
+    //assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
     assert(attr->attr_protocol == SYS_SYNC_PRIORITY ||
            attr->attr_protocol == SYS_SYNC_FIFO);
     std::shared_ptr<IQueue> queue;
@@ -80,7 +81,8 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
                                 usecond_t timeout,
                                 PPUThread* th)
 {
-    assert(timeout == 0);
+    // TODO: handle timeout
+    //assert(timeout == 0);
     auto queue = queues.get(equeue_id);
     auto event = queue->receive(th->priority());
     th->setGPR(4, event.source);

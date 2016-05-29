@@ -97,6 +97,7 @@ int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code,
 int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread);
 int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc);
 emu_void_t sys_ppu_thread_yield(PPUThread* thread);
+int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, int32_t* prio, Process* proc);
 
 emu_void_t sys_process_exit(PPUThread* thread);
 emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread);

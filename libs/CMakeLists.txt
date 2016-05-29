@@ -12,6 +12,9 @@ set(SRC
     sysSpu.cpp
     heap.cpp
     libpngdec.cpp
+    libl10n.cpp
+    audio/configuration.cpp
+    audio/libaudio.cpp
     sync/lwmutex.cpp
     sync/mutex.cpp
     sync/cond.cpp

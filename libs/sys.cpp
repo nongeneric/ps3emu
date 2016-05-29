@@ -266,12 +266,13 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
                               const char *threadname,
                               Process* proc)
 {
-    assert(flags == SYS_PPU_THREAD_CREATE_JOINABLE ||
+    assert(flags == 0 ||
+           flags == SYS_PPU_THREAD_CREATE_JOINABLE ||
            flags == SYS_PPU_THREAD_CREATE_INTERRUPT);
-    if (flags == SYS_PPU_THREAD_CREATE_JOINABLE) {
-        *thread_id = proc->createThread(stacksize, entry, arg);
-    } else {
+    if (flags == SYS_PPU_THREAD_CREATE_INTERRUPT) {
         *thread_id = proc->createInterruptThread(stacksize, entry, arg);
+    } else {
+        *thread_id = proc->createThread(stacksize, entry, arg);
     }
     return CELL_OK;
 }
@@ -279,11 +280,6 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
 int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc) {
     auto thread = proc->getThread(thread_id);
     *exit_code = thread->join();
-    return CELL_OK;
-}
-
-int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_ppu_thread_set_priority: not implemented");
     return CELL_OK;
 }
 
@@ -306,6 +302,19 @@ int32_t sys_process_is_stack(ps3_uintptr_t p) {
 emu_void_t sys_ppu_thread_yield(PPUThread* thread) {
     thread->yield();
     return emu_void;
+}
+
+int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, int32_t* prio, Process* proc) {
+    auto thread = proc->getThread(thread_id);
+    *prio = thread->priority();
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc) {
+    assert(0 <= prio && prio <= 3071);
+    auto thread = proc->getThread(thread_id);
+    thread->setPriority(prio);
+    return CELL_OK;
 }
 
 int32_t _sys_strlen(cstring_ptr_t str) {

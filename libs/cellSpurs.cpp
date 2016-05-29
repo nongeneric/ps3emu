@@ -59,6 +59,11 @@ int32_t cellSpursInitializeWithAttribute2(CellSpurs2*, const CellSpursAttribute*
     return CELL_OK;
 }
 
+int32_t cellSpursInitializeWithAttribute(CellSpurs*, const CellSpursAttribute*) {
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
 int32_t _cellSpursJobChainAttributeInitialize(uint32_t jmRevision,
                                               uint32_t sdkRevision,
                                               CellSpursJobChainAttribute *attr,
@@ -105,5 +110,24 @@ int32_t cellSpursJoinJobChain(CellSpursJobChain *jobChain) {
 
 int32_t cellSpursRunJobChain(const CellSpursJobChain* jobChain) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    return CELL_OK;
+}
+
+int32_t _cellSpursTasksetAttributeInitialize(CellSpursTasksetAttribute* pAttr,
+                                             uint32_t revision,
+                                             uint32_t sdkVersion,
+                                             uint64_t argTaskset,
+                                             ps3_uintptr_t priority,
+                                             uint32_t max_contention) {
+    return CELL_OK;
+}
+
+int32_t cellSpursTasksetAttributeSetName(CellSpursTasksetAttribute* attr, cstring_ptr_t name) {
+    return CELL_OK;
+}
+
+int32_t cellSpursCreateTasksetWithAttribute(CellSpurs* spurs,
+                                            CellSpursTaskset* taskset,
+                                            const CellSpursTasksetAttribute* attribute) {
     return CELL_OK;
 }

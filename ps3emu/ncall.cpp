@@ -18,6 +18,9 @@
 #include "../libs/sync/queue.h"
 #include "../libs/cellSpurs.h"
 #include "../libs/libpngdec.h"
+#include "../libs/libl10n.h"
+#include "../libs/audio/configuration.h"
+#include "../libs/audio/libaudio.h"
 #include "ppu/CallbackThread.h"
 #include <boost/log/trivial.hpp>
 #include <openssl/sha.h>
@@ -415,6 +418,7 @@ STUB_8(sys_ppu_thread_create_proxy);
 STUB_3(sys_ppu_thread_join);
 STUB_2(sys_ppu_thread_exit);
 STUB_3(sys_ppu_thread_set_priority);
+STUB_3(sys_ppu_thread_get_priority);
 STUB_4(sys_initialize_tls);
 STUB_1(sys_process_exit);
 STUB_5(cellGameBootCheck);
@@ -458,6 +462,7 @@ STUB_0(_sys_spu_printf_finalize);
 STUB_3(cellSpursAttributeSetNamePrefix);
 STUB_1(cellSpursAttributeEnableSpuPrintfIfAvailable);
 STUB_2(cellSpursAttributeSetSpuThreadGroupType);
+STUB_2(cellSpursInitializeWithAttribute);
 STUB_2(cellSpursInitializeWithAttribute2);
 STUB_7(_cellSpursAttributeInitialize);
 STUB_1(cellSpursFinalize);
@@ -524,6 +529,20 @@ STUB_1(cellGcmSetFlipStatus);
 STUB_2(cellGcmGetReportDataAddressLocation);
 STUB_1(cellGcmGetLastFlipTime);
 STUB_2(_sys_heap_delete_heap);
+STUB_2(l10n_get_converter);
+STUB_6(l10n_convert_str);
+STUB_4(cellAudioOutGetSoundAvailability);
+STUB_4(cellAudioOutConfigure);
+STUB_3(cellAudioOutGetState);
+STUB_0(cellAudioInit);
+STUB_3(_sys_heap_memalign);
+STUB_2(cellAudioPortOpen);
+STUB_2(cellAudioGetPortConfig);
+STUB_1(cellAudioPortStart);
+STUB_1(cellAudioSetNotifyEventQueue);
+STUB_6(_cellSpursTasksetAttributeInitialize);
+STUB_2(cellSpursTasksetAttributeSetName);
+STUB_3(cellSpursCreateTasksetWithAttribute);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -635,6 +654,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellSpursAttributeSetNamePrefix),
     ENTRY(cellSpursAttributeEnableSpuPrintfIfAvailable),
     ENTRY(cellSpursAttributeSetSpuThreadGroupType),
+    ENTRY(cellSpursInitializeWithAttribute),
     ENTRY(cellSpursInitializeWithAttribute2),
     ENTRY(_cellSpursAttributeInitialize),
     ENTRY(cellSpursFinalize),
@@ -677,6 +697,20 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmGetReportDataAddressLocation),
     ENTRY(cellGcmGetLastFlipTime),
     ENTRY(_sys_heap_delete_heap),
+    ENTRY(l10n_get_converter),
+    ENTRY(l10n_convert_str),
+    ENTRY(cellAudioOutGetSoundAvailability),
+    ENTRY(cellAudioOutConfigure),
+    ENTRY(cellAudioOutGetState),
+    ENTRY(cellAudioInit),
+    ENTRY(_sys_heap_memalign),
+    ENTRY(cellAudioPortOpen),
+    ENTRY(cellAudioGetPortConfig),
+    ENTRY(cellAudioPortStart),
+    ENTRY(cellAudioSetNotifyEventQueue),
+    ENTRY(_cellSpursTasksetAttributeInitialize),
+    ENTRY(cellSpursTasksetAttributeSetName),
+    ENTRY(cellSpursCreateTasksetWithAttribute),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -721,6 +755,7 @@ void PPUThread::scall() {
         case 41: nstub_sys_ppu_thread_exit(this); break;
         case 44: nstub_sys_ppu_thread_join(this); break;
         case 47: nstub_sys_ppu_thread_set_priority(this); break;
+        case 48: nstub_sys_ppu_thread_get_priority(this); break;
         case 120: nstub_sys_rwlock_create(this); break;
         case 121: nstub_sys_rwlock_destroy(this); break;
         case 122: nstub_sys_rwlock_rlock(this); break;

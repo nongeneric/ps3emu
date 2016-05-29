@@ -1,6 +1,7 @@
 #include "heap.h"
 #include "../ps3emu/MainMemory.h"
 #include "../ps3emu/IDMap.h"
+#include "../ps3emu/utils.h"
 #include <boost/log/trivial.hpp>
 
 namespace {
@@ -15,8 +16,8 @@ public:
         _end = _cur + size;
     }
     
-    ps3_uintptr_t alloc(uint32_t size) {
-        auto res = _cur;
+    ps3_uintptr_t alloc(uint32_t size, uint32_t alignment) {
+        auto res = ::align(_cur, alignment);
         _cur += size;
         assert(_cur < _end);
         return res;
@@ -39,5 +40,10 @@ uint32_t _sys_heap_delete_heap(uint32_t heap_id, uint64_t unk) {
 
 uint32_t _sys_heap_malloc(uint32_t heap_id, uint32_t size, big_uint32_t* ptr) {
     auto heap = map.get(heap_id);
-    return heap->alloc(size);
+    return heap->alloc(size, 1);
+}
+
+uint32_t _sys_heap_memalign(uint32_t heap_id, uint32_t alignment, uint32_t size) {
+    auto heap = map.get(heap_id);
+    return heap->alloc(size, alignment);
 }
