@@ -47,9 +47,13 @@ int32_t sys_event_port_create(sys_event_port_t* eport_id,
 int32_t sys_event_port_connect_local(sys_event_port_t event_port_id,
                                      sys_event_queue_t event_queue_id);
 
+int32_t sys_event_port_disconnect(sys_event_port_t event_port_id);
+
 int32_t sys_event_port_send(sys_event_port_t eport_id,
                             uint64_t data1,
                             uint64_t data2,
                             uint64_t data3);
 
 int32_t sys_event_queue_drain(sys_event_queue_t equeue_id);
+
+int32_t sys_event_port_destroy(sys_event_port_t eport_id);

@@ -1,16 +1,29 @@
 #pragma once
 
-#include "sys_defs.h"
+#include "../sys_defs.h"
 #include <array>
 
+#define CELL_SPURS_MAX_TASK 128
 #define CELL_SPURS_ATTRIBUTE_SIZE 512
 #define CELL_SPURS_JOBCHAIN_ATTRIBUTE_SIZE 512
 #define CELL_SPURS_SIZE 4096
 #define CELL_SPURS_SIZE2 8192
 #define CELL_SPURS_JOBCHAIN_SIZE 272
+#define CELL_SPURS_TASKSET_ATTRIBUTE_SIZE 512
+#define CELL_SPURS_TASKSET_CLASS0_SIZE (128 * 50)
+#define CELL_SPURS_TASKSET_SIZE CELL_SPURS_TASKSET_CLASS0_SIZE
+#define _CELL_SPURS_TASKSET_CLASS1_EXTENDED_SIZE (128 + 128 * 16 + 128 * 15)
+#define CELL_SPURS_TASKSET_CLASS1_SIZE \
+    (CELL_SPURS_TASKSET_CLASS0_SIZE + _CELL_SPURS_TASKSET_CLASS1_EXTENDED_SIZE)
+#define CELL_SPURS_TASKSET2_SIZE (CELL_SPURS_TASKSET_CLASS1_SIZE)
+#define CELL_SPURS_TASKSET_ATTRIBUTE2_SIZE CELL_SPURS_TASKSET_ATTRIBUTE_SIZE
+#define CELL_SPURS_MAX_TASK_NAME_LENGTH 32
 
 using spurs_name_t = std::array<char, 15>;
 using spurs_priority_table_t = std::array<uint8_t, 8>;
+using CellSpursTaskId = big_uint32_t;
+
+class Process;
 
 struct CellSpursAttribute {
     char prefix[15];
@@ -21,6 +34,7 @@ struct CellSpursAttribute {
     int32_t spuPriority;
     int32_t ppuPriority;
     bool exitIfNoWork;
+    bool enableSpuPrintf;
 };
 
 struct CellSpursJobChainAttribute {
@@ -44,7 +58,7 @@ struct CellSpurs {
     
 };
 
-struct CellSpurs2 {
+struct CellSpurs2 : public CellSpurs {
     
 };
 
@@ -52,32 +66,66 @@ struct CellSpursJobChain {
     
 };
 
-#define CELL_SPURS_TASKSET_ATTRIBUTE_ALIGN 8
-#define CELL_SPURS_TASKSET_ATTRIBUTE_SIZE 512
+struct CellSpursTasksetAttribute {
+    
+};
 
-typedef struct CellSpursTasksetAttribute {
-    unsigned char skip[CELL_SPURS_TASKSET_ATTRIBUTE_SIZE];
-} CellSpursTasksetAttribute;
+struct CellSpursTaskset {
+    
+};
 
-#define CELL_SPURS_TASKSET_CLASS0_SIZE            (128 * 50)
-#define CELL_SPURS_TASKSET_SIZE CELL_SPURS_TASKSET_CLASS0_SIZE
+struct CellSpursTaskset2 : public CellSpursTaskset {
+    
+};
 
-typedef struct CellSpursTaskset {
-        unsigned char skip[CELL_SPURS_TASKSET_SIZE];
-} CellSpursTaskset;
+struct CellSpursTaskNameBuffer {
+    
+};
 
+struct CellSpursTasksetAttribute2 {
+    big_uint32_t revision;
+    big_uint32_t name;
+    big_uint64_t argTaskset;
+    big_uint8_t priority[8];
+    big_uint32_t maxContention;
+    big_int32_t enableClearLs;
+    big_uint32_t taskNameBuffer; // CellSpursTaskNameBuffer
+};
+
+union CellSpursTaskLsPattern {
+    big_uint32_t u32[4];
+    big_uint64_t u64[2];
+};
+
+union CellSpursTaskArgument {
+    big_uint32_t u32[4];
+    big_uint64_t u64[2];
+};
+
+struct CellSpursTaskBinInfo {
+    big_uint64_t eaElf;
+    big_uint32_t sizeContext;
+    big_uint32_t __reserved__;
+    CellSpursTaskLsPattern lsPattern;
+};
+
+static_assert(sizeof(CellSpursTaskNameBuffer) <= CELL_SPURS_MAX_TASK * CELL_SPURS_MAX_TASK_NAME_LENGTH, "");
+static_assert(sizeof(CellSpursTaskset2) <= CELL_SPURS_TASKSET2_SIZE - CELL_SPURS_TASKSET_SIZE, "");
+static_assert(sizeof(CellSpursTaskset) <= CELL_SPURS_TASKSET_SIZE, "");
+static_assert(sizeof(CellSpursTasksetAttribute) <= CELL_SPURS_TASKSET_ATTRIBUTE_SIZE, "");
 static_assert(sizeof(CellSpursAttribute) <= CELL_SPURS_ATTRIBUTE_SIZE, "");
 static_assert(sizeof(CellSpursJobChainAttribute) <= CELL_SPURS_JOBCHAIN_ATTRIBUTE_SIZE, "");
 static_assert(sizeof(CellSpurs2) <= CELL_SPURS_SIZE2, "");
 static_assert(sizeof(CellSpursJobChain) <= CELL_SPURS_JOBCHAIN_SIZE, "");
+static_assert(sizeof(CellSpursTasksetAttribute2) <= CELL_SPURS_TASKSET_ATTRIBUTE2_SIZE, "");
 
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
                                         spurs_name_t* name,
                                         uint32_t size);
 int32_t cellSpursAttributeEnableSpuPrintfIfAvailable(CellSpursAttribute* attr);
 int32_t cellSpursAttributeSetSpuThreadGroupType(CellSpursAttribute* attr, int32_t type);
-int32_t cellSpursInitializeWithAttribute(CellSpurs*, const CellSpursAttribute*);
-int32_t cellSpursInitializeWithAttribute2(CellSpurs2*, const CellSpursAttribute*);
+int32_t cellSpursInitializeWithAttribute(CellSpurs*, const CellSpursAttribute*, Process* proc);
+int32_t cellSpursInitializeWithAttribute2(CellSpurs2*, const CellSpursAttribute*, Process* proc);
 int32_t _cellSpursAttributeInitialize(CellSpursAttribute* attr,
                                       uint32_t revision,
                                       uint32_t sdkVersion,
@@ -118,3 +166,20 @@ int32_t cellSpursTasksetAttributeSetName(CellSpursTasksetAttribute* attr, cstrin
 int32_t cellSpursCreateTasksetWithAttribute(CellSpurs* spurs,
                                             CellSpursTaskset* taskset,
                                             const CellSpursTasksetAttribute* attribute);
+int32_t cellSpursDestroyTaskset2(CellSpursTaskset2 *pTaskset);
+int32_t cellSpursCreateTaskset2(CellSpurs* pSpurs,
+                                CellSpursTaskset2* pTaskset,
+                                const CellSpursTasksetAttribute2* pAttr);
+int32_t cellSpursJoinTask2(CellSpursTaskset2* pTaskset,
+                           CellSpursTaskId idTask,
+                           int32_t* exitCode);
+emu_void_t _cellSpursTasksetAttribute2Initialize(CellSpursTasksetAttribute2* pAttr,
+                                                 uint32_t revision);
+int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
+                                        CellSpursTaskId* id,
+                                        const CellSpursTaskBinInfo* binInfo,
+                                        const CellSpursTaskArgument* argument,
+                                        ps3_uintptr_t contextBuffer,
+                                        cstring_ptr_t name,
+                                        uint64_t __reserved__,
+                                        Process* proc);

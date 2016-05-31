@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Process.h"
-#include "sys_defs.h"
+#include "../../Process.h"
+#include "../sys_defs.h"
 
 class SpuImage;
 using sys_spu_thread_t = big_uint32_t;

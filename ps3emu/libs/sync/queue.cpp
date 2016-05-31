@@ -139,3 +139,13 @@ int32_t sys_event_queue_drain(sys_event_queue_t equeue_id) {
     queues.get(equeue_id)->drain();
     return CELL_OK;
 }
+
+int32_t sys_event_port_disconnect(sys_event_port_t event_port_id) {
+    ports.get(event_port_id)->queue = nullptr;
+    return CELL_OK;
+}
+
+int32_t sys_event_port_destroy(sys_event_port_t eport_id) {
+    ports.destroy(eport_id);
+    return CELL_OK;
+}

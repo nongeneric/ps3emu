@@ -1,6 +1,10 @@
 #include "cellSpurs.h"
 
-#include "../utils.h"
+#include "SpuImage.h"
+#include "../../Process.h"
+#include "../../spu/SPUThread.h"
+#include "../../utils.h"
+#include "../../log.h"
 #include <boost/log/trivial.hpp>
 
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
@@ -14,6 +18,7 @@ int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
 
 int32_t cellSpursAttributeEnableSpuPrintfIfAvailable(CellSpursAttribute* attr) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    attr->enableSpuPrintf = true;
     return CELL_OK;
 }
 
@@ -46,6 +51,7 @@ int32_t _cellSpursAttributeInitialize(CellSpursAttribute* attr,
     attr->spuPriority = spuPriority;
     attr->ppuPriority = ppuPriority;
     attr->exitIfNoWork = exitIfNoWork;
+    attr->enableSpuPrintf = false;
     return CELL_OK;
 }
 
@@ -54,12 +60,13 @@ int32_t cellSpursFinalize(CellSpurs2* spurs) {
     return CELL_OK;
 }
 
-int32_t cellSpursInitializeWithAttribute2(CellSpurs2*, const CellSpursAttribute* attr) {
+int32_t cellSpursInitializeWithAttribute2(CellSpurs2* spurs2, const CellSpursAttribute* attr, Process* proc) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    cellSpursInitializeWithAttribute(spurs2, attr, proc);
     return CELL_OK;
 }
 
-int32_t cellSpursInitializeWithAttribute(CellSpurs*, const CellSpursAttribute*) {
+int32_t cellSpursInitializeWithAttribute(CellSpurs* spurs, const CellSpursAttribute* attr, Process* proc) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     return CELL_OK;
 }
@@ -129,5 +136,62 @@ int32_t cellSpursTasksetAttributeSetName(CellSpursTasksetAttribute* attr, cstrin
 int32_t cellSpursCreateTasksetWithAttribute(CellSpurs* spurs,
                                             CellSpursTaskset* taskset,
                                             const CellSpursTasksetAttribute* attribute) {
+    return CELL_OK;
+}
+
+int32_t cellSpursDestroyTaskset2(CellSpursTaskset2* pTaskset) {
+    return CELL_OK;
+}
+
+int32_t cellSpursCreateTaskset2(CellSpurs* pSpurs,
+                                CellSpursTaskset2* pTaskset,
+                                const CellSpursTasksetAttribute2* pAttr) {
+    return CELL_OK;                                    
+}
+                                
+int32_t cellSpursJoinTask2(CellSpursTaskset2* pTaskset,
+                           CellSpursTaskId idTask,
+                           int32_t* exitCode) {
+    return CELL_OK;                               
+}
+
+emu_void_t _cellSpursTasksetAttribute2Initialize(CellSpursTasksetAttribute2* pAttr,
+                                                 uint32_t revision) {
+    return CELL_OK;                                                     
+}
+
+void spuPrintf(void* ls, const uint8_t* regs, uint32_t size) {
+    R128 r;
+    r.load(regs);
+    printf("%s", (const char*)ls + r.w<0>());
+}
+
+int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
+                                        CellSpursTaskId* id,
+                                        const CellSpursTaskBinInfo* binInfo,
+                                        const CellSpursTaskArgument* argument,
+                                        ps3_uintptr_t contextBuffer,
+                                        cstring_ptr_t name,
+                                        uint64_t __reserved__,
+                                        Process* proc) {
+    SpuImage image([=](uint32_t ptr, void* buf, size_t size) {
+        proc->mm()->readMemory(ptr, buf, size);
+    }, binInfo->eaElf);
+    auto spuThreadId = proc->createSpuThread(name.str);
+    auto spuThread = proc->getSpuThread(spuThreadId);
+    memcpy(spuThread->ptr(0), image.localStorage(), LocalStorageSize);
+    spuThread->setNip(image.entryPoint());
+    spuThread->setElfSource(image.source());
+    spuThread->r(3).dw<0>() = argument->u64[0];
+    spuThread->r(3).dw<1>() = argument->u64[1];
+    // set r4 to taskset argument
+    spuThread->setInterruptHandler([&] {
+        auto& imbox = spuThread->getFromSpuInterruptMailbox();
+        auto& mbox = spuThread->getFromSpuMailbox();
+        auto regs = spuThread->ptr(mbox.receive(0));
+        auto size = imbox.receive(0);
+        spuPrintf(spuThread->ptr(0), regs, size);
+    });
+    spuThread->run();
     return CELL_OK;
 }

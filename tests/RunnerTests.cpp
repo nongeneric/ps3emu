@@ -881,3 +881,10 @@ TEST_CASE("pngdec_ppu") {
         "* errorLog: Finished decoding \n"
     );
 }
+
+TEST_CASE("spurs_task_hello") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"});
+    REQUIRE( output == 
+        "SPU: Hello world!\n"
+    );
+}

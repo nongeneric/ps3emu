@@ -17,6 +17,8 @@ set(SRC
     Process.h
     Process.cpp
     log.cpp
+    spu/SPUThread.cpp
+    spu/SPUDasm.cpp
     ppu/PPUThread.h
     ppu/PPUThread.cpp
     ppu/InterruptPPUThread.h
@@ -27,8 +29,6 @@ set(SRC
     ContentManager.cpp
     InternalMemoryManager.h
     InternalMemoryManager.cpp
-    spu/SPUThread.cpp
-    spu/SPUDasm.cpp
     shaders/shader_dasm.h
     shaders/shader_dasm.cpp
     shaders/ShaderRewriter.h
@@ -58,8 +58,9 @@ set(SRC
     libs/cellGame.cpp
     libs/sceNp2.cpp
     libs/sceNp.cpp
-    libs/cellSpurs.cpp
-    libs/sysSpu.cpp
+    libs/spu/cellSpurs.cpp
+    libs/spu/sysSpu.cpp
+    libs/spu/SpuImage.cpp
     libs/heap.cpp
     libs/libpngdec.cpp
     libs/libl10n.cpp

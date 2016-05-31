@@ -178,7 +178,7 @@ struct SPUThreadExitInfo {
 class SPUThread {
     uint32_t _nip;
     R128 _rs[128];
-    uint32_t _ch[28];
+    uint32_t _ch[32];
     uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
     uint32_t _spu;

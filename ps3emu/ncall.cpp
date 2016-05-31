@@ -8,7 +8,8 @@
 #include "libs/cellGame.h"
 #include "libs/sceNp2.h"
 #include "libs/sceNp.h"
-#include "libs/sysSpu.h"
+#include "libs/spu/sysSpu.h"
+#include "libs/spu/cellSpurs.h"
 #include "libs/heap.h"
 #include "libs/sync/lwmutex.h"
 #include "libs/sync/mutex.h"
@@ -16,7 +17,6 @@
 #include "libs/sync/cond.h"
 #include "libs/sync/rwlock.h"
 #include "libs/sync/queue.h"
-#include "libs/cellSpurs.h"
 #include "libs/libpngdec.h"
 #include "libs/libl10n.h"
 #include "libs/audio/configuration.h"
@@ -368,11 +368,13 @@ STUB_4(cellGcmMapMainMemory);
 STUB_4(sys_event_queue_create);
 STUB_3(sys_event_port_create);
 STUB_2(sys_event_port_connect_local);
+STUB_1(sys_event_port_disconnect);
 STUB_2(sys_event_queue_destroy);
 STUB_4(sys_event_queue_receive);
 STUB_5(sys_event_queue_tryreceive);
 STUB_4(sys_event_port_send);
 STUB_1(sys_event_queue_drain);
+STUB_1(sys_event_port_destroy);
 STUB_1(cellGcmSetFlipHandler);
 STUB_1(cellPadInit);
 STUB_1(cellPadClearBuf);
@@ -462,8 +464,8 @@ STUB_0(_sys_spu_printf_finalize);
 STUB_3(cellSpursAttributeSetNamePrefix);
 STUB_1(cellSpursAttributeEnableSpuPrintfIfAvailable);
 STUB_2(cellSpursAttributeSetSpuThreadGroupType);
-STUB_2(cellSpursInitializeWithAttribute);
-STUB_2(cellSpursInitializeWithAttribute2);
+STUB_3(cellSpursInitializeWithAttribute);
+STUB_3(cellSpursInitializeWithAttribute2);
 STUB_7(_cellSpursAttributeInitialize);
 STUB_1(cellSpursFinalize);
 STUB_2(cellSpursJobChainAttributeSetName);
@@ -543,6 +545,11 @@ STUB_1(cellAudioSetNotifyEventQueue);
 STUB_6(_cellSpursTasksetAttributeInitialize);
 STUB_2(cellSpursTasksetAttributeSetName);
 STUB_3(cellSpursCreateTasksetWithAttribute);
+STUB_1(cellSpursDestroyTaskset2);
+STUB_3(cellSpursCreateTaskset2);
+STUB_3(cellSpursJoinTask2);
+STUB_2(_cellSpursTasksetAttribute2Initialize);
+STUB_8(cellSpursCreateTask2WithBinInfo);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -711,6 +718,12 @@ NCallEntry ncallTable[] {
     ENTRY(_cellSpursTasksetAttributeInitialize),
     ENTRY(cellSpursTasksetAttributeSetName),
     ENTRY(cellSpursCreateTasksetWithAttribute),
+    ENTRY(cellSpursDestroyTaskset2),
+    ENTRY(cellSpursCreateTaskset2),
+    ENTRY(cellSpursJoinTask2),
+    ENTRY(_cellSpursTasksetAttribute2Initialize),
+    ENTRY(cellSpursCreateTask2WithBinInfo),
+    ENTRY(sys_event_port_disconnect),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -792,6 +805,8 @@ void PPUThread::scall() {
         case 818: nstub_sys_fs_lseek(this); break;
         case 802: nstub_sys_fs_read(this); break;
         case 804: nstub_sys_fs_close(this); break;
+        case 137: nstub_sys_event_port_disconnect(this); break;
+        case 135: nstub_sys_event_port_destroy(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }
