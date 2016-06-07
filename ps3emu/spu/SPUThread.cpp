@@ -92,10 +92,15 @@ SPUThread::SPUThread(Process* proc,
     _status = 0b11000; // BTHSM
 }
 
-SPUThreadExitInfo SPUThread::join() {
+SPUThreadExitInfo SPUThread::tryJoin() {
     if (_thread.try_join_for( boost::chrono::milliseconds(0) )) {
         return SPUThreadExitInfo{ SPUThreadExitCause::StillRunning, 0 };
     }
+    return SPUThreadExitInfo{_cause, _exitCode};
+}
+
+SPUThreadExitInfo SPUThread::join() {
+    _thread.join();
     return SPUThreadExitInfo{_cause, _exitCode};
 }
 
@@ -104,6 +109,7 @@ uint32_t SPUThread::getElfSource() {
 }
 
 void SPUThread::setElfSource(uint32_t src) {
+    BOOST_LOG_TRIVIAL(trace) << ssnprintf("setting elf source to #%x", src);
     _elfSource = src;
 }
 
@@ -133,6 +139,11 @@ void SPUThread::setElfSource(uint32_t src) {
 #define MFC_GETLF_CMD        0x0046   /* SPU Only */
 #define MFC_GETLB_CMD        0x0045   /* SPU Only */
 
+#define MFC_GETLLAR_CMD      0x00d0
+#define MFC_PUTLLC_CMD       0x00b4
+#define MFC_PUTLLUC_CMD      0x00b0
+#define MFC_PUTQLLUC_CMD     0x00b8
+
 void SPUThread::command(uint32_t word) {
     union {
         uint32_t val;
@@ -140,28 +151,46 @@ void SPUThread::command(uint32_t word) {
         BitField<8, 16> rid;
         BitField<16, 32> opcode;
     } cmd = { word };
+    auto eal = ch(MFC_EAL);
+    auto lsa = ptr(ch(MFC_LSA));
+    auto size = ch(MFC_Size);
     auto opcode = cmd.opcode.u();
-    if (opcode >= 0x40) {
-        auto ea = ch(MFC_EAL);
-        auto ls = ptr(ch(MFC_LSA));
-        auto size = ch(MFC_Size);
-        if (opcode == MFC_GETS_CMD || opcode == MFC_GETBS_CMD ||
-            opcode == MFC_GETLB_CMD) {
+    switch (opcode) {
+        case MFC_GET_CMD:
+        case MFC_GETS_CMD:
+        case MFC_GETF_CMD:
+        case MFC_GETB_CMD:
+        case MFC_GETFS_CMD:
+        case MFC_GETBS_CMD: {
             __sync_synchronize();
-        }
-        _proc->mm()->readMemory(ea, ls, size);
-        __sync_synchronize();
-    } else {
-        auto ea = ch(MFC_EAL);
-        auto ls = ptr(ch(MFC_LSA));
-        auto size = ch(MFC_Size);
-        if (opcode == MFC_PUTB_CMD || opcode == MFC_PUTBS_CMD ||
-            opcode == MFC_PUTRB_CMD || opcode == MFC_PUTLB_CMD ||
-            opcode == MFC_PUTRLB_CMD) {
+            _proc->mm()->readMemory(eal, lsa, size);
             __sync_synchronize();
+            break;
         }
-        _proc->mm()->writeMemory(ea, ls, size);
-        __sync_synchronize();
+        case MFC_PUT_CMD:
+        case MFC_PUTS_CMD:
+        case MFC_PUTR_CMD:
+        case MFC_PUTF_CMD:
+        case MFC_PUTB_CMD:
+        case MFC_PUTFS_CMD:
+        case MFC_PUTBS_CMD:
+        case MFC_PUTRF_CMD:
+        case MFC_PUTRB_CMD:
+        case MFC_PUTLLC_CMD: // TODO: handle sizes correctly
+        case MFC_PUTLLUC_CMD:
+        case MFC_PUTQLLUC_CMD: {
+            __sync_synchronize();
+            _proc->mm()->writeMemory(eal, lsa, size);
+            __sync_synchronize();
+            if (opcode == MFC_PUTLLUC_CMD) {
+                ch(MFC_RdAtomicStat) |= 0b010; // U
+            }
+            break;
+        }
+        case MFC_GETLLAR_CMD:
+            ch(MFC_RdAtomicStat) |= 0b100; // G
+            break; // do nothing, every access is atomic
+        default: throw std::runtime_error("not implemented");
     }
 }
 

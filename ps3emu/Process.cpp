@@ -97,7 +97,7 @@ Event Process::run() {
                     t->join();
                 }
                 for (auto& t : _spuThreads) {
-                    t->join();
+                    t->tryJoin();
                 }
                 return ProcessFinishedEvent();
             }

@@ -37,7 +37,7 @@ union SPUForm {
 #define INVOKE(name) invoke_impl<M>(#name, print##name, emulate##name, &x, cia, state); return
 
 PRINT(lqd) {
-    *result = format_nn("lqd", i->RT, i->RA);
+    *result = format_br_nnn("lqd", i->RT, i->I10, i->RA);
 }
 
 EMU(lqd) {
@@ -59,7 +59,7 @@ inline uint32_t abs_lsa(I16_t i16) {
 }
 
 inline uint32_t cia_lsa(I16_t i16, uint32_t cia) {
-    return ((i16 << 2) + cia) & LSLR & 0xfffffffc;
+    return ((i16 << 2) + cia) & LSLR & 0xfffffff0;
 }
 
 PRINT(lqa) {
@@ -94,7 +94,7 @@ PRINT(stqx) {
 }
 
 EMU(stqx) {
-    auto lsa = (th->r(i->RA).w<0>() + th->r(i->RB).w<0>()) & 0xfffffff0;
+    auto lsa = (th->r(i->RA).w<0>() + th->r(i->RB).w<0>()) & LSLR & 0xfffffff0;
     th->r(i->RT).store(th->ptr(lsa));
 }
 
@@ -410,8 +410,8 @@ EMU(cg) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        uint64_t t = (int64_t)rb.w(i) + ra.w(i);
-        rt.w(i) = t >> 32;
+        uint64_t t = (uint64_t)(uint32_t)rb.w(i) + (uint64_t)(uint32_t)ra.w(i);
+        rt.w(i) = (t >> 32) & 1;
     }
 }
 
@@ -424,8 +424,8 @@ EMU(cgx) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        uint64_t t = (int64_t)rb.w(i) + ra.w(i) + (rt.w(i) & 1);
-        rt.w(i) = t >> 32;
+        uint64_t t = (uint64_t)rb.w(i) + (uint64_t)ra.w(i) + (rt.w(i) & 1);
+        rt.w(i) = (t >> 32) & 1;
     }
 }
 
@@ -464,8 +464,11 @@ EMU(bgx) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        auto t = rb.w(i) + ~ra.w(i) + (rt.w(i) & 1);
-        rt.w(i) = t >= 0;
+        if (rt.w(i) & 1) {
+            rt.w(i) = (uint32_t)rb.w(i) >= (uint32_t)ra.w(i);
+        } else {
+            rt.w(i) = (uint32_t)rb.w(i) > (uint32_t)ra.w(i);
+        }
     }
 }
 
@@ -633,7 +636,7 @@ EMU(clz) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = ra.w(i) == 0 ? 32 : __builtin_clzll(ra.w(i));
+        rt.w(i) = ra.w(i) == 0 ? 32 : __builtin_clz(ra.w(i));
     }
 }
 
@@ -682,9 +685,9 @@ PRINT(fsm) {
 EMU(fsm) {
     auto& ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    std::bitset<4> bits(ra.w<0>());
+    auto mask = ra.w<0>() & 0b1111;
     for (int i = 0; i < 4; ++i) {
-        rt.hw(i) = bits[3 - i] ? -1 : 0;
+        rt.w(i) = mask & (1 << (3 - i)) ? ~0ul : 0;
     }
 }
 
@@ -762,7 +765,7 @@ EMU(absdb) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
-        rt.b(i) = rb.b(i) - ra.b(i);
+        rt.b(i) = std::abs(rb.b(i) - ra.b(i));
     }
 }
 
@@ -847,7 +850,7 @@ EMU(andc) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
-        rt.dw(i) = rb.dw(i) & ~ra.dw(i);
+        rt.dw(i) = ra.dw(i) & ~rb.dw(i);
     }
 }
 
@@ -912,7 +915,7 @@ EMU(orc) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
-        rt.dw(i) = rb.dw(i) | ~ra.dw(i);
+        rt.dw(i) = ra.dw(i) | ~rb.dw(i);
     }
 }
 
@@ -1435,8 +1438,8 @@ EMU(rotqmbybi) {
     auto& rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
-    auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
-    u128 = sh > 15 ? 0 : u128 >> sh * 8;
+    auto sh = -(rb.w<0>() >> 3) & 0b11111;
+    u128 = sh < 16 ? u128 >> sh * 8 : make128(0, 0);
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
 }
@@ -1478,7 +1481,7 @@ EMU(rotmah) {
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         auto sh = -rb.hw(i) & 0x1f;
-        rt.hw(i) = sh > 15 ? 0 : signed_rshift32(ra.hw(i), sh);
+        rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh) : 0;
     }
 }
 
@@ -1491,7 +1494,7 @@ EMU(rotmahi) {
     auto& rt = th->r(i->RT);
     auto sh = -i->I7.s() & 0x1f;
     for (int i = 0; i < 8; ++i) {
-        rt.hw(i) = sh > 15 ? 0 : signed_rshift32(ra.hw(i), sh);
+        rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh) : 0;
     }
 }
 
@@ -1505,7 +1508,7 @@ EMU(rotma) {
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto sh = -rb.w(i) & 0x3f;
-        rt.w(i) = sh > 31 ? 0 : signed_rshift32(ra.w(i), sh);
+        rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh) : 0;
     }
 }
 
@@ -1518,7 +1521,7 @@ EMU(rotmai) {
     auto& rt = th->r(i->RT);
     auto sh = -i->I7.s() & 0x3f;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = sh > 31 ? 0 : signed_rshift32(ra.w(i), sh);
+        rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh) : 0;
     }
 }
 
@@ -1826,7 +1829,7 @@ PRINT(br) {
 
 EMU(br) {
     int32_t offset = signed_lshift32(i->I16.s(), 2);
-    th->setNip( (cia + offset) & LSLR );
+    th->setNip((cia + offset) & LSLR);
 }
 
 PRINT(bra) {
@@ -1836,7 +1839,7 @@ PRINT(bra) {
 
 EMU(bra) {
     int32_t address = signed_lshift32(i->I16.s(), 2);
-    th->setNip( address & LSLR );
+    th->setNip(address & LSLR);
 }
 
 PRINT(brsl) {
@@ -1846,7 +1849,7 @@ PRINT(brsl) {
 
 EMU(brsl) {
     int32_t offset = signed_lshift32(i->I16.s(), 2);
-    th->setNip( (cia + offset) & LSLR );
+    th->setNip((cia + offset) & LSLR);
     auto& rt = th->r(i->RT);
     rt.w<0>() = (cia + 4) & LSLR;
     rt.w<1>() = 0;
@@ -1860,7 +1863,7 @@ PRINT(brasl) {
 
 EMU(brasl) {
     int32_t address = signed_lshift32(i->I16.s(), 2);
-    th->setNip( address & LSLR );
+    th->setNip(address & LSLR);
     auto& rt = th->r(i->RT);
     rt.w<0>() = (cia + 4) & LSLR;
     rt.w<1>() = 0;
@@ -1872,7 +1875,7 @@ PRINT(bi) {
 }
 
 EMU(bi) {
-    th->setNip( th->r(i->RA).w<0>() & LSLR & 0xfffffffc );
+    th->setNip(th->r(i->RA).w<0>() & LSLR & 0xfffffffc);
 }
 
 PRINT(iret) {
@@ -1880,7 +1883,7 @@ PRINT(iret) {
 }
 
 EMU(iret) {
-    th->setNip( th->getSrr0() );
+    th->setNip(th->getSrr0());
 }
 
 PRINT(bisl) {
@@ -1888,53 +1891,57 @@ PRINT(bisl) {
 }
 
 EMU(bisl) {
-    th->setNip( th->r(i->RA).w<0>() & LSLR & 0xfffffffc );
+    th->setNip(th->r(i->RA).w<0>() & LSLR & 0xfffffffc);
     auto& rt = th->r(i->RT);
     rt.w<0>() = LSLR & (cia + 4);
     rt.w<1>() = 0;
     rt.dw<1>() = 0;
 }
 
+inline uint32_t br_cia_lsa(I16_t i16, uint32_t cia) {
+    return ((i16 << 2) + cia) & LSLR & 0xfffffffc;
+}
+
 PRINT(brnz) {
-    *result = format_nu("brnz", i->RT, cia_lsa(i->I16, cia));
+    *result = format_nu("brnz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
 EMU(brnz) {
     if (th->r(i->RT).w<0>() != 0) {
-        auto address = cia_lsa(i->I16, cia);
+        auto address = br_cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
 
 PRINT(brz) {
-    *result = format_nu("brz", i->RT, cia_lsa(i->I16, cia));
+    *result = format_nu("brz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
 EMU(brz) {
     if (th->r(i->RT).w<0>() == 0) {
-        auto address = cia_lsa(i->I16, cia);
+        auto address = br_cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
 
 PRINT(brhnz) {
-    *result = format_nu("brhnz", i->RT, cia_lsa(i->I16, cia));
+    *result = format_nu("brhnz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
 EMU(brhnz) {
     if (th->r(i->RT).hw<0>() != 0) {
-        auto address = cia_lsa(i->I16, cia);
+        auto address = br_cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
 
 PRINT(brhz) {
-    *result = format_nu("brhz", i->RT, cia_lsa(i->I16, cia));
+    *result = format_nu("brhz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
 EMU(brhz) {
     if (th->r(i->RT).hw<0>() == 0) {
-        auto address = cia_lsa(i->I16, cia);
+        auto address = br_cia_lsa(i->I16, cia);
         th->setNip(address);
     }
 }
@@ -2704,6 +2711,8 @@ void SPUDasm(void* instr, uint32_t cia, S* state) {
         case 0b00000001101: INVOKE(rdch);
         case 0b00000001111: INVOKE(rchcnt);
         case 0b00100001101: INVOKE(wrch);
+        case 0b00001001000: INVOKE(sfh);
+        case 0b01101000001: INVOKE(sfx);
     }
     switch (i->OP10.u()) {
         case 0b0111011010: INVOKE(csflt);

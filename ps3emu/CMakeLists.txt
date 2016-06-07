@@ -61,6 +61,7 @@ set(SRC
     libs/spu/cellSpurs.cpp
     libs/spu/sysSpu.cpp
     libs/spu/SpuImage.cpp
+    libs/spu/libSync.cpp
     libs/heap.cpp
     libs/libpngdec.cpp
     libs/libl10n.cpp

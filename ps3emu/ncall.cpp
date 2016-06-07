@@ -10,6 +10,7 @@
 #include "libs/sceNp.h"
 #include "libs/spu/sysSpu.h"
 #include "libs/spu/cellSpurs.h"
+#include "libs/spu/libSync.h"
 #include "libs/heap.h"
 #include "libs/sync/lwmutex.h"
 #include "libs/sync/mutex.h"
@@ -550,6 +551,10 @@ STUB_3(cellSpursCreateTaskset2);
 STUB_3(cellSpursJoinTask2);
 STUB_2(_cellSpursTasksetAttribute2Initialize);
 STUB_8(cellSpursCreateTask2WithBinInfo);
+STUB_1(cellSyncMutexInitialize);
+STUB_1(cellSyncMutexTryLock);
+STUB_1(cellSyncMutexLock);
+STUB_1(cellSyncMutexUnlock);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -724,6 +729,10 @@ NCallEntry ncallTable[] {
     ENTRY(_cellSpursTasksetAttribute2Initialize),
     ENTRY(cellSpursCreateTask2WithBinInfo),
     ENTRY(sys_event_port_disconnect),
+    ENTRY(cellSyncMutexInitialize),
+    ENTRY(cellSyncMutexTryLock),
+    ENTRY(cellSyncMutexLock),
+    ENTRY(cellSyncMutexUnlock),
 };
 
 void PPUThread::ncall(uint32_t index) {

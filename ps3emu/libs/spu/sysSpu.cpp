@@ -230,7 +230,7 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
         tag->interruptThread->disestablish();
     }
     static int hangingRawSpuThreads = 0;
-    if (rawSpu->thread->join().cause == SPUThreadExitCause::StillRunning) {
+    if (rawSpu->thread->tryJoin().cause == SPUThreadExitCause::StillRunning) {
         // leave a hanging thread if couldn't join
         assert(hangingRawSpuThreads < 10);
         proc->destroySpuThread(rawSpu->thread);
