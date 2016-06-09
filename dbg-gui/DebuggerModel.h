@@ -37,6 +37,8 @@ class DebuggerModel : public QWidget {
     bool _elfLoaded = false;
     void log(std::string str);
     void traceTo(ps3_uintptr_t va);
+    void spuTraceTo(ps3_uintptr_t va);
+    void ppuTraceTo(ps3_uintptr_t va);
     void updateUI();
     void setSoftBreak(ps3_uintptr_t va);
     void clearSoftBreak(ps3_uintptr_t va);

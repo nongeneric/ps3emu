@@ -611,7 +611,53 @@ void DebuggerModel::toggleFPR() {
     _gprModel->toggleFPR();
 }
 
-void DebuggerModel::traceTo(ps3_uintptr_t va) {
+void printFrequencies(FILE* f, std::map<std::string, int>& counts) {
+    fprintf(f, "#\n#instruction frequencies:\n");
+    std::vector<std::pair<std::string, int>> sorted;
+    for (auto p : counts) {
+        sorted.push_back(p);
+    }
+    std::sort(begin(sorted), end(sorted), [](auto a, auto b) {
+        return b.second < a.second;
+    });
+    for (auto p : sorted) {
+        fprintf(f, "#%-10s%-5d\n", p.first.c_str(), p.second);
+    }
+}
+
+void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
+    auto tracefile = "/tmp/ps3trace-spu";
+    auto f = fopen(tracefile, "w");
+    ps3_uintptr_t nip;
+    std::string str;
+    std::map<std::string, int> counts;
+    while ((nip = _activeSPUThread->getNip()) != va) {
+        auto instr = _activeSPUThread->ptr(nip);
+        SPUDasm<DasmMode::Print>(instr, nip, &str);
+        std::string name;
+        SPUDasm<DasmMode::Name>(instr, nip, &name);
+        counts[name]++;
+        
+        fprintf(f, "pc:%08x;", nip);
+        for (auto i = 0u; i < 128; ++i) {
+            auto v = _activeSPUThread->r(i);
+            fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
+                    v.w<0>(),
+                    v.w<1>(),
+                    v.w<2>(),
+                    v.w<3>());
+        }
+        fprintf(f, " #%s\n", str.c_str());
+        
+        fflush(f);
+        _activeSPUThread->singleStepBreakpoint();
+        _proc->run();
+    }
+    printFrequencies(f, counts);
+    fclose(f);
+}
+
+void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
     auto tracefile = "/tmp/ps3trace";
     auto f = fopen(tracefile, "w");
     ps3_uintptr_t nip;
@@ -644,18 +690,16 @@ void DebuggerModel::traceTo(ps3_uintptr_t va) {
         _activeThread->singleStepBreakpoint();
         _proc->run();
     }
-    fprintf(f, "#\n#instruction frequencies:\n");
-    std::vector<std::pair<std::string, int>> sorted;
-    for (auto p : counts) {
-        sorted.push_back(p);
-    }
-    std::sort(begin(sorted), end(sorted), [](auto a, auto b) {
-        return b.second < a.second;
-    });
-    for (auto p : sorted) {
-        fprintf(f, "#%-10s%-5d\n", p.first.c_str(), p.second);
-    }
+    printFrequencies(f, counts);
     fclose(f);
+}
+
+void DebuggerModel::traceTo(ps3_uintptr_t va) {
+    if (_activeSPUThread) {
+        spuTraceTo(va);
+    } else {
+        ppuTraceTo(va);
+    }
 }
 
 void DebuggerModel::updateUI() {

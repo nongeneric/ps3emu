@@ -69,6 +69,10 @@ public:
         return _bs[15 - n];
     }
     
+    inline uint8_t& b_pref() {
+        return b<3>();
+    }
+    
     template <int N>
     int16_t& hw() {
         static_assert(0 <= N && N < 8, "");
@@ -80,6 +84,10 @@ public:
         return ((int16_t*)_bs)[7 - n];
     }
     
+    inline int16_t& hw_pref() {
+        return hw<1>();
+    }
+    
     template <int N>
     int32_t& w() {
         static_assert(0 <= N && N < 4, "");
@@ -89,6 +97,10 @@ public:
     inline int32_t& w(int n) {
         assert(0 <= n && n < 4);
         return ((int32_t*)_bs)[3 - n];
+    }
+    
+    inline int32_t& w_pref() {
+        return w<0>();
     }
     
     template <int N>

@@ -421,6 +421,148 @@ sn_uint32 AddressToLabel(sn_uint32 uProcessID, sn_uint64 uThreadID, sn_address a
 static char filePath[1024];
 static char fileName[1024];
 
+const char* regstrs[32] = {
+	"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", 
+	"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", 
+	"r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", 
+	"r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31",
+};
+const char* vmregstrs[32] = {
+	"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", 
+	"v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
+	"v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", 
+	"v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
+};
+const char* spuregstrs[128] = {
+	"r000", "r001", "r002", "r003", "r004", "r005", "r006", "r007", "r008", "r009", "r010", 
+	"r011", "r012", "r013", "r014", "r015", "r016", "r017", "r018", "r019", "r020", "r021",
+	"r022", "r023", "r024", "r025", "r026", "r027", "r028", "r029", "r030", "r031", "r032", 
+	"r033", "r034", "r035", "r036", "r037", "r038", "r039", "r040", "r041", "r042", "r043", 
+	"r044", "r045", "r046", "r047", "r048", "r049", "r050", "r051", "r052", "r053", "r054", 
+	"r055", "r056", "r057", "r058", "r059", "r060", "r061", "r062", "r063", "r064", "r065", 
+	"r066", "r067", "r068", "r069", "r070", "r071", "r072", "r073", "r074", "r075", "r076", 
+	"r077", "r078", "r079", "r080", "r081", "r082", "r083", "r084", "r085", "r086", "r087", 
+	"r088", "r089", "r090", "r091", "r092", "r093", "r094", "r095", "r096", "r097", "r098", 
+	"r099", "r100", "r101", "r102", "r103", "r104", "r105", "r106", "r107", "r108", "r109", 
+	"r110", "r111", "r112", "r113", "r114", "r115", "r116", "r117", "r118", "r119", "r120",
+	"r121", "r122", "r123", "r124", "r125", "r126", "r127"
+};
+
+sn_uint32 get_pc(sn_uint32 process, sn_uint64 thread) {
+	sn_val result;
+	if (SN_FAILED(PS3EvaluateExpression(process, thread, &result, "pc"))) {
+		printf("\nError: %s", GetLastErrorString());
+		return -1;
+	}
+	return result.val.i64.word[0];
+}
+
+sn_address get_pc_addr(sn_uint32 process, sn_uint64 thread) {
+	sn_address addr;
+	addr.word[0] = get_pc(process, thread);
+	addr.word[1] = 0;
+	return addr;
+}
+
+// PS3ThreadStep doesn't work for SPU threads
+// this function emulates single stepping by interpreting
+// branch instructions and using breakpoints to stop at 
+// a predicted next instruction
+void step_in(sn_uint32 process, sn_uint64 thread) {
+	sn_val result;
+	sn_address pc;
+	sn_uint32 instr;
+	sn_uint32 opcode9;
+	sn_uint32 opcode11;
+	sn_uint32 rt;
+	sn_uint32 ra;
+	sn_int16 i16_shifted2;
+	
+	pc = get_pc_addr(process, thread);
+	
+	PS3GetMemory(process, thread, &instr, pc, 4);
+	instr = EndianSwap_4(instr);
+	opcode9 = instr >> (32 - 9) & 0x1ff;
+	opcode11 = instr >> (32 - 11) & 0x7ff;
+	i16_shifted2 = ((instr >> 7) << 2) & 0xffff;
+	rt = instr & 0x7f;
+	ra = (instr >> 7) & 0x7f;
+	
+	if (opcode9 == 0x64 || opcode9 == 0x60 || opcode9 == 0x66 ||
+	    opcode9 == 0x62 || opcode9 == 0x42 || opcode9 == 0x40 ||
+		opcode9 == 0x46 || opcode9 == 0x44 || opcode11 == 0x1a9 ||
+		opcode11 == 0x128 || opcode11 == 0x129 || opcode11 == 0x12a ||
+		opcode11 == 0x12b || opcode11 == 0x1a8 || opcode11 == 0x1aa) {
+		
+		switch (opcode11) {
+			case 0x1a9:
+			case 0x1a8: {
+				PS3EvaluateExpression(process, thread, &result, spuregstrs[ra]);
+				pc.word[0] = result.val.i128.word[3];
+				printf("bi to %08x\n", pc.word[0]);
+				break;
+			}
+			default: {
+				switch (opcode9) {
+					case 0x46:
+					case 0x40:
+					case 0x44:
+					case 0x42: {
+						PS3EvaluateExpression(process, thread, &result, spuregstrs[rt]);
+						if ((result.val.i128.word[3] != 0 && opcode9 == 0x42) ||
+							(result.val.i128.word[3] == 0 && opcode9 == 0x40) ||
+							((result.val.i128.word[3] & 0xffff) != 0 && opcode9 == 0x46) ||
+							((result.val.i128.word[3] & 0xffff) == 0 && opcode9 == 0x44)) {
+							pc.word[0] += i16_shifted2;
+							printf("brnz/brz to %08x\n", pc.word[0]);
+						} else {
+							pc.word[0] += 4;
+						}
+						break;
+					}
+					case 0x66:
+					case 0x64: {
+						pc.word[0] += i16_shifted2;
+						printf("br/brsl to %08x\n", pc.word[0]);
+						break;
+					}
+					default: 
+						printf("unsupported branch!");
+						return;
+				}
+			}
+		}
+	} else {
+		pc.word[0] += 4;
+	}
+	
+	PS3AddBreakPoint(process, thread, pc, 0);
+	PS3ThreadStart(process, thread);
+	
+	while (pc.word[0] != get_pc(process, thread)) {
+	}
+	
+	PS3RemoveAllBreakPoints(process, thread);
+}
+
+void step_over(sn_uint32 process, sn_uint64 thread) {
+	sn_val result;
+	sn_address * pAddress;
+	sn_uint32 pc;
+	
+	pAddress = malloc(8);
+	
+	pc = get_pc(process, thread) + 4;
+	
+	pAddress->word[0] = pc;
+	pAddress->word[1] = 0;
+	
+	PS3ThreadRunToAddress(process, thread, *pAddress);
+	
+	while (pc != get_pc(process, thread)) {
+	}
+}
+
 ////////////////////////////////////////////////////
 int main(int argc, char ** argv)
 {
@@ -467,19 +609,8 @@ int main(int argc, char ** argv)
 	unsigned long pc;
 	unsigned long oldpc;
 	sn_uint32 regs[64];
-	const char* regstrs[32] = {
-		"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", 
-		"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", 
-		"r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", 
-		"r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31",
-	};
-	const char* vmregstrs[32] = {
-		"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", 
-		"v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
-		"v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", 
-		"v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
-	};
 	sn_uint32 steps;
+	sn_address sn_pc;
 	sn_address addr;
 	FILE* f;
 	const char* fpath = "/c/file.txt";
@@ -490,10 +621,10 @@ int main(int argc, char ** argv)
 	pBuffIn[2] = 0xBE;
 	pBuffIn[3] = 0xEF;
 	
-	//AddMenuItem("!---------- Trace To", &uSrcItemId[0], "DBGSourceView");
-	//AddMenuItem("!---------- Step step", &uSrcItemId[1], "DBGSourceView");
-	AddMenuItem("!---------- Trace To", &uSrcItemId[0], "MemoryView");
-	AddMenuItem("!---------- Step step", &uSrcItemId[1], "MemoryView");
+	AddMenuItem("!---------- Trace PPU", &uSrcItemId[0], "MemoryView");
+	AddMenuItem("!---------- Trace SPU", &uSrcItemId[1], "MemoryView");
+	AddMenuItem("!---------- Single Step", &uSrcItemId[2], "DisasmView");
+	AddMenuItem("!---------- Eval", &uSrcItemId[3], "DisasmView");
 
 	RequestNotification(NT_CUSTMENU);
 	RequestNotification(NT_KEYDOWN);        //  Allows exit from script
@@ -506,21 +637,77 @@ int main(int argc, char ** argv)
 
 		GetNotification(NT_ANY, &Notify);
 		PS3UpdateTargetInfo();
-		if ((sn_uint32)Notify.pParam1 == uSrcItemId[1])
+		if ((sn_uint32)Notify.pParam1 == uSrcItemId[3]) {
+			GetObjectData(LOWORD(Notify.pParam2), GVD_THREAD, &uThreadID, uSize64);
+			GetObjectData(LOWORD(Notify.pParam2), GVD_PROCESS, &uProcessID, uSize32);
+			
+			if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, "*$pc = 200"))) {
+				printf("\nError: %s", GetLastErrorString());
+				break;
+			}
+			printf("%08x\n", result.val.i64.word[0]);
+		}		
+		else if ((sn_uint32)Notify.pParam1 == uSrcItemId[2]) {
+			GetObjectData(LOWORD(Notify.pParam2), GVD_THREAD, &uThreadID, uSize64);
+			GetObjectData(LOWORD(Notify.pParam2), GVD_PROCESS, &uProcessID, uSize32);
+			
+			step_in(uProcessID, uThreadID);
+		} 
+		else if ((sn_uint32)Notify.pParam1 == uSrcItemId[1])
 		{
 			GetObjectData(LOWORD(Notify.pParam2), GVD_THREAD, &uThreadID, uSize64);
 			GetObjectData(LOWORD(Notify.pParam2), GVD_PROCESS, &uProcessID, uSize32);
-			GetObjectData(LOWORD(Notify.pParam2), GVD_ADDR_AT_CURSOR, pAddress, uSize64);
-			puts("step step");
-			if (SN_FAILED(PS3ThreadStep(uProcessID, uThreadID, SM_DISASSEMBLY))) {
-				printf("\nError: %s", GetLastErrorString());
+			printf("\nEvaluate in the Thread 0x%x and Process %x context\n", uThreadID.word[0], uProcessID);
+			
+			printf(">>");
+			GetInputLine(pInputBuffer, sizeof(pInputBuffer)/sizeof(char), &uInputLength);
+			to = strtoul(pInputBuffer, NULL, 16);
+			puts("\n");
+			
+			//FileSelectionDialog(filePath, fileName);
+			
+			//printf("%s\n", filePath);
+			//printf("%s\n", fileName);
+			
+			f = fopen("C:\\Users\\tr\\Desktop\\ps3realtrace.txt", "w");
+			if (!f) {
+				printf("failed to open file %s\n", fpath);
 				break;
 			}
-			PS3UpdateTargetInfo();
-			if (SN_FAILED(PS3ThreadStep(uProcessID, uThreadID, SM_DISASSEMBLY))) {
-				printf("\nError: %s", GetLastErrorString());
-				break;
+			printf("\ntracing to %x\n", to);
+			pc = 0;
+			steps = 1;
+			while (pc != to) {
+				pc = get_pc(uProcessID, uThreadID);
+				
+				fprintf(f, "pc:%08x;", pc);
+				fflush(f);
+				
+				for (i = 0; i < 128; i++) {
+					if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, spuregstrs[i]))) {
+						printf("\nError: %s", GetLastErrorString());
+						break;
+					}
+					fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
+						result.val.i128.word[3],
+						result.val.i128.word[2],
+						result.val.i128.word[1],
+						result.val.i128.word[0]);
+					fflush(f);
+				}
+				
+				fprintf(f, "\n");
+				
+				step_in(uProcessID, uThreadID);
+				
+				if (steps % 100 == 0) {
+					printf("steps = %d\n", steps);
+				}
+				
+				steps++;
 			}
+			
+			fclose(f);
 		}
 		if ((sn_uint32)Notify.pParam1 == uSrcItemId[0])
 		{

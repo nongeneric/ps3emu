@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # parse-trace.py --changes /tmp/ps3trace
+# parse-trace.py --spu --changes /tmp/ps3trace-spu
 # --changes shows what registers change at each line and their new values
 # each line is either starts with a # and ignored or has the following format
 #     pc:%08x;r0=%016x;...;r31=%016x;v0=%032;...;v31=%032; #optional comment
@@ -13,6 +14,7 @@ class Trace:
     vregs = None
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--spu', action="store_true")
 parser.add_argument('--changes', type=str)
 args = parser.parse_args()
 
@@ -35,15 +37,19 @@ if args.changes:
             split = line.split(';')
             trace = Trace()
             trace.nip = int(split[0].split(':')[1], 16)
-            trace.regs = parse_regs(split[1:33])
-            trace.vregs = parse_regs(split[33:-1])
+            if args.spu:
+                trace.regs = parse_regs(split[1:-1])
+                trace.vregs = []
+            else:
+                trace.regs = parse_regs(split[1:33])
+                trace.vregs = parse_regs(split[33:-1])
             traces.append(trace)
             
     print(len(traces), "lines")
     for c, n in zip(traces, traces[1:]):
         changed = []
-        rnames = ['r' + str(x) for x in range(0, 32)]
-        vnames = ['v' + str(x) for x in range(0, 32)]
+        rnames = ['r' + str(x) for x in range(0, len(n.regs))]
+        vnames = ['v' + str(x) for x in range(0, len(n.vregs))]
         for creg, nreg, name in zip(c.regs, n.regs, rnames):
             if creg != nreg: changed.append((name, nreg))
         for creg, nreg, name in zip(c.vregs, n.vregs, vnames):

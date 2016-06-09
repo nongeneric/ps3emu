@@ -154,5 +154,5 @@ inline uint64_t rol(uint64_t n, unsigned sh) {
 
 template <int Size>
 inline uint64_t ror(uint64_t n, unsigned sh) {
-    return rol<Size, uint64_t>(Size - n, sh);
+    return rol<Size, uint64_t>(n, Size - sh);
 }

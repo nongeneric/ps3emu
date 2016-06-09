@@ -289,8 +289,8 @@ PRINT(ah) {
 }
 
 EMU(ah) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = ra.hw(i) + rb.hw(i);
@@ -302,7 +302,7 @@ PRINT(ahi) {
 }
 
 EMU(ahi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto s = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -315,8 +315,8 @@ PRINT(a) {
 }
 
 EMU(a) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.w(i) + rb.w(i);
@@ -328,7 +328,7 @@ PRINT(ai) {
 }
 
 EMU(ai) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto s = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -341,8 +341,8 @@ PRINT(sfh) {
 }
 
 EMU(sfh) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = rb.hw(i) - ra.hw(i);
@@ -354,7 +354,7 @@ PRINT(sfhi) {
 }
 
 EMU(sfhi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto s = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -367,8 +367,8 @@ PRINT(sf) {
 }
 
 EMU(sf) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = rb.w(i) - ra.w(i);
@@ -380,7 +380,7 @@ PRINT(sfi) {
 }
 
 EMU(sfi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto s = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -393,8 +393,8 @@ PRINT(addx) {
 }
 
 EMU(addx) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = rb.w(i) + ra.w(i) + (rt.w(i) & 1);
@@ -406,8 +406,8 @@ PRINT(cg) {
 }
 
 EMU(cg) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         uint64_t t = (uint64_t)(uint32_t)rb.w(i) + (uint64_t)(uint32_t)ra.w(i);
@@ -420,11 +420,13 @@ PRINT(cgx) {
 }
 
 EMU(cgx) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        uint64_t t = (uint64_t)rb.w(i) + (uint64_t)ra.w(i) + (rt.w(i) & 1);
+        uint64_t t = (uint64_t)(uint32_t)rb.w(i) 
+                   + (uint64_t)(uint32_t)ra.w(i) 
+                   + (rt.w(i) & 1);
         rt.w(i) = (t >> 32) & 1;
     }
 }
@@ -434,8 +436,8 @@ PRINT(sfx) {
 }
 
 EMU(sfx) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = rb.w(i) + ~ra.w(i) + (rt.w(i) & 1);
@@ -447,8 +449,8 @@ PRINT(bg) {
 }
 
 EMU(bg) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = (uint32_t)ra.w(i) <= (uint32_t)rb.w(i);
@@ -460,8 +462,8 @@ PRINT(bgx) {
 }
 
 EMU(bgx) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         if (rt.w(i) & 1) {
@@ -477,8 +479,8 @@ PRINT(mpy) {
 }
 
 EMU(mpy) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         int32_t t = (int16_t)ra.w(i);
@@ -492,8 +494,8 @@ PRINT(mpyu) {
 }
 
 EMU(mpyu) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ((uint32_t)ra.w(i) & 0xffff) * ((uint32_t)rb.w(i) & 0xffff);
@@ -505,7 +507,7 @@ PRINT(mpyi) {
 }
 
 EMU(mpyi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto s = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -518,11 +520,11 @@ PRINT(mpyui) {
 }
 
 EMU(mpyui) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
-    uint32_t s = i->I10.s();
+    uint32_t s = (uint16_t)i->I10.s();
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = ((uint32_t)ra.w(i) & 0xffff) * s;
+        rt.w(i) = (uint32_t)(uint16_t)ra.w(i) * s;
     }
 }
 
@@ -531,8 +533,8 @@ PRINT(mpya) {
 }
 
 EMU(mpya) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
@@ -547,8 +549,8 @@ PRINT(mpyh) {
 }
 
 EMU(mpyh) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         int32_t t = (int16_t)signed_rshift32(ra.w(i), 16);
@@ -562,8 +564,8 @@ PRINT(mpys) {
 }
 
 EMU(mpys) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         int32_t t = (int16_t)ra.w(i);
@@ -577,8 +579,8 @@ PRINT(mpyhh) {
 }
 
 EMU(mpyhh) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         int32_t t = (int16_t)signed_rshift32(ra.w(i), 16);
@@ -592,8 +594,8 @@ PRINT(mpyhha) {
 }
 
 EMU(mpyhha) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         int32_t t = (int16_t)signed_rshift32(ra.w(i), 16);
@@ -607,8 +609,8 @@ PRINT(mpyhhu) {
 }
 
 EMU(mpyhhu) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ((uint32_t)ra.w(i) >> 16) * ((uint32_t)rb.w(i) >> 16);
@@ -620,8 +622,8 @@ PRINT(mpyhhau) {
 }
 
 EMU(mpyhhau) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) += ((uint32_t)ra.w(i) >> 16) * ((uint32_t)rb.w(i) >> 16);
@@ -633,7 +635,7 @@ PRINT(clz) {
 }
 
 EMU(clz) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.w(i) == 0 ? 32 : __builtin_clz(ra.w(i));
@@ -645,7 +647,7 @@ PRINT(cntb) {
 }
 
 EMU(cntb) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
         rt.b(i) = count_ones32(ra.b(i));
@@ -657,7 +659,7 @@ PRINT(fsmb) {
 }
 
 EMU(fsmb) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     std::bitset<16> bits(ra.w<0>());
     for (int i = 0; i < 16; ++i) {
@@ -670,7 +672,7 @@ PRINT(fsmh) {
 }
 
 EMU(fsmh) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     std::bitset<8> bits(ra.w<0>());
     for (int i = 0; i < 8; ++i) {
@@ -683,7 +685,7 @@ PRINT(fsm) {
 }
 
 EMU(fsm) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto mask = ra.w<0>() & 0b1111;
     for (int i = 0; i < 4; ++i) {
@@ -696,7 +698,7 @@ PRINT(gbb) {
 }
 
 EMU(gbb) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     std::bitset<16> bits;
     for (int i = 0; i < 16; ++i) {
@@ -713,7 +715,7 @@ PRINT(gbh) {
 }
 
 EMU(gbh) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     std::bitset<8> bits;
     for (int i = 0; i < 8; ++i) {
@@ -730,7 +732,7 @@ PRINT(gb) {
 }
 
 EMU(gb) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     std::bitset<4> bits;
     for (int i = 0; i < 4; ++i) {
@@ -747,8 +749,8 @@ PRINT(avgb) {
 }
 
 EMU(avgb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
         auto t = (uint16_t)ra.b(i) + rb.b(i) + 1;
@@ -761,8 +763,8 @@ PRINT(absdb) {
 }
 
 EMU(absdb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
         rt.b(i) = std::abs(rb.b(i) - ra.b(i));
@@ -774,8 +776,8 @@ PRINT(sumb) {
 }
 
 EMU(sumb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto bsum = (uint16_t)
@@ -797,7 +799,7 @@ PRINT(xsbh) {
 }
 
 EMU(xsbh) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = (int8_t)ra.b(2 * i + 1);
@@ -809,7 +811,7 @@ PRINT(xshw) {
 }
 
 EMU(xshw) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.hw(2 * i + 1);
@@ -821,7 +823,7 @@ PRINT(xswd) {
 }
 
 EMU(xswd) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = ra.w(2 * i + 1);
@@ -833,8 +835,8 @@ PRINT(and_) {
 }
 
 EMU(and_) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = rb.dw(i) & ra.dw(i);
@@ -846,8 +848,8 @@ PRINT(andc) {
 }
 
 EMU(andc) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = ra.dw(i) & ~rb.dw(i);
@@ -859,7 +861,7 @@ PRINT(andbi) {
 }
 
 EMU(andbi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto b = i->I10.u() & 0xff;
     for (int i = 0; i < 16; ++i) {
@@ -872,7 +874,7 @@ PRINT(andhi) {
 }
 
 EMU(andhi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int16_t t = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -885,7 +887,7 @@ PRINT(andi) {
 }
 
 EMU(andi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int32_t t = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -898,8 +900,8 @@ PRINT(or_) {
 }
 
 EMU(or_) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = rb.dw(i) | ra.dw(i);
@@ -911,8 +913,8 @@ PRINT(orc) {
 }
 
 EMU(orc) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = ra.dw(i) | ~rb.dw(i);
@@ -924,7 +926,7 @@ PRINT(orbi) {
 }
 
 EMU(orbi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto b = i->I10.u() & 0xff;
     for (int i = 0; i < 16; ++i) {
@@ -937,7 +939,7 @@ PRINT(orhi) {
 }
 
 EMU(orhi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int16_t t = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -950,7 +952,7 @@ PRINT(ori) {
 }
 
 EMU(ori) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int32_t t = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -963,7 +965,7 @@ PRINT(orx) {
 }
 
 EMU(orx) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     rt.w<0>() = ra.w<0>() | ra.w<1>() | ra.w<2>() | ra.w<3>();
     rt.w<1>() = 0;
@@ -975,8 +977,8 @@ PRINT(xor_) {
 }
 
 EMU(xor_) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = rb.dw(i) ^ ra.dw(i);
@@ -988,7 +990,7 @@ PRINT(xorbi) {
 }
 
 EMU(xorbi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto b = i->I10.u() & 0xff;
     for (int i = 0; i < 16; ++i) {
@@ -1001,7 +1003,7 @@ PRINT(xorhi) {
 }
 
 EMU(xorhi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int16_t t = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -1014,7 +1016,7 @@ PRINT(xori) {
 }
 
 EMU(xori) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int32_t t = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -1027,8 +1029,8 @@ PRINT(nand) {
 }
 
 EMU(nand) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ~(rb.w(i) & ra.w(i));
@@ -1040,8 +1042,8 @@ PRINT(nor) {
 }
 
 EMU(nor) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ~(rb.w(i) | ra.w(i));
@@ -1053,8 +1055,8 @@ PRINT(eqv) {
 }
 
 EMU(eqv) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = rb.w(i) ^ ~ra.w(i);
@@ -1066,8 +1068,8 @@ PRINT(selb) {
 }
 
 EMU(selb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 2; ++i) {
@@ -1080,8 +1082,8 @@ PRINT(shufb) {
 }
 
 EMU(shufb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 16; ++i) {
@@ -1099,8 +1101,8 @@ PRINT(shlh) {
 }
 
 EMU(shlh) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         auto sh = (uint16_t)rb.hw(i) & 0b11111;
@@ -1113,7 +1115,7 @@ PRINT(shlhi) {
 }
 
 EMU(shlhi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b11111;
     for (int i = 0; i < 8; ++i) {
@@ -1126,8 +1128,8 @@ PRINT(shl) {
 }
 
 EMU(shl) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto sh = (uint32_t)rb.w(i) & 0b111111;
@@ -1140,7 +1142,7 @@ PRINT(shli) {
 }
 
 EMU(shli) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b111111;
     for (int i = 0; i < 4; ++i) {
@@ -1153,8 +1155,8 @@ PRINT(shlqbi) {
 }
 
 EMU(shlqbi) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 <<= (uint32_t)rb.w<0>() & 0b111;
@@ -1167,7 +1169,7 @@ PRINT(shlqbii) {
 }
 
 EMU(shlqbii) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 <<= i->I7.u() & 0b111;
@@ -1180,8 +1182,8 @@ PRINT(shlqby) {
 }
 
 EMU(shlqby) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b11111;
@@ -1195,7 +1197,7 @@ PRINT(shlqbyi) {
 }
 
 EMU(shlqbyi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b11111;
@@ -1209,8 +1211,8 @@ PRINT(shlqbybi) {
 }
 
 EMU(shlqbybi) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
@@ -1224,12 +1226,12 @@ PRINT(roth) {
 }
 
 EMU(roth) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
-        auto sh = (uint16_t)rb.hw(i) & 0b1111;
-        rt.hw(i) = rol<16>(ra.hw(i), sh);
+        auto sh = rb.hw(i) & 0b1111;
+        rt.hw(i) = rol<16>((uint16_t)ra.hw(i), sh);
     }
 }
 
@@ -1238,11 +1240,11 @@ PRINT(rothi) {
 }
 
 EMU(rothi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b1111;
     for (int i = 0; i < 8; ++i) {
-        rt.hw(i) = rol<16>(ra.hw(i), sh);
+        rt.hw(i) = rol<16>((uint16_t)ra.hw(i), sh);
     }
 }
 
@@ -1251,12 +1253,12 @@ PRINT(rot) {
 }
 
 EMU(rot) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto sh = (uint32_t)rb.w(i) & 0b11111;
-        rt.w(i) = rol<32>(ra.w(i), sh);
+        rt.w(i) = rol<32>((uint32_t)ra.w(i), sh);
     }
 }
 
@@ -1265,11 +1267,11 @@ PRINT(roti) {
 }
 
 EMU(roti) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b11111;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = rol<32>(ra.w(i), sh);
+        rt.w(i) = rol<32>((uint32_t)ra.w(i), sh);
     }
 }
 
@@ -1278,8 +1280,8 @@ PRINT(rotqby) {
 }
 
 EMU(rotqby) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b1111;
@@ -1293,7 +1295,7 @@ PRINT(rotqbyi) {
 }
 
 EMU(rotqbyi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b1111;
@@ -1307,8 +1309,8 @@ PRINT(rotqbybi) {
 }
 
 EMU(rotqbybi) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
@@ -1322,8 +1324,8 @@ PRINT(rotqbi) {
 }
 
 EMU(rotqbi) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b111;
@@ -1337,7 +1339,7 @@ PRINT(rotqbii) {
 }
 
 EMU(rotqbii) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b111;
@@ -1351,12 +1353,12 @@ PRINT(rothm) {
 }
 
 EMU(rothm) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         auto sh = -rb.hw(i) & 0x1f;
-        rt.hw(i) = sh > 15 ? 0 : (uint32_t)ra.hw(i) >> sh;
+        rt.hw(i) = sh < 16 ? (uint16_t)ra.hw(i) >> sh : 0;
     }
 }
 
@@ -1365,11 +1367,11 @@ PRINT(rothmi) {
 }
 
 EMU(rothmi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = -i->I7.s() & 0x1f;
     for (int i = 0; i < 8; ++i) {
-        rt.hw(i) = sh > 15 ? 0 : (uint16_t)ra.hw(i) >> sh;
+        rt.hw(i) = sh < 16 ? (uint16_t)ra.hw(i) >> sh : 0;
     }
 }
 
@@ -1378,12 +1380,12 @@ PRINT(rotm) {
 }
 
 EMU(rotm) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto sh = -rb.w(i) & 0x3f;
-        rt.w(i) = sh > 31 ? 0 : (uint32_t)ra.w(i) >> sh;
+        rt.w(i) = sh < 32 ? (uint32_t)ra.w(i) >> sh : 0;
     }
 }
 
@@ -1392,11 +1394,11 @@ PRINT(rotmi) {
 }
 
 EMU(rotmi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = -i->I7.s() & 0x3f;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = sh > 31 ? 0 : (uint32_t)ra.w(i) >> sh;
+        rt.w(i) = sh < 32 ? (uint32_t)ra.w(i) >> sh : 0;
     }
 }
 
@@ -1405,8 +1407,8 @@ PRINT(rotqmby) {
 }
 
 EMU(rotqmby) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = -rb.w<0>() & 0x1f;
@@ -1420,7 +1422,7 @@ PRINT(rotqmbyi) {
 }
 
 EMU(rotqmbyi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = -i->I7.s() & 0x1f;
@@ -1434,8 +1436,8 @@ PRINT(rotqmbybi) {
 }
 
 EMU(rotqmbybi) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = -(rb.w<0>() >> 3) & 0b11111;
@@ -1449,8 +1451,8 @@ PRINT(rotqmbi) {
 }
 
 EMU(rotqmbi) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 >>= -rb.w<0>() & 7;
@@ -1463,7 +1465,7 @@ PRINT(rotqmbii) {
 }
 
 EMU(rotqmbii) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     u128 >>= -i->I7.s() & 7;
@@ -1476,12 +1478,13 @@ PRINT(rotmah) {
 }
 
 EMU(rotmah) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         auto sh = -rb.hw(i) & 0x1f;
-        rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh) : 0;
+        rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh) 
+                 : ((ra.hw(i) & (1 << 15)) ? ~0ul : 0);
     }
 }
 
@@ -1490,11 +1493,12 @@ PRINT(rotmahi) {
 }
 
 EMU(rotmahi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = -i->I7.s() & 0x1f;
     for (int i = 0; i < 8; ++i) {
-        rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh) : 0;
+        rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh)
+                 : ((ra.hw(i) & (1 << 15)) ? ~0ul : 0);
     }
 }
 
@@ -1503,12 +1507,13 @@ PRINT(rotma) {
 }
 
 EMU(rotma) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto sh = -rb.w(i) & 0x3f;
-        rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh) : 0;
+        rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh)
+                : ((ra.w(i) & (1 << 31)) ? ~0ul : 0);
     }
 }
 
@@ -1517,11 +1522,12 @@ PRINT(rotmai) {
 }
 
 EMU(rotmai) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto sh = -i->I7.s() & 0x3f;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh) : 0;
+        rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh)
+                : ((ra.w(i) & (1 << 31)) ? ~0ul : 0);
     }
 }
 
@@ -1530,8 +1536,8 @@ PRINT(heq) {
 }
 
 EMU(heq) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     if (ra.w<0>() == rb.w<0>())
         throw BreakpointException();
 }
@@ -1541,7 +1547,7 @@ PRINT(heqi) {
 }
 
 EMU(heqi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     if (ra.w<0>() == i->I10.s())
         throw BreakpointException();
 }
@@ -1551,8 +1557,8 @@ PRINT(hgt) {
 }
 
 EMU(hgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     if (ra.w<0>() > rb.w<0>())
         throw BreakpointException();
 }
@@ -1562,7 +1568,7 @@ PRINT(hgti) {
 }
 
 EMU(hgti) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     if (ra.w<0>() > i->I10.s())
         throw BreakpointException();
 }
@@ -1572,8 +1578,8 @@ PRINT(hlgt) {
 }
 
 EMU(hlgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     if ((uint32_t)ra.w<0>() > (uint32_t)rb.w<0>())
         throw BreakpointException();
 }
@@ -1583,7 +1589,7 @@ PRINT(hlgti) {
 }
 
 EMU(hlgti) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     if ((uint32_t)ra.w<0>() > (uint32_t)i->I10.s())
         throw BreakpointException();
 }
@@ -1593,8 +1599,8 @@ PRINT(ceqb) {
 }
 
 EMU(ceqb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
         rt.b(i) = ra.b(i) == rb.b(i) ? 0xff : 0;
@@ -1606,7 +1612,7 @@ PRINT(ceqbi) {
 }
 
 EMU(ceqbi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint8_t imm = i->I10.u();
     for (int i = 0; i < 16; ++i) {
@@ -1619,8 +1625,8 @@ PRINT(ceqh) {
 }
 
 EMU(ceqh) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = ra.hw(i) == rb.hw(i) ? 0xffff : 0;
@@ -1632,7 +1638,7 @@ PRINT(ceqhi) {
 }
 
 EMU(ceqhi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int16_t imm = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -1645,8 +1651,8 @@ PRINT(ceq) {
 }
 
 EMU(ceq) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.w(i) == rb.w(i) ? 0xffffffff : 0;
@@ -1658,7 +1664,7 @@ PRINT(ceqi) {
 }
 
 EMU(ceqi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int32_t imm = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -1671,8 +1677,8 @@ PRINT(cgtb) {
 }
 
 EMU(cgtb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
         rt.b(i) = (int8_t)ra.b(i) > (int8_t)rb.b(i) ? 0xff : 0;
@@ -1684,7 +1690,7 @@ PRINT(cgtbi) {
 }
 
 EMU(cgtbi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int8_t imm = i->I10.u() & 0xff;
     for (int i = 0; i < 16; ++i) {
@@ -1697,8 +1703,8 @@ PRINT(cgth) {
 }
 
 EMU(cgth) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = ra.hw(i) > rb.hw(i) ? 0xffff : 0;
@@ -1710,7 +1716,7 @@ PRINT(cgthi) {
 }
 
 EMU(cgthi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int16_t imm = i->I10.s();
     for (int i = 0; i < 8; ++i) {
@@ -1723,8 +1729,8 @@ PRINT(cgt) {
 }
 
 EMU(cgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.w(i) > rb.w(i) ? 0xffffffff : 0;
@@ -1736,7 +1742,7 @@ PRINT(cgti) {
 }
 
 EMU(cgti) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     int32_t imm = i->I10.s();
     for (int i = 0; i < 4; ++i) {
@@ -1749,8 +1755,8 @@ PRINT(clgtb) {
 }
 
 EMU(clgtb) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 16; ++i) {
         rt.b(i) = ra.b(i) > rb.b(i) ? 0xff : 0;
@@ -1762,7 +1768,7 @@ PRINT(clgtbi) {
 }
 
 EMU(clgtbi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint8_t imm = i->I10.u();
     for (int i = 0; i < 16; ++i) {
@@ -1775,8 +1781,8 @@ PRINT(clgth) {
 }
 
 EMU(clgth) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = (uint16_t)ra.hw(i) > (uint16_t)rb.hw(i) ? 0xffff : 0;
@@ -1788,7 +1794,7 @@ PRINT(clgthi) {
 }
 
 EMU(clgthi) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint16_t imm = i->I10.u();
     for (int i = 0; i < 8; ++i) {
@@ -1801,8 +1807,8 @@ PRINT(clgt) {
 }
 
 EMU(clgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = (uint32_t)ra.w(i) > (uint32_t)rb.w(i) ? 0xffffffff : 0;
@@ -1814,7 +1820,7 @@ PRINT(clgti) {
 }
 
 EMU(clgti) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint32_t imm = i->I10.u();
     for (int i = 0; i < 4; ++i) {
@@ -1929,7 +1935,7 @@ PRINT(brhnz) {
 }
 
 EMU(brhnz) {
-    if (th->r(i->RT).hw<0>() != 0) {
+    if (th->r(i->RT).hw_pref() != 0) {
         auto address = br_cia_lsa(i->I16, cia);
         th->setNip(address);
     }
@@ -1940,7 +1946,7 @@ PRINT(brhz) {
 }
 
 EMU(brhz) {
-    if (th->r(i->RT).hw<0>() == 0) {
+    if (th->r(i->RT).hw_pref() == 0) {
         auto address = br_cia_lsa(i->I16, cia);
         th->setNip(address);
     }
@@ -1973,7 +1979,7 @@ PRINT(bihz) {
 }
 
 EMU(bihz) {
-    if (th->r(i->RT).hw<0>() == 0) {
+    if (th->r(i->RT).hw_pref() == 0) {
         auto address = th->r(i->RA).w<0>() & LSLR & 0xfffffffc;
         th->setNip(address);
     }
@@ -1984,7 +1990,7 @@ PRINT(bihnz) {
 }
 
 EMU(bihnz) {
-    if (th->r(i->RT).hw<0>() != 0) {
+    if (th->r(i->RT).hw_pref() != 0) {
         auto address = th->r(i->RA).w<0>() & LSLR & 0xfffffffc;
         th->setNip(address);
     }
@@ -2013,8 +2019,8 @@ PRINT(fa) {
 }
 
 EMU(fa) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = ra.fs(i) + rb.fs(i);
@@ -2026,8 +2032,8 @@ PRINT(dfa) {
 }
 
 EMU(dfa) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = ra.fd(i) + rb.fd(i);
@@ -2039,8 +2045,8 @@ PRINT(fs) {
 }
 
 EMU(fs) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = ra.fs(i) - rb.fs(i);
@@ -2052,8 +2058,8 @@ PRINT(dfs) {
 }
 
 EMU(dfs) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = ra.fd(i) - rb.fd(i);
@@ -2065,8 +2071,8 @@ PRINT(fm) {
 }
 
 EMU(fm) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = ra.fs(i) * rb.fs(i);
@@ -2078,8 +2084,8 @@ PRINT(dfm) {
 }
 
 EMU(dfm) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = ra.fd(i) * rb.fd(i);
@@ -2091,8 +2097,8 @@ PRINT(fma) {
 }
 
 EMU(fma) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
@@ -2105,8 +2111,8 @@ PRINT(dfma) {
 }
 
 EMU(dfma) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 2; ++i) {
@@ -2119,8 +2125,8 @@ PRINT(fnms) {
 }
 
 EMU(fnms) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
@@ -2133,12 +2139,11 @@ PRINT(dfnms) {
 }
 
 EMU(dfnms) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
-    auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT_ABC);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
+    auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
-        rt.fd(i) = rc.fd(i) - ra.fd(i) * rb.fd(i);
+        rt.fd(i) = rt.fd(i) - ra.fd(i) * rb.fd(i);
     }
 }
 
@@ -2147,8 +2152,8 @@ PRINT(fms) {
 }
 
 EMU(fms) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
@@ -2161,12 +2166,11 @@ PRINT(dfms) {
 }
 
 EMU(dfms) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
-    auto& rc = th->r(i->RC);
-    auto& rt = th->r(i->RT_ABC);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
+    auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
-        rt.fd(i) = ra.fd(i) * rb.fd(i) - rc.fd(i);
+        rt.fd(i) = ra.fd(i) * rb.fd(i) - rt.fd(i);
     }
 }
 
@@ -2175,8 +2179,8 @@ PRINT(dfnma) {
 }
 
 EMU(dfnma) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = -(ra.fd(i) * rb.fd(i) + rt.fd(i));
@@ -2188,7 +2192,7 @@ PRINT(frest) {
 }
 
 EMU(frest) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = 1.f / ra.fs(i);
@@ -2200,7 +2204,7 @@ PRINT(frsqest) {
 }
 
 EMU(frsqest) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = 1.f / std::sqrt(std::abs(ra.fs(i)));
@@ -2213,7 +2217,7 @@ PRINT(fi) {
 
 EMU(fi) {
     // skip Newton-Raphson's second step
-    auto& rb = th->r(i->RB);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.fs(i) = rb.fs(i);
@@ -2225,7 +2229,7 @@ PRINT(csflt) {
 }
 
 EMU(csflt) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint128_t scale = 1;
     scale <<= 155 - i->I8.u();
@@ -2239,7 +2243,7 @@ PRINT(cflts) {
 }
 
 EMU(cflts) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint128_t scale = 1;
     scale <<= 173 - i->I8.u();
@@ -2253,7 +2257,7 @@ PRINT(cuflt) {
 }
 
 EMU(cuflt) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint128_t scale = 1;
     scale <<= 155 - i->I8.u();
@@ -2267,7 +2271,7 @@ PRINT(cfltu) {
 }
 
 EMU(cfltu) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     uint128_t scale = 1;
     scale <<= 173 - i->I8.u();
@@ -2281,7 +2285,7 @@ PRINT(frds) {
 }
 
 EMU(frds) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.fs(i * 2) = ra.fd(i);
@@ -2294,7 +2298,7 @@ PRINT(fesd) {
 }
 
 EMU(fesd) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.fd(i) = ra.fs(2 * i);
@@ -2306,8 +2310,8 @@ PRINT(dfceq) {
 }
 
 EMU(dfceq) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = ra.fd(i) == rb.fd(i) ? ~0ull : 0;
@@ -2319,8 +2323,8 @@ PRINT(dfcmeq) {
 }
 
 EMU(dfcmeq) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = std::abs(ra.fd(i)) == std::abs(rb.fd(i)) ? ~0ull : 0;
@@ -2332,8 +2336,8 @@ PRINT(dfcgt) {
 }
 
 EMU(dfcgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = ra.fd(i) > rb.fd(i) ? ~0ull : 0;
@@ -2345,8 +2349,8 @@ PRINT(dfcmgt) {
 }
 
 EMU(dfcmgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 2; ++i) {
         rt.dw(i) = std::abs(ra.fd(i)) > std::abs(rb.fd(i)) ? ~0ull : 0;
@@ -2358,7 +2362,7 @@ PRINT(dftsv) {
 }
 
 EMU(dftsv) {
-    auto& ra = th->r(i->RA);
+    auto ra = th->r(i->RA);
     auto& rt = th->r(i->RT);
     auto i7 = i->I7.u();
     for (int i = 0; i < 2; ++i) {
@@ -2380,8 +2384,8 @@ PRINT(fceq) {
 }
 
 EMU(fceq) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.fs(i) == rb.fs(i) ? -1 : 0;
@@ -2393,8 +2397,8 @@ PRINT(fcmeq) {
 }
 
 EMU(fcmeq) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = std::abs(ra.fs(i)) == std::abs(rb.fs(i)) ? -1 : 0;
@@ -2406,8 +2410,8 @@ PRINT(fcgt) {
 }
 
 EMU(fcgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = ra.fs(i) > rb.fs(i) ? -1 : 0;
@@ -2419,8 +2423,8 @@ PRINT(fcmgt) {
 }
 
 EMU(fcmgt) {
-    auto& ra = th->r(i->RA);
-    auto& rb = th->r(i->RB);
+    auto ra = th->r(i->RA);
+    auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = std::abs(ra.fs(i)) > std::abs(rb.fs(i)) ? -1 : 0;
