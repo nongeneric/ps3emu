@@ -2071,7 +2071,7 @@ inline void completeFPInstr(T a, T b, T c, T r, Rc_t rc, PPUThread* thread) {
         fx |= fpscr.f.VXSNAN == 0;
         fpscr.f.VXSNAN = 1;
     }
-    if (isinf(a) && isinf(b)) {
+    if (std::isinf(a) && std::isinf(b)) {
         if ((a > 0 && b < 0) || (a < 0 && b > 0)) {
             fx |= fpscr.f.VXISI == 0;
             fpscr.f.VXISI = 1;
@@ -2323,7 +2323,7 @@ PRINT(FCMPU, XForm_17) {
 EMU(FCMPU, XForm_17) {
     auto a = TH->getFPRd(i->FRA);
     auto b = TH->getFPRd(i->FRB);
-    uint32_t c = isnan(a) || isnan(b) ? 1
+    uint32_t c = std::isnan(a) || std::isnan(b) ? 1
                : a < b ? 8
                : a > b ? 4
                : 2;

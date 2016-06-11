@@ -4,6 +4,7 @@
 #include "../constants.h"
 #include "../BitField.h"
 #include <boost/thread.hpp>
+#include <boost/noncopyable.hpp>
 #include <atomic>
 #include <assert.h>
 #include <algorithm>
@@ -57,6 +58,10 @@ enum class SPUThreadEvent {
 class R128 {
     uint8_t _bs[16];
 public:
+    R128() = default;
+    inline R128(R128 const& r) {
+        memcpy(_bs, r._bs, sizeof(_bs));
+    }
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
     template <int N>
     uint8_t& b() {
@@ -187,7 +192,7 @@ struct SPUThreadExitInfo {
     int32_t status;
 };
 
-class SPUThread {
+class SPUThread : boost::noncopyable {
     uint32_t _nip;
     R128 _rs[128];
     uint32_t _ch[32];
@@ -209,7 +214,7 @@ class SPUThread {
     ConcurrentFifoQueue<uint32_t> _fromSpuInterruptMailbox;
     std::atomic<uint32_t> _status;
     void loop();
-    
+
 public:
     SPUThread(Process* proc,
               std::string name,
@@ -217,6 +222,7 @@ public:
     
     template <typename V>
     inline R128& r(V i) {
+        assert(getUValue(i) < 128);
         return _rs[getUValue(i)];
     }
     

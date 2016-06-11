@@ -86,8 +86,12 @@ SPUThread::SPUThread(Process* proc,
       _dbgPaused(true),
       _singleStep(false),
       _exitCode(0) {
-    memset(_rs, 0, sizeof(_rs));
-    memset(_ch, 0, sizeof(_ch));
+    for (auto& r : _rs) {
+        r.dw<0>() = 0;
+        r.dw<1>() = 0;
+    }
+    std::fill(std::begin(_ch), std::end(_ch), 0);
+    std::fill(std::begin(_ls), std::end(_ls), 0);
     _ch[MFC_WrTagMask] = -1;
     _status = 0b11000; // BTHSM
 }

@@ -3,6 +3,8 @@
 #include <string>
 #include <boost/variant.hpp>
 
+#include <vector>
+
 enum {
     CELL_GAME_PARAMID_TITLE = 0,
     CELL_GAME_PARAMID_TITLE_DEFAULT,

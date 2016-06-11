@@ -13,6 +13,6 @@ bool CommandLineEdit::eventFilter(QObject* o, QEvent* e) {
     return QLineEdit::eventFilter(o, e);
 }
 
-CommandLineEdit::CommandLineEdit(QWidget* parent): QLineEdit(parent) {
+CommandLineEdit::CommandLineEdit(QWidget* parent) : QLineEdit(parent) {
     installEventFilter(this);
 }

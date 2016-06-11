@@ -17,6 +17,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
+#include <numeric>
 
 using namespace boost::endian;
 using namespace boost::filesystem;

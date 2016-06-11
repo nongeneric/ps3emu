@@ -5,6 +5,7 @@
 #include <set>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 #include <boost/range/algorithm.hpp>
 #include <boost/log/trivial.hpp>
 

@@ -8,6 +8,8 @@
 #define GCM_EMU
 #include <gcm_tool.h>
 
+#include <vector>
+
 class Process;
 class MainMemory;
 
