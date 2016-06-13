@@ -1011,10 +1011,9 @@ void Rsx::init(Process* proc) {
     
     BOOST_LOG_TRIVIAL(trace) << "waiting for rsx loop to initialize";
     
-    _thread.reset(new boost::thread([=]{ loop(); }));
-    
     // lock the thread until Rsx has initialized the buffer
     boost::unique_lock<boost::mutex> lock(_initMutex);
+    _thread.reset(new boost::thread([=]{ loop(); }));
     _initCv.wait(lock, [=] { return _initialized; });
     
     BOOST_LOG_TRIVIAL(trace) << "rsx loop completed initialization";

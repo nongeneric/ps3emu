@@ -16,7 +16,7 @@ void thread_entry(uint64_t arg) {
 	for (int n = 0; n < 1000; ++n) {
 		huge_tls_block[n] += n;
 		tls_int++;
-		sys_mutex_lock(mutex, 10000);
+		sys_mutex_lock(mutex, 0);
 		int tmp = *i;
 		sys_timer_usleep(10);
 		*i = tmp + 1;

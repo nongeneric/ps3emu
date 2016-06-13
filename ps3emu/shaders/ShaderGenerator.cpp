@@ -188,7 +188,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "                rank > 2 ? readbyte(input_idx, offset + 2) : 0,\n"
         "                rank > 3 ? readbyte(input_idx, offset + 3) : 255) / 255.0;\n"
         "}");
-    line(ssnprintf(
+    line(
         "uint get_input_offset(uint i) {\n"
         "    uint index = gl_VertexID;\n"
         "    uint freq = samplersInfo.inputBufferFrequencies[i];\n"
@@ -200,7 +200,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "        }\n"
         "    }\n"
         "    return samplersInfo.inputBufferBases[i] + samplersInfo.inputBufferStrides[i] * index;\n"
-        "}"));
+        "}");
     
     line(ssnprintf("layout (std140, binding = %d) uniform ViewportInfo {",
                    VertexShaderViewportMatrixBinding));

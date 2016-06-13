@@ -10,7 +10,7 @@ inline void deleteProgramPipeline(GLuint handle) {
 }
 
 class GLProgramPipeline : public HandleWrapper<GLuint, deleteProgramPipeline> {
-    GLuint create() {
+    static GLuint create() {
         GLuint handle = 0;
         glcall(glGenProgramPipelines(1, &handle));
         return handle;

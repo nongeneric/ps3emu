@@ -139,10 +139,10 @@ void setCurrentCommandBuffer(MainMemory* mm, ps3_uintptr_t va) {
 }
 
 uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
-                            uint32_t cmdSize,
-                            uint32_t ioSize,
-                            ps3_uintptr_t ioAddress,
-                            Process* proc) {
+                          uint32_t cmdSize,
+                          uint32_t ioSize,
+                          ps3_uintptr_t ioAddress,
+                          Process* proc) {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
     
     auto internalMemory = proc->internalMemoryManager();
@@ -196,7 +196,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     
     callbackDescr->va = callbackNcallInstrEa;
     callbackDescr->tocBase = 0;
-    
+
     emuGcmState.rsx->setGet(emuGcmState.defaultContext->begin - ioAddress);
     emuGcmState.rsx->setPut(emuGcmState.defaultContext->current - ioAddress);
     auto rsxPrimaryDmaLabel = 3;

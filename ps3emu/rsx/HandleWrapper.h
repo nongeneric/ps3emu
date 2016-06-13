@@ -1,13 +1,15 @@
 #pragma once
 
 #include <glad/glad.h>
+#include <assert.h>
 #include <algorithm>
 
 template <typename H, void (*Deleter)(H)>
 class HandleWrapper {
+protected:
     H _handle = H();
 public:
-    HandleWrapper(H handle) : _handle(handle) { }
+    HandleWrapper(H handle = H()) : _handle(handle) { }
     
     HandleWrapper(HandleWrapper&& other) {
         _handle = other._handle;

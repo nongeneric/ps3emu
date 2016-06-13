@@ -17,7 +17,7 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
                                             uint size,
                                             bool cond) {
     
-    boost::unique_lock<spinlock> lock(_storeLock);
+    boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
     if (!cond || (_reservationThread == boost::this_thread::get_id())) {
         memcpy(dest, source, size);
         _reservationThread = boost::thread::id();
@@ -30,7 +30,8 @@ template <bool Read>
 void MainMemory::copy(ps3_uintptr_t va, 
           const void* buf, 
           uint len, 
-          bool allocate) {
+          bool allocate,
+          bool locked) {
     assert(va != 0 || len == 0);
     char* chars = (char*)buf;
     for (auto curVa = va; curVa != va + len;) {
@@ -62,7 +63,11 @@ void MainMemory::copy(ps3_uintptr_t va,
         auto dest = (uint8_t*)((page.ptr & PagePtrMask) + offset);
         auto size = end - curVa;
         if (Read) {
+            if (locked)
+                _storeLock.lock();
             memcpy(source, dest, size);
+            if (locked)
+                _storeLock.unlock();
         } else {
             storeMemoryWithReservation(dest, source, size, false);
         }
@@ -94,7 +99,7 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool a
         return;
     }
     
-    copy<false>(va, buf, len, allocate);
+    copy<false>(va, buf, len, allocate, true);
 }
 
 void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
@@ -108,7 +113,7 @@ struct IForm {
     uint8_t _ : 2;
 };
 
-void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate) {
+void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate, bool locked) {
     assert(buf);
     
     if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
@@ -132,7 +137,7 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
         throw std::runtime_error("unknown rsx register");
     }
 
-    copy<true>(va, buf, len, allocate);
+    copy<true>(va, buf, len, allocate, locked);
 }
 
 bool MainMemory::isAllocated(ps3_uintptr_t va) {

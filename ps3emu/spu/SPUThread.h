@@ -55,7 +55,7 @@ enum class SPUThreadEvent {
     Failure
 };
 
-class R128 {
+class alignas(16) R128 {
     uint8_t _bs[16];
 public:
     R128() = default;
@@ -213,6 +213,7 @@ class SPUThread : boost::noncopyable {
     ConcurrentFifoQueue<uint32_t> _fromSpuMailbox;
     ConcurrentFifoQueue<uint32_t> _fromSpuInterruptMailbox;
     std::atomic<uint32_t> _status;
+    uint64_t _id;
     void loop();
 
 public:
@@ -277,4 +278,5 @@ public:
     ConcurrentFifoQueue<uint32_t>& getFromSpuInterruptMailbox();
     ConcurrentFifoQueue<uint32_t>& getToSpuMailbox();
     std::atomic<uint32_t>& getStatus();
+    void setId(uint64_t id);
 };

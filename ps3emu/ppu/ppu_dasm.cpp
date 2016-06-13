@@ -2419,7 +2419,8 @@ PRINT(LWARX, XForm_1) {
 EMU(LWARX, XForm_1) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
-    auto val = MM->loadReserve<4>(ea, cia);
+    big_uint32_t val;
+    MM->readReserve(ea, &val, 4);
     TH->setGPR(i->RT, val);
 }
 
@@ -2430,7 +2431,8 @@ PRINT(STWCX, XForm_8) {
 EMU(STWCX, XForm_8) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
-    auto stored = MM->storeCond<4>(ea, TH->getGPR(i->RS));
+    big_uint32_t val = TH->getGPR(i->RS);
+    auto stored = MM->writeCond(ea, &val, 4);
     TH->setCRF_sign(0, stored);
 }
 
@@ -2441,7 +2443,8 @@ PRINT(LDARX, XForm_1) {
 EMU(LDARX, XForm_1) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
-    auto val = MM->loadReserve<8>(ea, cia);
+    big_uint64_t val;
+    MM->readReserve(ea, &val, 8);
     TH->setGPR(i->RT, val);
 }
 
@@ -2452,7 +2455,8 @@ PRINT(STDCX, XForm_8) {
 EMU(STDCX, XForm_8) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
-    auto stored = MM->storeCond<8>(ea, TH->getGPR(i->RS));
+    big_uint64_t val = TH->getGPR(i->RS);
+    auto stored = MM->writeCond(ea, &val, 8);
     TH->setCRF_sign(0, stored);
 }
 

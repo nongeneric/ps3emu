@@ -2,14 +2,15 @@
 
 #include "BitField.h"
 #include "constants.h"
-#include "spinlock.h"
 #include "utils.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/smart_ptr/detail/spinlock.hpp>
 #include <functional>
 #include <bitset>
 #include <memory>
+#include <atomic>
 
 class PPUThread;
 class Process;
@@ -73,15 +74,15 @@ class MainMemory {
     Rsx* _rsx;
     Process* _proc;
     boost::mutex _pageMutex;
-    spinlock _storeLock;
+    boost::detail::spinlock _storeLock = BOOST_DETAIL_SPINLOCK_INIT;
     boost::thread::id _reservationThread;
-    ps3_uintptr_t _reservationInstr;
     
     template <bool Read>
     void copy(ps3_uintptr_t va, 
         const void* buf, 
         uint len, 
-        bool allocate);
+        bool allocate,
+        bool locked);
     bool storeMemoryWithReservation(void* dest, 
                                     const void* buf, 
                                     uint len,
@@ -92,7 +93,7 @@ class MainMemory {
 public:
     MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
-    void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false);
+    void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false, bool locked = true);
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
     ps3_uintptr_t malloc(ps3_uintptr_t size);
     void free(ps3_uintptr_t addr);
@@ -106,8 +107,6 @@ public:
     void memoryBreak(uint32_t va, uint32_t size);
     void setRsx(Rsx* rsx);
     void setProc(Process* proc);
-    uint32_t loadReserve4(ps3_uintptr_t va);
-    bool storeCond4(ps3_uintptr_t va, uint32_t val);
     
     void store16(uint64_t va, unsigned __int128 value) {
         uint8_t *bytes = (uint8_t*)&value;
@@ -157,20 +156,16 @@ public:
         auto f = (uint64_t)load<sizeof(double)>(va);
         return union_cast<uint64_t, double>(f);
     }
-    
-    template <int N>
-    typename BytesToBEType<N>::type loadReserve(ps3_uintptr_t va, ps3_uintptr_t cia) {
-        boost::unique_lock<spinlock> lock(_storeLock);
+
+    void readReserve(ps3_uintptr_t va, void* buf, uint len) {
+        boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
         _reservationThread = boost::this_thread::get_id();
-        _reservationInstr = cia;
-        return load<N>(va);
+        readMemory(va, buf, len, false, false);
     }
 
-    template <int N>
-    bool storeCond(ps3_uintptr_t va, typename BytesToBEType<N>::type val) {
-        auto dest = getMemoryPointer(va, N);
-        boost::endian::native_to_big_inplace(val);
-        return storeMemoryWithReservation(dest, &val, N, true);
+    bool writeCond(ps3_uintptr_t va, const void* buf, uint len) {
+        auto dest = getMemoryPointer(va, len);
+        return storeMemoryWithReservation(dest, buf, len, true);
     }
 };
 

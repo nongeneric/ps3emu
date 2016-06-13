@@ -18,7 +18,6 @@ class GLBuffer : public HandleWrapper<GLuint, deleteBuffer> {
     bool _mapped = false;
     uint32_t _size;
     GLBufferType _type;
-    GLuint init(GLBufferType type, uint32_t size, void* data);
     GLBuffer(GLBuffer&) = delete;
     GLBuffer& operator=(GLBuffer&) = delete;
 public:
@@ -31,7 +30,6 @@ public:
 };
 
 class GLPersistentGpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
-    GLuint init(uint32_t size);
     uint32_t _size;
 public:
     GLPersistentGpuBuffer();
@@ -41,7 +39,6 @@ public:
 };
 
 class GLPersistentCpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
-    GLuint init(uint32_t size);
     uint32_t _size;
     void* _ptr;
 public:

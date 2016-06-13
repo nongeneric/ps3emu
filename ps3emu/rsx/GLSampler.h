@@ -10,11 +10,8 @@ inline void deleteSampler(GLuint handle) {
 
 class GLSampler : public HandleWrapper<GLuint, deleteSampler> {
 public:
-    GLSampler(GLuint handle) : HandleWrapper(handle) { }
-    GLSampler() : HandleWrapper(init()) { }
-    GLuint init() {
-        GLuint handle;
-        glcall(glCreateSamplers(1, &handle));
-        return handle;
+    inline GLSampler(GLuint handle) : HandleWrapper(handle) { }
+    inline GLSampler() {
+        glCreateSamplers(1, &_handle);
     }
 };

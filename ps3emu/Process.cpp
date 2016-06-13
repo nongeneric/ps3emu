@@ -233,6 +233,7 @@ uint32_t Process::createSpuThread(std::string name) {
                                     }));
     auto t = _spuThreads.back().get();
     auto id = _spuThreadIds.create(std::move(t));
+    t->setId(id);
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread %d created", id);
     return id;
 }

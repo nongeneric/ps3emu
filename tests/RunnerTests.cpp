@@ -399,7 +399,7 @@ TEST_CASE("ppu_fs_readdir") {
 
 TEST_CASE("ppu_fios") {
     auto output = startWaitGetOutput({"./binaries/ppu_fios/USRDIR/a.elf"});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "FiosSimple build date : Jan  4 2016 09:39:06\n"
         "FiosSimple start.\n"
         "SysCache : /dev_hdd1\n"

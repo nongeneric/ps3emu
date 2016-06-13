@@ -133,7 +133,7 @@ PRINT(cbx) {
 }
 
 EMU(cbx) {
-    auto t = th->r(i->RA).w<0>() + th->r(i->RB).w<0>();
+    auto t = (uint32_t)th->r(i->RA).w<0>() + (uint32_t)th->r(i->RB).w<0>();
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
@@ -157,7 +157,7 @@ PRINT(chx) {
 }
 
 EMU(chx) {
-    auto t = th->r(i->RA).w<0>() + th->r(i->RB).w<0>();
+    auto t = (uint32_t)th->r(i->RA).w<0>() + (uint32_t)th->r(i->RB).w<0>();
     const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
     th->r(i->RT).load(mask);
@@ -319,7 +319,7 @@ EMU(a) {
     auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = ra.w(i) + rb.w(i);
+        rt.w(i) = (uint32_t)ra.w(i) + (uint32_t)rb.w(i);
     }
 }
 
@@ -371,7 +371,7 @@ EMU(sf) {
     auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = rb.w(i) - ra.w(i);
+        rt.w(i) = (uint32_t)rb.w(i) - (uint32_t)ra.w(i);
     }
 }
 
@@ -440,7 +440,7 @@ EMU(sfx) {
     auto rb = th->r(i->RB);
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = rb.w(i) + ~ra.w(i) + (rt.w(i) & 1);
+        rt.w(i) = (uint64_t)rb.w(i) + ~ra.w(i) + (rt.w(i) & 1);
     }
 }
 
@@ -538,7 +538,7 @@ EMU(mpya) {
     auto& rc = th->r(i->RC);
     auto& rt = th->r(i->RT_ABC);
     for (int i = 0; i < 4; ++i) {
-        int32_t t = (int16_t)ra.w(i);
+        uint32_t t = (int16_t)ra.w(i);
         t *= (int16_t)rb.w(i);
         rt.w(i) = t + rc.w(i);
     }
@@ -2509,6 +2509,9 @@ EMU(rdch) {
     rt.dw<1>() = 0;
     if (ch == SPU_RdInMbox) {
         rt.w<0>() = th->getToSpuMailbox().receive(0);
+    } else if (ch == MFC_RdAtomicStat) {
+        rt.w<0>() = th->ch(ch);
+        th->ch(ch) = 0;
     } else {
         if (ch == MFC_RdTagStat) {
             // as every MFC request completes immediately

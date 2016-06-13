@@ -5,14 +5,11 @@
 GLBuffer::GLBuffer() : HandleWrapper(0) { }
 
 GLBuffer::GLBuffer(GLBufferType type, uint32_t size, void* data) 
-    : HandleWrapper(init(type, size, data)), _size(size), _type(type) { }
-
-GLuint GLBuffer::init(GLBufferType type, uint32_t size, void* data) {
+    : _size(size), _type(type) {
     if (!data && type == GLBufferType::Static)
         throw std::runtime_error("static buffer should be initialized with data");
-    GLuint handle;
     auto flags = type == GLBufferType::Dynamic ? GL_DYNAMIC_STORAGE_BIT
-               : type == GLBufferType::MapRead ? 
+               : type == GLBufferType::MapRead ?
                     GL_MAP_READ_BIT
                : type == GLBufferType::MapWrite ?
                     GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT
@@ -20,9 +17,8 @@ GLuint GLBuffer::init(GLBufferType type, uint32_t size, void* data) {
     _mapFlags = type == GLBufferType::MapRead ? GL_MAP_READ_BIT
               : type == GLBufferType::MapWrite ? GL_MAP_WRITE_BIT
               : 0;
-    glcall(glCreateBuffers(1, &handle));
-    glcall(glNamedBufferStorage(handle, size, data, flags));
-    return handle;
+    glcall(glCreateBuffers(1, &_handle));
+    glcall(glNamedBufferStorage(_handle, size, data, flags));
 }
 
 void* GLBuffer::map() {
@@ -69,21 +65,17 @@ GLPersistentCpuBuffer& GLPersistentCpuBuffer::operator=(GLPersistentCpuBuffer&& 
 }
 
 GLPersistentCpuBuffer::GLPersistentCpuBuffer(uint32_t size)
-    : HandleWrapper(init(size)), _size(size) {}
+    : _size(size) {
+    glCreateBuffers(1, &_handle);
+    auto flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT |
+                 GL_CLIENT_STORAGE_BIT;
+    glNamedBufferStorage(_handle, size, 0, flags);
+    auto mapFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+    _ptr = glMapNamedBufferRange(_handle, 0, size, mapFlags);
+}
 
 uint8_t* GLPersistentCpuBuffer::mapped() {
     return (uint8_t*)_ptr;
-}
-
-GLuint GLPersistentCpuBuffer::init(uint32_t size) {
-    GLuint handle;
-    glCreateBuffers(1, &handle);
-    auto flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT |
-                 GL_CLIENT_STORAGE_BIT;
-    glNamedBufferStorage(handle, size, 0, flags);
-    auto mapFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    _ptr = glMapNamedBufferRange(handle, 0, size, mapFlags);
-    return handle;
 }
 
 uint32_t GLPersistentCpuBuffer::size() {
@@ -99,12 +91,9 @@ GLPersistentGpuBuffer& GLPersistentGpuBuffer::operator=(GLPersistentGpuBuffer&& 
 }
 
 GLPersistentGpuBuffer::GLPersistentGpuBuffer(uint32_t size)
-    : HandleWrapper(init(size)), _size(size) {}
-
-GLuint GLPersistentGpuBuffer::init(uint32_t size) {
-    GLuint handle;
-    glCreateBuffers(1, &handle);
+    : _size(size) {
+    glCreateBuffers(1, &_handle);
     auto flags = 0;
-    glNamedBufferStorage(handle, size, 0, flags);
-    return handle;
+    glNamedBufferStorage(_handle, size, 0, flags);
 }
+

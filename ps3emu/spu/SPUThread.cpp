@@ -2,6 +2,7 @@
 
 #include "../Process.h"
 #include "../MainMemory.h"
+#include "../log.h"
 #include "SPUDasm.h"
 #include <boost/log/trivial.hpp>
 #include <stdio.h>
@@ -15,6 +16,7 @@ void SPUThread::loop() {
     BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     _dbgPaused = true;
+    log_set_thread_name(ssnprintf("spu %d", _id));
     
 #ifdef DEBUG
     auto f = fopen(ssnprintf("/tmp/spu_ls_dump_%x.bin", getNip()).c_str(), "w");
@@ -54,6 +56,7 @@ void SPUThread::loop() {
             break;
         } catch (StopSignalException& e) {
             _status |= 0b10;
+            _cause = SPUThreadExitCause::Exit;
             break;
         } catch (SPUThreadInterruptException& e) {
             _interruptHandler();
@@ -85,7 +88,8 @@ SPUThread::SPUThread(Process* proc,
       _eventHandler(eventHandler),
       _dbgPaused(true),
       _singleStep(false),
-      _exitCode(0) {
+      _exitCode(0),
+      _cause(SPUThreadExitCause::StillRunning) {
     for (auto& r : _rs) {
         r.dw<0>() = 0;
         r.dw<1>() = 0;
@@ -160,6 +164,12 @@ void SPUThread::command(uint32_t word) {
     auto size = ch(MFC_Size);
     auto opcode = cmd.opcode.u();
     switch (opcode) {
+        case MFC_GETLLAR_CMD: {
+            _proc->mm()->readReserve(eal, lsa, size);
+            // reservation always succeeds
+            ch(MFC_RdAtomicStat) |= 0b100; // G
+            break;
+        }
         case MFC_GET_CMD:
         case MFC_GETS_CMD:
         case MFC_GETF_CMD:
@@ -171,6 +181,21 @@ void SPUThread::command(uint32_t word) {
             __sync_synchronize();
             break;
         }
+        case MFC_PUTLLC_CMD: // TODO: handle sizes correctly
+        case MFC_PUTLLUC_CMD:
+        case MFC_PUTQLLUC_CMD: {
+            auto stored = _proc->mm()->writeCond(eal, lsa, size);
+            if (opcode == MFC_PUTLLUC_CMD) {
+                if (!stored) {
+                    _proc->mm()->writeMemory(eal, lsa, size);
+                } else {
+                    ch(MFC_RdAtomicStat) |= 0b010; // U
+                }
+            } else if (opcode == MFC_PUTLLC_CMD) {
+                ch(MFC_RdAtomicStat) |= !stored; // S
+            }
+            break;
+        }
         case MFC_PUT_CMD:
         case MFC_PUTS_CMD:
         case MFC_PUTR_CMD:
@@ -179,21 +204,12 @@ void SPUThread::command(uint32_t word) {
         case MFC_PUTFS_CMD:
         case MFC_PUTBS_CMD:
         case MFC_PUTRF_CMD:
-        case MFC_PUTRB_CMD:
-        case MFC_PUTLLC_CMD: // TODO: handle sizes correctly
-        case MFC_PUTLLUC_CMD:
-        case MFC_PUTQLLUC_CMD: {
+        case MFC_PUTRB_CMD: {
             __sync_synchronize();
             _proc->mm()->writeMemory(eal, lsa, size);
             __sync_synchronize();
-            if (opcode == MFC_PUTLLUC_CMD) {
-                ch(MFC_RdAtomicStat) |= 0b010; // U
-            }
             break;
         }
-        case MFC_GETLLAR_CMD:
-            ch(MFC_RdAtomicStat) |= 0b100; // G
-            break; // do nothing, every access is atomic
         default: throw std::runtime_error("not implemented");
     }
 }
@@ -204,6 +220,10 @@ void SPUThread::setInterruptHandler(std::function<void()> interruptHandler) {
 
 std::atomic<uint32_t>& SPUThread::getStatus() {
     return _status;
+}
+
+void SPUThread::setId(uint64_t id){
+    _id = id;
 }
 
 ConcurrentFifoQueue<uint32_t>& SPUThread::getFromSpuMailbox() {
