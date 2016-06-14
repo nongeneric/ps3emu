@@ -14,7 +14,6 @@
 #include <atomic>
 #include <vector>
 #include <fstream>
-#include <boost/log/trivial.hpp>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/range/algorithm.hpp>
 #include "../libs/graphics/graphics.h"
@@ -68,7 +67,7 @@ void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
         this->waitForIdle();
     }
     auto offset = index * 0x10;
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("setting rsx label at offset %x", offset);
+    INFO(rsx) << ssnprintf("setting rsx label at offset %x", offset);
     auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     atomic->store(boost::endian::native_to_big(value));
@@ -84,18 +83,18 @@ void Rsx::ChannelSemaphoreOffset(uint32_t offset) {
 
 void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     auto offset = _semaphores[_activeSemaphoreHandle];
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
+    INFO(rsx) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
     auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     while (boost::endian::big_to_native(atomic->load()) != value) ;
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("acquired");
+    INFO(rsx) << ssnprintf("acquired");
 }
 
 void Rsx::SemaphoreRelease(uint32_t value) {
     auto offset = _semaphores[_activeSemaphoreHandle];
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("releasing semaphore %x at offset %x with value %x",
+    INFO(rsx) << ssnprintf("releasing semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
     auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
@@ -105,7 +104,7 @@ void Rsx::SemaphoreRelease(uint32_t value) {
 
 void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
     auto offset = _context->semaphoreOffset;
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
+    INFO(rsx) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
     auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
@@ -788,8 +787,8 @@ void Rsx::updateShaders() {
             arraySizes};
         auto shader = _context->vertexShaderCache.retrieve(key);
         if (!shader) {
-            LOG << ssnprintf("updating vertex shader");
-            LOG << ssnprintf("updated vertex shader:\n%s\n%s",
+            INFO(rsx) << ssnprintf("updating vertex shader");
+            INFO(rsx) << ssnprintf("updated vertex shader:\n%s\n%s",
                      PrintVertexBytecode(&_context->vertexInstructions[0]),
                      PrintVertexProgram(&_context->vertexInstructions[0]));
             auto text = GenerateVertexShader(&_context->vertexInstructions[0],
@@ -797,7 +796,7 @@ void Rsx::updateShaders() {
                                              samplerSizes,
                                              0); // TODO: loadAt
             shader = new VertexShader(text.c_str());
-            LOG << ssnprintf("updated vertex shader (2):\n%s\n%s", text, shader->log());
+            INFO(rsx) << ssnprintf("updated vertex shader (2):\n%s\n%s", text, shader->log());
             auto updater = new SimpleCacheItemUpdater<VertexShader> {
                 uint32_t(), (uint32_t)key.bytecode.size(), [](auto){}
             };
@@ -1009,14 +1008,14 @@ void Rsx::init(Process* proc) {
     _proc = proc;
     _mm = proc->mm();
     
-    BOOST_LOG_TRIVIAL(trace) << "waiting for rsx loop to initialize";
+    INFO(rsx) << "waiting for rsx loop to initialize";
     
     // lock the thread until Rsx has initialized the buffer
     boost::unique_lock<boost::mutex> lock(_initMutex);
     _thread.reset(new boost::thread([=]{ loop(); }));
     _initCv.wait(lock, [=] { return _initialized; });
     
-    BOOST_LOG_TRIVIAL(trace) << "rsx loop completed initialization";
+    INFO(rsx) << "rsx loop completed initialization";
 }
 
 void Rsx::VertexTextureBorderColor(unsigned int index, float a, float r, float g, float b) {
@@ -1262,7 +1261,7 @@ void Rsx::Control0(uint32_t format) {
             assert(false);
         }
     } else {
-        BOOST_LOG_TRIVIAL(error) << "unknown control0";
+        INFO(rsx) << "unknown control0";
     }
 }
 
@@ -1319,13 +1318,13 @@ void glDebugCallbackFunction(GLenum source,
                    : source == GL_DEBUG_SOURCE_THIRD_PARTY ? "ThirdParty"
                    : source == GL_DEBUG_SOURCE_APPLICATION ? "Application"
                    : "Other";
-    LOG << ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
+    INFO(rsx) << ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
     if (severity == GL_DEBUG_SEVERITY_HIGH)
         exit(1);
 }
 
 void Rsx::initGcm() {
-    BOOST_LOG_TRIVIAL(trace) << "initializing rsx";
+    INFO(rsx) << "initializing rsx";
     
     _window.init();
     
@@ -1367,7 +1366,7 @@ void Rsx::initGcm() {
     resetContext();
     
     boost::lock_guard<boost::mutex> lock(_initMutex);
-    BOOST_LOG_TRIVIAL(trace) << "rsx initialized";
+    INFO(rsx) << "rsx initialized";
     _initialized = true;
     _initCv.notify_all();
 }
@@ -1463,14 +1462,14 @@ void Rsx::waitForIdle() {
 }
 
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
+    INFO(rsx) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
     waitForIdle();
     _mm->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
     __sync_synchronize();
 }
 
 void Rsx::SemaphoreOffset(uint32_t offset) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("SemaphoreOffset(%x)", offset);
+    INFO(rsx) << ssnprintf("SemaphoreOffset(%x)", offset);
     _context->semaphoreOffset = offset;
 }
 

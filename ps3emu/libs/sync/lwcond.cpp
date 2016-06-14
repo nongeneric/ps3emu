@@ -2,7 +2,7 @@
 
 #include "lwmutex.h"
 #include <boost/thread/condition_variable.hpp>
-#include <boost/log/trivial.hpp>
+#include "ps3emu/log.h"
 
 namespace {
     struct cv_info_t {
@@ -26,7 +26,7 @@ int32_t sys_lwcond_create(ps3_uintptr_t lwcond,
                           ps3_uintptr_t lwmutex,
                           const sys_lwcond_attribute_t* attr,
                           MainMemory* mm) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_lwcond_create(%x, %x, ...)", lwcond, lwmutex);
+    LOG << ssnprintf("sys_lwcond_create(%x, %x, ...)", lwcond, lwmutex);
     sys_lwcond_t type = { 0 };
     type.lwmutex = lwmutex;
     type.lwcond_queue = 0xaabbccdd;
@@ -39,7 +39,7 @@ int32_t sys_lwcond_create(ps3_uintptr_t lwcond,
 }
 
 int32_t sys_lwcond_destroy(ps3_uintptr_t lwcond) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_lwcond_destroy(%x)", lwcond);
+    LOG << ssnprintf("sys_lwcond_destroy(%x)", lwcond);
     boost::unique_lock<boost::mutex> lock(map_mutex);
     cvs.erase(find_cv_iter(lwcond));
     return CELL_OK;

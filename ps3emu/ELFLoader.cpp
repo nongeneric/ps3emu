@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdexcept>
-#include <boost/log/trivial.hpp>
+#include "log.h"
 
 using namespace boost::endian;
 
@@ -125,7 +125,7 @@ void ELFLoader::map(MainMemory* mm) {
         if (ph->p_memsz == 0)
             continue;
         
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("mapping segment of size %" PRIx64 " to %" PRIx64 "-%" PRIx64,
+        LOG << ssnprintf("mapping segment of size %" PRIx64 " to %" PRIx64 "-%" PRIx64,
             (uint64_t)ph->p_filesz, (uint64_t)ph->p_vaddr, (ph->p_paddr + ph->p_memsz));
         
         assert(ph->p_memsz >= ph->p_filesz);
@@ -201,11 +201,11 @@ void ELFLoader::link(MainMemory* mm) {
     auto vaDescr = FunctionDescriptorsVa;
     mm->setMemory(vaDescr, 0, prxFnids.size() * 8, true);
     uint32_t curUnknownNcall = 2000;
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("resolving %d rsx modules", prxInfos.size());
+    LOG << ssnprintf("resolving %d rsx modules", prxInfos.size());
     for (auto& info : prxInfos) {
         auto nameOffset = info.prx_name - firstPrxName->prx_name;
         std::string name(&prxNames[nameOffset + 4]);
-        BOOST_LOG_TRIVIAL(trace) << "  " << name;
+        LOG << ssnprintf("  %s", name);
         
         auto firstFnid = (info.prx_fnids - firstPrxFnid->prx_fnids) / sizeof(uint32_t);
         auto firstStub = (info.prx_stubs - firstPrxStub->prx_stubs) / sizeof(uint32_t);
@@ -224,7 +224,7 @@ void ELFLoader::link(MainMemory* mm) {
             }
             mm->store<4>(vaDescr, vaDescr + 4);
             encodeNCall(mm, vaDescr + 4, index);
-            BOOST_LOG_TRIVIAL(trace) << ssnprintf("    %x -> %s (ncall %x)",
+            LOG << ssnprintf("    %x -> %s (ncall %x)",
                 stub, name, index);
             stub = vaDescr;
             vaDescr += 8;

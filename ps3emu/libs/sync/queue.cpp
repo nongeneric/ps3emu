@@ -4,7 +4,7 @@
 #include "../../IDMap.h"
 #include "../../MainMemory.h"
 #include <boost/thread.hpp>
-#include <boost/log/trivial.hpp>
+#include "ps3emu/log.h"
 
 namespace {    
     class IQueue {
@@ -53,7 +53,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                sys_event_queue_attribute_t* attr,
                                sys_ipc_key_t event_queue_key,
                                uint32_t size) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     assert(1 <= size && size < 128);
     // TODO: handle unique key
     //assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
@@ -70,7 +70,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
 }
 
 int32_t sys_event_queue_destroy(sys_event_queue_t equeue_id, int32_t mode) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     assert(!mode);
     queues.destroy(equeue_id);
     return CELL_OK;
@@ -108,7 +108,7 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
 }
 
 int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uint64_t name) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     auto port = std::make_shared<queue_port_t>();
     port->name = name;
     port->type = port_type;
@@ -119,7 +119,7 @@ int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uin
 int32_t sys_event_port_connect_local(sys_event_port_t event_port_id, 
                                  sys_event_queue_t event_queue_id)
 {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     assert(ports.get(event_port_id)->type == SYS_EVENT_PORT_LOCAL);
     ports.get(event_port_id)->queue = queues.get(event_queue_id).get();
     return CELL_OK;

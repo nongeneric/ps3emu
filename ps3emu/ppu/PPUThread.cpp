@@ -2,7 +2,6 @@
 #include "../Process.h"
 #include "../MainMemory.h"
 #include "ppu_dasm.h"
-#include <boost/log/trivial.hpp>
 #include "../log.h"
 
 #ifdef DEBUG
@@ -76,7 +75,7 @@ void PPUThread::innerLoop() {
             _threadFinishedGracefully = true;
             break;
         } catch (std::exception& e) {
-            BOOST_LOG_TRIVIAL(fatal) << ssnprintf("thread exception: %s", e.what());
+            LOG << ssnprintf("thread exception: %s", e.what());
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Failure);
             break;
@@ -86,13 +85,13 @@ void PPUThread::innerLoop() {
 
 void PPUThread::loop() {
     log_set_thread_name(ssnprintf("ppu_%d", (unsigned)_id));
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop started");
+    LOG << ssnprintf("thread loop started");
     _eventHandler(this, PPUThreadEvent::Started);
     dbgpause(true);
     
     innerLoop();
     
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread loop finished (%s)", 
+    LOG << ssnprintf("thread loop finished (%s)",
         _threadFinishedGracefully ? "gracefully" : "with a failure"
     );
     _eventHandler(this, PPUThreadEvent::Finished);

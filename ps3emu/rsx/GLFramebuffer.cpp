@@ -1,4 +1,5 @@
 #include "GLFramebuffer.h"
+#include "../utils.h"
 #include "../log.h"
 
 void GLFramebuffer::dumpTexture(GLSimpleTexture* tex, ps3_uintptr_t va) {
@@ -78,7 +79,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
     auto status = glCheckNamedFramebufferStatus(_id, GL_FRAMEBUFFER);
 #define X(x) status == x ? #x
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        LOG << "framebuffer incomplete " <<
+        LOG << ssnprintf("framebuffer incomplete %s %d",
             (status == 0x8cd9 ? "GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT" :
             X(GL_FRAMEBUFFER_UNDEFINED) :
             X(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT) :
@@ -87,8 +88,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
             X(GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER) :
             X(GL_FRAMEBUFFER_UNSUPPORTED) :
             X(GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE) :
-            X(GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS) : "");
-        LOG << status;
+            X(GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS) : ""), status);
         exit(0);
 #undef X
     }

@@ -22,21 +22,21 @@ std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context) {
 }
 
 void FragmentShaderUpdateFunctor::updateBytecode(FragmentShader* shader) {
-    LOG << ssnprintf("updating fragment bytecode at %x", va);
+    INFO(libs) << ssnprintf("updating fragment bytecode at %x", va);
     auto sizes = getFragmentSamplerSizes(_context);
-    LOG << ssnprintf("Updated fragment shader:\n%s\n%s",
+    INFO(libs) << ssnprintf("Updated fragment shader:\n%s\n%s",
                      PrintFragmentBytecode(&_newbytecode[0]),
                      PrintFragmentProgram(&_newbytecode[0]));
     auto text = GenerateFragmentShader(
         _newbytecode, sizes, _context->isFlatShadeMode, isMrt(_context->surface));
     *shader = FragmentShader(text.c_str());
-    LOG << ssnprintf("Updated fragment shader (2):\n%s\n%s", text, shader->log());
+    INFO(libs) << ssnprintf("Updated fragment shader (2):\n%s\n%s", text, shader->log());
     _info = get_fragment_bytecode_info(&_newbytecode[0]);
     updateConsts();
 }
 
 void FragmentShaderUpdateFunctor::updateConsts() {
-    LOG << ssnprintf("updating fragment consts at %x", va);
+    INFO(libs) << ssnprintf("updating fragment consts at %x", va);
     _bytecode = _newbytecode;
     auto fconst = (std::array<float, 4>*)_constBuffer.mapped();
     for (auto i = 0u; i < _info.length; i += 16) {

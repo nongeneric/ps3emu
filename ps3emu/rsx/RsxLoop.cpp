@@ -8,7 +8,6 @@
 #include "../log.h"
 
 #include <vector>
-#include <boost/log/trivial.hpp>
 
 union MethodHeader {
     uint32_t val;
@@ -154,26 +153,26 @@ int64_t Rsx::interpret(uint32_t get) {
     };
     
     if (header.val == 0) {
-        BOOST_LOG_TRIVIAL(trace) << "rsx nop";
+        LOG << "rsx nop";
         return 4;
     }
     if (header.prefix.u() == 1) {
         auto offset = header.jumpoffset.u();
         if (offset != get) { // don't log on busy wait
-            BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx jump to %x", offset);
+            LOG << ssnprintf("rsx jump to %x", offset);
         }
         return offset - get;
     }
     if (header.callsuffix.u() == 2) {
         auto offset = header.calloffset.u() << 2;
         _ret = get + 4;
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx call to %x", offset);
+        LOG << ssnprintf("rsx call to %x", offset);
         return offset - get;
     }
     if (header.val == 0x20000) {
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("rsx ret to %x", _ret.load());
+        LOG << ssnprintf("rsx ret to %x", _ret.load());
         if (!_get) {
-            BOOST_LOG_TRIVIAL(error) << "rsx ret to 0, command buffer corruption is likely";
+            LOG << "rsx ret to 0, command buffer corruption is likely";
         }
         auto offset = _ret - get;
         _ret = 0;
@@ -1552,11 +1551,11 @@ int64_t Rsx::interpret(uint32_t get) {
                 );
                 break;
             }
-            BOOST_LOG_TRIVIAL(fatal) << ssnprintf("illegal method offset %x", offset);
+            LOG << ssnprintf("illegal method offset %x", offset);
         }
     }
     if (name) {
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("[0x%08x: %02d%s] %s", 
+        LOG << ssnprintf("[0x%08x: %02d%s] %s",
             get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
     }
     len = (header.count.u() + 1) * 4;
@@ -1590,7 +1589,7 @@ void Rsx::loop() {
     _ref = 0xffffffff;
     _isFlipInProgress = false;
     log_set_thread_name("rsx_loop");
-    BOOST_LOG_TRIVIAL(trace) << "rsx loop started, waiting for updates";
+    LOG << "rsx loop started, waiting for updates";
     if (_mode == RsxOperationMode::Replay) {
         replayLoop();
     } else {
@@ -1603,7 +1602,7 @@ void Rsx::runLoop() {
     boost::unique_lock<boost::mutex> lock(_mutex);
     for (;;) {
         _cv.wait(lock);
-        BOOST_LOG_TRIVIAL(trace) << "rsx loop update received";
+        LOG << "rsx loop update received";
         while (_get != _put || _ret) {
             _get += interpret(_get);
         }
@@ -1649,7 +1648,7 @@ void Rsx::shutdown() {
         return;
     
     if (!_shutdown) {
-        BOOST_LOG_TRIVIAL(trace) << "waiting for rsx to shutdown";
+        LOG << "waiting for rsx to shutdown";
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             _shutdown = true;

@@ -23,7 +23,7 @@
 #include "libs/audio/configuration.h"
 #include "libs/audio/libaudio.h"
 #include "ppu/CallbackThread.h"
-#include <boost/log/trivial.hpp>
+#include "log.h"
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
 #include <memory>

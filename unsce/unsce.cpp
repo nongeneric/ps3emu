@@ -3,8 +3,7 @@
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 #include <zlib.h>
-#include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/console.hpp>
+#include "ps3emu/log.h"
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include <boost/optional.hpp>
@@ -144,10 +143,6 @@ static_assert(sizeof(ci_data_npdrm) == 128, "");
 
 #pragma pack()
 
-void init_logging() {
-    boost::log::add_console_log(std::cout, boost::log::keywords::format = "%Message%");
-}
-
 #define SELF_TYPE_LV0 1
 #define SELF_TYPE_LV1 2
 #define SELF_TYPE_LV2 3
@@ -183,7 +178,7 @@ std::vector<key_info_t> read_keys(path data_path) {
     auto keys_path = data_path / "keys";
     std::ifstream f(keys_path.string());
     if (!f.is_open()) {
-        BOOST_LOG_TRIVIAL(error) << "can't read the keys file";
+        LOG << "can't read the keys file";
         return {};
     }
     
@@ -328,12 +323,12 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                       std::vector<control_info_t*> const& control_infos) {
     auto opt_key = search_self_key(keys, app_info->self_type, sce_header->revision, app_info->version);
     if (!opt_key) {
-        BOOST_LOG_TRIVIAL(error) << "can't find a suitable key";
+        LOG << "can't find a suitable key";
         return false;
     }
     
     auto key = opt_key.get();
-    BOOST_LOG_TRIVIAL(trace) << "key to decrypt metadata\n"
+    LOG << "key to decrypt metadata\n"
         << ssnprintf("  name       %s\n", key.name)
         << ssnprintf("  self_type  %s\n", key.self_type)
         << ssnprintf("  revision   %x\n", key.revision)
@@ -355,11 +350,11 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
     
     if (std::accumulate(metadata_info->iv_pad, metadata_info->iv_pad + 16, 0) != 0 ||
         std::accumulate(metadata_info->key_pad, metadata_info->key_pad + 16, 0) != 0) {
-        BOOST_LOG_TRIVIAL(error) << "metadata decryption failed, check your keys";
+        LOG << "metadata decryption failed, check your keys";
         return false;
     }
     
-    BOOST_LOG_TRIVIAL(trace) << "metadata info\n"
+    LOG << "metadata info\n"
         << ssnprintf("  key  %s\n", print_hex(metadata_info->key, 16))
         << ssnprintf("  iv   %s\n", print_hex(metadata_info->iv, 16));
     
@@ -374,7 +369,7 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                        ecount_buf,
                        &num);
     
-    BOOST_LOG_TRIVIAL(trace) << "metadata header\n"
+    LOG << "metadata header\n"
         << ssnprintf("  section_count  %d\n", metadata_header->section_count)
         << ssnprintf("  key_count      %d\n", metadata_header->key_count);
     
@@ -388,11 +383,11 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                        ecount_buf,
                        &num);
     
-    BOOST_LOG_TRIVIAL(trace) << "metadata section headers\n"
+    LOG << "metadata section headers\n"
         << "  Idx Offset   Size     Type Index Hashed SHA1 Encrypted Key IV Compressed";
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto sh = &metadata_section_headers[i];
-        BOOST_LOG_TRIVIAL(trace) << 
+        LOG << 
             ssnprintf("  %02d  %08X %08X %02X   %02d    %s    %02X   %s       %s  %s %s",
                 i, sh->data_offset, sh->data_size, sh->type, sh->index,
                 sh->hashed == 2 ? "YES" : "NO ",
@@ -403,7 +398,7 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                 sh->compressed == METADATA_SECTION_COMPRESSED ? "YES" : "NO "
             );
     }
-    BOOST_LOG_TRIVIAL(trace) << "";
+    LOG << "";
         
     return true;
 }
@@ -418,9 +413,9 @@ bool decrypt_sections(sce_header_t* sce_header,
     auto keys = reinterpret_cast<std::array<uint8_t, 16>*>(
         metadata_section_headers + metadata_header->section_count);
     
-    BOOST_LOG_TRIVIAL(error) << "sce keys";
+    LOG << "sce keys";
     for (auto i = 0u; i < metadata_header->key_count; ++i) {
-        BOOST_LOG_TRIVIAL(error) << ssnprintf("  %02x  %s", i, print_hex(&keys[i][0], 16));
+        LOG << ssnprintf("  %02x  %s", i, print_hex(&keys[i][0], 16));
     }
     
     for (auto sh = metadata_section_headers;
@@ -430,7 +425,7 @@ bool decrypt_sections(sce_header_t* sce_header,
             continue;
         if (sh->key_index >= metadata_header->key_count ||
             sh->iv_index >= metadata_header->key_count) {
-            BOOST_LOG_TRIVIAL(error) << "a section marked encrypted references a non existent key";
+            LOG << "a section marked encrypted references a non existent key";
             continue;
         }
         AES_KEY aes_key;
@@ -439,7 +434,7 @@ bool decrypt_sections(sce_header_t* sce_header,
         auto key_ptr = &keys[sh->key_index][0];
         auto iv_ptr = &keys[sh->iv_index][0];
         
-        BOOST_LOG_TRIVIAL(error) << "decoding section\n"
+        LOG << "decoding section\n"
             << ssnprintf("  offset  %08X\n", sh->data_offset)
             << ssnprintf("  size    %08X\n", sh->data_size)
             << ssnprintf("  key     %s\n", print_hex(key_ptr, 16))
@@ -484,7 +479,7 @@ bool write_elf(std::string elf_path,
                metadata_section_header_t* metadata_section_headers) {
     std::ofstream elf_file(elf_path);
     if (!elf_file.is_open()) {
-        BOOST_LOG_TRIVIAL(error) << "can't open elf file for writing";
+        LOG << "can't open elf file for writing";
         return false;
     }
     
@@ -513,13 +508,13 @@ bool write_elf(std::string elf_path,
         
         std::vector<uint8_t> vec(std::max(ph->p_filesz, msh->data_size));
         if (msh->compressed == METADATA_SECTION_COMPRESSED) {
-            BOOST_LOG_TRIVIAL(trace) << "inflating";
+            LOG << "inflating";
             src_size = inflate(reinterpret_cast<uint8_t*>(src_ptr), 
                                msh->data_size, &vec[0], vec.size());
             src_ptr = reinterpret_cast<char*>(&vec[0]);
         }
         
-        BOOST_LOG_TRIVIAL(trace) << "writing self section to elf\n"
+        LOG << "writing self section to elf\n"
             << ssnprintf("  self source  %08X\n", src)
             << ssnprintf("  elf dest     %08X\n", dest)
             << ssnprintf("  size         %08X\n", src_size);
@@ -537,7 +532,7 @@ bool write_elf(std::string elf_path,
 }
 
 int main(int argc, char* argv[]) {
-    init_logging();
+    log_init(log_console, log_info, -1);
     std::string sce_path, elf_path, data_path;
     options_description console_descr("Allowed options");
     try {
@@ -565,7 +560,7 @@ int main(int argc, char* argv[]) {
     
     std::ifstream f(sce_path);
     if (!f.is_open()) {
-        BOOST_LOG_TRIVIAL(error) << "can't read input file";
+        LOG << "can't read input file";
         return 1;
     }
     f.seekg(0, std::ios_base::end);
@@ -593,11 +588,11 @@ int main(int argc, char* argv[]) {
     }
     
     if (std::string("SCE") != sce_header->magic) {
-        BOOST_LOG_TRIVIAL(error) << "not an sce file";
+        LOG << "not an sce file";
         return 1;
     }
     
-    BOOST_LOG_TRIVIAL(trace) << "sce header\n"
+    LOG << "sce header\n"
         << ssnprintf("  magic:            %s\n", sce_header->magic)
         << ssnprintf("  version:          %-x\n", sce_header->version)
         << ssnprintf("  revision:         %-x\n", sce_header->revision)
@@ -606,7 +601,7 @@ int main(int argc, char* argv[]) {
         << ssnprintf("  header_size:      %-lx\n", sce_header->header_size)
         << ssnprintf("  data_size:        %-lx\n", sce_header->data_size);
     
-    BOOST_LOG_TRIVIAL(trace) << "self header\n"
+    LOG << "self header\n"
         << ssnprintf("  header_type:            %-lx\n", self_header->header_type)
         << ssnprintf("  appinfo_offset:         %-lx\n", self_header->appinfo_offset)
         << ssnprintf("  elf_offset:             %-lx\n", self_header->elf_offset)

@@ -1,11 +1,13 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/log.h"
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string.hpp>
 #include "stdio.h"
 
-using namespace boost::log;
+using namespace boost::program_options;
 
-void emulate(const char* path, std::vector<std::string> args) {
+void emulate(std::string path, std::vector<std::string> args) {
     Process proc;
     proc.init(path, args);
     for (;;) {
@@ -20,20 +22,44 @@ void emulate(const char* path, std::vector<std::string> args) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("specify elf path\n");
+    std::string elfPath, elfArgs, verbosity, filter, sinks;
+    options_description consoleDescr("Allowed options");
+    try {
+        consoleDescr.add_options()
+            ("help", "produce help message")
+            ("elf,e", value<std::string>(&elfPath)->required(), "elf file")
+            ("args,a", value<std::string>(&elfArgs)->default_value(""), "elf arguments")
+            ("verbosity,v", value<std::string>(&verbosity)->default_value("warning"),
+                "logging verbosity: info, warning, error")
+            ("filter,f", value<std::string>(&filter)->default_value(""),
+                "logging filter: spu, libs, ppu, debugger [e.g. spu,libs]")
+            ("sinks,s", value<std::string>(&sinks)->default_value(""),
+                "logging sinks: file, console [e.g. file,console]")
+            ;
+        variables_map console_vm;
+        store(parse_command_line(argc, argv, consoleDescr), console_vm);
+        if (console_vm.count("help")) {
+            std::cout << consoleDescr;
+            return 0;
+        }
+        notify(console_vm);
+    } catch(std::exception& e) {
+        std::cout << "can't parse program options:\n";
+        std::cout << e.what() << "\n\n";
+        std::cout << consoleDescr;
         return 1;
     }
-    
-    log_init(true);
-    
-    auto path = argv[1];
+
+    log_init(log_parse_sinks(sinks),
+             log_parse_verbosity(verbosity),
+             log_parse_filter(filter));
+
     try {
-        std::vector<std::string> args;
-        for (int i = 1; i < argc; ++i) {
-            args.push_back(argv[i]);
-        }
-        emulate(path, args);
+        std::vector<std::string> argvec;
+        boost::split(
+            argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);
+        argvec.insert(begin(argvec), argv[0]);
+        emulate(elfPath, argvec);
     } catch(std::exception& e) {
         return 1;
     }

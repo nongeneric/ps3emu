@@ -2,7 +2,7 @@
 #include "../MainMemory.h"
 #include "../IDMap.h"
 #include "../utils.h"
-#include <boost/log/trivial.hpp>
+#include "../log.h"
 
 namespace {
 

@@ -2,7 +2,7 @@
 
 #include "libs/spu/sysSpu.h"
 #include "rsx/Rsx.h"
-#include <boost/log/trivial.hpp>
+#include "log.h"
 
 using namespace boost::endian;
 
@@ -181,7 +181,7 @@ ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
 }
 
 void MainMemory::free(ps3_uintptr_t addr) {
-    BOOST_LOG_TRIVIAL(trace) << "free() not implemented";
+    LOG << "free() not implemented";
 }
 
 void MainMemory::setRsx(Rsx* rsx) {

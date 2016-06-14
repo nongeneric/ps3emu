@@ -8,7 +8,7 @@
 #include "../../spu/SPUThread.h"
 #include "../../utils.h"
 #include "../../ContentManager.h"
-#include <boost/log/trivial.hpp>
+#include "../../log.h"
 #include <array>
 #include <vector>
 #include <fstream>
@@ -51,12 +51,12 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
                                big_uint64_t* value,
                                size_t type) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -64,7 +64,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
                              uint32_t type,
                              MainMemory* mm) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     img->elf = new SpuImage([=](uint32_t ptr, void* buf, size_t size) {
         mm->readMemory(ptr, buf, size);
     }, src);
@@ -72,7 +72,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
 }
 
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
+    LOG << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
     auto hostPath = proc->contentManager()->toHost(path.str.c_str());
     auto elfPath = hostPath;
     if (hostPath.substr(hostPath.size() - 4) != ".elf") {
@@ -81,7 +81,7 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* pr
     std::ifstream f(elfPath);
     if (!f.is_open()) {
         auto message = ssnprintf("sys_spu_image_open: elf not found (\"%s\")", elfPath);
-        BOOST_LOG_TRIVIAL(fatal) << message;
+        LOG << message;
         throw std::runtime_error(message);
     }
     img->elf = new SpuImage([&](uint32_t ptr, void* buf, size_t size) {
@@ -92,7 +92,7 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* pr
 }
 
 int32_t sys_spu_image_close(sys_spu_image_t* img) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     delete img->elf;
     return CELL_OK;
 }
@@ -102,7 +102,7 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     int32_t prio,
                                     sys_spu_thread_group_attribute_t* attr,
                                     MainMemory* mm) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     assert(attr->type == SYS_SPU_THREAD_GROUP_TYPE_NORMAL);
     auto group = std::make_shared<ThreadGroup>();
     group->name.resize(attr->nsize);
@@ -124,7 +124,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
                                   const sys_spu_thread_attribute_t* attr,
                                   const sys_spu_thread_argument_t* arg,
                                   Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_spu_thread_initialize() source=%x", img->elf->source());
+    LOG << ssnprintf("sys_spu_thread_initialize() source=%x", img->elf->source());
     auto group = groups.get(group_id);
     std::string name;
     name.resize(attr->nsize);
@@ -259,7 +259,7 @@ int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
                                          TagClassId class_id,
                                          uint32_t unused,
                                          sys_interrupt_tag_t* intrtag) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     auto tag = std::make_shared<InterruptTag>();
     tag->classId = class_id;
     tag->rawSpu = rawSpus.get(id);
@@ -273,7 +273,7 @@ int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
                                        uint32_t intrthread,
                                        uint64_t arg,
                                        Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     auto th = dynamic_cast<InterruptPPUThread*>(proc->getThread(intrthread));
     auto tag = interruptTags.get(intrtag);
     tag->interruptThread = th;
@@ -285,7 +285,7 @@ int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
 int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id,
                                  uint32_t class_id,
                                  uint64_t mask) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     assert(class_id == 2);
     auto rawSpu = rawSpus.get(id);
     auto interruptThread = rawSpu->tag->interruptThread;
@@ -304,7 +304,7 @@ int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
                                TagClassId classId,
                                uint32_t value,
                                Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf(
+    LOG << ssnprintf(
         "ppu writes %x via mmio to spu %d tag %s", value, id, tagToString(classId));
     auto rawSpu = rawSpus.get(id);
     if (classId == TagClassId::SPU_RunCntl && value == 1) {
@@ -373,7 +373,7 @@ uint32_t sys_raw_spu_mmio_read_impl(sys_raw_spu_t id, TagClassId classId, Proces
 
 uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc) {
     uint32_t value = sys_raw_spu_mmio_read_impl(id, classId, proc);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf(
+    LOG << ssnprintf(
         "ppu reads %x via mmio from spu %d tag %s", value, id, tagToString(classId));
     return value;
 }

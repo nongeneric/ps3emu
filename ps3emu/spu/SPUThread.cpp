@@ -4,7 +4,6 @@
 #include "../MainMemory.h"
 #include "../log.h"
 #include "SPUDasm.h"
-#include <boost/log/trivial.hpp>
 #include <stdio.h>
 #include <signal.h>
 
@@ -13,7 +12,7 @@ void SPUThread::run() {
 }
 
 void SPUThread::loop() {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread loop started");
+    LOG << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     _dbgPaused = true;
     log_set_thread_name(ssnprintf("spu %d", _id));
@@ -61,14 +60,14 @@ void SPUThread::loop() {
         } catch (SPUThreadInterruptException& e) {
             _interruptHandler();
         } catch (std::exception& e) {
-            BOOST_LOG_TRIVIAL(fatal) << ssnprintf("spu thread exception: %s", e.what());
+            LOG << ssnprintf("spu thread exception: %s", e.what());
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Failure);
             break;
         }
     }
     
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread loop finished");
+    LOG << ssnprintf("spu thread loop finished");
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 
@@ -117,7 +116,7 @@ uint32_t SPUThread::getElfSource() {
 }
 
 void SPUThread::setElfSource(uint32_t src) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("setting elf source to #%x", src);
+    LOG << ssnprintf("setting elf source to #%x", src);
     _elfSource = src;
 }
 

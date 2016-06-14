@@ -1,17 +1,16 @@
 #include "gcm.h"
 #include "graphics.h"
 #include "../sys.h"
-#include "../../constants.h"
-#include "../../Process.h"
-#include "../../rsx/Rsx.h"
-#include "../../rsx/RsxContext.h"
-#include "../../ELFLoader.h"
-#include "../../InternalMemoryManager.h"
-#include "../../log.h"
+#include "ps3emu/constants.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/rsx/Rsx.h"
+#include "ps3emu/rsx/RsxContext.h"
+#include "ps3emu/ELFLoader.h"
+#include "ps3emu/InternalMemoryManager.h"
+#include "ps3emu/log.h"
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <boost/log/trivial.hpp>
 
 using namespace boost::endian;
 
@@ -117,13 +116,13 @@ struct OffsetTable {
 };
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     //assert(mode == CELL_GCM_DISPLAY_VSYNC);
     return emu_void;
 }
 
 emu_void_t cellGcmGetConfiguration(CellGcmConfig* config) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     config->memoryFrequency = RsxMemoryFrequency;
     config->coreFrequency = RsxCoreFrequency;
     config->localSize = GcmLocalMemorySize;
@@ -134,7 +133,7 @@ emu_void_t cellGcmGetConfiguration(CellGcmConfig* config) {
 }
 
 void setCurrentCommandBuffer(MainMemory* mm, ps3_uintptr_t va) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     mm->store<4>(emuGcmState.gCellGcmCurrentContext, va);
 }
 
@@ -143,7 +142,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
                           uint32_t ioSize,
                           ps3_uintptr_t ioAddress,
                           Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     
     auto internalMemory = proc->internalMemoryManager();
     emuGcmState.offsetTable = internalMemory->internalAlloc<128, OffsetTable>(&emuGcmState.offsetTableEmuEa);
@@ -257,13 +256,13 @@ void setFlipCommand(Process* proc, uint32_t contextEa, uint32_t label, uint32_t 
 }
 
 emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     setFlipCommand(proc, context, -1, 0, buffer);
     return emu_void;
 }
 
 uint32_t cellGcmGetTiledPitchSize(uint32_t size) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return size;
 }
 
@@ -276,7 +275,7 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint16_t base,
                            uint8_t bank)
 {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto& info = (*emuGcmState.tileInfos)[index];
     info.tile = (location + 1) | (bank << 4) | ((offset / 0x10000) << 16) | (location << 31);
     info.limit = (((offset + size - 1) / 0x10000) << 16) | (location << 31);
@@ -287,18 +286,18 @@ int32_t cellGcmSetTileInfo(uint8_t index,
 
 uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, Process* proc) {
     assert(false);
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     setFlipCommand(proc, 0, labelindex, labelvalue, id);
     return CELL_OK;
 }
 
 int32_t cellGcmBindTile(uint8_t index) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
 int32_t cellGcmUnbindTile(uint8_t index) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -314,23 +313,23 @@ int32_t cellGcmBindZcull(uint8_t index,
                          uint32_t sFunc, 
                          uint32_t sRef, 
                          uint32_t sMask) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
 int32_t cellGcmUnbindZcull(uint8_t index) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     emuGcmState.rsx->setFlipHandler(handler);
     return emu_void;
 }
 
 emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     setCurrentCommandBuffer(proc->mm(), emuGcmState.defaultContextDataEa);
     return emu_void;
 }
@@ -358,7 +357,7 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     
     emuGcmState.rsx->encodeJump(data->current, nextBuffer - ioBase);
     
-    BOOST_LOG_TRIVIAL(trace) << 
+    INFO(libs) <<
         ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, jump = %x, dest = %x, defsize = %x)",
             nextSize, nextBuffer - ioBase, data->current - ioBase, nextBuffer - ioBase, 
             emuGcmState.defaultCommandBufferSize
@@ -483,7 +482,7 @@ uint32_t cellGcmGetZcullInfo() {
 }
 
 int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
-    LOG << "NOT IMPLEMENTED: cellGcmInitDefaultFifoMode";
+    INFO(libs) << "NOT IMPLEMENTED: cellGcmInitDefaultFifoMode";
     return CELL_OK;
 }
 

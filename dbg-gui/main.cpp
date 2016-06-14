@@ -8,15 +8,15 @@
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    log_init(false);
+    log_init(log_file | log_console, log_info, log_spu | log_rsx | log_libs | log_debugger);
     log_set_thread_name("dbg_main");
-    
+
     std::string elfPath;
     options_description consoleDescr("Allowed options");
     try {
         consoleDescr.add_options()
             ("help", "produce help message")
-            ("elf", value<std::string>(&elfPath), "load elf file")
+            ("elf,e", value<std::string>(&elfPath), "elf file")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);

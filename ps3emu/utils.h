@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+namespace {
+    thread_local std::string ssnprintf_buf;
+}
+
 template <typename T>
 struct AdaptType {
     T const& adapt(T const& t) { return t; }
@@ -13,7 +17,18 @@ struct AdaptType {
 
 template <>
 struct AdaptType<std::string> { 
-    const char* adapt(std::string const& str) { return str.c_str(); }
+    const char* adapt(std::string const& str) {
+        assert(&str != &ssnprintf_buf);
+        return str.c_str();
+    }
+};
+
+template <>
+struct AdaptType<const char*> {
+    const char* adapt(const char* str) {
+        assert(str != ssnprintf_buf.c_str());
+        return str;
+    }
 };
 
 template <>
@@ -48,11 +63,13 @@ struct AdaptType<boost::endian::big_int16_t> {
 
 template <typename... Args>
 std::string& ssnprintf(const char* f, Args... args) {
-    thread_local std::string buf;
     auto len = snprintf(0, 0, f, AdaptType<decltype(args)>().adapt(args)...);
-    buf.resize(len);
-    len = snprintf(&buf[0], buf.size() + 1, f, AdaptType<decltype(args)>().adapt(args)...);
-    return buf;
+    ssnprintf_buf.resize(len);
+    len = snprintf(&ssnprintf_buf[0],
+                   ssnprintf_buf.size() + 1,
+                   f,
+                   AdaptType<decltype(args)>().adapt(args)...);
+    return ssnprintf_buf;
 }
 
 template <typename S, typename D>

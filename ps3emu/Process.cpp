@@ -8,7 +8,7 @@
 
 #include "ppu/InterruptPPUThread.h"
 #include <boost/thread/locks.hpp>
-#include <boost/log/trivial.hpp>
+#include "log.h"
 
 MainMemory* Process::mm() {
     return _mainMemory.get();
@@ -145,7 +145,7 @@ uint64_t Process::createThread(uint32_t stackSize,
     initNewThread(t, entryPointDescriptorVa, stackSize);
     t->setGPR(3, arg);
     auto id = _threadIds.create(std::move(t));
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("thread %d created", id);
+    LOG << ssnprintf("thread %d created", id);
     t->setId(id);
     t->run();
     return id;
@@ -161,7 +161,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
     t->setEntry(entryPointDescriptorVa);
     initNewThread(t, entryPointDescriptorVa, stackSize);
     auto id = _threadIds.create(std::move(t));
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("interrupt thread %d created", id);
+    LOG << ssnprintf("interrupt thread %d created", id);
     t->run();
     _threads.emplace_back(std::unique_ptr<PPUThread>(t));
     return id;
@@ -234,7 +234,7 @@ uint32_t Process::createSpuThread(std::string name) {
     auto t = _spuThreads.back().get();
     auto id = _spuThreadIds.create(std::move(t));
     t->setId(id);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("spu thread %d created", id);
+    LOG << ssnprintf("spu thread %d created", id);
     return id;
 }
 

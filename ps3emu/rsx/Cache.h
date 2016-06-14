@@ -5,7 +5,8 @@
 #include <set>
 #include <stdint.h>
 #include "../utils.h"
-#include <boost/log/trivial.hpp>
+#include "../log.h"
+#undef LOG
 
 template <typename T>
 struct SimpleCacheItemUpdater {
@@ -53,7 +54,7 @@ public:
     }
     
     void invalidate(uint32_t va, uint32_t size) {
-        BOOST_LOG_TRIVIAL(trace) << ssnprintf("invalidating cache %x, %x", va, size);
+        INFO(rsx) << ssnprintf("invalidating cache %x, %x", va, size);
         for (auto& p : _store) {
             if (!intersects(p.second.updater->va, p.second.updater->size, va, size))
                 continue;

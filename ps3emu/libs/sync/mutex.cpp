@@ -2,9 +2,9 @@
 
 #include "../../utils.h"
 #include "../../IDMap.h"
+#include "../../log.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
-#include <boost/log/trivial.hpp>
 #include <memory>
 #include <assert.h>
 
@@ -22,12 +22,12 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
         mutex.reset(new Mutex<boost::recursive_timed_mutex>());
     }
     *mutex_id = mutexes.create(std::move(mutex));
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_mutex_create(%x, ...)", *mutex_id);
+    LOG << ssnprintf("sys_mutex_create(%x, ...)", *mutex_id);
     return CELL_OK;
 }
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
+    LOG << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
     mutexes.destroy(mutex_id);
     return CELL_OK;
 }

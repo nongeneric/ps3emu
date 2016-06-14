@@ -5,25 +5,24 @@
 #include "../../spu/SPUThread.h"
 #include "../../utils.h"
 #include "../../log.h"
-#include <boost/log/trivial.hpp>
 
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
                                         spurs_name_t* name,
                                         uint32_t size)
 {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellSpursAttributeSetNamePrefix(\"%s\")", name);
+    LOG << ssnprintf("cellSpursAttributeSetNamePrefix(\"%s\")", name);
     strncpy(attr->prefix, name->data(), std::min<uint32_t>(size, 15));
     return CELL_OK;
 }
 
 int32_t cellSpursAttributeEnableSpuPrintfIfAvailable(CellSpursAttribute* attr) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     attr->enableSpuPrintf = true;
     return CELL_OK;
 }
 
 int32_t cellSpursAttributeSetSpuThreadGroupType(CellSpursAttribute* attr, int32_t type) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     attr->spuThreadGroupType = type;
     return CELL_OK;
 }
@@ -31,7 +30,7 @@ int32_t cellSpursAttributeSetSpuThreadGroupType(CellSpursAttribute* attr, int32_
 int32_t cellSpursJobChainAttributeSetName(CellSpursJobChainAttribute* attr,
                                           ps3_uintptr_t name)
 {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     attr->name = name;
     return CELL_OK;
 }
@@ -44,7 +43,7 @@ int32_t _cellSpursAttributeInitialize(CellSpursAttribute* attr,
                                       int32_t ppuPriority,
                                       bool exitIfNoWork)
 {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     attr->revision = revision;
     attr->sdkVersion = sdkVersion;
     attr->nSpus = nSpus;
@@ -56,18 +55,18 @@ int32_t _cellSpursAttributeInitialize(CellSpursAttribute* attr,
 }
 
 int32_t cellSpursFinalize(CellSpurs2* spurs) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
 int32_t cellSpursInitializeWithAttribute2(CellSpurs2* spurs2, const CellSpursAttribute* attr, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     cellSpursInitializeWithAttribute(spurs2, attr, proc);
     return CELL_OK;
 }
 
 int32_t cellSpursInitializeWithAttribute(CellSpurs* spurs, const CellSpursAttribute* attr, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -106,17 +105,17 @@ int32_t cellSpursCreateJobChainWithAttribute(CellSpurs2 *spurs,
                                              CellSpursJobChain *jobChain,
                                              const CellSpursJobChainAttribute *attr)
 {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
 int32_t cellSpursJoinJobChain(CellSpursJobChain *jobChain) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;    
 }
 
 int32_t cellSpursRunJobChain(const CellSpursJobChain* jobChain) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 

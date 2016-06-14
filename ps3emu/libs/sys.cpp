@@ -9,38 +9,38 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
-#include <boost/log/trivial.hpp>
+#include "../log.h"
 #include <memory>
 #include <map>
 
 void init_sys_lib() {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
 }
 
 void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
 }
 
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     mem_info->total_user_memory = 221249536;
     mem_info->available_user_memory = 0.9 * mem_info->total_user_memory; // TODO: handle alloc/dealloc
     return CELL_OK;
 }
 
 cell_system_time_t sys_time_get_system_time(PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     auto sec = (float)thread->proc()->getTimeBase() / (float)thread->proc()->getFrequency();
     return sec * 1000000;
 }
 
 int _sys_process_atexitspawn() {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
 int _sys_process_at_Exitspawn() {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -87,38 +87,34 @@ int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
 #define  SYS_TTYP_USER13       (SYS_TTYP15)
 
 int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     if (len == 0)
         return CELL_OK;
-    auto asChar = (const char*)buf;
     if (ch == SYS_TTYP_PPU_STDOUT) {
         fwrite(buf, 1, len, stdout);
         fflush(stdout);
-        BOOST_LOG_TRIVIAL(trace) << "stdout: " << std::string(asChar, asChar + len);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_PPU_STDERR) {
         fwrite(buf, 1, len, stderr);
         fflush(stderr);
-        BOOST_LOG_TRIVIAL(trace) << "stderr: " << std::string(asChar, asChar + len);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_SPU_STDOUT) {
         fwrite(buf, 1, len, stdout);
         fflush(stdout);
-        BOOST_LOG_TRIVIAL(trace) << "spu: " << std::string(asChar, asChar + len);
         return CELL_OK;
     }
     throw std::runtime_error(ssnprintf("unknown channel %d", ch));
 }
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_prx_exitspawn_with_level(uint64_t level) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -126,7 +122,7 @@ constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_allocate(%x,...)", size);
+    LOG << ssnprintf("sys_memory_allocate(%x,...)", size);
     (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
@@ -135,7 +131,7 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
 }
 
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_memory_free(%x)", start_addr);
+    LOG << ssnprintf("sys_memory_free(%x)", start_addr);
     thread->mm()->free(start_addr);
     return CELL_OK;
 }
@@ -146,7 +142,7 @@ int sys_timer_usleep(usecond_t sleep_time) {
 }
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return thread->proc()->getFrequency();
 }
 
@@ -166,19 +162,19 @@ uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime) {
 }
 
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUThread* thread) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     info->pst_addr = thread->getStackBase();
     info->pst_size = thread->getStackSize();
     return CELL_OK;
 }
 
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 
 uint32_t cellSysmoduleUnloadModule(uint16_t id) {
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__;
+    LOG << __FUNCTION__;
     return CELL_OK;
 }
 

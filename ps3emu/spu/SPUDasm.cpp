@@ -6,7 +6,7 @@
 #include "../utils.h"
 #include <boost/endian/conversion.hpp>
 #include <bitset>
-#include <boost/log/trivial.hpp>
+#include "../log.h"
 
 using namespace boost::endian;
 
@@ -2521,7 +2521,7 @@ EMU(rdch) {
         auto& ca = th->ch(ch);
         rt.w<0>() = ca;
     }
-    BOOST_LOG_TRIVIAL(trace) << 
+    LOG << 
         ssnprintf("spu reads %x from channel %s", rt.w<0>(), classIdToString(ch));
 }
 
@@ -2546,7 +2546,7 @@ EMU(rchcnt) {
     }
     if (rt.w<0>() == 0 && ch == SPU_RdInMbox)
         return;
-    BOOST_LOG_TRIVIAL(trace) << 
+    LOG << 
         ssnprintf("spu reads count %d from channel %s", rt.w<0>(), classIdToString(ch));
 }
 
@@ -2560,7 +2560,7 @@ EMU(wrch) {
     if (ch == SPU_WrOutIntrMbox) {
         th->getFromSpuInterruptMailbox().send(rt.w<0>());
         th->getStatus() |= 1;
-        BOOST_LOG_TRIVIAL(trace) <<
+        LOG <<
         ssnprintf("spu writes %x to interrupt mailbox", rt.w<0>());
         throw SPUThreadInterruptException();
     } else if (ch == SPU_WrOutMbox) {
@@ -2574,7 +2574,7 @@ EMU(wrch) {
             ca = rt.w<0>();
         }
     }
-    BOOST_LOG_TRIVIAL(trace) << 
+    LOG << 
         ssnprintf("spu writes %x to channel %s", rt.w<0>(), classIdToString(ch));
 }
 

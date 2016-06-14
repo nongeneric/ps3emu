@@ -2,8 +2,8 @@
 
 #include "../../utils.h"
 #include "../../IDMap.h"
+#include "../../log.h"
 #include <boost/thread/condition_variable.hpp>
-#include <boost/log/trivial.hpp>
 
 namespace {
     struct cv_info_t {
@@ -21,12 +21,12 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
     auto info = std::make_shared<cv_info_t>();
     info->m = find_mutex(lwmutex).get();
     *cond_id = cvs.create(std::move(info));
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_cond_create(%x, %s)", *cond_id, attr->name);
+    LOG << ssnprintf("sys_cond_create(%x, %s)", *cond_id, attr->name);
     return CELL_OK;
 }
 
 int32_t sys_cond_destroy(sys_cond_t cond) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("sys_cond_destroy(%x)", cond);
+    LOG << ssnprintf("sys_cond_destroy(%x)", cond);
     cvs.destroy(cond);
     return CELL_OK;
 }

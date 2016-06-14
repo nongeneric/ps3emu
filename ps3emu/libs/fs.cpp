@@ -9,7 +9,7 @@
 #include <string>
 #include <array>
 #include <algorithm>
-#include <boost/log/trivial.hpp>
+#include "../log.h"
 #include <sys/stat.h>
 #include <stdio.h>
 #include <dirent.h>
@@ -85,7 +85,7 @@ void copy(CellFsStat& sb, struct stat& st) {
 
 CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc) {
     auto hostPath = proc->contentManager()->toHost(path);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsStat(%s (%s), ...)", path, hostPath);
+    LOG << ssnprintf("cellFsStat(%s (%s), ...)", path, hostPath);
     struct stat st;
     auto err = stat(hostPath.c_str(), &st);
     if (err)
@@ -95,7 +95,7 @@ CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc) {
 }
 
 CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsStat(%d, ...)", fd);
+    LOG << ssnprintf("cellFsStat(%d, ...)", fd);
     struct stat st;
     auto err = fstat(fileno(fileMap.get(fd)), &st);
     if (err)
@@ -137,7 +137,7 @@ FILE* openFile(const char* path, int flags) {
 
 CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, Process* proc) {
     auto hostPath = proc->contentManager()->toHost(path);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
+    LOG << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
     auto f = openFile(hostPath.c_str(), flags);
     if (!f) {
         return toCellErrno(errno);
@@ -160,7 +160,7 @@ int toStdWhence(int cellWhence) {
 }
 
 CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t* pos) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsLseek(%d, %x, %d, ...)", fd, offset, whence);
+    LOG << ssnprintf("cellFsLseek(%d, %x, %d, ...)", fd, offset, whence);
     auto stdWhence = toStdWhence(whence);
     auto file = fileMap.get(fd);
     if (fseek(file, offset, stdWhence))
@@ -170,7 +170,7 @@ CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t
 }
 
 CellFsErrno cellFsClose(int32_t fd) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsClose(%d)", fd);
+    LOG << ssnprintf("cellFsClose(%d)", fd);
     auto file = fileMap.get(fd);
     if (fclose(file))
         return toCellErrno(errno);
@@ -195,7 +195,7 @@ CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint
 }
 
 CellFsErrno cellFsMkdir(const char* path, uint32_t mode, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsMkdir(%s, ...)", path);
+    LOG << ssnprintf("cellFsMkdir(%s, ...)", path);
     if (exists(path))
         return CELL_FS_EEXIST;
     auto res = create_directory(proc->contentManager()->toHost(path));
@@ -211,7 +211,7 @@ CellFsErrno cellFsGetFreeSize(const char* directory_path,
 {
     *block_size = 4096;
     auto host = proc->contentManager()->toHost(directory_path);
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsGetFreeSize(%s (%s), ...)", 
+    LOG << ssnprintf("cellFsGetFreeSize(%s (%s), ...)", 
                                           directory_path,
                                           host);
     auto s = space(host);
@@ -220,14 +220,14 @@ CellFsErrno cellFsGetFreeSize(const char* directory_path,
 }
 
 CellFsErrno cellFsFsync(int32_t fd) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsFsync(%d, ...)", fd);
+    LOG << ssnprintf("cellFsFsync(%d, ...)", fd);
     auto file = fileMap.get(fd);
     syncfs(fileno(file));
     return CELL_FS_SUCCEEDED;
 }
 
 CellFsErrno cellFsUnlink(const char* path, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsUnlink(%s, ...)", path);
+    LOG << ssnprintf("cellFsUnlink(%s, ...)", path);
     remove(proc->contentManager()->toHost(path));
     return CELL_FS_SUCCEEDED;
 }
@@ -238,7 +238,7 @@ CellFsErrno cellFsUnlink(const char* path, Process* proc) {
 #define CELL_FS_TYPE_SYMLINK   3
 
 CellFsErrno cellFsOpendir(const char* path, big_int32_t* fd, Process* proc) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsOpendir(%s, ...)", path);
+    LOG << ssnprintf("cellFsOpendir(%s, ...)", path);
     auto host = proc->contentManager()->toHost(path);
     auto dir = opendir(host.c_str());
     if (!dir)
@@ -249,7 +249,7 @@ CellFsErrno cellFsOpendir(const char* path, big_int32_t* fd, Process* proc) {
 }
 
 CellFsErrno cellFsReaddir(int32_t fd, CellFsDirent* dirent, big_uint64_t* nread) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsReaddir(%d, ...)", fd);
+    LOG << ssnprintf("cellFsReaddir(%d, ...)", fd);
     auto info = dirMap.get(fd);
     auto entry = readdir(info->dir);
     if (entry) {
@@ -264,7 +264,7 @@ CellFsErrno cellFsReaddir(int32_t fd, CellFsDirent* dirent, big_uint64_t* nread)
 }
 
 CellFsErrno cellFsClosedir(int32_t fd) {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsClosedir(%d, ...)", fd);
+    LOG << ssnprintf("cellFsClosedir(%d, ...)", fd);
     dirMap.destroy(fd);
     return CELL_FS_SUCCEEDED;
 }
@@ -274,7 +274,7 @@ CellFsErrno cellFsGetDirectoryEntries(int32_t fd,
                                       uint32_t entries_size, 
                                       uint32_t* data_count)
 {
-    BOOST_LOG_TRIVIAL(trace) << ssnprintf("cellFsGetDirectoryEntries(%d, ...)", fd);
+    LOG << ssnprintf("cellFsGetDirectoryEntries(%d, ...)", fd);
     auto info = dirMap.get(fd);
     auto entry = readdir(info->dir);
     if (entry) {
