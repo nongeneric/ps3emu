@@ -1,3 +1,4 @@
 *.user
 *.kdev4
 *.db*
+*.autosave
