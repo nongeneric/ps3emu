@@ -1292,3 +1292,20 @@ TEST_CASE("spu_generic_test") {
         "complete"
     );
 }
+
+TEST_CASE("spu_sync_mutex") {
+    auto output = startWaitGetOutput({"./binaries/spu_sync_mutex/a.elf"});
+    REQUIRE( output ==
+         "Creating an SPU thread group.\n"
+         "Initializing SPU thread 0\n"
+         "Initializing SPU thread 1\n"
+         "All SPU threads have been successfully initialized.\n"
+         "Starting the SPU thread group.\n"
+         "All SPU threads exited by sys_spu_thread_exit().\n"
+         "SPU thread 0's exit status = 0\n"
+         "SPU thread 1's exit status = 0\n"
+         "count = 20\n"
+         "message : \n"
+         "## libsync : sample_sync_mutex_ppu SUCCEEDED ##\n"
+    );
+}

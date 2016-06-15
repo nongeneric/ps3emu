@@ -175,9 +175,8 @@ void SPUThread::command(uint32_t word) {
         case MFC_GETB_CMD:
         case MFC_GETFS_CMD:
         case MFC_GETBS_CMD: {
-            __sync_synchronize();
+            // readMemory always synchronizes
             _proc->mm()->readMemory(eal, lsa, size);
-            __sync_synchronize();
             break;
         }
         case MFC_PUTLLC_CMD: // TODO: handle sizes correctly
@@ -204,9 +203,8 @@ void SPUThread::command(uint32_t word) {
         case MFC_PUTBS_CMD:
         case MFC_PUTRF_CMD:
         case MFC_PUTRB_CMD: {
-            __sync_synchronize();
+            // writeMemory always synchorizes
             _proc->mm()->writeMemory(eal, lsa, size);
-            __sync_synchronize();
             break;
         }
         default: throw std::runtime_error("not implemented");
