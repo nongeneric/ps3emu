@@ -551,7 +551,7 @@ STUB_3(cellSpursCreateTaskset2);
 STUB_3(cellSpursJoinTask2);
 STUB_2(_cellSpursTasksetAttribute2Initialize);
 STUB_8(cellSpursCreateTask2WithBinInfo);
-STUB_1(cellSyncMutexInitialize);
+STUB_2(cellSyncMutexInitialize);
 STUB_1(cellSyncMutexTryLock);
 STUB_1(cellSyncMutexLock);
 STUB_1(cellSyncMutexUnlock);
