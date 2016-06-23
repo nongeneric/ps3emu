@@ -32,11 +32,11 @@ void log_init(int sink_flags, log_severity_t severity, int types) {
 }
 
 void log_set_thread_name(std::string name) {
-    thread_name = name;
+    thread_name = "[" + name + "] ";
 }
 
 void log_unconditional(log_severity_t severity, log_type_t type, const char* message) {
-    auto const& formatted = ssnprintf("%s [%s] %s: %s",
+    auto const& formatted = ssnprintf("%s %s%s: %s",
                                       type == log_spu ? "SPU" :
                                       type == log_libs ? "LIB" :
                                       type == log_debugger ? "DBG" :

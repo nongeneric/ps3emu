@@ -3,6 +3,7 @@
 # fnid.py --makedb /ppu/lib
 # fnid.py --patch /tmp/log
 # fnid.py --find 12345
+# fnid.py --fnid _functionName
 
 import subprocess
 import argparse
@@ -15,14 +16,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--makedb', type=str)
 parser.add_argument('--patch', type=str)
 parser.add_argument('--find', type=str)
+parser.add_argument('--fnid', type=str)
 args = parser.parse_args()
 
 def calcfnid(s):
     sha = hashlib.sha1()
-    sha.update(s)
-    sha.update('\x67\x59\x65\x99\x04\x25\x04\x90\x56\x64\x27\x49\x94\x89\x74\x1A')
+    sha.update(s.encode('utf-8'))
+    sha.update('\x67\x59\x65\x99\x04\x25\x04\x90\x56\x64\x27\x49\x94\x89\x74\x1A'.encode('utf-8'))
     d = sha.digest()
-    return ord(d[0]) | (ord(d[1]) << 8) | (ord(d[2]) << 16) | (ord(d[3]) << 24)
+    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
 
 def find(c, fnid):
     cur = c.cursor()
@@ -31,6 +33,9 @@ def find(c, fnid):
     return str[0] if str else "none"
 
 c = sqlite3.connect('fnids.db')
+
+if args.fnid:
+    print("%08x" % calcfnid(args.fnid))
 
 if args.find:
     print(find(c, int(args.find, 16)))

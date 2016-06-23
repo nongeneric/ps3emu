@@ -1,14 +1,14 @@
-#include "../ps3emu/ELFLoader.h"
-#include "../ps3emu/utils.h"
+#include "ps3tool.h"
+#include "ps3emu/ELFLoader.h"
+#include "ps3emu/utils.h"
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 #include <zlib.h>
-#include "ps3emu/log.h"
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include <boost/optional.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/program_options.hpp>
+
 #include <fstream>
 #include <memory>
 #include <vector>
@@ -20,7 +20,6 @@
 
 using namespace boost::endian;
 using namespace boost::filesystem;
-using namespace boost::program_options;
 using namespace boost;
 
 #pragma pack(1)
@@ -178,7 +177,7 @@ std::vector<key_info_t> read_keys(path data_path) {
     auto keys_path = data_path / "keys";
     std::ifstream f(keys_path.string());
     if (!f.is_open()) {
-        LOG << "can't read the keys file";
+        std::cout << "can't read the keys file";
         return {};
     }
     
@@ -323,12 +322,12 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                       std::vector<control_info_t*> const& control_infos) {
     auto opt_key = search_self_key(keys, app_info->self_type, sce_header->revision, app_info->version);
     if (!opt_key) {
-        LOG << "can't find a suitable key";
+        std::cout << "can't find a suitable key";
         return false;
     }
     
     auto key = opt_key.get();
-    LOG << "key to decrypt metadata\n"
+    std::cout << "key to decrypt metadata\n"
         << ssnprintf("  name       %s\n", key.name)
         << ssnprintf("  self_type  %s\n", key.self_type)
         << ssnprintf("  revision   %x\n", key.revision)
@@ -350,11 +349,11 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
     
     if (std::accumulate(metadata_info->iv_pad, metadata_info->iv_pad + 16, 0) != 0 ||
         std::accumulate(metadata_info->key_pad, metadata_info->key_pad + 16, 0) != 0) {
-        LOG << "metadata decryption failed, check your keys";
+        std::cout << "metadata decryption failed, check your keys";
         return false;
     }
     
-    LOG << "metadata info\n"
+    std::cout << "metadata info\n"
         << ssnprintf("  key  %s\n", print_hex(metadata_info->key, 16))
         << ssnprintf("  iv   %s\n", print_hex(metadata_info->iv, 16));
     
@@ -369,7 +368,7 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                        ecount_buf,
                        &num);
     
-    LOG << "metadata header\n"
+    std::cout << "metadata header\n"
         << ssnprintf("  section_count  %d\n", metadata_header->section_count)
         << ssnprintf("  key_count      %d\n", metadata_header->key_count);
     
@@ -383,12 +382,12 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                        ecount_buf,
                        &num);
     
-    LOG << "metadata section headers\n"
-        << "  Idx Offset   Size     Type Index Hashed SHA1 Encrypted Key IV Compressed";
+    std::cout << "metadata section headers\n"
+        << "  Idx Offset   Size     Type Index Hashed SHA1 Encrypted Key IV Compressed\n";
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto sh = &metadata_section_headers[i];
-        LOG << 
-            ssnprintf("  %02d  %08X %08X %02X   %02d    %s    %02X   %s       %s  %s %s",
+        std::cout <<
+            ssnprintf("  %02d  %08X %08X %02X   %02d    %s    %02X   %s       %s  %s %s\n",
                 i, sh->data_offset, sh->data_size, sh->type, sh->index,
                 sh->hashed == 2 ? "YES" : "NO ",
                 sh->sha1_index,
@@ -398,7 +397,7 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                 sh->compressed == METADATA_SECTION_COMPRESSED ? "YES" : "NO "
             );
     }
-    LOG << "";
+    std::cout << "";
         
     return true;
 }
@@ -413,9 +412,9 @@ bool decrypt_sections(sce_header_t* sce_header,
     auto keys = reinterpret_cast<std::array<uint8_t, 16>*>(
         metadata_section_headers + metadata_header->section_count);
     
-    LOG << "sce keys";
+    std::cout << "sce keys\n";
     for (auto i = 0u; i < metadata_header->key_count; ++i) {
-        LOG << ssnprintf("  %02x  %s", i, print_hex(&keys[i][0], 16));
+        std::cout << ssnprintf("  %02x  %s\n", i, print_hex(&keys[i][0], 16));
     }
     
     for (auto sh = metadata_section_headers;
@@ -425,7 +424,7 @@ bool decrypt_sections(sce_header_t* sce_header,
             continue;
         if (sh->key_index >= metadata_header->key_count ||
             sh->iv_index >= metadata_header->key_count) {
-            LOG << "a section marked encrypted references a non existent key";
+            std::cout << "a section marked encrypted references a non existent key";
             continue;
         }
         AES_KEY aes_key;
@@ -434,7 +433,7 @@ bool decrypt_sections(sce_header_t* sce_header,
         auto key_ptr = &keys[sh->key_index][0];
         auto iv_ptr = &keys[sh->iv_index][0];
         
-        LOG << "decoding section\n"
+        std::cout << "decoding section\n"
             << ssnprintf("  offset  %08X\n", sh->data_offset)
             << ssnprintf("  size    %08X\n", sh->data_size)
             << ssnprintf("  key     %s\n", print_hex(key_ptr, 16))
@@ -479,7 +478,7 @@ bool write_elf(std::string elf_path,
                metadata_section_header_t* metadata_section_headers) {
     std::ofstream elf_file(elf_path);
     if (!elf_file.is_open()) {
-        LOG << "can't open elf file for writing";
+        std::cout << "can't open elf file for writing";
         return false;
     }
     
@@ -508,13 +507,13 @@ bool write_elf(std::string elf_path,
         
         std::vector<uint8_t> vec(std::max(ph->p_filesz, msh->data_size));
         if (msh->compressed == METADATA_SECTION_COMPRESSED) {
-            LOG << "inflating";
+            std::cout << "inflating\n";
             src_size = inflate(reinterpret_cast<uint8_t*>(src_ptr), 
                                msh->data_size, &vec[0], vec.size());
             src_ptr = reinterpret_cast<char*>(&vec[0]);
         }
         
-        LOG << "writing self section to elf\n"
+        std::cout << "writing self section to elf\n"
             << ssnprintf("  self source  %08X\n", src)
             << ssnprintf("  elf dest     %08X\n", dest)
             << ssnprintf("  size         %08X\n", src_size);
@@ -525,43 +524,22 @@ bool write_elf(std::string elf_path,
     
     auto elf_header = reinterpret_cast<Elf64_be_Ehdr*>(&file_buf[0] + self_header->elf_offset);
     auto shs = &file_buf[0] + self_header->section_header_offset;
+    elf_file.seekp(0);
+    elf_file.write((char*)elf_header, sizeof(Elf64_be_Ehdr));
+    elf_file.seekp((uint32_t)elf_header->e_phoff);
+    elf_file.write((char*)phs, sizeof(Elf64_be_Phdr) * elf_header->e_phnum);
     elf_file.seekp((uint32_t)elf_header->e_shoff);
     elf_file.write(shs, sizeof(Elf64_be_Shdr) * elf_header->e_shnum);
     
     return true;
 }
 
-int main(int argc, char* argv[]) {
-    log_init(log_console, log_info, -1);
-    std::string sce_path, elf_path, data_path;
-    options_description console_descr("Allowed options");
-    try {
-        console_descr.add_options()
-            ("help", "produce help message")
-            ("elf", value<std::string>(&elf_path), "output elf file")
-            ("sce", value<std::string>(&sce_path), "input sce file")
-            ("data", value<std::string>(&data_path), "data directory")
-            ;
-        variables_map console_vm;
-        store(parse_command_line(argc, argv, console_descr), console_vm);
-        if (console_vm.count("help")) {
-            std::cout << console_descr;
-            return 0;
-        }
-        notify(console_vm);
-    } catch(std::exception& e) {
-        std::cout << "can't parse program options:\n";
-        std::cout << e.what() << "\n\n";
-        std::cout << console_descr;
-        return 1;
-    }
+void HandleUnsce(UnsceCommand const& command) {
+    auto keys = read_keys(command.data);
     
-    auto keys = read_keys(data_path);
-    
-    std::ifstream f(sce_path);
+    std::ifstream f(command.sce);
     if (!f.is_open()) {
-        LOG << "can't read input file";
-        return 1;
+        throw std::runtime_error("can't read input file");
     }
     f.seekg(0, std::ios_base::end);
     auto file_size = f.tellg();
@@ -588,11 +566,10 @@ int main(int argc, char* argv[]) {
     }
     
     if (std::string("SCE") != sce_header->magic) {
-        LOG << "not an sce file";
-        return 1;
+        throw std::runtime_error("not an sce file");
     }
     
-    LOG << "sce header\n"
+    std::cout << "sce header\n"
         << ssnprintf("  magic:            %s\n", sce_header->magic)
         << ssnprintf("  version:          %-x\n", sce_header->version)
         << ssnprintf("  revision:         %-x\n", sce_header->revision)
@@ -601,7 +578,7 @@ int main(int argc, char* argv[]) {
         << ssnprintf("  header_size:      %-lx\n", sce_header->header_size)
         << ssnprintf("  data_size:        %-lx\n", sce_header->data_size);
     
-    LOG << "self header\n"
+    std::cout << "self header\n"
         << ssnprintf("  header_type:            %-lx\n", self_header->header_type)
         << ssnprintf("  appinfo_offset:         %-lx\n", self_header->appinfo_offset)
         << ssnprintf("  elf_offset:             %-lx\n", self_header->elf_offset)
@@ -619,14 +596,14 @@ int main(int argc, char* argv[]) {
                           metadata_header,
                           metadata_section_headers,
                           control_infos))
-        return 1;
+        throw std::runtime_error("can't decrypt metadata");
         
     if (!decrypt_sections(sce_header,
                           metadata_header,
                           metadata_section_headers))
-        return 1;
+        throw std::runtime_error("can't decrypt sections");
     
-    if (!write_elf(elf_path, file_buf, sce_header, self_header, 
+    if (!write_elf(command.elf, file_buf, sce_header, self_header,
                    metadata_header, metadata_section_headers))
-        return 1;
+        throw std::runtime_error("can't write elf");
 }

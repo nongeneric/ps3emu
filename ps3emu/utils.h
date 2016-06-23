@@ -16,18 +16,9 @@ struct AdaptType {
 };
 
 template <>
-struct AdaptType<std::string> { 
+struct AdaptType<std::string> {
     const char* adapt(std::string const& str) {
-        assert(&str != &ssnprintf_buf);
         return str.c_str();
-    }
-};
-
-template <>
-struct AdaptType<const char*> {
-    const char* adapt(const char* str) {
-        assert(str != ssnprintf_buf.c_str());
-        return str;
     }
 };
 
@@ -62,11 +53,11 @@ struct AdaptType<boost::endian::big_int16_t> {
 };
 
 template <typename... Args>
-std::string& ssnprintf(const char* f, Args... args) {
+std::string ssnprintf(const char* f, Args... args) {
     auto len = snprintf(0, 0, f, AdaptType<decltype(args)>().adapt(args)...);
-    ssnprintf_buf.resize(len);
+    ssnprintf_buf.resize(len + 1);
     len = snprintf(&ssnprintf_buf[0],
-                   ssnprintf_buf.size() + 1,
+                   ssnprintf_buf.size(),
                    f,
                    AdaptType<decltype(args)>().adapt(args)...);
     return ssnprintf_buf;

@@ -24,6 +24,7 @@ using spurs_priority_table_t = std::array<uint8_t, 8>;
 using CellSpursTaskId = big_uint32_t;
 
 class Process;
+class MainMemory;
 
 struct CellSpursAttribute {
     char prefix[15];
@@ -183,3 +184,22 @@ int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
                                         cstring_ptr_t name,
                                         uint64_t __reserved__,
                                         Process* proc);
+
+typedef enum CellSpursEventFlagClearMode {
+    CELL_SPURS_EVENT_FLAG_CLEAR_AUTO = 0,
+    CELL_SPURS_EVENT_FLAG_CLEAR_MANUAL = 1
+} CellSpursEventFlagClearMode;
+
+typedef enum CellSpursEventFlagDirection {
+    CELL_SPURS_EVENT_FLAG_SPU2SPU,
+    CELL_SPURS_EVENT_FLAG_SPU2PPU,
+    CELL_SPURS_EVENT_FLAG_PPU2SPU,
+    CELL_SPURS_EVENT_FLAG_ANY2ANY
+} CellSpursEventFlagDirection;
+
+int32_t _cellSpursEventFlagInitialize(CellSpurs* spurs,
+                                      CellSpursTaskset* taskset,
+                                      uint32_t eventFlag,
+                                      CellSpursEventFlagClearMode clearMode,
+                                      CellSpursEventFlagDirection direction,
+                                      MainMemory* mm);

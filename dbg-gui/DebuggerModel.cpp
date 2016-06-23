@@ -770,6 +770,7 @@ void DebuggerModel::clearSPUSoftBreak(ps3_uintptr_t va) {
     if (it == end(_spuBreaks)) {
         emit message(
             QString::fromStdString(ssnprintf("there is no spu breakpoint at %x", va)));
+        _activeSPUThread->setNip(_activeSPUThread->getNip() + 4);
         return;
     }
     if (!_activeSPUThread) {

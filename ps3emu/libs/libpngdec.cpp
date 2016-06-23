@@ -67,7 +67,7 @@ namespace {
         
         uint32_t readChunkInfo() {
             uint32_t info = 0;
-            for (auto i = 0; i < PNG_INFO_IDAT; ++i) {
+            for (auto i = 0u; i < PNG_INFO_IDAT; ++i) {
                 info |= png_get_valid(_png, _info, i);
             }
             return info;

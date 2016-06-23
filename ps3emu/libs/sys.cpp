@@ -87,7 +87,6 @@ int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
 #define  SYS_TTYP_USER13       (SYS_TTYP15)
 
 int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
-    LOG << __FUNCTION__;
     if (len == 0)
         return CELL_OK;
     if (ch == SYS_TTYP_PPU_STDOUT) {

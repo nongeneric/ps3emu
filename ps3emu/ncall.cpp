@@ -555,6 +555,7 @@ STUB_2(cellSyncMutexInitialize);
 STUB_1(cellSyncMutexTryLock);
 STUB_1(cellSyncMutexLock);
 STUB_1(cellSyncMutexUnlock);
+STUB_6(_cellSpursEventFlagInitialize);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -733,6 +734,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellSyncMutexTryLock),
     ENTRY(cellSyncMutexLock),
     ENTRY(cellSyncMutexUnlock),
+    ENTRY(_cellSpursEventFlagInitialize),
 };
 
 void PPUThread::ncall(uint32_t index) {

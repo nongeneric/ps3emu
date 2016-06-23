@@ -12,7 +12,7 @@ void SPUThread::run() {
 }
 
 void SPUThread::loop() {
-    LOG << ssnprintf("spu thread loop started");
+    INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     _dbgPaused = true;
     log_set_thread_name(ssnprintf("spu %d", _id));
@@ -60,14 +60,14 @@ void SPUThread::loop() {
         } catch (SPUThreadInterruptException& e) {
             _interruptHandler();
         } catch (std::exception& e) {
-            LOG << ssnprintf("spu thread exception: %s", e.what());
+            INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Failure);
             break;
         }
     }
     
-    LOG << ssnprintf("spu thread loop finished");
+    INFO(spu) << ssnprintf("spu thread loop finished");
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 
@@ -116,7 +116,7 @@ uint32_t SPUThread::getElfSource() {
 }
 
 void SPUThread::setElfSource(uint32_t src) {
-    LOG << ssnprintf("setting elf source to #%x", src);
+    INFO(spu) << ssnprintf("setting elf source to #%x", src);
     _elfSource = src;
 }
 

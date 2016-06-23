@@ -1,10 +1,13 @@
 #include "cellSpurs.h"
 
 #include "SpuImage.h"
-#include "../../Process.h"
-#include "../../spu/SPUThread.h"
-#include "../../utils.h"
-#include "../../log.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/spu/SPUThread.h"
+#include "ps3emu/utils.h"
+#include "ps3emu/log.h"
+
+#define CELL_SPURS_EVENT_FLAG_SIZE		128
 
 int32_t cellSpursAttributeSetNamePrefix(CellSpursAttribute* attr,
                                         spurs_name_t* name,
@@ -160,9 +163,20 @@ emu_void_t _cellSpursTasksetAttribute2Initialize(CellSpursTasksetAttribute2* pAt
 }
 
 void spuPrintf(void* ls, const uint8_t* regs, uint32_t size) {
-    R128 r;
-    r.load(regs);
-    printf("%s", (const char*)ls + r.w<0>());
+    R128 r[10];
+    for (int i = 0; i < 10; ++i) {
+        r[i].load(&regs[i * sizeof(R128)]);
+    }
+    printf((const char*)ls + r[0].w<0>(),
+           r[1].w<0>(),
+           r[2].w<0>(),
+           r[3].w<0>(),
+           r[4].w<0>(),
+           r[5].w<0>(),
+           r[6].w<0>(),
+           r[7].w<0>(),
+           r[8].w<0>(),
+           r[9].w<0>());
 }
 
 int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
@@ -187,10 +201,21 @@ int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
     spuThread->setInterruptHandler([&] {
         auto& imbox = spuThread->getFromSpuInterruptMailbox();
         auto& mbox = spuThread->getFromSpuMailbox();
-        auto regs = spuThread->ptr(mbox.receive(0));
         auto size = imbox.receive(0);
+        auto regs = spuThread->ptr(mbox.receive(0));
         spuPrintf(spuThread->ptr(0), regs, size);
     });
     spuThread->run();
+    return CELL_OK;
+}
+
+int32_t _cellSpursEventFlagInitialize(CellSpurs* spurs,
+                                      CellSpursTaskset* taskset,
+                                      uint32_t eventFlag,
+                                      CellSpursEventFlagClearMode clearMode,
+                                      CellSpursEventFlagDirection direction,
+                                      MainMemory* mm) {
+    mm->setMemory(eventFlag, 0, CELL_SPURS_EVENT_FLAG_SIZE);
+    mm->store<4>(eventFlag + 3 * 4, 0xff000000);
     return CELL_OK;
 }
