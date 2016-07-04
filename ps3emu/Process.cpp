@@ -8,6 +8,7 @@
 
 #include "ppu/InterruptPPUThread.h"
 #include <boost/thread/locks.hpp>
+#include <boost/range/algorithm.hpp>
 #include "log.h"
 
 MainMemory* Process::mm() {
@@ -30,7 +31,9 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _mainMemory->setProc(this);
     _elf.reset(new ELFLoader());
     _elf->load(elfPath);
-    _elf->map(_mainMemory.get());
+    _elf->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
+        _segments.push_back({_elf, index, va, size});
+    });
     _elf->link(_mainMemory.get());
     _internalMemoryManager.reset(new InternalMemoryManager());
     _internalMemoryManager->setMainMemory(_mainMemory.get());
@@ -47,6 +50,17 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     thread->setGPR(3, args.size());
     thread->setGPR(4, vaArgs);
     _threadIds.create(std::move(thread));
+}
+
+uint32_t Process::loadPrx(std::string path) {
+    auto prx = std::make_shared<ELFLoader>();
+    prx->load(path);
+    assert(_segments.size());
+    auto imageBase = ::align(_segments.back().va + _segments.back().size, 1 << 10);
+    prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
+        _segments.push_back({prx, index, va, size});
+    }, imageBase);
+    return imageBase;
 }
 
 void Process::dbgPause(bool pause, bool takeMutex) {
@@ -303,4 +317,8 @@ boost::chrono::nanoseconds Process::getTimeBaseNanoseconds() {
     auto now = boost::chrono::high_resolution_clock::now();
     auto diff = now - _systemStart;
     return boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
+}
+
+std::vector<ModuleSegment>& Process::getSegments() {
+    return _segments;
 }

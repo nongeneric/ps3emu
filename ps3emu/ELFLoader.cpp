@@ -43,6 +43,7 @@ struct sys_process_prx_info {
 #pragma pack()
 
 void ELFLoader::load(std::string filePath) {
+    _elfName = filePath;
     FILE* f = fopen(filePath.c_str(), "rb");
     assert(f);
     fseek(f, 0, SEEK_END);
@@ -116,7 +117,7 @@ const char* ELFLoader::getSectionName(uint32_t idx) {
     return reinterpret_cast<const char*>(ptr);
 }
 
-void ELFLoader::map(MainMemory* mm) {
+void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase) {
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -125,12 +126,16 @@ void ELFLoader::map(MainMemory* mm) {
         if (ph->p_memsz == 0)
             continue;
         
-        LOG << ssnprintf("mapping segment of size %" PRIx64 " to %" PRIx64 "-%" PRIx64,
-            (uint64_t)ph->p_filesz, (uint64_t)ph->p_vaddr, (ph->p_paddr + ph->p_memsz));
+        uint64_t va = imageBase + ph->p_vaddr;
+        
+        LOG << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
+            (uint64_t)ph->p_filesz, va, va + ph->p_memsz, imageBase);
         
         assert(ph->p_memsz >= ph->p_filesz);
-        mm->writeMemory(ph->p_vaddr, ph->p_offset + &_file[0], ph->p_filesz, true);
-        mm->setMemory(ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
+        mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
+        mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
+        
+        makeSegment(va, ph->p_memsz, std::distance(_pheaders, ph));
     }
 }
 
@@ -176,18 +181,12 @@ void ELFLoader::link(MainMemory* mm) {
     auto prxInfos = readSection<prx_info>(
         _sections, _header, prxInfo.prx_infos, mm);
     
-    auto firstPrxName = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
-        return l.prx_name < r.prx_name;
-    });
     auto firstPrxFnid = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
         return l.prx_fnids < r.prx_fnids;
     });
     auto firstPrxStub = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
         return l.prx_stubs < r.prx_stubs;
     });
-    
-    auto prxNames = readSection<char>(
-        _sections, _header, firstPrxName->prx_name - 4, mm);
     
     auto prxFnids = readSection<big_uint32_t>(
         _sections, _header, firstPrxFnid->prx_fnids, mm);
@@ -203,8 +202,8 @@ void ELFLoader::link(MainMemory* mm) {
     uint32_t curUnknownNcall = 2000;
     LOG << ssnprintf("resolving %d rsx modules", prxInfos.size());
     for (auto& info : prxInfos) {
-        auto nameOffset = info.prx_name - firstPrxName->prx_name;
-        std::string name(&prxNames[nameOffset + 4]);
+        std::string name;
+        readString(mm, info.prx_name, name);
         LOG << ssnprintf("  %s", name);
         
         auto firstFnid = (info.prx_fnids - firstPrxFnid->prx_fnids) / sizeof(uint32_t);
@@ -224,8 +223,7 @@ void ELFLoader::link(MainMemory* mm) {
             }
             mm->store<4>(vaDescr, vaDescr + 4);
             encodeNCall(mm, vaDescr + 4, index);
-            LOG << ssnprintf("    %x -> %s (ncall %x)",
-                stub, name, index);
+            LOG << ssnprintf("    %x -> %s (ncall %x)", stub, name, index);
             stub = vaDescr;
             vaDescr += 8;
         }
@@ -314,3 +312,27 @@ ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
     return info;
 }
 
+std::vector<prx_export_info_t> ELFLoader::getExports() {
+    auto module = reinterpret_cast<module_info_t*>(&_file[_pheaders->p_paddr]);
+    auto exports = reinterpret_cast<prx_export_t*>(&_file[_pheaders->p_offset + module->exports_start]);
+    auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
+    std::vector<prx_export_info_t> vec;
+    for (auto i = 0u; i < nexports; ++i) {
+        auto& e = exports[i];
+        auto fnids = reinterpret_cast<big_uint32_t*>(
+            &_file[_pheaders->p_offset + e.fnid_table]);
+        auto stubs = reinterpret_cast<big_uint32_t*>(
+            &_file[_pheaders->p_offset + e.stub_table]);
+        for (auto i = 0; i < e.functions; ++i) {
+            prx_export_info_t info;
+            info.stub = *reinterpret_cast<fdescr*>(&_file[_pheaders->p_offset + stubs[i]]);
+            info.fnid = fnids[i];
+            vec.push_back(info);
+        }
+    }
+    return vec;
+}
+
+std::string ELFLoader::elfName() {
+    return _elfName;
+}

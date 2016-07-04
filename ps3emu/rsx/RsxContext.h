@@ -177,8 +177,7 @@ struct SurfaceToFramebufferLink {
 class FragmentShaderUpdateFunctor;
 class GLFramebuffer;
 class TextureRenderer;
-class RsxContext {
-public:
+struct RsxContext {
     Tracer tracer;
     uint32_t frame = 0;
     uint32_t commandNum = 0;

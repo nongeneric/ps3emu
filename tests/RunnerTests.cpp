@@ -1309,3 +1309,13 @@ TEST_CASE("spu_sync_mutex") {
          "## libsync : sample_sync_mutex_ppu SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("prx_simple_c") {
+    auto output = startWaitGetOutput({"./binaries/prx_simple_c/a.elf"});
+    REQUIRE( output ==
+        "simple-main:start\n"
+        "arg0 = 0, arg1 = 2, arg2 = 4, modres = 1\n"
+        "simple-main:done\n"
+    );
+}
+

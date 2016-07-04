@@ -1,6 +1,7 @@
 #include "PPUThread.h"
 #include "../Process.h"
 #include "../MainMemory.h"
+#include "../InternalMemoryManager.h"
 #include "ppu_dasm.h"
 #include "../log.h"
 
@@ -166,4 +167,32 @@ void PPUThread::yield() {
 
 void PPUThread::setId(unsigned id) {
     _id = id;
+}
+
+struct CallStub {
+    uint32_t ncall;
+};
+
+void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
+    _ps3calls.push({getNIP(), getLR(), then});
+    
+    uint32_t stubVa;
+    _proc->internalMemoryManager()->internalAlloc<4, CallStub>(&stubVa);
+    setLR(stubVa);
+    setNIP(va);
+    
+    uint32_t ncallIndex;
+    auto entry = findNCallEntry(calcFnid("ps3call_then"), ncallIndex);
+    assert(entry);
+    encodeNCall(_mm, stubVa + offsetof(CallStub, ncall), ncallIndex);
+}
+
+uint64_t ps3call_then(PPUThread* thread) {
+    auto top = thread->_ps3calls.top();
+    thread->_ps3calls.pop();
+    top.then();
+    thread->setLR(top.lr);
+    thread->setNIP(top.ret);
+    // TODO: delete stub
+    return thread->getGPR(3);
 }

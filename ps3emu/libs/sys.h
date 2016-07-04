@@ -29,7 +29,18 @@ extern int sys_tty_write(unsigned int ch, const void *buf,
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags);
 
+typedef big_uint32_t sys_prx_id_t;
+
 int sys_prx_exitspawn_with_level(uint64_t level);
+int32_t sys_prx_register_library(ps3_uintptr_t library);
+sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc);
+int32_t sys_prx_start_module(sys_prx_id_t id,
+                             size_t args,
+                             ps3_uintptr_t argp,
+                             ps3_uintptr_t modres,
+                             uint64_t flags,
+                             uint64_t pOpt,
+                             PPUThread* thread);
 
 typedef big_uint32_t sys_addr_t;
 

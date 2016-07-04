@@ -109,13 +109,22 @@ class ContentManager;
 class InternalMemoryManager;
 class CallbackThread;
 
+struct ModuleSegment {
+    ModuleSegment(std::shared_ptr<ELFLoader> elf, unsigned index, ps3_uintptr_t va, uint32_t size)
+        : elf(elf), index(index), va(va), size(size) {}
+    std::shared_ptr<ELFLoader> elf;
+    unsigned index;
+    ps3_uintptr_t va;
+    uint32_t size;
+};
+
 class Process {
     ConcurrentFifoQueue<ThreadEvent> _eventQueue;
     std::unique_ptr<ThreadInitInfo> _threadInitInfo;
     MemoryBlockManager<StackArea, StackAreaSize, 1 * 1024 * 1024> _stackBlocks;
     MemoryBlockManager<TLSArea, TLSAreaSize, 1 * 1024 * 1024> _tlsBlocks;
     std::unique_ptr<Rsx> _rsx;
-    std::unique_ptr<ELFLoader> _elf;
+    std::shared_ptr<ELFLoader> _elf;
     std::unique_ptr<MainMemory> _mainMemory;
     std::unique_ptr<ContentManager> _contentManager;
     std::unique_ptr<InternalMemoryManager> _internalMemoryManager;
@@ -127,13 +136,14 @@ class Process {
     IDMap<uint64_t, PPUThread*> _threadIds;
     IDMap<uint32_t, SPUThread*> _spuThreadIds;
     bool _firstRun = true;
+    boost::chrono::high_resolution_clock::time_point _systemStart;
+    std::vector<ModuleSegment> _segments;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
     void initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
     void dbgPause(bool pause, bool takeMutex = true);
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
-    boost::chrono::high_resolution_clock::time_point _systemStart;
     
 public:
     Process();
@@ -144,6 +154,7 @@ public:
     ContentManager* contentManager();
     InternalMemoryManager* internalMemoryManager();
     void init(std::string elfPath, std::vector<std::string> args);
+    uint32_t loadPrx(std::string path);
     Event run();
     uint64_t createThread(uint32_t stackSize,
                           ps3_uintptr_t entryPointDescriptorVa,
@@ -162,4 +173,5 @@ public:
     uint64_t getTimeBase();
     boost::chrono::microseconds getTimeBaseMicroseconds();
     boost::chrono::nanoseconds getTimeBaseNanoseconds();
+    std::vector<ModuleSegment>& getSegments();
 };

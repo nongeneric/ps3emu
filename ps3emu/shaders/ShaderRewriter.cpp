@@ -109,7 +109,7 @@ namespace ShaderRewriter {
             return _ret;
         }
         
-        virtual void visit(IfStubFragmentStatement* st) {
+        virtual void visit(IfStubFragmentStatement* st) override {
             return visit((IfStatement*)st);
         }
         

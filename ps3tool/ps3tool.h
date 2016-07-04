@@ -20,6 +20,7 @@ struct RestoreElfCommand {
 
 struct ReadPrxCommand {
     std::string elf;
+    bool writeIdaScript;
 };
 
 void HandleUnsce(UnsceCommand const& command);

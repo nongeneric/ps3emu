@@ -47,6 +47,7 @@ class DebuggerModel : public QWidget {
     void trySetPendingSPUBreaks();
     void switchThread(PPUThread* ppu);
     void switchThread(SPUThread* spu);
+    void dumpSegments();
 
 public:
     DebuggerModel();

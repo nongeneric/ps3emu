@@ -9,6 +9,7 @@
 #include <functional>
 #include <atomic>
 #include <array>
+#include <stack>
 
 enum class PPUThreadEvent {
     Breakpoint,
@@ -111,6 +112,12 @@ union XER_t {
 };
 static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 
+struct ps3call_info_t {
+    uint64_t ret;
+    uint64_t lr;
+    std::function<void()> then;
+};
+
 class MainMemory;
 class Process;
 class PPUThread {
@@ -141,6 +148,8 @@ class PPUThread {
     FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
+    
+    std::stack<ps3call_info_t> _ps3calls;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -384,6 +393,10 @@ public:
     void ncall(uint32_t index);
     void scall();
     void yield();
+    void ps3call(uint32_t va, std::function<void()> then);
     virtual void setArg(uint64_t arg);
     ~PPUThread() = default;
+    friend uint64_t ps3call_then(PPUThread* thread);
 };
+
+uint64_t ps3call_then(PPUThread* thread);

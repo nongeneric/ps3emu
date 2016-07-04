@@ -77,12 +77,14 @@ Command ParseOptions(int argc, const char *argv[])
         options_description desc("read-prx");
 
         desc.add_options()
-            ("elf", value<std::string>(&command.elf)->required(), "elf file");
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
+            ("script", "write Ida script");
 
         auto opts = collect_unrecognized(parsed.options, include_positional);
         opts.erase(opts.begin());
         store(command_line_parser(opts).options(desc).run(), vm);
         notify(vm);
+        command.writeIdaScript = vm.count("script");
         return command;
     } else {
         throw std::runtime_error("unknown command");
@@ -113,6 +115,6 @@ int main(int argc, const char* argv[]) {
         auto command = ParseOptions(argc, argv);
         boost::apply_visitor(CommandVisitor(), command);
     } catch (std::exception& e) {
-        std::cout << "error occured: " << e.what();
+        std::cout << "error occured: " << e.what() << std::endl;
     }
 }

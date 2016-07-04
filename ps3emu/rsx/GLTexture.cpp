@@ -302,11 +302,11 @@ GLTexture::GLTexture(const RsxTextureInfo& info): _info(info) {
 class LinearTextureIterator {
     uint8_t* _buf;
     uint32_t _pitch;
-    uint32_t _width;
-    uint32_t _height;
+    //uint32_t _width;
+    //uint32_t _height;
     uint32_t _texelSize;
-    uint32_t _level;
-    bool _paddedLevels;
+    //uint32_t _level;
+    //bool _paddedLevels;
     uint32_t _levelOffset;
     uint32_t _levelWidth;
     uint32_t _levelHeight;
@@ -322,11 +322,11 @@ public:
                           bool paddedLevels = false)
         : _buf((uint8_t*)buf),
           _pitch(pitch == 0 ? level0width * texelSize : pitch),
-          _width(level0width),
-          _height(level0height),
-          _texelSize(texelSize),
-          _level(level),
-          _paddedLevels(paddedLevels),
+//           _width(level0width),
+//           _height(level0height),
+           _texelSize(texelSize),
+//           _level(level),
+//           _paddedLevels(paddedLevels),
           _levelWidth(level0width),
           _levelHeight(level0height)
     {

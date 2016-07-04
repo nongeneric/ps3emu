@@ -5,8 +5,8 @@
 #include "GLShader.h"
 
 class MainMemory;
-class RsxContext;
-class SurfaceInfo;
+struct RsxContext;
+struct SurfaceInfo;
 class FragmentShaderUpdateFunctor {
     GLPersistentCpuBuffer _constBuffer;
     std::vector<uint8_t> _bytecode;

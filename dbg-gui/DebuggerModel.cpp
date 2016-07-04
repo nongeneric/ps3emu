@@ -532,6 +532,12 @@ void DebuggerModel::log(std::string str) {
 
 void DebuggerModel::exec(QString command) {
     auto name = command.section(':', 0, 0).trimmed();
+    
+    if (name == "segments") {
+        dumpSegments();
+        return;
+    }
+    
     auto expr = command.section(':', 1, 1);
     if (name.isEmpty() || expr.isEmpty()) {
         emit message("incorrect command format");
@@ -577,7 +583,7 @@ void DebuggerModel::exec(QString command) {
             setSPUSoftBreak(elfSource, exprVal);
             return;
         } else if (name == "p") {
-            message(QString(" : #%1").arg(exprVal, 0, 16));
+            emit message(QString(" : #%1").arg(exprVal, 0, 16));
             return;
         } else if (name == "put") {
             auto id = command.section(':', 2, 2).trimmed().toStdString();
@@ -600,6 +606,13 @@ void DebuggerModel::exec(QString command) {
     } catch (...) {
         emit message("command failed");
         return;
+    }
+}
+
+void DebuggerModel::dumpSegments() {
+    for (auto segment : _proc->getSegments()) {
+        emit message(QString::asprintf(
+            "%08x  %08x  %s", segment.va, segment.size, segment.elf->elfName().c_str()));
     }
 }
 

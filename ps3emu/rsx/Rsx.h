@@ -34,7 +34,7 @@ struct GcmCommandReplayInfo {
     std::function<void()> action;
 };
 
-class RsxContext;
+struct RsxContext;
 class MainMemory;
 class Process;
 struct GcmCommandArg;

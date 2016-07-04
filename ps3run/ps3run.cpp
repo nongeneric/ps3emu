@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
         std::cout << consoleDescr;
         return 1;
     }
-
+    
     log_init(log_parse_sinks(sinks),
              log_parse_verbosity(verbosity),
              log_parse_filter(filter));
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     try {
         std::vector<std::string> argvec;
         boost::split(
-            argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);
+              argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);
         argvec.insert(begin(argvec), argv[0]);
         emulate(elfPath, argvec);
     } catch(std::exception& e) {

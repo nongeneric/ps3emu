@@ -79,21 +79,30 @@ namespace boost {
 
 using namespace emu::Gcm;
 
-uint32_t calcFnid(const char* name) {
+uint32_t calcSHA1id(const char* name, const uint8_t* suffix, size_t suffix_len) {
     SHA_CTX ctx;
     SHA1_Init(&ctx);
-    static uint8_t suffix[] = {
-        0x67, 0x59, 0x65, 0x99, 0x04, 0x25, 0x04, 0x90, 
-        0x56, 0x64, 0x27, 0x49, 0x94, 0x89, 0x74, 0x1A
-    };
     SHA1_Update(&ctx, (const uint8_t*)name, strlen(name));
-    SHA1_Update(&ctx, suffix, sizeof(suffix));
+    SHA1_Update(&ctx, suffix, suffix_len);
     union {
         uint8_t b[20];
         uint32_t u32[5];
     } md;
     SHA1_Final(md.b, &ctx);
     return md.u32[0];
+}
+
+uint32_t calcEid(const char* name) {
+    auto suffix = "0xbc5eba9e042504905b64274994d9c41f";
+    return calcSHA1id(name, (const uint8_t*)suffix, strlen(suffix));
+}
+
+uint32_t calcFnid(const char* name) {
+    static uint8_t suffix[] = {
+        0x67, 0x59, 0x65, 0x99, 0x04, 0x25, 0x04, 0x90, 
+        0x56, 0x64, 0x27, 0x49, 0x94, 0x89, 0x74, 0x1A
+    };
+    return calcSHA1id(name, (const uint8_t*)suffix, sizeof(suffix));
 }
 
 template <int ArgN, class T, class Enable = void>
@@ -339,6 +348,9 @@ STUB_1(sys_memory_get_user_memory_size);
 STUB_2(sys_dbg_set_mask_to_ppu_exception_handler);
 STUB_sys_tty_write(sys_tty_write);
 STUB_1(sys_prx_exitspawn_with_level);
+STUB_1(sys_prx_register_library);
+STUB_4(sys_prx_load_module);
+STUB_7(sys_prx_start_module);
 STUB_4(sys_memory_allocate);
 STUB_2(sys_memory_free);
 STUB_4(cellVideoOutConfigure);
@@ -556,6 +568,7 @@ STUB_1(cellSyncMutexTryLock);
 STUB_1(cellSyncMutexLock);
 STUB_1(cellSyncMutexUnlock);
 STUB_6(_cellSpursEventFlagInitialize);
+STUB_1(ps3call_then);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -577,6 +590,9 @@ NCallEntry ncallTable[] {
     ENTRY(_sys_process_at_Exitspawn),
     ENTRY(sys_ppu_thread_get_id),
     ENTRY(sys_prx_exitspawn_with_level),
+    ENTRY(sys_prx_register_library),
+    ENTRY(sys_prx_load_module),
+    ENTRY(sys_prx_start_module),
     ENTRY(sys_process_exit),
     ENTRY(_cellGcmInitBody),
     ENTRY(cellVideoOutConfigure),
@@ -735,6 +751,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellSyncMutexLock),
     ENTRY(cellSyncMutexUnlock),
     ENTRY(_cellSpursEventFlagInitialize),
+    ENTRY(ps3call_then),
 };
 
 void PPUThread::ncall(uint32_t index) {

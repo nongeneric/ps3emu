@@ -689,7 +689,7 @@ EMU(fsm) {
     auto& rt = th->r(i->RT);
     auto mask = ra.w<0>() & 0b1111;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = mask & (1 << (3 - i)) ? ~0ul : 0;
+        rt.w(i) = mask & (1 << (3 - i)) ? ~0u : 0;
     }
 }
 
@@ -1484,7 +1484,7 @@ EMU(rotmah) {
     for (int i = 0; i < 8; ++i) {
         auto sh = -rb.hw(i) & 0x1f;
         rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh) 
-                 : ((ra.hw(i) & (1 << 15)) ? ~0ul : 0);
+                 : ((ra.hw(i) & (1 << 15)) ? ~0 : 0);
     }
 }
 
@@ -1498,7 +1498,7 @@ EMU(rotmahi) {
     auto sh = -i->I7.s() & 0x1f;
     for (int i = 0; i < 8; ++i) {
         rt.hw(i) = sh < 16 ? signed_rshift32(ra.hw(i), sh)
-                 : ((ra.hw(i) & (1 << 15)) ? ~0ul : 0);
+                 : ((ra.hw(i) & (1 << 15)) ? ~0 : 0);
     }
 }
 
@@ -1513,7 +1513,7 @@ EMU(rotma) {
     for (int i = 0; i < 4; ++i) {
         auto sh = -rb.w(i) & 0x3f;
         rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh)
-                : ((ra.w(i) & (1 << 31)) ? ~0ul : 0);
+                : ((ra.w(i) & (1 << 31)) ? ~0u : 0);
     }
 }
 
@@ -1527,7 +1527,7 @@ EMU(rotmai) {
     auto sh = -i->I7.s() & 0x3f;
     for (int i = 0; i < 4; ++i) {
         rt.w(i) = sh < 32 ? signed_rshift32(ra.w(i), sh)
-                : ((ra.w(i) & (1 << 31)) ? ~0ul : 0);
+                : ((ra.w(i) & (1 << 31)) ? ~0u : 0);
     }
 }
 

@@ -68,11 +68,60 @@ struct fdescr {
     boost::endian::big_uint32_t tocBase;
 };
 
+struct module_info_t {
+    boost::endian::big_uint16_t attributes;
+    char minor_version;
+    char major_version;
+    char name[28];
+    boost::endian::big_uint32_t toc;
+    boost::endian::big_uint32_t exports_start;
+    boost::endian::big_uint32_t exports_end;
+    boost::endian::big_uint32_t imports_start;
+    boost::endian::big_uint32_t imports_end;
+};
+
+struct prx_export_t {
+    char size;
+    char padding;
+    boost::endian::big_uint16_t version;
+    boost::endian::big_uint16_t attributes;
+    boost::endian::big_uint16_t functions;
+    boost::endian::big_uint16_t variables;
+    boost::endian::big_uint16_t tls_variables;
+    char hash;
+    char tls_hash;
+    char reserved[2];
+    boost::endian::big_uint32_t name;
+    boost::endian::big_uint32_t fnid_table;
+    boost::endian::big_uint32_t stub_table;
+};
+
+struct prx_import_t {
+    char size;
+    char padding;
+    boost::endian::big_uint16_t version;
+    boost::endian::big_uint16_t attributes;
+    boost::endian::big_uint16_t functions;
+    boost::endian::big_uint16_t variables;
+    boost::endian::big_uint16_t tls_variables;
+    boost::endian::big_uint32_t reserved;
+    boost::endian::big_uint32_t name;
+    boost::endian::big_uint32_t libtable;
+    boost::endian::big_uint32_t stubs;
+    boost::endian::big_uint32_t fnid_table;
+    boost::endian::big_uint32_t entries;
+    boost::endian::big_uint32_t tls_fnid_table;
+    boost::endian::big_uint32_t tls_entries;
+};
+
 static_assert(sizeof(fdescr) == 8, "");
 static_assert(sizeof(Elf64_be_Ehdr) == sizeof(Elf64_Ehdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Shdr) == sizeof(Elf64_Shdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Sym) == sizeof(Elf64_Sym), "big endian struct mismatch");
+static_assert(sizeof(module_info_t) == 0x34, "");
+static_assert(sizeof(prx_export_t) == 0x1c, "");
+static_assert(sizeof(prx_import_t) == 0x2c, "");
 
 struct ThreadInitInfo {
     void* tlsBase;
@@ -82,7 +131,15 @@ struct ThreadInitInfo {
     ps3_uintptr_t entryPointDescriptorVa;
 };
 
+struct prx_export_info_t {
+    fdescr stub;
+    uint32_t fnid;
+};
+
+using make_segment_t = std::function<void(ps3_uintptr_t va, uint32_t size, unsigned index)>;
+
 class ELFLoader {
+    std::string _elfName;
     std::vector<uint8_t> _file;
     Elf64_be_Ehdr* _header;
     Elf64_be_Phdr* _pheaders;
@@ -96,7 +153,9 @@ public:
     Elf64_be_Sym* getGlobalSymbolByValue(uint32_t value, uint32_t section);
     uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
-    void map(MainMemory* mm);
+    void map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase = 0);
     void link(MainMemory* mm);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
+    std::vector<prx_export_info_t> getExports();
+    std::string elfName();
 };

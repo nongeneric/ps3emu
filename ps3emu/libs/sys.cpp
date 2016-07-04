@@ -1,4 +1,5 @@
 #include "ConcurrentQueue.h"
+#include "ps3emu/ContentManager.h"
 #include "../utils.h"
 #include "sys.h"
 #include <time.h>
@@ -9,6 +10,7 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/range/algorithm.hpp>
 #include "../log.h"
 #include <memory>
 #include <map>
@@ -115,6 +117,46 @@ int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
 int sys_prx_exitspawn_with_level(uint64_t level) {
     LOG << __FUNCTION__;
     return CELL_OK;
+}
+
+int32_t sys_prx_register_library(ps3_uintptr_t library) {
+    return CELL_OK;
+}
+
+int32_t sys_prx_start_module(sys_prx_id_t id,
+                             size_t args,
+                             ps3_uintptr_t argp,
+                             ps3_uintptr_t modres, // big_int32_t*
+                             uint64_t flags,
+                             uint64_t pOpt,
+                             PPUThread* thread) {
+    assert(flags == 0);
+    assert(pOpt == 0);
+    auto& segments = thread->proc()->getSegments();
+    auto segment = boost::find_if(segments, [=](auto& s) {
+        return s.va == id;
+    });
+    assert(segment != end(segments));
+    auto exports = segment->elf->getExports();
+    auto func = boost::find_if(exports, [=](auto& e) {
+        return e.fnid == calcEid("module_start");
+    });
+    assert(func != end(exports));
+    thread->setGPR(2, func->stub.tocBase + id);
+    thread->setGPR(3, args);
+    thread->setGPR(4, argp);
+    thread->ps3call(func->stub.va + id, [=] {
+        thread->mm()->store<4>(modres, thread->getGPR(3));
+    });
+    return thread->getGPR(3);
+}
+
+sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc) {
+    assert(flags == 0);
+    assert(opt == 0);
+    LOG << ssnprintf("sys_prx_load_module(%s)", path.str);
+    auto hostPath = proc->contentManager()->toHost(path.str.c_str()) + ".elf";
+    return proc->loadPrx(hostPath);
 }
 
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
