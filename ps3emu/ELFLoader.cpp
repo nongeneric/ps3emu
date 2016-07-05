@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdexcept>
 #include "log.h"
+#include <boost/range/algorithm.hpp>
 
 using namespace boost::endian;
 
@@ -167,6 +168,88 @@ std::vector<Elem> readSection(Elf64_be_Shdr* sections,
     return vec;
 }
 
+class ImportEntry {
+    MainMemory* _mm;
+    uint32_t _fnid;
+    ps3_uintptr_t _stub;
+    ps3_uintptr_t _descrVa;
+    
+public:
+    ImportEntry(MainMemory* mm, uint32_t fnid, ps3_uintptr_t stub, ps3_uintptr_t descrVa)
+        : _mm(mm), _fnid(fnid), _stub(stub), _descrVa(descrVa) {}
+    
+    void resolveNcall(uint32_t index) {
+        _mm->store<4>(_stub, _descrVa);
+        _mm->store<4>(_descrVa, _descrVa + 4);
+        encodeNCall(_mm, _descrVa + 4, index);
+    }
+    
+    void resolve(ps3_uintptr_t exportStubVa) {
+        _mm->store<4>(_stub, exportStubVa);
+    }
+    
+    uint32_t fnid() {
+        return _fnid;
+    }
+    
+    ps3_uintptr_t stub() {
+        return _stub;
+    }
+};
+
+class ImportedLibrary {
+    MainMemory* _mm;
+    std::string _name;
+    std::vector<ImportEntry> _entries;
+    ps3_uintptr_t _descrVa;
+    
+public:
+    ImportedLibrary(MainMemory* mm, prx_info* info, ps3_uintptr_t descrVa)
+        : _mm(mm), _descrVa(descrVa)
+    {
+        readString(_mm, info->prx_name, _name);
+        _mm->setMemory(descrVa, 0, 8 * info->count, true);
+        for (auto i = 0u; i < info->count; ++i) {
+            auto fnid = _mm->load<4>(info->prx_fnids + sizeof(uint32_t) * i);
+            uint32_t stub = info->prx_stubs + sizeof(uint32_t) * i;
+            _entries.push_back({_mm, fnid, stub, _descrVa});
+            _descrVa += 8;
+        }
+    }
+    
+    std::string name() {
+        return _name;
+    }
+    
+    std::vector<ImportEntry>& entries() {
+        return _entries;
+    }
+    
+    ps3_uintptr_t lastDescrVa() {
+        return _descrVa;
+    }
+};
+
+class ImportResolver {
+    MainMemory* _mm;
+    std::vector<ImportedLibrary> _libraries;
+    ps3_uintptr_t _descrVa;
+    
+public:
+    ImportResolver(MainMemory* mm) : _mm(mm), _descrVa(FunctionDescriptorsVa) { }
+    
+    void populate(prx_info* infos, size_t count) {
+        for (auto i = 0u; i < count; ++i) {
+            _libraries.push_back({_mm, &infos[i], _descrVa});
+            _descrVa = _libraries.back().lastDescrVa();
+        }
+    }
+    
+    std::vector<ImportedLibrary>& libraries() {
+        return _libraries;
+    }
+};
+
 void ELFLoader::link(MainMemory* mm) {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
@@ -181,55 +264,54 @@ void ELFLoader::link(MainMemory* mm) {
     auto prxInfos = readSection<prx_info>(
         _sections, _header, prxInfo.prx_infos, mm);
     
-    auto firstPrxFnid = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
-        return l.prx_fnids < r.prx_fnids;
-    });
-    auto firstPrxStub = std::min_element(prxInfos.begin(), prxInfos.end(), [](auto& l, auto& r) {
-        return l.prx_stubs < r.prx_stubs;
-    });
+    _resolver.reset(new ImportResolver(mm));
+    _resolver->populate(&prxInfos[0], prxInfos.size());
     
-    auto prxFnids = readSection<big_uint32_t>(
-        _sections, _header, firstPrxFnid->prx_fnids, mm);
-    
-    auto prxStubs = readSection<big_uint32_t>(
-        _sections, _header, firstPrxStub->prx_stubs, mm);
-    
-    if (prxFnids.size() != prxStubs.size())
-        throw std::runtime_error("prx infos/stubs/fnids inconsistency");
-    
-    auto vaDescr = FunctionDescriptorsVa;
-    mm->setMemory(vaDescr, 0, prxFnids.size() * 8, true);
     uint32_t curUnknownNcall = 2000;
     LOG << ssnprintf("resolving %d rsx modules", prxInfos.size());
-    for (auto& info : prxInfos) {
-        std::string name;
-        readString(mm, info.prx_name, name);
-        LOG << ssnprintf("  %s", name);
-        
-        auto firstFnid = (info.prx_fnids - firstPrxFnid->prx_fnids) / sizeof(uint32_t);
-        auto firstStub = (info.prx_stubs - firstPrxStub->prx_stubs) / sizeof(uint32_t);
-        for (auto i = 0u; i < info.count; ++i) {
-            auto fnid = prxFnids.at(firstFnid + i);
-            auto& stub = prxStubs.at(firstStub + i);
-            
+    for (auto& lib : _resolver->libraries()) {
+        LOG << ssnprintf("  %s", lib.name());
+        for (auto& entry : lib.entries()) {
             uint32_t index = 0;
-            auto ncallEntry = findNCallEntry(fnid, index);
+            auto ncallEntry = findNCallEntry(entry.fnid(), index);
             std::string name;
             if (!ncallEntry) {
                 index = curUnknownNcall--;
-                name = ssnprintf("(!) fnid_%08X", fnid);
+                name = ssnprintf("(!) fnid_%08X", entry.fnid());
             } else {
                 name = ncallEntry->name;
             }
-            mm->store<4>(vaDescr, vaDescr + 4);
-            encodeNCall(mm, vaDescr + 4, index);
-            LOG << ssnprintf("    %x -> %s (ncall %x)", stub, name, index);
-            stub = vaDescr;
-            vaDescr += 8;
+            LOG << ssnprintf("    %x -> %s (ncall %x)", entry.stub(), name, index);
+            entry.resolveNcall(index);
         }
     }
-    
-    mm->writeMemory(firstPrxStub->prx_stubs, &prxStubs[0], prxStubs.size() * sizeof(big_uint32_t));
+}
+
+void ELFLoader::relink(MainMemory* mm, ELFLoader* prx, ps3_uintptr_t prxImageBase) {
+    // populate with prx imports
+    // resolve prx imports with ncalls
+    INFO(libs) << ssnprintf("relinking prx %s", prx->elfName());
+    auto& importLibs = _resolver->libraries();
+    for (auto& exportLib : prx->getExports()) {
+        for (auto& importLib : importLibs) {
+            auto& importEntries = importLib.entries();
+            for (auto& exportEntry : exportLib.entries) {
+                auto importEntry = boost::find_if(importEntries, [=](auto& ie) {
+                    return ie.fnid() == exportEntry.fnid;
+                });
+                if (importEntry == end(importEntries))
+                    continue;
+                auto stubVa = exportEntry.stubVa + prxImageBase;
+                mm->store<4>(stubVa, exportEntry.stub.va + prxImageBase);
+                mm->store<4>(stubVa + 4, exportEntry.stub.tocBase + prxImageBase);
+                importEntry->resolve(stubVa);
+                INFO(libs) << ssnprintf("  %x -> %x (fnid_%08x)",
+                                        importEntry->stub(),
+                                        stubVa,
+                                        importEntry->fnid());
+            }
+        }
+    }
 }
 
 uint64_t ELFLoader::entryPoint() {
@@ -312,23 +394,27 @@ ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
     return info;
 }
 
-std::vector<prx_export_info_t> ELFLoader::getExports() {
+std::vector<prx_export_lib_t> ELFLoader::getExports() {
     auto module = reinterpret_cast<module_info_t*>(&_file[_pheaders->p_paddr]);
     auto exports = reinterpret_cast<prx_export_t*>(&_file[_pheaders->p_offset + module->exports_start]);
     auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
-    std::vector<prx_export_info_t> vec;
+    std::vector<prx_export_lib_t> vec;
     for (auto i = 0u; i < nexports; ++i) {
         auto& e = exports[i];
         auto fnids = reinterpret_cast<big_uint32_t*>(
             &_file[_pheaders->p_offset + e.fnid_table]);
         auto stubs = reinterpret_cast<big_uint32_t*>(
             &_file[_pheaders->p_offset + e.stub_table]);
+        prx_export_lib_t lib;
+        lib.name = e.name;
         for (auto i = 0; i < e.functions; ++i) {
             prx_export_info_t info;
+            info.stubVa = stubs[i];
             info.stub = *reinterpret_cast<fdescr*>(&_file[_pheaders->p_offset + stubs[i]]);
             info.fnid = fnids[i];
-            vec.push_back(info);
+            lib.entries.push_back(info);
         }
+        vec.push_back(lib);
     }
     return vec;
 }
@@ -336,3 +422,6 @@ std::vector<prx_export_info_t> ELFLoader::getExports() {
 std::string ELFLoader::elfName() {
     return _elfName;
 }
+
+ELFLoader::ELFLoader() {}
+ELFLoader::~ELFLoader() {}

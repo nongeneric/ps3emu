@@ -60,6 +60,7 @@ uint32_t Process::loadPrx(std::string path) {
     prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
     }, imageBase);
+    _elf->relink(_mainMemory.get(), prx.get(), imageBase);
     return imageBase;
 }
 

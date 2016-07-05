@@ -351,6 +351,8 @@ STUB_1(sys_prx_exitspawn_with_level);
 STUB_1(sys_prx_register_library);
 STUB_4(sys_prx_load_module);
 STUB_7(sys_prx_start_module);
+STUB_6(sys_prx_stop_module);
+STUB_3(sys_prx_unload_module);
 STUB_4(sys_memory_allocate);
 STUB_2(sys_memory_free);
 STUB_4(cellVideoOutConfigure);
@@ -593,6 +595,8 @@ NCallEntry ncallTable[] {
     ENTRY(sys_prx_register_library),
     ENTRY(sys_prx_load_module),
     ENTRY(sys_prx_start_module),
+    ENTRY(sys_prx_stop_module),
+    ENTRY(sys_prx_unload_module),
     ENTRY(sys_process_exit),
     ENTRY(_cellGcmInitBody),
     ENTRY(cellVideoOutConfigure),

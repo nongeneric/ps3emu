@@ -41,6 +41,13 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
                              uint64_t flags,
                              uint64_t pOpt,
                              PPUThread* thread);
+int32_t sys_prx_stop_module(sys_prx_id_t id,
+                            size_t args,
+                            ps3_uintptr_t argp,
+                            ps3_uintptr_t modres,
+                            uint64_t flags,
+                            uint64_t pOpt);
+int32_t sys_prx_unload_module(sys_prx_id_t id, uint64_t flags, uint64_t pOpt);
 
 typedef big_uint32_t sys_addr_t;
 

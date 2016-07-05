@@ -11,6 +11,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/optional.hpp>
 #include "../log.h"
 #include <memory>
 #include <map>
@@ -123,6 +124,17 @@ int32_t sys_prx_register_library(ps3_uintptr_t library) {
     return CELL_OK;
 }
 
+boost::optional<prx_export_info_t> findExport(std::vector<prx_export_lib_t>& libs, uint32_t eid) {
+    for (auto exportLib : libs) {
+        for (auto entry : exportLib.entries) {
+            if (entry.fnid == eid) {
+                return entry;
+            }
+        }
+    }
+    return {};
+}
+
 int32_t sys_prx_start_module(sys_prx_id_t id,
                              size_t args,
                              ps3_uintptr_t argp,
@@ -138,14 +150,12 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
     });
     assert(segment != end(segments));
     auto exports = segment->elf->getExports();
-    auto func = boost::find_if(exports, [=](auto& e) {
-        return e.fnid == calcEid("module_start");
-    });
-    assert(func != end(exports));
-    thread->setGPR(2, func->stub.tocBase + id);
+    auto moduleStart = findExport(exports, calcEid("module_start"));
+    assert(moduleStart);
+    thread->setGPR(2, moduleStart->stub.tocBase + id);
     thread->setGPR(3, args);
     thread->setGPR(4, argp);
-    thread->ps3call(func->stub.va + id, [=] {
+    thread->ps3call(moduleStart->stub.va + id, [=] {
         thread->mm()->store<4>(modres, thread->getGPR(3));
     });
     return thread->getGPR(3);
@@ -157,6 +167,25 @@ sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t op
     LOG << ssnprintf("sys_prx_load_module(%s)", path.str);
     auto hostPath = proc->contentManager()->toHost(path.str.c_str()) + ".elf";
     return proc->loadPrx(hostPath);
+}
+
+int32_t sys_prx_stop_module(sys_prx_id_t id,
+                            size_t args,
+                            ps3_uintptr_t argp,
+                            ps3_uintptr_t modres,
+                            uint64_t flags,
+                            uint64_t pOpt) {
+    assert(flags == 0);
+    assert(pOpt == 0);
+    WARNING(libs) << "sys_prx_stop_module not implemented";
+    return CELL_OK;
+}
+
+int32_t sys_prx_unload_module(sys_prx_id_t id, uint64_t flags, uint64_t pOpt) {
+    assert(flags == 0);
+    assert(pOpt == 0);
+    WARNING(libs) << "sys_prx_unload_module not implemented";
+    return CELL_OK;
 }
 
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;

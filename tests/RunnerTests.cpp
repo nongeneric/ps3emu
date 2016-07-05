@@ -1319,3 +1319,14 @@ TEST_CASE("prx_simple_c") {
     );
 }
 
+TEST_CASE("prx_call") {
+    auto output = startWaitGetOutput({"./binaries/prx_call/a.elf"});
+    REQUIRE( output ==
+        "call-prx-main:start\n"
+        "call_import start\n"
+        "20\n"
+        "call-prx-main:done\n"
+    );
+}
+
+

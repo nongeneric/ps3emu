@@ -133,11 +133,18 @@ struct ThreadInitInfo {
 
 struct prx_export_info_t {
     fdescr stub;
+    ps3_uintptr_t stubVa;
     uint32_t fnid;
+};
+
+struct prx_export_lib_t {
+    std::string name;
+    std::vector<prx_export_info_t> entries;
 };
 
 using make_segment_t = std::function<void(ps3_uintptr_t va, uint32_t size, unsigned index)>;
 
+class ImportResolver;
 class ELFLoader {
     std::string _elfName;
     std::vector<uint8_t> _file;
@@ -146,7 +153,11 @@ class ELFLoader {
     Elf64_be_Shdr* _sections;
     Elf64_be_Shdr* findSectionByName(std::string name);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
+    std::unique_ptr<ImportResolver> _resolver;
+    
 public:
+    ELFLoader();
+    ~ELFLoader();
     uint64_t entryPoint();
     const char* getString(uint32_t idx);
     const char* getSectionName(uint32_t idx);
@@ -155,7 +166,8 @@ public:
     void load(std::string filePath);
     void map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase = 0);
     void link(MainMemory* mm);
+    void relink(MainMemory* mm, ELFLoader* prx, ps3_uintptr_t prxImageBase);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
-    std::vector<prx_export_info_t> getExports();
+    std::vector<prx_export_lib_t> getExports();
     std::string elfName();
 };
