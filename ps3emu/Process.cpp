@@ -10,6 +10,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/range/algorithm.hpp>
 #include "log.h"
+#include <set>
 
 MainMemory* Process::mm() {
     return _mainMemory.get();
@@ -60,7 +61,13 @@ uint32_t Process::loadPrx(std::string path) {
     prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
     }, imageBase);
-    _elf->relink(_mainMemory.get(), prx.get(), imageBase);
+    std::set<ELFLoader*> prxSet;
+    for (auto& s : _segments) {
+        prxSet.insert(s.elf.get());
+    }
+    prxSet.erase(_segments.front().elf.get());
+    std::vector<ELFLoader*> prxVector(begin(prxSet), end(prxSet));
+    _elf->relink(_mainMemory.get(), prxVector, imageBase);
     return imageBase;
 }
 

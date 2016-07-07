@@ -1,4 +1,5 @@
 #include "ELFLoader.h"
+#include "ImportResolver.h"
 #include "ppu/PPUThread.h"
 #include "utils.h"
 #include <assert.h>
@@ -11,37 +12,6 @@ using namespace boost::endian;
 
 static const uint32_t PT_TYPE_PARAMS = PT_LOOS + 1;
 static const uint32_t PT_TYPE_PRXINFO = PT_LOOS + 2;
-
-#pragma pack(1)
-
-struct prx_info {
-    big_uint32_t lib_header;
-    big_uint16_t lib_id;
-    big_uint16_t count;
-    big_uint32_t unk0;
-    big_uint32_t unk1;
-    big_uint32_t prx_name;
-    big_uint32_t prx_fnids;
-    big_uint32_t prx_stubs;
-    big_uint32_t unk2;
-    big_uint32_t unk3;
-    big_uint32_t unk4;
-    big_uint32_t unk5;
-};
-
-static_assert(sizeof(prx_info) == 44, "");
-
-struct sys_process_prx_info {
-    big_uint32_t header_size;
-    big_uint32_t unk0;
-    big_uint32_t unk1;
-    big_uint32_t unk2;
-    big_uint32_t unk3;
-    big_uint32_t unk4;
-    big_uint32_t prx_infos;
-};
-
-#pragma pack()
 
 void ELFLoader::load(std::string filePath) {
     _elfName = filePath;
@@ -119,6 +89,7 @@ const char* ELFLoader::getSectionName(uint32_t idx) {
 }
 
 void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase) {
+    _imageBase = imageBase;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -128,6 +99,12 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
             continue;
         
         uint64_t va = imageBase + ph->p_vaddr;
+        auto index = std::distance(_pheaders, ph);
+        if (imageBase && index == 1) {
+            assert(_header->e_phnum == 3);
+            auto ph0 = _pheaders[0];
+            _prxPh1Va = va = ::align(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
+        }
         
         LOG << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
             (uint64_t)ph->p_filesz, va, va + ph->p_memsz, imageBase);
@@ -136,7 +113,7 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
         mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
         mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
         
-        makeSegment(va, ph->p_memsz, std::distance(_pheaders, ph));
+        makeSegment(va, ph->p_memsz, index);
     }
 }
 
@@ -168,88 +145,6 @@ std::vector<Elem> readSection(Elf64_be_Shdr* sections,
     return vec;
 }
 
-class ImportEntry {
-    MainMemory* _mm;
-    uint32_t _fnid;
-    ps3_uintptr_t _stub;
-    ps3_uintptr_t _descrVa;
-    
-public:
-    ImportEntry(MainMemory* mm, uint32_t fnid, ps3_uintptr_t stub, ps3_uintptr_t descrVa)
-        : _mm(mm), _fnid(fnid), _stub(stub), _descrVa(descrVa) {}
-    
-    void resolveNcall(uint32_t index) {
-        _mm->store<4>(_stub, _descrVa);
-        _mm->store<4>(_descrVa, _descrVa + 4);
-        encodeNCall(_mm, _descrVa + 4, index);
-    }
-    
-    void resolve(ps3_uintptr_t exportStubVa) {
-        _mm->store<4>(_stub, exportStubVa);
-    }
-    
-    uint32_t fnid() {
-        return _fnid;
-    }
-    
-    ps3_uintptr_t stub() {
-        return _stub;
-    }
-};
-
-class ImportedLibrary {
-    MainMemory* _mm;
-    std::string _name;
-    std::vector<ImportEntry> _entries;
-    ps3_uintptr_t _descrVa;
-    
-public:
-    ImportedLibrary(MainMemory* mm, prx_info* info, ps3_uintptr_t descrVa)
-        : _mm(mm), _descrVa(descrVa)
-    {
-        readString(_mm, info->prx_name, _name);
-        _mm->setMemory(descrVa, 0, 8 * info->count, true);
-        for (auto i = 0u; i < info->count; ++i) {
-            auto fnid = _mm->load<4>(info->prx_fnids + sizeof(uint32_t) * i);
-            uint32_t stub = info->prx_stubs + sizeof(uint32_t) * i;
-            _entries.push_back({_mm, fnid, stub, _descrVa});
-            _descrVa += 8;
-        }
-    }
-    
-    std::string name() {
-        return _name;
-    }
-    
-    std::vector<ImportEntry>& entries() {
-        return _entries;
-    }
-    
-    ps3_uintptr_t lastDescrVa() {
-        return _descrVa;
-    }
-};
-
-class ImportResolver {
-    MainMemory* _mm;
-    std::vector<ImportedLibrary> _libraries;
-    ps3_uintptr_t _descrVa;
-    
-public:
-    ImportResolver(MainMemory* mm) : _mm(mm), _descrVa(FunctionDescriptorsVa) { }
-    
-    void populate(prx_info* infos, size_t count) {
-        for (auto i = 0u; i < count; ++i) {
-            _libraries.push_back({_mm, &infos[i], _descrVa});
-            _descrVa = _libraries.back().lastDescrVa();
-        }
-    }
-    
-    std::vector<ImportedLibrary>& libraries() {
-        return _libraries;
-    }
-};
-
 void ELFLoader::link(MainMemory* mm) {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
@@ -265,7 +160,7 @@ void ELFLoader::link(MainMemory* mm) {
         _sections, _header, prxInfo.prx_infos, mm);
     
     _resolver.reset(new ImportResolver(mm));
-    _resolver->populate(&prxInfos[0], prxInfos.size());
+    _resolver->populate(this, &prxInfos[0], prxInfos.size());
     
     uint32_t curUnknownNcall = 2000;
     LOG << ssnprintf("resolving %d rsx modules", prxInfos.size());
@@ -282,33 +177,69 @@ void ELFLoader::link(MainMemory* mm) {
                 name = ncallEntry->name;
             }
             LOG << ssnprintf("    %x -> %s (ncall %x)", entry.stub(), name, index);
-            entry.resolveNcall(index);
+            entry.resolveNcall(index, !ncallEntry);
         }
     }
 }
 
-void ELFLoader::relink(MainMemory* mm, ELFLoader* prx, ps3_uintptr_t prxImageBase) {
-    // populate with prx imports
-    // resolve prx imports with ncalls
-    INFO(libs) << ssnprintf("relinking prx %s", prx->elfName());
+void ELFLoader::relink(MainMemory* mm, std::vector<ELFLoader*> prxs, ps3_uintptr_t prxImageBase) {
+    auto newPrx = prxs.back();
+    assert(newPrx->_prxPh1Va);
+    INFO(libs) << ssnprintf("relinking prx %s", newPrx->elfName());
+    
+    auto module =
+        reinterpret_cast<module_info_t*>(&newPrx->_file[newPrx->_pheaders->p_paddr]);
+    auto imports = reinterpret_cast<prx_import_t*>(
+        &newPrx->_file[newPrx->_pheaders->p_offset + module->imports_start]);
+    auto nimports = (module->imports_end - module->imports_start) / sizeof(prx_import_t);
+    auto importLibCount = _resolver->libraries().size();
+    auto ph1va = newPrx->_pheaders[1].p_vaddr;
+    _resolver->populate(
+        newPrx, imports, nimports, prxImageBase, ph1va, newPrx->_prxPh1Va);
+    
     auto& importLibs = _resolver->libraries();
-    for (auto& exportLib : prx->getExports()) {
-        for (auto& importLib : importLibs) {
-            auto& importEntries = importLib.entries();
-            for (auto& exportEntry : exportLib.entries) {
-                auto importEntry = boost::find_if(importEntries, [=](auto& ie) {
-                    return ie.fnid() == exportEntry.fnid;
-                });
-                if (importEntry == end(importEntries))
-                    continue;
-                auto stubVa = exportEntry.stubVa + prxImageBase;
-                mm->store<4>(stubVa, exportEntry.stub.va + prxImageBase);
-                mm->store<4>(stubVa + 4, exportEntry.stub.tocBase + prxImageBase);
-                importEntry->resolve(stubVa);
-                INFO(libs) << ssnprintf("  %x -> %x (fnid_%08x)",
-                                        importEntry->stub(),
-                                        stubVa,
-                                        importEntry->fnid());
+    // patch imports of newPrx
+    for (auto i = importLibCount; i < importLibs.size(); ++i) {
+        for (auto& entry : importLibs[i].entries()) {
+            if (entry.type() == prx_symbol_type_t::function) {
+                auto code = mm->load<4>(entry.stub());
+                auto orisImmVa = prxImageBase + code + 6;
+                auto orisImm = mm->load<2>(orisImmVa);
+                mm->store<2>(orisImmVa, orisImm + (newPrx->_prxPh1Va >> 16));
+                auto lwzImmVa = prxImageBase + code + 10;
+                auto lwzImm = mm->load<2>(lwzImmVa);
+                mm->store<2>(lwzImmVa, lwzImm - ph1va);
+            } else if (entry.type() == prx_symbol_type_t::variable) {
+                
+            }
+        }
+    }
+    
+    auto tocVa = module->toc - 0x8000 + newPrx->_prxPh1Va - newPrx->ph1rva();
+    auto tocEntry = mm->load<4>(tocVa);
+    tocEntry = tocEntry + newPrx->_prxPh1Va - newPrx->ph1rva();
+    mm->store<4>(tocVa, tocEntry);
+    
+    for (auto prx : prxs) {
+        for (auto& exportLib : prx->getExports()) {
+            for (auto& importLib : importLibs) {
+                auto& importEntries = importLib.entries();
+                for (auto& exportEntry : exportLib.entries) {
+                    auto importEntry = boost::find_if(importEntries, [=](auto& ie) {
+                        return ie.fnid() == exportEntry.fnid;
+                    });
+                    if (importEntry == end(importEntries))
+                        continue;
+                    auto stubVa = exportEntry.stubVa + prx->_imageBase;
+                    mm->store<4>(stubVa, exportEntry.stub.va + prx->_imageBase);
+                    mm->store<4>(stubVa + 4, exportEntry.stub.tocBase + prx->_imageBase);
+                    assert(importEntry->type() == exportEntry.type);
+                    importEntry->resolve(stubVa);
+                    INFO(libs) << ssnprintf("  %x -> %x (fnid_%08x)",
+                                            importEntry->stub(),
+                                            stubVa,
+                                            importEntry->fnid());
+                }
             }
         }
     }
@@ -407,11 +338,14 @@ std::vector<prx_export_lib_t> ELFLoader::getExports() {
             &_file[_pheaders->p_offset + e.stub_table]);
         prx_export_lib_t lib;
         lib.name = e.name;
-        for (auto i = 0; i < e.functions; ++i) {
+        for (auto i = 0; i < e.functions + e.variables + e.tls_variables; ++i) {
             prx_export_info_t info;
             info.stubVa = stubs[i];
             info.stub = *reinterpret_cast<fdescr*>(&_file[_pheaders->p_offset + stubs[i]]);
             info.fnid = fnids[i];
+            info.type = i < e.functions ? prx_symbol_type_t::function
+                      : i < e.functions + e.variables ? prx_symbol_type_t::variable
+                      : prx_symbol_type_t::tls_variable;
             lib.entries.push_back(info);
         }
         vec.push_back(lib);
@@ -421,6 +355,15 @@ std::vector<prx_export_lib_t> ELFLoader::getExports() {
 
 std::string ELFLoader::elfName() {
     return _elfName;
+}
+
+ImportResolver* ELFLoader::resolver() {
+    return _resolver.get();
+}
+
+ps3_uintptr_t ELFLoader::ph1rva() {
+    assert(_header->e_phnum > 1);
+    return _pheaders[1].p_vaddr;
 }
 
 ELFLoader::ELFLoader() {}

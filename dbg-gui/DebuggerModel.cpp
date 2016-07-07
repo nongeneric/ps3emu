@@ -1,10 +1,11 @@
 #include "DebuggerModel.h"
 #include "DebugExpr.h"
-#include "../ps3emu/MainMemory.h"
-#include "../ps3emu/ELFLoader.h"
-#include "../ps3emu/rsx/Rsx.h"
-#include "../ps3emu/ppu/ppu_dasm.h"
-#include "../ps3emu/spu/SPUDasm.h"
+#include "ps3emu/ImportResolver.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/ELFLoader.h"
+#include "ps3emu/rsx/Rsx.h"
+#include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/spu/SPUDasm.h"
 #include <QStringList>
 #include "stdio.h"
 #include <boost/regex.hpp>
@@ -536,6 +537,9 @@ void DebuggerModel::exec(QString command) {
     if (name == "segments") {
         dumpSegments();
         return;
+    } else if (name == "imports") {
+        dumpImports();
+        return;
     }
     
     auto expr = command.section(':', 1, 1);
@@ -613,6 +617,30 @@ void DebuggerModel::dumpSegments() {
     for (auto segment : _proc->getSegments()) {
         emit message(QString::asprintf(
             "%08x  %08x  %s", segment.va, segment.size, segment.elf->elfName().c_str()));
+    }
+}
+
+const char* resolutionName(ImportResolution resolution) {
+    switch (resolution) {
+        case ImportResolution::ncall: return "NCALL";
+        case ImportResolution::ncallStub: return "NCALL_STUB";
+        case ImportResolution::prx: return "PRX";
+        case ImportResolution::unresolved: return "UNRESOLVED";
+        default: return "unknown";
+    }
+}
+
+void DebuggerModel::dumpImports() {
+    auto& libs = _proc->elfLoader()->resolver()->libraries();
+    for (auto& lib : libs) {
+        emit message(ssnprintf("import library: %s", lib.name()).c_str());
+        for (auto& entry : lib.entries()) {
+            emit message(ssnprintf("  fnid_%08x  %08x | %s",
+                                   entry.fnid(),
+                                   entry.stub(),
+                                   resolutionName(entry.resolution()))
+                             .c_str());
+        }
     }
 }
 

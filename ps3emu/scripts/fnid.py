@@ -21,13 +21,13 @@ parser.add_argument('--fnid', type=str)
 parser.add_argument('--eid', type=str)
 args = parser.parse_args()
 
-fn_suffix = '\x67\x59\x65\x99\x04\x25\x04\x90\x56\x64\x27\x49\x94\x89\x74\x1A'
-export_suffix = '0xbc5eba9e042504905b64274994d9c41f'
+fn_suffix = b'\x67\x59\x65\x99\x04\x25\x04\x90\x56\x64\x27\x49\x94\x89\x74\x1A'
+export_suffix = b'0xbc5eba9e042504905b64274994d9c41f'
 
 def calcfnid(s, suffix):
     sha = hashlib.sha1()
     sha.update(s.encode('utf-8'))
-    sha.update(suffix.encode('utf-8'))
+    sha.update(suffix)
     d = sha.digest()
     return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
 

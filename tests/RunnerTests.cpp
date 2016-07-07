@@ -1329,4 +1329,14 @@ TEST_CASE("prx_call") {
     );
 }
 
-
+TEST_CASE("prx_library_c") {
+    auto output = startWaitGetOutput({"./binaries/prx_library_c/a.elf"});
+    REQUIRE( output ==
+        "library-c-main:start\n"
+        "load val=3\n"
+        "load val=12\n"
+        "unload val=98\n"
+        "unload val=9\n"
+        "library-c-main:done\n"
+    );
+}

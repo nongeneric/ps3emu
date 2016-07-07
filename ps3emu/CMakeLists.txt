@@ -16,6 +16,8 @@ set(SRC
     MainMemory.cpp
     Process.h
     Process.cpp
+    ImportResolver.h
+    ImportResolver.cpp
     log.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp

@@ -106,14 +106,40 @@ struct prx_import_t {
     boost::endian::big_uint16_t tls_variables;
     boost::endian::big_uint32_t reserved;
     boost::endian::big_uint32_t name;
-    boost::endian::big_uint32_t libtable;
-    boost::endian::big_uint32_t stubs;
-    boost::endian::big_uint32_t fnid_table;
-    boost::endian::big_uint32_t entries;
-    boost::endian::big_uint32_t tls_fnid_table;
-    boost::endian::big_uint32_t tls_entries;
+    boost::endian::big_uint32_t fnids;
+    boost::endian::big_uint32_t fstubs;
+    boost::endian::big_uint32_t vnids;
+    boost::endian::big_uint32_t vstubs;
+    boost::endian::big_uint32_t tls_vnids;
+    boost::endian::big_uint32_t tls_vstubs;
 };
 
+struct prx_info {
+    boost::endian::big_uint32_t lib_header;
+    boost::endian::big_uint16_t lib_id;
+    boost::endian::big_uint16_t count;
+    boost::endian::big_uint32_t unk0;
+    boost::endian::big_uint32_t unk1;
+    boost::endian::big_uint32_t prx_name;
+    boost::endian::big_uint32_t prx_fnids;
+    boost::endian::big_uint32_t prx_stubs;
+    boost::endian::big_uint32_t unk2;
+    boost::endian::big_uint32_t unk3;
+    boost::endian::big_uint32_t unk4;
+    boost::endian::big_uint32_t unk5;
+};
+
+struct sys_process_prx_info {
+    boost::endian::big_uint32_t header_size;
+    boost::endian::big_uint32_t unk0;
+    boost::endian::big_uint32_t unk1;
+    boost::endian::big_uint32_t unk2;
+    boost::endian::big_uint32_t unk3;
+    boost::endian::big_uint32_t unk4;
+    boost::endian::big_uint32_t prx_infos;
+};
+
+static_assert(sizeof(prx_info) == 44, "");
 static_assert(sizeof(fdescr) == 8, "");
 static_assert(sizeof(Elf64_be_Ehdr) == sizeof(Elf64_Ehdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mismatch");
@@ -131,10 +157,15 @@ struct ThreadInitInfo {
     ps3_uintptr_t entryPointDescriptorVa;
 };
 
+enum class prx_symbol_type_t {
+    function, variable, tls_variable
+};
+
 struct prx_export_info_t {
     fdescr stub;
     ps3_uintptr_t stubVa;
     uint32_t fnid;
+    prx_symbol_type_t type;
 };
 
 struct prx_export_lib_t {
@@ -154,6 +185,8 @@ class ELFLoader {
     Elf64_be_Shdr* findSectionByName(std::string name);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
     std::unique_ptr<ImportResolver> _resolver;
+    ps3_uintptr_t _prxPh1Va = 0;
+    ps3_uintptr_t _imageBase = 0;
     
 public:
     ELFLoader();
@@ -166,8 +199,10 @@ public:
     void load(std::string filePath);
     void map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase = 0);
     void link(MainMemory* mm);
-    void relink(MainMemory* mm, ELFLoader* prx, ps3_uintptr_t prxImageBase);
+    void relink(MainMemory* mm, std::vector<ELFLoader*> prxs, ps3_uintptr_t prxImageBase);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
     std::vector<prx_export_lib_t> getExports();
     std::string elfName();
+    ImportResolver* resolver();
+    ps3_uintptr_t ph1rva();
 };

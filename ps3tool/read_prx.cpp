@@ -43,6 +43,10 @@ void HandleReadPrx(ReadPrxCommand const& command) {
             &elf[pheader->p_offset + e.fnid_table]);
         auto stubs = reinterpret_cast<big_uint32_t*>(
             &elf[pheader->p_offset + e.stub_table]);
+        std::cout << ssnprintf("# functions: %d, variables: %d, tls_variables: %d\n\n",
+                               e.functions,
+                               e.variables,
+                               e.tls_variables);
         for (auto i = 0; i < e.functions + e.variables + e.tls_variables; ++i) {
             auto descr =
                 reinterpret_cast<fdescr*>(&elf[pheader->p_offset + stubs[i]]);
@@ -68,9 +72,11 @@ void HandleReadPrx(ReadPrxCommand const& command) {
         auto& import = imports[i];
         auto libname = &elf[pheader->p_offset + import.name];
         auto fnids = reinterpret_cast<big_uint32_t*>(
-            &elf[pheader->p_offset + import.fnid_table]);
+            &elf[pheader->p_offset + import.fnids]);
         auto stubs =
-            reinterpret_cast<big_uint32_t*>(&elf[pheader->p_offset + import.stubs]);
+            reinterpret_cast<big_uint32_t*>(&elf[pheader->p_offset + import.fstubs]);
+        std::cout << ssnprintf(
+            "fnid table: %08x\nstub table: %08x\n", import.fnids, import.fstubs);
         for (auto i = 0u; i < import.functions; ++i) {
             if (command.writeIdaScript) {
                 std::cout << ssnprintf("make_func(0x%08x, \"%s_stub_fnid_%08X_%d\") # %08x\n",

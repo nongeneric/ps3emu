@@ -135,6 +135,26 @@ boost::optional<prx_export_info_t> findExport(std::vector<prx_export_lib_t>& lib
     return {};
 }
 
+int32_t executeExportedFunction(sys_prx_id_t id,
+                                size_t args,
+                                ps3_uintptr_t argp,
+                                ps3_uintptr_t modres, // big_int32_t*
+                                PPUThread* thread,
+                                const char* name) {
+    auto& segments = thread->proc()->getSegments();
+    auto segment = boost::find_if(segments, [=](auto& s) { return s.va == id; });
+    assert(segment != end(segments));
+    auto exports = segment->elf->getExports();
+    auto moduleStart = findExport(exports, calcEid(name));
+    assert(moduleStart);
+    thread->setGPR(2, moduleStart->stub.tocBase - segment->elf->ph1rva() + segment[1].va);
+    thread->setGPR(3, args);
+    thread->setGPR(4, argp);
+    thread->ps3call(moduleStart->stub.va + id,
+                    [=] { thread->mm()->store<4>(modres, thread->getGPR(3)); });
+    return thread->getGPR(3);
+}
+
 int32_t sys_prx_start_module(sys_prx_id_t id,
                              size_t args,
                              ps3_uintptr_t argp,
@@ -144,21 +164,7 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
                              PPUThread* thread) {
     assert(flags == 0);
     assert(pOpt == 0);
-    auto& segments = thread->proc()->getSegments();
-    auto segment = boost::find_if(segments, [=](auto& s) {
-        return s.va == id;
-    });
-    assert(segment != end(segments));
-    auto exports = segment->elf->getExports();
-    auto moduleStart = findExport(exports, calcEid("module_start"));
-    assert(moduleStart);
-    thread->setGPR(2, moduleStart->stub.tocBase + id);
-    thread->setGPR(3, args);
-    thread->setGPR(4, argp);
-    thread->ps3call(moduleStart->stub.va + id, [=] {
-        thread->mm()->store<4>(modres, thread->getGPR(3));
-    });
-    return thread->getGPR(3);
+    return executeExportedFunction(id, args, argp, modres, thread, "module_start");
 }
 
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc) {
@@ -174,11 +180,11 @@ int32_t sys_prx_stop_module(sys_prx_id_t id,
                             ps3_uintptr_t argp,
                             ps3_uintptr_t modres,
                             uint64_t flags,
-                            uint64_t pOpt) {
+                            uint64_t pOpt,
+                            PPUThread* thread) {
     assert(flags == 0);
     assert(pOpt == 0);
-    WARNING(libs) << "sys_prx_stop_module not implemented";
-    return CELL_OK;
+    return executeExportedFunction(id, args, argp, modres, thread, "module_stop");
 }
 
 int32_t sys_prx_unload_module(sys_prx_id_t id, uint64_t flags, uint64_t pOpt) {
