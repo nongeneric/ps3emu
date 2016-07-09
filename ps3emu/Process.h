@@ -138,6 +138,7 @@ class Process {
     bool _firstRun = true;
     boost::chrono::high_resolution_clock::time_point _systemStart;
     std::vector<ModuleSegment> _segments;
+    std::vector<std::shared_ptr<ELFLoader>> _prxs;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
     void initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);

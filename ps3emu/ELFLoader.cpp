@@ -1,5 +1,4 @@
 #include "ELFLoader.h"
-#include "ImportResolver.h"
 #include "ppu/PPUThread.h"
 #include "utils.h"
 #include <assert.h>
@@ -88,8 +87,17 @@ const char* ELFLoader::getSectionName(uint32_t idx) {
     return reinterpret_cast<const char*>(ptr);
 }
 
+module_info_t* ELFLoader::module() {
+    return _module;
+}
+
+struct vdescr {
+    big_uint32_t size;
+    big_uint32_t toc;
+};
+
 void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase) {
-    _imageBase = imageBase;
+    uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD)
             continue;
@@ -103,7 +111,7 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
         if (imageBase && index == 1) {
             assert(_header->e_phnum == 3);
             auto ph0 = _pheaders[0];
-            _prxPh1Va = va = ::align(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
+            prxPh1Va = va = ::align(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
         }
         
         LOG << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
@@ -115,6 +123,145 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
         
         makeSegment(va, ph->p_memsz, index);
     }
+    
+    if (!imageBase)
+        return;
+    
+    assert(prxPh1Va);
+    auto rebase = [=](auto& x) { x += imageBase; };
+    auto rebase_aux = [=](auto& x) { x += prxPh1Va - _pheaders[1].p_vaddr; };
+    
+    _module = (module_info_t*)mm->getMemoryPointer(
+        _pheaders->p_paddr - _pheaders->p_offset + imageBase, sizeof(module_info_t));
+    rebase(_module->imports_start);
+    rebase(_module->imports_end);
+    rebase(_module->exports_start);
+    rebase(_module->exports_end);
+    rebase_aux(_module->toc);
+    prx_export_t* exports;
+    prx_import_t* imports;
+    int nexports, nimports;
+    std::tie(exports, nexports) = this->exports(mm);
+    std::tie(imports, nimports) = this->imports(mm);
+    
+    for (auto i = 0; i < nexports; ++i) {
+        if (exports[i].name)
+            rebase(exports[i].name);
+        rebase(exports[i].fnid_table);
+        rebase(exports[i].stub_table);
+        auto totalExports = exports[i].functions + exports[i].variables + exports[i].tls_variables;
+        auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * totalExports);
+        for (auto j = 0; j < totalExports; ++j) {
+            rebase_aux(stubs[j]);
+        }
+        for (auto j = 0; j < exports[i].functions; ++j) {
+            auto descr = (fdescr*)mm->getMemoryPointer(stubs[j], sizeof(fdescr));
+            rebase(descr->va);
+            rebase_aux(descr->tocBase);
+        }
+        if (exports[i].name) {
+            auto tocs = (big_uint32_t*)mm->getMemoryPointer(_module->toc - 0x8000, 4 * exports[i].variables);
+            for (auto j = 0; j < exports[i].variables; ++j) {
+                rebase_aux(tocs[j]);
+            }
+        }
+    }
+    
+    for (auto i = 0; i < nimports; ++i) {
+        rebase(imports[i].name);
+        rebase(imports[i].fnids);
+        rebase_aux(imports[i].fstubs);
+        rebase(imports[i].vnids);
+        rebase(imports[i].vstubs);
+        auto vstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].vstubs, 4 * imports[i].variables);
+        for (auto j = 0; j < imports[i].variables; ++j) {
+            rebase(vstubs[j]);
+            auto descr = (vdescr*)mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
+            rebase_aux(descr->toc);
+        }
+        auto fstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].fstubs, 4 * imports[i].functions);
+        for (auto j = 0; j < imports[i].functions; ++j) {
+            rebase(fstubs[j]);
+            auto orisImm = (big_uint16_t*)mm->getMemoryPointer(fstubs[j] + 6, 2);
+            auto lwzImm = (big_uint16_t*)mm->getMemoryPointer(fstubs[j] + 10, 2);
+            *orisImm += prxPh1Va >> 16;
+            *lwzImm -= _pheaders[1].p_vaddr;
+        }
+    }
+}
+
+std::tuple<prx_import_t*, int> ELFLoader::imports(MainMemory* mm) {
+    auto count = _module->imports_end - _module->imports_start;
+    return std::make_tuple(
+        (prx_import_t*)mm->getMemoryPointer(_module->imports_start, count),
+        count / sizeof(prx_import_t));
+}
+
+std::tuple<prx_export_t*, int> ELFLoader::exports(MainMemory* mm) {
+    auto count = _module->exports_end - _module->exports_start;
+    return std::make_tuple(
+        (prx_export_t*)mm->getMemoryPointer(_module->exports_start, count),
+        count / sizeof(prx_export_t));
+}
+
+uint32_t findExportedSymbol(MainMemory* mm,
+                            std::vector<std::shared_ptr<ELFLoader>> const& prxs,
+                            uint32_t id,
+                            std::string library,
+                            prx_symbol_type_t type) {
+    static auto curUnknownNcall = 2000;
+    static auto ncallDescrVa = FunctionDescriptorsVa;
+    for (auto prx : prxs) {
+        prx_export_t* exports;
+        int nexports;
+        std::tie(exports, nexports) = prx->exports(mm);
+        for (auto i = 0; i < nexports; ++i) {
+            if (!exports[i].name)
+                continue;
+            std::string name;
+            readString(mm, exports[i].name, name);
+            if (name != library)
+                continue;
+            auto fnids = (big_uint32_t*)mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
+            auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
+            auto first = 0;
+            auto last = 0;
+            if (type == prx_symbol_type_t::function) {
+                first = 0;
+                last = exports[i].functions;
+            } else if (type == prx_symbol_type_t::variable) {
+                first = exports[i].functions;
+                last = first + exports[i].variables;
+            } else { assert(false); }
+            
+            for (auto j = first; j < last; ++j) {
+                if (fnids[j] == id) {
+                    return stubs[j];
+                }
+            }
+        }
+    }
+    
+    if (type == prx_symbol_type_t::function) {
+        uint32_t index;
+        auto ncallEntry = findNCallEntry(id, index);
+        std::string name;
+        if (!ncallEntry) {
+            index = curUnknownNcall--;
+            name = ssnprintf("(!) fnid_%08X", id);
+        } else {
+            name = ncallEntry->name;
+        }
+        LOG << ssnprintf("    %s (ncall %x)", name, index);
+        
+        mm->setMemory(ncallDescrVa, 0, 8, true);
+        mm->store<4>(ncallDescrVa, ncallDescrVa + 4);
+        encodeNCall(mm, ncallDescrVa + 4, index);
+        ncallDescrVa += 8;
+        return ncallDescrVa - 8;
+    }
+    
+    return 0;
 }
 
 Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
@@ -145,7 +292,7 @@ std::vector<Elem> readSection(Elf64_be_Shdr* sections,
     return vec;
 }
 
-void ELFLoader::link(MainMemory* mm) {
+void ELFLoader::link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs) {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
     });
@@ -159,90 +306,43 @@ void ELFLoader::link(MainMemory* mm) {
     auto prxInfos = readSection<prx_info>(
         _sections, _header, prxInfo.prx_infos, mm);
     
-    _resolver.reset(new ImportResolver(mm));
-    _resolver->populate(this, &prxInfos[0], prxInfos.size());
-    
-    uint32_t curUnknownNcall = 2000;
     LOG << ssnprintf("resolving %d rsx modules", prxInfos.size());
-    for (auto& lib : _resolver->libraries()) {
-        LOG << ssnprintf("  %s", lib.name());
-        for (auto& entry : lib.entries()) {
-            uint32_t index = 0;
-            auto ncallEntry = findNCallEntry(entry.fnid(), index);
-            std::string name;
-            if (!ncallEntry) {
-                index = curUnknownNcall--;
-                name = ssnprintf("(!) fnid_%08X", entry.fnid());
-            } else {
-                name = ncallEntry->name;
-            }
-            LOG << ssnprintf("    %x -> %s (ncall %x)", entry.stub(), name, index);
-            entry.resolveNcall(index, !ncallEntry);
+    for (auto& info : prxInfos) {
+        std::string prxName;
+        readString(mm, info.prx_name, prxName);
+        auto fnids = (big_uint32_t*)mm->getMemoryPointer(info.prx_fnids, info.count * 4);
+        auto stubs = (big_uint32_t*)mm->getMemoryPointer(info.prx_stubs, info.count * 4);
+        for (auto i = 0; i < info.count; ++i) {
+            stubs[i] = findExportedSymbol(mm, prxs, fnids[i], prxName, prx_symbol_type_t::function);
         }
     }
 }
 
-void ELFLoader::relink(MainMemory* mm, std::vector<ELFLoader*> prxs, ps3_uintptr_t prxImageBase) {
+void ELFLoader::relink(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs) {
     auto newPrx = prxs.back();
-    assert(newPrx->_prxPh1Va);
     INFO(libs) << ssnprintf("relinking prx %s", newPrx->elfName());
     
-    auto module =
-        reinterpret_cast<module_info_t*>(&newPrx->_file[newPrx->_pheaders->p_paddr]);
-    auto imports = reinterpret_cast<prx_import_t*>(
-        &newPrx->_file[newPrx->_pheaders->p_offset + module->imports_start]);
-    auto nimports = (module->imports_end - module->imports_start) / sizeof(prx_import_t);
-    auto importLibCount = _resolver->libraries().size();
-    auto ph1va = newPrx->_pheaders[1].p_vaddr;
-    _resolver->populate(
-        newPrx, imports, nimports, prxImageBase, ph1va, newPrx->_prxPh1Va);
-    
-    auto& importLibs = _resolver->libraries();
-    // patch imports of newPrx
-    for (auto i = importLibCount; i < importLibs.size(); ++i) {
-        for (auto& entry : importLibs[i].entries()) {
-            if (entry.type() == prx_symbol_type_t::function) {
-                auto code = mm->load<4>(entry.stub());
-                auto orisImmVa = prxImageBase + code + 6;
-                auto orisImm = mm->load<2>(orisImmVa);
-                mm->store<2>(orisImmVa, orisImm + (newPrx->_prxPh1Va >> 16));
-                auto lwzImmVa = prxImageBase + code + 10;
-                auto lwzImm = mm->load<2>(lwzImmVa);
-                mm->store<2>(lwzImmVa, lwzImm - ph1va);
-            } else if (entry.type() == prx_symbol_type_t::variable) {
-                
-            }
+    prx_import_t* imports;
+    int count;
+    std::tie(imports, count) = newPrx->imports(mm);
+    for (auto i = 0; i < count; ++i) {
+        std::string library;
+        readString(mm, imports[i].name, library);
+        auto vstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].vstubs, 4 * imports[i].variables);
+        auto vnids = (big_uint32_t*)mm->getMemoryPointer(imports[i].vnids, 4 * imports[i].variables);
+        for (auto j = 0; j < imports[i].variables; ++j) {
+            auto descr = (vdescr*)mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
+            auto symbol = findExportedSymbol(mm, prxs, vnids[j], library, prx_symbol_type_t::variable);
+            mm->store<4>(descr->toc, symbol);
+        }
+        auto fstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].fstubs, imports[i].functions);
+        auto fnids = (big_uint32_t*)mm->getMemoryPointer(imports[i].fnids, imports[i].functions);
+        for (auto j = 0; j < imports[i].functions; ++j) {
+            fstubs[j] = findExportedSymbol(mm, prxs, fnids[j], library, prx_symbol_type_t::function);
         }
     }
     
-    auto tocVa = module->toc - 0x8000 + newPrx->_prxPh1Va - newPrx->ph1rva();
-    auto tocEntry = mm->load<4>(tocVa);
-    tocEntry = tocEntry + newPrx->_prxPh1Va - newPrx->ph1rva();
-    mm->store<4>(tocVa, tocEntry);
-    
-    for (auto prx : prxs) {
-        for (auto& exportLib : prx->getExports()) {
-            for (auto& importLib : importLibs) {
-                auto& importEntries = importLib.entries();
-                for (auto& exportEntry : exportLib.entries) {
-                    auto importEntry = boost::find_if(importEntries, [=](auto& ie) {
-                        return ie.fnid() == exportEntry.fnid;
-                    });
-                    if (importEntry == end(importEntries))
-                        continue;
-                    auto stubVa = exportEntry.stubVa + prx->_imageBase;
-                    mm->store<4>(stubVa, exportEntry.stub.va + prx->_imageBase);
-                    mm->store<4>(stubVa + 4, exportEntry.stub.tocBase + prx->_imageBase);
-                    assert(importEntry->type() == exportEntry.type);
-                    importEntry->resolve(stubVa);
-                    INFO(libs) << ssnprintf("  %x -> %x (fnid_%08x)",
-                                            importEntry->stub(),
-                                            stubVa,
-                                            importEntry->fnid());
-                }
-            }
-        }
-    }
+    link(mm, prxs);
 }
 
 uint64_t ELFLoader::entryPoint() {
@@ -325,45 +425,8 @@ ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
     return info;
 }
 
-std::vector<prx_export_lib_t> ELFLoader::getExports() {
-    auto module = reinterpret_cast<module_info_t*>(&_file[_pheaders->p_paddr]);
-    auto exports = reinterpret_cast<prx_export_t*>(&_file[_pheaders->p_offset + module->exports_start]);
-    auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
-    std::vector<prx_export_lib_t> vec;
-    for (auto i = 0u; i < nexports; ++i) {
-        auto& e = exports[i];
-        auto fnids = reinterpret_cast<big_uint32_t*>(
-            &_file[_pheaders->p_offset + e.fnid_table]);
-        auto stubs = reinterpret_cast<big_uint32_t*>(
-            &_file[_pheaders->p_offset + e.stub_table]);
-        prx_export_lib_t lib;
-        lib.name = e.name;
-        for (auto i = 0; i < e.functions + e.variables + e.tls_variables; ++i) {
-            prx_export_info_t info;
-            info.stubVa = stubs[i];
-            info.stub = *reinterpret_cast<fdescr*>(&_file[_pheaders->p_offset + stubs[i]]);
-            info.fnid = fnids[i];
-            info.type = i < e.functions ? prx_symbol_type_t::function
-                      : i < e.functions + e.variables ? prx_symbol_type_t::variable
-                      : prx_symbol_type_t::tls_variable;
-            lib.entries.push_back(info);
-        }
-        vec.push_back(lib);
-    }
-    return vec;
-}
-
 std::string ELFLoader::elfName() {
     return _elfName;
-}
-
-ImportResolver* ELFLoader::resolver() {
-    return _resolver.get();
-}
-
-ps3_uintptr_t ELFLoader::ph1rva() {
-    assert(_header->e_phnum > 1);
-    return _pheaders[1].p_vaddr;
 }
 
 ELFLoader::ELFLoader() {}

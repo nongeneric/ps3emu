@@ -1335,7 +1335,7 @@ TEST_CASE("prx_library_c") {
         "library-c-main:start\n"
         "load val=3\n"
         "load val=12\n"
-        "unload val=98\n"
+        "unload val=287454118\n"
         "unload val=9\n"
         "library-c-main:done\n"
     );

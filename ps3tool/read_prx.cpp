@@ -35,6 +35,7 @@ void HandleReadPrx(ReadPrxCommand const& command) {
                   << "    add_func(ea, -1)\n"
                   << "    set_name(ea, name)\n\n";
     }
+    
     std::cout << "\n# exports\n";
     for (auto i = 0u; i < nexports; ++i) {
         auto& e = exports[i];
@@ -43,7 +44,7 @@ void HandleReadPrx(ReadPrxCommand const& command) {
             &elf[pheader->p_offset + e.fnid_table]);
         auto stubs = reinterpret_cast<big_uint32_t*>(
             &elf[pheader->p_offset + e.stub_table]);
-        std::cout << ssnprintf("# functions: %d, variables: %d, tls_variables: %d\n\n",
+        std::cout << ssnprintf("\n# functions: %d, variables: %d, tls_variables: %d\n\n",
                                e.functions,
                                e.variables,
                                e.tls_variables);
@@ -67,6 +68,7 @@ void HandleReadPrx(ReadPrxCommand const& command) {
             }
         }
     }
+    
     std::cout << "\n# imports\n";
     for (auto i = 0u; i < nimports; ++i) {
         auto& import = imports[i];

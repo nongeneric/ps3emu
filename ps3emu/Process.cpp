@@ -35,7 +35,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({_elf, index, va, size});
     });
-    _elf->link(_mainMemory.get());
+    _elf->link(_mainMemory.get(), {});
     _internalMemoryManager.reset(new InternalMemoryManager());
     _internalMemoryManager->setMainMemory(_mainMemory.get());
     _contentManager.reset(new ContentManager());
@@ -55,19 +55,14 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
 
 uint32_t Process::loadPrx(std::string path) {
     auto prx = std::make_shared<ELFLoader>();
+    _prxs.push_back(prx);
     prx->load(path);
     assert(_segments.size());
     auto imageBase = ::align(_segments.back().va + _segments.back().size, 1 << 10);
     prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
     }, imageBase);
-    std::set<ELFLoader*> prxSet;
-    for (auto& s : _segments) {
-        prxSet.insert(s.elf.get());
-    }
-    prxSet.erase(_segments.front().elf.get());
-    std::vector<ELFLoader*> prxVector(begin(prxSet), end(prxSet));
-    _elf->relink(_mainMemory.get(), prxVector, imageBase);
+    _elf->relink(_mainMemory.get(), _prxs);
     return imageBase;
 }
 

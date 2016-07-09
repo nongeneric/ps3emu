@@ -124,11 +124,20 @@ int32_t sys_prx_register_library(ps3_uintptr_t library) {
     return CELL_OK;
 }
 
-boost::optional<prx_export_info_t> findExport(std::vector<prx_export_lib_t>& libs, uint32_t eid) {
-    for (auto exportLib : libs) {
-        for (auto entry : exportLib.entries) {
-            if (entry.fnid == eid) {
-                return entry;
+boost::optional<fdescr> findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid) {
+    prx_export_t* exports;
+    int count;
+    std::tie(exports, count) = prx->exports(mm);
+    for (auto i = 0; i < count; ++i) {
+        if (exports[i].name)
+            continue;
+        auto fnids = (big_uint32_t*)mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
+        auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
+        for (auto j = 0; j < exports[i].functions; ++j) {
+            if (fnids[j] == eid) {
+                fdescr descr;
+                mm->readMemory(stubs[j], &descr, sizeof(descr));
+                return descr;
             }
         }
     }
@@ -144,13 +153,12 @@ int32_t executeExportedFunction(sys_prx_id_t id,
     auto& segments = thread->proc()->getSegments();
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == id; });
     assert(segment != end(segments));
-    auto exports = segment->elf->getExports();
-    auto moduleStart = findExport(exports, calcEid(name));
-    assert(moduleStart);
-    thread->setGPR(2, moduleStart->stub.tocBase - segment->elf->ph1rva() + segment[1].va);
+    auto func = findExport(thread->mm(), segment->elf.get(), calcEid(name));
+    assert(func);
+    thread->setGPR(2, func->tocBase);
     thread->setGPR(3, args);
     thread->setGPR(4, argp);
-    thread->ps3call(moduleStart->stub.va + id,
+    thread->ps3call(func->va,
                     [=] { thread->mm()->store<4>(modres, thread->getGPR(3)); });
     return thread->getGPR(3);
 }
