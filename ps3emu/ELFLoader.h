@@ -116,32 +116,17 @@ struct prx_import_t {
     boost::endian::big_uint32_t tls_vstubs;
 };
 
-struct prx_info {
-    boost::endian::big_uint32_t lib_header;
-    boost::endian::big_uint16_t lib_id;
-    boost::endian::big_uint16_t count;
-    boost::endian::big_uint32_t unk0;
-    boost::endian::big_uint32_t unk1;
-    boost::endian::big_uint32_t prx_name;
-    boost::endian::big_uint32_t prx_fnids;
-    boost::endian::big_uint32_t prx_stubs;
-    boost::endian::big_uint32_t unk2;
-    boost::endian::big_uint32_t unk3;
-    boost::endian::big_uint32_t unk4;
-    boost::endian::big_uint32_t unk5;
-};
-
 struct sys_process_prx_info {
     boost::endian::big_uint32_t header_size;
-    boost::endian::big_uint32_t unk0;
-    boost::endian::big_uint32_t unk1;
-    boost::endian::big_uint32_t unk2;
-    boost::endian::big_uint32_t unk3;
-    boost::endian::big_uint32_t unk4;
-    boost::endian::big_uint32_t prx_infos;
+    boost::endian::big_uint32_t magic;
+    boost::endian::big_uint32_t version;
+    boost::endian::big_uint32_t sdk_version;
+    boost::endian::big_uint32_t exports_start;
+    boost::endian::big_uint32_t exports_end;
+    boost::endian::big_uint32_t imports_start;
+    boost::endian::big_uint32_t imports_end;
 };
 
-static_assert(sizeof(prx_info) == 44, "");
 static_assert(sizeof(fdescr) == 8, "");
 static_assert(sizeof(Elf64_be_Ehdr) == sizeof(Elf64_Ehdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mismatch");
@@ -174,6 +159,8 @@ class ELFLoader {
     Elf64_be_Shdr* findSectionByName(std::string name);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
     module_info_t* _module = nullptr;
+    std::tuple<prx_import_t*, int> elfImports(MainMemory* mm);
+    std::tuple<prx_import_t*, int> prxImports(MainMemory* mm);
     
 public:
     ELFLoader();
@@ -186,10 +173,10 @@ public:
     void load(std::string filePath);
     void map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase = 0);
     void link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
-    void relink(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
     std::string elfName();
+    std::string shortName();
     module_info_t* module();
-    std::tuple<prx_import_t*, int> imports(MainMemory* mm);
     std::tuple<prx_export_t*, int> exports(MainMemory* mm);
+    std::tuple<prx_import_t*, int> imports(MainMemory* mm);
 };

@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include "log.h"
 #include <boost/range/algorithm.hpp>
+#include <boost/filesystem.hpp>
 
 using namespace boost::endian;
 
@@ -190,14 +191,23 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
     }
 }
 
-std::tuple<prx_import_t*, int> ELFLoader::imports(MainMemory* mm) {
+std::tuple<prx_import_t*, int> ELFLoader::prxImports(MainMemory* mm) {
     auto count = _module->imports_end - _module->imports_start;
     return std::make_tuple(
         (prx_import_t*)mm->getMemoryPointer(_module->imports_start, count),
         count / sizeof(prx_import_t));
 }
 
+std::tuple<prx_import_t*, int> ELFLoader::imports(MainMemory* mm) {
+    if (_module)
+        return prxImports(mm);
+    return elfImports(mm);
+}
+
 std::tuple<prx_export_t*, int> ELFLoader::exports(MainMemory* mm) {
+    if (!_module)
+        return {nullptr, 0};
+    
     auto count = _module->exports_end - _module->exports_start;
     return std::make_tuple(
         (prx_export_t*)mm->getMemoryPointer(_module->exports_start, count),
@@ -272,27 +282,7 @@ Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
     return nullptr;
 }
 
-template <typename Elem>
-std::vector<Elem> readSection(Elf64_be_Shdr* sections,
-                              Elf64_be_Ehdr* header,
-                              uint32_t va,
-                              MainMemory* mm) {
-    auto section = std::find_if(sections, sections + header->e_shnum, [&](auto& sh) {
-        return sh.sh_addr == va;
-    });
-    
-    if (section == sections + header->e_shnum)
-        throw std::runtime_error("section not present");
-    
-    if (section->sh_size % sizeof(Elem) != 0)
-        throw std::runtime_error("section size inconsistency");
-    
-    std::vector<Elem> vec(section->sh_size / sizeof(Elem));
-    mm->readMemory(section->sh_addr, &vec[0], section->sh_size);
-    return vec;
-}
-
-void ELFLoader::link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs) {
+std::tuple<prx_import_t*, int> ELFLoader::elfImports(MainMemory* mm) {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
     });
@@ -300,31 +290,18 @@ void ELFLoader::link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prx
     if (phprx == _pheaders + _header->e_phnum)
         throw std::runtime_error("PRXINFO segment not present");
     
-    sys_process_prx_info prxInfo;
-    mm->readMemory(phprx->p_vaddr, &prxInfo, sizeof(prxInfo));
-    
-    auto prxInfos = readSection<prx_info>(
-        _sections, _header, prxInfo.prx_infos, mm);
-    
-    LOG << ssnprintf("resolving %d rsx modules", prxInfos.size());
-    for (auto& info : prxInfos) {
-        std::string prxName;
-        readString(mm, info.prx_name, prxName);
-        auto fnids = (big_uint32_t*)mm->getMemoryPointer(info.prx_fnids, info.count * 4);
-        auto stubs = (big_uint32_t*)mm->getMemoryPointer(info.prx_stubs, info.count * 4);
-        for (auto i = 0; i < info.count; ++i) {
-            stubs[i] = findExportedSymbol(mm, prxs, fnids[i], prxName, prx_symbol_type_t::function);
-        }
-    }
+    auto prxInfo = (sys_process_prx_info*)mm->getMemoryPointer(phprx->p_vaddr, sizeof(sys_process_prx_info));
+    auto count = prxInfo->imports_end - prxInfo->imports_start;
+    return std::make_tuple(
+        (prx_import_t*)mm->getMemoryPointer(prxInfo->imports_start, count),
+        count / sizeof(prx_import_t));
 }
 
-void ELFLoader::relink(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs) {
-    auto newPrx = prxs.back();
-    INFO(libs) << ssnprintf("relinking prx %s", newPrx->elfName());
-    
+void ELFLoader::link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs) {
+    INFO(libs) << ssnprintf("linking prx %s", elfName());
     prx_import_t* imports;
     int count;
-    std::tie(imports, count) = newPrx->imports(mm);
+    std::tie(imports, count) = this->imports(mm);
     for (auto i = 0; i < count; ++i) {
         std::string library;
         readString(mm, imports[i].name, library);
@@ -341,8 +318,6 @@ void ELFLoader::relink(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> p
             fstubs[j] = findExportedSymbol(mm, prxs, fnids[j], library, prx_symbol_type_t::function);
         }
     }
-    
-    link(mm, prxs);
 }
 
 uint64_t ELFLoader::entryPoint() {
@@ -427,6 +402,10 @@ ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
 
 std::string ELFLoader::elfName() {
     return _elfName;
+}
+
+std::string ELFLoader::shortName() {
+    return boost::filesystem::path(_elfName).filename().string();
 }
 
 ELFLoader::ELFLoader() {}

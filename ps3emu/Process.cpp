@@ -35,7 +35,8 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({_elf, index, va, size});
     });
-    _elf->link(_mainMemory.get(), {});
+    _prxs.push_back(_elf);
+    _elf->link(_mainMemory.get(), _prxs);
     _internalMemoryManager.reset(new InternalMemoryManager());
     _internalMemoryManager->setMainMemory(_mainMemory.get());
     _contentManager.reset(new ContentManager());
@@ -62,7 +63,9 @@ uint32_t Process::loadPrx(std::string path) {
     prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
     }, imageBase);
-    _elf->relink(_mainMemory.get(), _prxs);
+    for (auto p : _prxs) {
+        p->link(_mainMemory.get(), _prxs);
+    }
     return imageBase;
 }
 

@@ -8,7 +8,8 @@
 #include <QStringList>
 #include "stdio.h"
 #include <boost/regex.hpp>
-#include <boost/filesystem.hpp>
+#include <boost/range/algorithm.hpp>
+#include <set>
 
 class GridModelChangeTracker {
     MonospaceGridModel* _model;
@@ -619,22 +620,50 @@ void DebuggerModel::dumpSegments() {
             "%08x  %08x  %s",
             segment.va,
             segment.size,
-            boost::filesystem::path(segment.elf->elfName()).filename().c_str()));
+            segment.elf->shortName().c_str()));
     }
 }
 
 void DebuggerModel::dumpImports() {
-//     auto& libs = _proc->elfLoader()->resolver()->libraries();
-//     for (auto& lib : libs) {
-//         emit message(ssnprintf("import library: %s", lib.name()).c_str());
-//         for (auto& entry : lib.entries()) {
-//             emit message(ssnprintf("  fnid_%08x  %08x | %s",
-//                                    entry.fnid(),
-//                                    entry.stub(),
-//                                    resolutionName(entry.resolution()))
-//                              .c_str());
-//         }
-//     }
+    auto segments = _proc->getSegments();
+    std::set<ELFLoader*> elfs;
+    for (auto s : segments) {
+         if (elfs.find(s.elf.get()) != end(elfs))
+            continue;
+        elfs.insert(s.elf.get());
+        
+        emit message(ssnprintf("module %s", s.elf->shortName()).c_str());
+        
+        prx_import_t* imports;
+        int count;
+        std::tie(imports, count) = s.elf->imports(_proc->mm());
+        
+        for (auto i = 0; i < count; ++i) {
+            std::string name;
+            readString(_proc->mm(), imports[i].name, name);
+            emit message(ssnprintf("  import %s", name).c_str());
+            
+            auto printImports = [&](auto idsVa, auto stubsVa, auto count, auto type, auto isVar) {
+                auto fnids = (big_uint32_t*)_proc->mm()->getMemoryPointer(idsVa, count * 4);
+                auto stubs = (big_uint32_t*)_proc->mm()->getMemoryPointer(stubsVa, count * 4);
+                for (auto j = 0; j < count; ++j) {
+                    auto segment = boost::find_if(segments, [=](auto& s) {
+                        auto stub = stubs[j];
+                        if (isVar) {
+                            auto tocVa = _proc->mm()->load<4>(stubs[j] + 4);
+                            stub = _proc->mm()->load<4>(tocVa);
+                        }
+                        return s.va <= stub && stub < s.va + s.size;
+                    });
+                    auto resolution = segment == end(segments) ? "NCALL" : segment->elf->shortName();
+                    emit message(ssnprintf("    %s fnid_%08x | %s", type, fnids[j], resolution).c_str());
+                }
+            };
+            printImports(imports[i].fnids, imports[i].fstubs, imports[i].functions, "FUNC    ", false);
+            printImports(imports[i].vnids, imports[i].vstubs, imports[i].variables, "VARIABLE", true);
+            printImports(imports[i].tls_vnids, imports[i].tls_vstubs, imports[i].tls_variables, "TLS VARIABLE", true);
+        }
+    }
 }
 
 void DebuggerModel::runToLR() {
