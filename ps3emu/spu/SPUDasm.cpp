@@ -30,6 +30,7 @@ union SPUForm {
     BitField<8, 18, BitFieldType::Signed> I10;
     I16_t I16;
     BitField<7, 25, BitFieldType::Signed> I18;
+    BitField<18, 32> StopAndSignalType;
 };
 
 #define PRINT(name) inline void print##name(SPUForm* i, uint32_t cia, std::string* result)
@@ -2448,11 +2449,11 @@ EMU(fscrrd) {
 }
 
 PRINT(stop) {
-    *result = "stop";
+    *result = format_n("stop", i->StopAndSignalType);
 }
 
 EMU(stop) {
-    throw StopSignalException();
+    throw StopSignalException(i->StopAndSignalType.u());
 }
 
 PRINT(stopd) {

@@ -198,7 +198,7 @@ int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
     spuThread->r(3).dw<0>() = argument->u64[0];
     spuThread->r(3).dw<1>() = argument->u64[1];
     // set r4 to taskset argument
-    spuThread->setInterruptHandler([&] {
+    spuThread->setInterruptHandler(-1, [&] {
         auto& imbox = spuThread->getFromSpuInterruptMailbox();
         auto& mbox = spuThread->getFromSpuMailbox();
         auto size = imbox.receive(0);

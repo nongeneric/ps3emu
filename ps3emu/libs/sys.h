@@ -123,3 +123,4 @@ emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUT
 
 int32_t sys_process_is_stack(ps3_uintptr_t p);
 int32_t _sys_strlen(cstring_ptr_t str);
+int32_t sys_process_is_spu_lock_line_reservation_address(ps3_uintptr_t addr, uint64_t flags);

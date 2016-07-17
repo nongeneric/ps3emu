@@ -57,3 +57,19 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
 int32_t sys_event_queue_drain(sys_event_queue_t equeue_id);
 
 int32_t sys_event_port_destroy(sys_event_port_t eport_id);
+
+int32_t sys_spu_thread_connect_event(uint32_t thread_id,
+                                     sys_event_queue_t eq,
+                                     sys_event_type_t et,
+                                     uint8_t spup,
+                                     Process* proc);
+
+int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
+                                  sys_event_queue_t spuq,
+                                  uint32_t spuq_num,
+                                  Process* proc);
+
+int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
+                                                       sys_event_queue_t eq,
+                                                       uint64_t req,
+                                                       uint8_t* spup);

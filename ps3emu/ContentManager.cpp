@@ -37,8 +37,8 @@ MountPoint splitPathImpl(const char* path, const char** point, const char** rela
     throw std::runtime_error("illegal mount point");
 }
 
-void ContentManager::setElfPath(std::string path) {
-    _elfPath = absolute(path).string();
+void ContentManager::setElfPath(std::experimental::string_view path) {
+    _elfPath = absolute(begin(path)).string();
 }
 
 std::string ContentManager::usrDir() {
@@ -56,10 +56,10 @@ std::string ContentManager::cacheDir() {
     return dir;
 }
 
-std::string ContentManager::toHost(const char* path) {
+std::string ContentManager::toHost(std::experimental::string_view path) {
     const char* point;
     const char* relative;
-    auto type = splitPathImpl(path, &point, &relative);
+    auto type = splitPathImpl(begin(path), &point, &relative);
     if (type == MountPoint::HostAbsolute) {
         relative += 3;
     }

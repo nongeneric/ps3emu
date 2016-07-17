@@ -26,16 +26,26 @@ void HandleReadPrx(ReadPrxCommand const& command) {
     auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
     auto nimports = (module->imports_end - module->imports_start) / sizeof(prx_import_t);
 
-    std::cout << ssnprintf("# %s\n", module->name);
-    if (command.writeIdaScript) {
-        std::cout << "from idaapi import *\n"
-                  << "\n"
-                  << "def make_func(ea, name):\n"
-                  << "    del_func(ea)\n"
-                  << "    add_func(ea, -1)\n"
-                  << "    set_name(ea, name)\n\n";
-    }
+    std::cout << "from idaapi import *\n"
+                << "\n"
+                << "def make_func(ea, name):\n"
+                << "    del_func(ea)\n"
+                << "    add_func(ea, -1)\n"
+                << "    set_name(ea, name)\n\n";
     
+    auto tocOrigin = module->toc - 0x8000;
+    auto tocSize = pheader[1].p_vaddr + pheader[1].p_filesz - tocOrigin;
+    std::cout << ssnprintf("# module_info (%08x)\n", pheader->p_paddr)
+              << ssnprintf("#   attributes %04x\n", module->attributes)
+              << ssnprintf("#   minor version %x\n", module->minor_version)
+              << ssnprintf("#   major version %x\n", module->major_version)
+              << ssnprintf("#   name %s\n", module->name)
+              << ssnprintf("#   toc %08x (origin %08x, size %08x)\n", module->toc, tocOrigin, tocSize)
+              << ssnprintf("#   exports start %08x\n", module->exports_start)
+              << ssnprintf("#   exports end %08x\n", module->exports_end)
+              << ssnprintf("#   imports start %08x\n", module->imports_start)
+              << ssnprintf("#   imports end %08x\n", module->imports_end);
+                
     std::cout << "\n# exports\n";
     for (auto i = 0u; i < nexports; ++i) {
         auto& e = exports[i];
@@ -51,21 +61,13 @@ void HandleReadPrx(ReadPrxCommand const& command) {
         for (auto i = 0; i < e.functions + e.variables + e.tls_variables; ++i) {
             auto descr =
                 reinterpret_cast<fdescr*>(&elf[pheader->p_offset + stubs[i]]);
-            if (command.writeIdaScript) {
-                std::cout
-                    << ssnprintf("make_func(0x%08x, \"%s_fnid_%08X_%d\") # %08x\n",
-                                    descr->va,
-                                    libname,
-                                    fnids[i],
-                                    i,
-                                    fnids[i]);
-            } else {
-                std::cout << ssnprintf("%s, fnid_%08X, %08x, %08x\n",
-                                        libname,
-                                        fnids[i],
-                                        stubs[i],
-                                        descr->va);
-            }
+                std::cout << ssnprintf("# exported symbol\n")
+                      << ssnprintf("#   lib      %s\n", libname)
+                      << ssnprintf("#   name     fnid_%08X\n", fnids[i])
+                      << ssnprintf("#   fnid     %08X\n", fnids[i])
+                      << ssnprintf("#   stub     %08x\n", stubs[i]);
+                std::cout << ssnprintf(
+                    "make_func(0x%08x, \"%s_fnid_%08X_%d\")\n\n", descr->va, libname, fnids[i], i);
         }
     }
     
@@ -73,23 +75,22 @@ void HandleReadPrx(ReadPrxCommand const& command) {
     for (auto i = 0u; i < nimports; ++i) {
         auto& import = imports[i];
         auto libname = &elf[pheader->p_offset + import.name];
-        auto fnids = reinterpret_cast<big_uint32_t*>(
-            &elf[pheader->p_offset + import.fnids]);
-        auto stubs =
-            reinterpret_cast<big_uint32_t*>(&elf[pheader->p_offset + import.fstubs]);
+        auto fnids = (big_uint32_t*)&elf[pheader->p_offset + import.fnids];
+        auto fstubs = (big_uint32_t*)&elf[pheader->p_offset + import.fstubs];
         std::cout << ssnprintf(
-            "fnid table: %08x\nstub table: %08x\n", import.fnids, import.fstubs);
+            "# fnid table: %08x, stub table: %08x\n", import.fnids, import.fstubs);
         for (auto i = 0u; i < import.functions; ++i) {
-            if (command.writeIdaScript) {
-                std::cout << ssnprintf("make_func(0x%08x, \"%s_stub_fnid_%08X_%d\") # %08x\n",
-                                       stubs[i],
-                                       libname,
-                                       fnids[i],
-                                       i,
-                                       fnids[i]);
-            } else {
-                std::cout << ssnprintf("%s, fnid_%08X\n", libname, fnids[i]);
-            }
+            std::cout << ssnprintf("# imported function\n")
+                      << ssnprintf("#   lib      %s\n", libname)
+                      << ssnprintf("#   name     fnid_%08X\n", fnids[i])
+                      << ssnprintf("#   fnid     %08X\n", fnids[i])
+                      << ssnprintf("#   fstub    %08x\n", fstubs[i])
+                      << ssnprintf("#   fstubVa  %08x\n", import.fstubs + 4 * i);
+            std::cout << ssnprintf("make_func(0x%08x, \"%s_stub_fnid_%08X_%d\")\n\n",
+                                   fstubs[i],
+                                   libname,
+                                   fnids[i],
+                                   i);
         }
     }
 }

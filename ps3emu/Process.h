@@ -143,6 +143,7 @@ class Process {
     void initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
     void dbgPause(bool pause, bool takeMutex = true);
+    void loadPrxStore();
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
     

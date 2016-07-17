@@ -5,33 +5,10 @@
 #include "../../MainMemory.h"
 #include <boost/thread.hpp>
 #include "ps3emu/log.h"
+#include "ps3emu/Process.h"
 
 namespace {    
-    class IQueue {
-    public:
-        virtual ~IQueue() = default;
-        virtual void send(sys_event_t const& t) = 0;
-        virtual sys_event_t receive(unsigned priority) = 0;
-        virtual void tryReceive(sys_event_t* arr, size_t size, size_t* number) = 0;
-        virtual void drain() = 0;
-    };
-    
-    template <template<class> class Q>
-    class EventQueue : public IQueue, public Q<sys_event_t> {
-    public:
-        void send(sys_event_t const& t) override {
-            Q<sys_event_t>::send(t);
-        }
-        sys_event_t receive(unsigned priority) override {
-            return Q<sys_event_t>::receive(priority);
-        }
-        void tryReceive(sys_event_t* arr, size_t size, size_t* number) override {
-            Q<sys_event_t>::tryReceive(arr, size, number);
-        }
-        void drain() override {
-            Q<sys_event_t>::drain();
-        }
-    };
+    using IQueue = IConcurrentQueue<sys_event_t>;
     
     struct queue_port_t {
         uint64_t name;
@@ -48,6 +25,7 @@ namespace {
 #define SYS_EVENT_QUEUE_LOCAL 0x00
 #define SYS_EVENT_PORT_NO_NAME 0x00
 #define SYS_EVENT_PORT_LOCAL   0x01
+#define SYS_SPU_THREAD_EVENT_USER 0x1
 
 int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                sys_event_queue_attribute_t* attr,
@@ -61,9 +39,9 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
            attr->attr_protocol == SYS_SYNC_FIFO);
     std::shared_ptr<IQueue> queue;
     if (attr->attr_protocol == SYS_SYNC_PRIORITY) {
-        queue.reset(new EventQueue<ConcurrentPriorityQueue>);
+        queue.reset(new ConcurrentPriorityQueue<sys_event_t>);
     } else {
-        queue.reset(new EventQueue<ConcurrentFifoQueue>);
+        queue.reset(new ConcurrentFifoQueue<sys_event_t>);
     }
     *equeue_id = queues.create(std::move(queue));
     return CELL_OK;
@@ -147,5 +125,35 @@ int32_t sys_event_port_disconnect(sys_event_port_t event_port_id) {
 
 int32_t sys_event_port_destroy(sys_event_port_t eport_id) {
     ports.destroy(eport_id);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_connect_event(uint32_t thread_id,
+                                     sys_event_queue_t eq,
+                                     sys_event_type_t et,
+                                     uint8_t spup,
+                                     Process* proc) {
+    assert(et ==  SYS_SPU_THREAD_EVENT_USER);
+    auto thread = proc->getSpuThread(thread_id);
+    auto queue = queues.get(eq);
+    thread->connectOrBindQueue(queue, spup);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
+                                  sys_event_queue_t spuq,
+                                  uint32_t spuq_num,
+                                  Process* proc) {
+    auto thread = proc->getSpuThread(thread_id);
+    auto queue = queues.get(spuq);
+    thread->connectOrBindQueue(queue, spuq_num);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
+                                                       sys_event_queue_t eq,
+                                                       uint64_t req,
+                                                       uint8_t* spup) {
+    assert(false);
     return CELL_OK;
 }

@@ -1340,3 +1340,21 @@ TEST_CASE("prx_library_c") {
         "library-c-main:done\n"
     );
 }
+
+TEST_CASE("spu_queue") {
+    auto output = startWaitGetOutput({"./binaries/spu_queue/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "source: 53505501, data: data1 [00223344,0000002c] [aabbccdd,00000000]\n"
+        "event.data01 == thread id: 1\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "count = 60\n"
+        "message : \n"
+        "## libsync : sample_sync_mutex_ppu SUCCEEDED ##\n"
+    );
+}
+

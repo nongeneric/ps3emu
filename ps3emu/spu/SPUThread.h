@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../libs/ConcurrentQueue.h"
+#include "../libs/sync/queue.h"
 #include "../constants.h"
 #include "../BitField.h"
 #include <boost/thread.hpp>
@@ -11,13 +12,19 @@
 #include <stdexcept>
 #include <string.h>
 #include <functional>
+#include <experimental/optional>
 
 static constexpr uint32_t LSLR = 0x3ffff;
 static constexpr uint32_t LocalStorageSize = 256 * 1024;
 
 class StopSignalException : public virtual std::runtime_error {
+    uint32_t _type;
 public:
-    StopSignalException() : std::runtime_error("stop signal") { }
+    StopSignalException(uint32_t type) : std::runtime_error("stop signal"), _type(type) { }
+    uint32_t type() {
+        return _type;
+        
+    }
 };
 
 enum class SPUThreadExitCause {
@@ -192,6 +199,16 @@ struct SPUThreadExitInfo {
     int32_t status;
 };
 
+struct InterruptThreadInfo {
+    uint32_t mask2;
+    std::function<void()> handler;
+};
+
+struct EventQueueInfo {
+    uint32_t port;
+    std::shared_ptr<IConcurrentQueue<sys_event_t>> queue;
+};
+
 class SPUThread : boost::noncopyable {
     uint32_t _nip;
     R128 _rs[128];
@@ -208,13 +225,16 @@ class SPUThread : boost::noncopyable {
     int32_t _exitCode;
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
-    std::function<void()> _interruptHandler;
+    std::experimental::optional<InterruptThreadInfo> _interruptHandler;
     ConcurrentFifoQueue<uint32_t> _toSpuMailbox;
     ConcurrentFifoQueue<uint32_t> _fromSpuMailbox;
     ConcurrentFifoQueue<uint32_t> _fromSpuInterruptMailbox;
     std::atomic<uint32_t> _status;
     uint64_t _id;
+    std::vector<EventQueueInfo> _eventQueues;
     void loop();
+    void handleSendEvent();
+    void handleReceiveEvent();
 
 public:
     SPUThread(Process* proc,
@@ -273,10 +293,13 @@ public:
     void setElfSource(uint32_t src);
     uint32_t getElfSource();
     void command(uint32_t word);
-    void setInterruptHandler(std::function<void()> interruptHandler);
+    void setInterruptHandler(uint32_t mask2, std::function<void()> interruptHandler);
+    // TODO: removeInterruptHandler
     ConcurrentFifoQueue<uint32_t>& getFromSpuMailbox();
     ConcurrentFifoQueue<uint32_t>& getFromSpuInterruptMailbox();
     ConcurrentFifoQueue<uint32_t>& getToSpuMailbox();
     std::atomic<uint32_t>& getStatus();
     void setId(uint64_t id);
+    void connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
+                            uint32_t portNumber);
 };

@@ -6,6 +6,7 @@
 #include "SPUDasm.h"
 #include <stdio.h>
 #include <signal.h>
+#include <boost/range/algorithm.hpp>
 
 void SPUThread::run() {
     _thread = boost::thread([=] { loop(); });
@@ -54,11 +55,19 @@ void SPUThread::loop() {
             _cause = e.cause();
             break;
         } catch (StopSignalException& e) {
-            _status |= 0b10;
-            _cause = SPUThreadExitCause::Exit;
-            break;
+            if (e.type() == 0x110) {
+                handleReceiveEvent();
+            } else {
+                _status |= 0b10;
+                _cause = SPUThreadExitCause::Exit;
+                break;
+            }
         } catch (SPUThreadInterruptException& e) {
-            _interruptHandler();
+            if (_interruptHandler && (_interruptHandler->mask2 & getStatus())) {
+                _interruptHandler->handler();
+            } else {
+                handleSendEvent();
+            }
         } catch (std::exception& e) {
             INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
             setNip(cia);
@@ -151,6 +160,11 @@ void SPUThread::setElfSource(uint32_t src) {
 #define MFC_PUTLLUC_CMD      0x00b0
 #define MFC_PUTQLLUC_CMD     0x00b8
 
+#define SYS_SPU_THREAD_EVENT_USER 0x1
+#define SYS_SPU_THREAD_EVENT_DMA  0x2
+#define SYS_SPU_THREAD_EVENT_USER_KEY 0xFFFFFFFF53505501ULL
+#define SYS_SPU_THREAD_EVENT_DMA_KEY  0xFFFFFFFF53505502ULL
+
 void SPUThread::command(uint32_t word) {
     union {
         uint32_t val;
@@ -203,7 +217,7 @@ void SPUThread::command(uint32_t word) {
         case MFC_PUTBS_CMD:
         case MFC_PUTRF_CMD:
         case MFC_PUTRB_CMD: {
-            // writeMemory always synchorizes
+            // writeMemory always synchronizes
             _proc->mm()->writeMemory(eal, lsa, size);
             break;
         }
@@ -211,8 +225,8 @@ void SPUThread::command(uint32_t word) {
     }
 }
 
-void SPUThread::setInterruptHandler(std::function<void()> interruptHandler) {
-    _interruptHandler = interruptHandler;
+void SPUThread::setInterruptHandler(uint32_t mask2, std::function<void()> interruptHandler) {
+    _interruptHandler = InterruptThreadInfo{mask2, interruptHandler};
 }
 
 std::atomic<uint32_t>& SPUThread::getStatus() {
@@ -237,4 +251,35 @@ ConcurrentFifoQueue<uint32_t>& SPUThread::getToSpuMailbox() {
 
 void SPUThread::cancel() {
     pthread_cancel(_thread.native_handle());
+}
+
+void SPUThread::handleSendEvent() {
+    auto data1 = _fromSpuMailbox.receive(0);
+    auto spupData0 = _fromSpuInterruptMailbox.receive(0);
+    auto port = (spupData0 >> 24) & 0xff;
+    auto data0 = spupData0 & 0xffffff;
+    auto info = boost::find_if(_eventQueues, [=](auto& i) {
+        return i.port == port;
+    });
+    assert(info != end(_eventQueues));
+    info->queue->send({SYS_SPU_THREAD_EVENT_USER_KEY, _id, ((uint64_t)port << 32) | data0, data1});
+    _toSpuMailbox.send(0);
+}
+
+void SPUThread::handleReceiveEvent() {
+    uint32_t port = r(3).w_pref();
+    auto info = boost::find_if(_eventQueues, [=](auto& i) {
+        return i.port == port;
+    });
+    assert(info != end(_eventQueues));
+    auto event = info->queue->receive(0);
+    _toSpuMailbox.send(event.source);
+    _toSpuMailbox.send(event.data1);
+    _toSpuMailbox.send(event.data2);
+    _toSpuMailbox.send(event.data3);
+}
+
+void SPUThread::connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
+                                   uint32_t portNumber) {
+    _eventQueues.push_back({portNumber, queue});
 }

@@ -9,8 +9,12 @@
 #include "ppu/InterruptPPUThread.h"
 #include <boost/thread/locks.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/filesystem.hpp>
 #include "log.h"
 #include <set>
+#include <cstdlib>
+
+using namespace boost::filesystem;
 
 MainMemory* Process::mm() {
     return _mainMemory.get();
@@ -22,6 +26,19 @@ ELFLoader* Process::elfLoader() {
 
 Rsx* Process::rsx() {
     return _rsx.get();
+}
+
+void Process::loadPrxStore() {
+    auto storePath = std::getenv("PS3_PRX_STORE");
+    if (!storePath)
+        return;
+    for (auto f = directory_iterator(storePath); f != directory_iterator(); ++f) {
+        if (is_directory(*f))
+            continue;
+        if (extension(*f) != ".prx")
+            continue;
+        loadPrx(f->path().string());
+    }
 }
 
 void Process::init(std::string elfPath, std::vector<std::string> args) {
@@ -37,6 +54,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     });
     _prxs.push_back(_elf);
     _elf->link(_mainMemory.get(), _prxs);
+    loadPrxStore();
     _internalMemoryManager.reset(new InternalMemoryManager());
     _internalMemoryManager->setMainMemory(_mainMemory.get());
     _contentManager.reset(new ContentManager());

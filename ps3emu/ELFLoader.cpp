@@ -134,6 +134,7 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
     
     _module = (module_info_t*)mm->getMemoryPointer(
         _pheaders->p_paddr - _pheaders->p_offset + imageBase, sizeof(module_info_t));
+    auto tocSize = _pheaders[1].p_vaddr + _pheaders[1].p_filesz - (_module->toc - 0x8000);
     rebase(_module->imports_start);
     rebase(_module->imports_end);
     rebase(_module->exports_start);
@@ -145,6 +146,16 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
     std::tie(exports, nexports) = this->exports(mm);
     std::tie(imports, nimports) = this->imports(mm);
     
+    auto tocVa = _module->toc - 0x8000;
+    auto toc = (big_uint32_t*)mm->getMemoryPointer(tocVa, tocSize);
+    for (auto i = 0u; i < tocSize / 4; ++i) {
+        if (imageBase && toc[i] > _pheaders[0].p_vaddr + _pheaders[0].p_memsz) {
+            rebase_aux(toc[i]);
+        } else {
+            rebase(toc[i]);
+        }
+    }
+            
     for (auto i = 0; i < nexports; ++i) {
         if (exports[i].name)
             rebase(exports[i].name);
@@ -159,12 +170,6 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
             auto descr = (fdescr*)mm->getMemoryPointer(stubs[j], sizeof(fdescr));
             rebase(descr->va);
             rebase_aux(descr->tocBase);
-        }
-        if (exports[i].name) {
-            auto tocs = (big_uint32_t*)mm->getMemoryPointer(_module->toc - 0x8000, 4 * exports[i].variables);
-            for (auto j = 0; j < exports[i].variables; ++j) {
-                rebase_aux(tocs[j]);
-            }
         }
     }
     
@@ -184,9 +189,16 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
         for (auto j = 0; j < imports[i].functions; ++j) {
             rebase(fstubs[j]);
             auto orisImm = (big_uint16_t*)mm->getMemoryPointer(fstubs[j] + 6, 2);
-            auto lwzImm = (big_uint16_t*)mm->getMemoryPointer(fstubs[j] + 10, 2);
-            *orisImm += prxPh1Va >> 16;
-            *lwzImm -= _pheaders[1].p_vaddr;
+            auto lwzImm = (big_int16_t*)mm->getMemoryPointer(fstubs[j] + 10, 2);
+            auto fstubVa = ((uint32_t)*orisImm << 16) + *lwzImm;
+            rebase_aux(fstubVa);
+            if (::align(fstubVa, 0x10000) > 0x8000) {
+                *orisImm = fstubVa >> 16;
+                *lwzImm = fstubVa & 0xffff;
+            } else {
+                *orisImm = (fstubVa + 1) >> 16;
+                *lwzImm = -(0x10000 - (fstubVa & 0xffff));
+            }
         }
     }
 }
@@ -212,6 +224,36 @@ std::tuple<prx_export_t*, int> ELFLoader::exports(MainMemory* mm) {
     return std::make_tuple(
         (prx_export_t*)mm->getMemoryPointer(_module->exports_start, count),
         count / sizeof(prx_export_t));
+}
+
+bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
+    auto name = prx->shortName();
+    if (name == "liblv2.prx") {
+        const char* allowed[] {
+            "_sys_strncmp",
+            "_sys_memset",
+            "_sys_strcat",
+            "_sys_vsnprintf",
+            "_sys_snprintf",
+            "_sys_strrchr",
+            "_sys_memcpy",
+            "_sys_strcpy",
+            "_sys_strncat",
+            "_sys_spu_printf_attach_group",
+            "_sys_spu_printf_initialize",
+            "_sys_spu_printf_finalize",
+            "_sys_spu_printf_detach_group",
+        };
+        for (auto s : allowed) {
+            if (id == calcFnid(s))
+                return true;
+        }
+        return false;
+    }
+    if (name == "libsre.prx") {
+        return false;
+    }
+    return true;
 }
 
 uint32_t findExportedSymbol(MainMemory* mm,
@@ -246,6 +288,8 @@ uint32_t findExportedSymbol(MainMemory* mm,
             
             for (auto j = first; j < last; ++j) {
                 if (fnids[j] == id) {
+                    if (!isSymbolWhitelisted(prx.get(), fnids[j]))
+                        continue;
                     return stubs[j];
                 }
             }

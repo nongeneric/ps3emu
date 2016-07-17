@@ -12,7 +12,6 @@ enum class InterruptType {
 
 struct InterruptInfo {
     InterruptType type;
-    uint64_t status;
 };
 
 class InterruptPPUThread : public PPUThread {
@@ -22,6 +21,7 @@ class InterruptPPUThread : public PPUThread {
     uint64_t _arg;
     void innerLoop() override;
     void handler(PPUThread* thread, PPUThreadEvent event);
+    SPUThread* _establishedThread = nullptr;
     
 public:
     InterruptPPUThread(Process* proc,

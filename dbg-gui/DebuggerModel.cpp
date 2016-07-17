@@ -656,7 +656,7 @@ void DebuggerModel::dumpImports() {
                         return s.va <= stub && stub < s.va + s.size;
                     });
                     auto resolution = segment == end(segments) ? "NCALL" : segment->elf->shortName();
-                    emit message(ssnprintf("    %s fnid_%08x | %s", type, fnids[j], resolution).c_str());
+                    emit message(ssnprintf("    %s fnid_%08X | %s", type, fnids[j], resolution).c_str());
                 }
             };
             printImports(imports[i].fnids, imports[i].fstubs, imports[i].functions, "FUNC    ", false);

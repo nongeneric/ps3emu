@@ -9,8 +9,17 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 
+template <typename T>
+struct IConcurrentQueue {
+    virtual ~IConcurrentQueue() = default;
+    virtual void send(T const& t) = 0;
+    virtual T receive(unsigned priority) = 0;
+    virtual void tryReceive(T* arr, size_t size, size_t* number) = 0;
+    virtual void drain() = 0;
+};
+
 template <template<class> class Q, typename T>
-class ConcurrentQueue {
+class ConcurrentQueue : public IConcurrentQueue<T> {
     
     struct WaitingThread {
         boost::thread::id id;
@@ -29,13 +38,13 @@ class ConcurrentQueue {
 public:
     ConcurrentQueue() = default;
     
-    void send(T const& t) {
+    void send(T const& t) override {
         boost::lock_guard<boost::mutex> lock(_mutex);
         _values.push(t);
         _cv.notify_all();
     }
     
-    T receive(unsigned priority) {
+    T receive(unsigned priority) override {
         auto id = boost::this_thread::get_id();
         boost::unique_lock<boost::mutex> lock(_mutex);
         _waiting.push({id, priority});
@@ -48,7 +57,7 @@ public:
         return val;
     }
     
-    void tryReceive(T* arr, size_t size, size_t* number) {
+    void tryReceive(T* arr, size_t size, size_t* number) override {
         boost::lock_guard<boost::mutex> lock(_mutex);
         *number = std::min(size, _values.size());
         for (auto i = 0u; i < *number; ++i) {
@@ -57,7 +66,7 @@ public:
         }
     }
     
-    void drain() {
+    void drain() override {
         boost::lock_guard<boost::mutex> lock(_mutex);
         while (!_values.empty())
             _values.pop();

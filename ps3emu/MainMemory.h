@@ -89,7 +89,7 @@ class MainMemory {
                                     bool cond);
     void writeSpuAddress(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readSpuAddress(ps3_uintptr_t va);
-        
+
 public:
     MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);

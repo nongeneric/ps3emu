@@ -9,6 +9,7 @@
 #include "../../utils.h"
 #include "../../ContentManager.h"
 #include "../../log.h"
+#include <boost/range/algorithm.hpp>
 #include <array>
 #include <vector>
 #include <fstream>
@@ -63,10 +64,10 @@ int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu) {
 int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
                              uint32_t type,
-                             MainMemory* mm) {
+                             PPUThread* th) {
     LOG << __FUNCTION__;
     img->elf = new SpuImage([=](uint32_t ptr, void* buf, size_t size) {
-        mm->readMemory(ptr, buf, size);
+        th->mm()->readMemory(ptr, buf, size);
     }, src);
     return CELL_OK;
 }
@@ -103,7 +104,7 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     sys_spu_thread_group_attribute_t* attr,
                                     MainMemory* mm) {
     LOG << __FUNCTION__;
-    assert(attr->type == SYS_SPU_THREAD_GROUP_TYPE_NORMAL);
+    //assert(attr->type == SYS_SPU_THREAD_GROUP_TYPE_NORMAL);
     auto group = std::make_shared<ThreadGroup>();
     group->name.resize(attr->nsize);
     mm->readMemory(attr->name, &group->name[0], attr->nsize);

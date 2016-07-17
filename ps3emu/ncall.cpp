@@ -571,6 +571,9 @@ STUB_1(cellSyncMutexLock);
 STUB_1(cellSyncMutexUnlock);
 STUB_6(_cellSpursEventFlagInitialize);
 STUB_1(ps3call_then);
+STUB_2(sys_process_is_spu_lock_line_reservation_address);
+STUB_5(sys_spu_thread_connect_event);
+STUB_4(sys_spu_thread_bind_queue);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -839,6 +842,9 @@ void PPUThread::scall() {
         case 804: nstub_sys_fs_close(this); break;
         case 137: nstub_sys_event_port_disconnect(this); break;
         case 135: nstub_sys_event_port_destroy(this); break;
+        case 14: nstub_sys_process_is_spu_lock_line_reservation_address(this); break;
+        case 191: nstub_sys_spu_thread_connect_event(this); break;
+        case 193: nstub_sys_spu_thread_bind_queue(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

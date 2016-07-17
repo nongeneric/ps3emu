@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Process.h"
+#include "ps3emu/Process.h"
 #include "../sys_defs.h"
 
 class SpuImage;
@@ -86,7 +86,7 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
 int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
                              uint32_t type,
-                             MainMemory* mm);
+                             PPUThread* proc);
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc);
 int32_t sys_spu_image_close(sys_spu_image_t* img);
 int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
