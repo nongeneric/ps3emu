@@ -212,6 +212,7 @@ void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, 
     thread->setStackInfo(stack, stackSize);
     
     // PPU_ABI-Specifications_e
+
     auto mm = thread->mm();
     
     fdescr entryDescr;
@@ -264,7 +265,7 @@ ContentManager* Process::contentManager() {
 uint32_t Process::createSpuThread(std::string name) {
     boost::unique_lock<boost::mutex> _(_spuThreadMutex);
     _spuThreads.emplace_back(
-        std::make_unique<SPUThread>(this,
+        std::make_shared<SPUThread>(this,
                                     name,
                                     [=](auto t, auto e) {
                                         _eventQueue.send(SPUThreadEventInfo{e, t});

@@ -574,6 +574,7 @@ STUB_1(ps3call_then);
 STUB_2(sys_process_is_spu_lock_line_reservation_address);
 STUB_5(sys_spu_thread_connect_event);
 STUB_4(sys_spu_thread_bind_queue);
+STUB_5(sys_spu_thread_group_connect_event_all_threads);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -845,6 +846,7 @@ void PPUThread::scall() {
         case 14: nstub_sys_process_is_spu_lock_line_reservation_address(this); break;
         case 191: nstub_sys_spu_thread_connect_event(this); break;
         case 193: nstub_sys_spu_thread_bind_queue(this); break;
+        case 251: nstub_sys_spu_thread_group_connect_event_all_threads(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

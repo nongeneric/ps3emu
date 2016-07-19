@@ -93,4 +93,16 @@ void HandleReadPrx(ReadPrxCommand const& command) {
                                    i);
         }
     }
+    
+    std::cout << "\n# relocations\n\n";
+    auto rel = (Elf64_be_Rela*)&elf[pheader[2].p_offset];
+    auto endRel = rel + pheader[2].p_filesz / sizeof(Elf64_be_Rela);
+    for (; rel != endRel; ++rel) {
+        assert(((uint64_t)rel->r_offset >> 32) == 0);
+        assert(((uint64_t)rel->r_addend >> 32) == 0);
+        uint64_t info = rel->r_info;
+        std::cout << ssnprintf("# offset: %08x\n", rel->r_offset)
+                  << ssnprintf("# sym: %08x; type: %08x; addend: %08x\n\n",
+                               ELF64_R_SYM(info), ELF64_R_TYPE(info), (uint32_t)rel->r_addend);
+    }
 }

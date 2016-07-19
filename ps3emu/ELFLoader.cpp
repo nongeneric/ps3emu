@@ -129,78 +129,41 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
         return;
     
     assert(prxPh1Va);
-    auto rebase = [=](auto& x) { x += imageBase; };
-    auto rebase_aux = [=](auto& x) { x += prxPh1Va - _pheaders[1].p_vaddr; };
+    
+    auto lo = [](uint32_t x) { return x & 0xffff; };
+    auto hi = [](uint32_t x) { return (x >> 16) & 0xffff; };
+    auto ha = [](uint32_t x) { return ((x >> 16) + ((x & 0x8000) ? 1 : 0)) & 0xffff; };
+    
+    auto rel = (Elf64_be_Rela*)&_file[_pheaders[2].p_offset];
+    auto endRel = rel + _pheaders[2].p_filesz / sizeof(Elf64_be_Rela);
+    for (; rel != endRel; ++rel) {
+        assert(((uint64_t)rel->r_offset >> 32) == 0);
+        assert(((uint64_t)rel->r_addend >> 32) == 0);
+        uint64_t info = rel->r_info;
+        uint32_t sym = ELF64_R_SYM(info);
+        uint32_t type = ELF64_R_TYPE(info);
+        auto offsetRelativeToSegment = sym & 0xff;
+        assert(offsetRelativeToSegment <= 1);
+        auto pointsToSegment = (sym >> 8) & 0xff;
+        assert(offsetRelativeToSegment <= 1);
+        auto offset = rel->r_offset + (offsetRelativeToSegment ? prxPh1Va : imageBase);
+        auto base = pointsToSegment ? prxPh1Va : imageBase;
+        auto val = rel->r_addend + base;
+        if (type == R_PPC64_ADDR32) {
+            mm->store<4>(offset, val);
+        } else if (type == R_PPC64_ADDR16_LO) {
+            mm->store<2>(offset, lo(val));
+        } else if (type == R_PPC64_ADDR16_HI) {
+            mm->store<2>(offset, hi(val));
+        } else if (type == R_PPC64_ADDR16_HA) {
+            mm->store<2>(offset, ha(val));
+        } else {
+            throw std::runtime_error("unimplemented reloc type");
+        }
+    }
     
     _module = (module_info_t*)mm->getMemoryPointer(
         _pheaders->p_paddr - _pheaders->p_offset + imageBase, sizeof(module_info_t));
-    auto tocSize = _pheaders[1].p_vaddr + _pheaders[1].p_filesz - (_module->toc - 0x8000);
-    rebase(_module->imports_start);
-    rebase(_module->imports_end);
-    rebase(_module->exports_start);
-    rebase(_module->exports_end);
-    rebase_aux(_module->toc);
-    prx_export_t* exports;
-    prx_import_t* imports;
-    int nexports, nimports;
-    std::tie(exports, nexports) = this->exports(mm);
-    std::tie(imports, nimports) = this->imports(mm);
-    
-    auto tocVa = _module->toc - 0x8000;
-    auto toc = (big_uint32_t*)mm->getMemoryPointer(tocVa, tocSize);
-    for (auto i = 0u; i < tocSize / 4; ++i) {
-        if (imageBase && toc[i] > _pheaders[0].p_vaddr + _pheaders[0].p_memsz) {
-            rebase_aux(toc[i]);
-        } else {
-            rebase(toc[i]);
-        }
-    }
-            
-    for (auto i = 0; i < nexports; ++i) {
-        if (exports[i].name)
-            rebase(exports[i].name);
-        rebase(exports[i].fnid_table);
-        rebase(exports[i].stub_table);
-        auto totalExports = exports[i].functions + exports[i].variables + exports[i].tls_variables;
-        auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * totalExports);
-        for (auto j = 0; j < totalExports; ++j) {
-            rebase_aux(stubs[j]);
-        }
-        for (auto j = 0; j < exports[i].functions; ++j) {
-            auto descr = (fdescr*)mm->getMemoryPointer(stubs[j], sizeof(fdescr));
-            rebase(descr->va);
-            rebase_aux(descr->tocBase);
-        }
-    }
-    
-    for (auto i = 0; i < nimports; ++i) {
-        rebase(imports[i].name);
-        rebase(imports[i].fnids);
-        rebase_aux(imports[i].fstubs);
-        rebase(imports[i].vnids);
-        rebase(imports[i].vstubs);
-        auto vstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].vstubs, 4 * imports[i].variables);
-        for (auto j = 0; j < imports[i].variables; ++j) {
-            rebase(vstubs[j]);
-            auto descr = (vdescr*)mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
-            rebase_aux(descr->toc);
-        }
-        auto fstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].fstubs, 4 * imports[i].functions);
-        for (auto j = 0; j < imports[i].functions; ++j) {
-            rebase(fstubs[j]);
-            auto orisImm = (big_uint16_t*)mm->getMemoryPointer(fstubs[j] + 6, 2);
-            auto lwzImm = (big_int16_t*)mm->getMemoryPointer(fstubs[j] + 10, 2);
-            auto fstubVa = ((uint32_t)*orisImm << 16) + *lwzImm;
-            rebase_aux(fstubVa);
-            if (::align(fstubVa, 0x10000) > 0x8000) {
-                *orisImm = fstubVa >> 16;
-                *lwzImm = fstubVa & 0xffff;
-            } else {
-                *orisImm = (fstubVa + 1) >> 16;
-                *lwzImm = -(0x10000 - (fstubVa & 0xffff));
-            }
-        }
-    }
 }
 
 std::tuple<prx_import_t*, int> ELFLoader::prxImports(MainMemory* mm) {

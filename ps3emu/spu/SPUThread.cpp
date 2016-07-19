@@ -283,3 +283,10 @@ void SPUThread::connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>
                                    uint32_t portNumber) {
     _eventQueues.push_back({portNumber, queue});
 }
+
+bool SPUThread::isAvailableQueuePort(uint8_t portNumber) {
+    auto it = boost::find_if(_eventQueues, [=](auto& i) {
+        return i.port == portNumber;
+    });
+    return it == end(_eventQueues);
+}

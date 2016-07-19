@@ -131,7 +131,7 @@ class Process {
     std::unique_ptr<CallbackThread> _callbackThread;
     std::vector<std::unique_ptr<PPUThread>> _threads;
     boost::mutex _ppuThreadMutex;
-    std::vector<std::unique_ptr<SPUThread>> _spuThreads;
+    std::vector<std::shared_ptr<SPUThread>> _spuThreads;
     boost::mutex _spuThreadMutex;
     IDMap<uint64_t, PPUThread*> _threadIds;
     IDMap<uint32_t, SPUThread*> _spuThreadIds;

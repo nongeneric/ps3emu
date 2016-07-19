@@ -65,6 +65,12 @@ typedef struct
     boost::endian::big_uint64_t   st_size;                /* Symbol size */
 } Elf64_be_Sym;
 
+typedef struct {
+    boost::endian::big_uint64_t	r_offset;
+    boost::endian::big_uint64_t	r_info;
+    boost::endian::big_uint64_t	r_addend;
+} Elf64_be_Rela;
+
 struct fdescr {
     boost::endian::big_uint32_t va;
     boost::endian::big_uint32_t tocBase;
@@ -132,6 +138,7 @@ static_assert(sizeof(Elf64_be_Ehdr) == sizeof(Elf64_Ehdr), "big endian struct mi
 static_assert(sizeof(Elf64_be_Phdr) == sizeof(Elf64_Phdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Shdr) == sizeof(Elf64_Shdr), "big endian struct mismatch");
 static_assert(sizeof(Elf64_be_Sym) == sizeof(Elf64_Sym), "big endian struct mismatch");
+static_assert(sizeof(Elf64_be_Rela) == sizeof(Elf64_Rela), "big endian struct mismatch");
 static_assert(sizeof(module_info_t) == 0x34, "");
 static_assert(sizeof(prx_export_t) == 0x1c, "");
 static_assert(sizeof(prx_import_t) == 0x2c, "");

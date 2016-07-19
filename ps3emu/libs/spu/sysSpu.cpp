@@ -23,12 +23,6 @@
 #define SYS_SPU_THREAD_GROUP_TYPE_EXCLUSIVE_NON_CONTEXT  0x18
 #define SYS_SPU_THREAD_GROUP_TYPE_COOPERATE_WITH_SYSTEM  0x20
 
-struct ThreadGroup {
-    std::vector<uint32_t> threads;
-    std::string name;
-    std::map<uint32_t, int32_t> errorCodes;
-};
-
 struct InterruptTag;
 
 struct RawSpu {
@@ -408,4 +402,8 @@ emu_void_t sys_interrupt_thread_eoi() {
 
 SPUThread* findRawSpuThread(sys_raw_spu_t id) {
     return rawSpus.get(id)->thread;
+}
+
+std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id) {
+    return groups.get(id);
 }

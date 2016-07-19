@@ -72,4 +72,5 @@ int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
 int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        sys_event_queue_t eq,
                                                        uint64_t req,
-                                                       uint8_t* spup);
+                                                       uint8_t* spup,
+                                                       Process* proc);

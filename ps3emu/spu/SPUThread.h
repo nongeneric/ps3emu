@@ -302,4 +302,5 @@ public:
     void setId(uint64_t id);
     void connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
                             uint32_t portNumber);
+    bool isAvailableQueuePort(uint8_t portNumber);
 };

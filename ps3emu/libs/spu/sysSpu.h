@@ -54,6 +54,12 @@ struct sys_spu_thread_argument_t {
     big_uint64_t arg4;
 };
 
+struct ThreadGroup {
+    std::vector<uint32_t> threads;
+    std::string name;
+    std::map<uint32_t, int32_t> errorCodes;
+};
+
 #define X(k, v) k = v,
 #define TagClassIdX \
     X(_MFC_LSA, 0x3004U) \
@@ -135,3 +141,4 @@ int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t s
 emu_void_t sys_interrupt_thread_eoi();
 
 SPUThread* findRawSpuThread(sys_raw_spu_t id);
+std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id);

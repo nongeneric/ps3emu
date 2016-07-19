@@ -3,9 +3,11 @@
 #include "../ConcurrentQueue.h"
 #include "../../IDMap.h"
 #include "../../MainMemory.h"
-#include <boost/thread.hpp>
+#include "../spu/sysSpu.h"
 #include "ps3emu/log.h"
 #include "ps3emu/Process.h"
+#include <boost/thread.hpp>
+#include <algorithm>
 
 namespace {    
     using IQueue = IConcurrentQueue<sys_event_t>;
@@ -153,7 +155,28 @@ int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
 int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        sys_event_queue_t eq,
                                                        uint64_t req,
-                                                       uint8_t* spup) {
+                                                       uint8_t* spup,
+                                                       Process* proc) {
+    auto group = findThreadGroup(group_id);
+    std::vector<SPUThread*> threads;
+    std::transform(begin(group->threads), end(group->threads), std::back_inserter(threads), [=](auto id) {
+        return proc->getSpuThread(id);
+    });
+    auto queue = queues.get(eq);
+    for (auto i = 0u; i < 64; ++i) {
+        if (((1ull << i) & req) == 0)
+            continue;
+        auto available = std::all_of(begin(threads), end(threads), [=](auto& th) {
+            return th->isAvailableQueuePort(i);
+        });
+        if (available) {
+            for (auto& th : threads) {
+                th->connectOrBindQueue(queue, i);
+            }
+            *spup = i;
+            return CELL_OK;
+        }
+    }
     assert(false);
-    return CELL_OK;
+    return -1;
 }
