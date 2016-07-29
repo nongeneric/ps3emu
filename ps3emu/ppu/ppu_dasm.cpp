@@ -832,6 +832,25 @@ EMU(SUBFC, XOForm_1) {
     update_CR0_OV(i->OE, i->Rc, ca, res, TH);
 }
 
+PRINT(SUBFE, XOForm_1) {
+    const char* mnemonics[][2] = {
+        { "subfe", "subfe." }, { "subfeo", "subfeo." }
+    };
+    *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
+}
+
+EMU(SUBFE, XOForm_1) {
+    auto ra = TH->getGPR(i->RA);
+    auto rb = TH->getGPR(i->RB);
+    unsigned __int128 res = ~ra;
+    res += rb;
+    res += TH->getCA();
+    auto ca = res >> 64;
+    TH->setCA(ca);
+    TH->setGPR(i->RT, res);
+    update_CR0_OV(i->OE, i->Rc, ca, res, TH);
+}
+
 // Fixed-Point Logical Instructions, p65
 
 // AND
@@ -3392,6 +3411,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 4: invoke(TW);
                 case 10: invoke(ADDC);
                 case 8: invoke(SUBFC);
+                case 136: invoke(SUBFE);
                 case 20: invoke(LWARX);
                 case 84: invoke(LDARX);
                 case 150: invoke(STWCX);

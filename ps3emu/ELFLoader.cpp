@@ -202,6 +202,7 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
             "_sys_memcpy",
             "_sys_strcpy",
             "_sys_strncat",
+            "_sys_strncpy",
             "_sys_spu_printf_attach_group",
             "_sys_spu_printf_initialize",
             "_sys_spu_printf_finalize",
@@ -214,6 +215,9 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
         return false;
     }
     if (name == "libsre.prx") {
+        return false;
+    }
+    if (name == "libsync2.prx") {
         return false;
     }
     return true;

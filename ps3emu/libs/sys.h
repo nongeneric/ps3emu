@@ -116,7 +116,7 @@ int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code,
 int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread);
 int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc);
 emu_void_t sys_ppu_thread_yield(PPUThread* thread);
-int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, int32_t* prio, Process* proc);
+int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, big_int32_t* prio, Process* proc);
 
 emu_void_t sys_process_exit(PPUThread* thread);
 emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread);
@@ -124,3 +124,10 @@ emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUT
 int32_t sys_process_is_stack(ps3_uintptr_t p);
 int32_t _sys_strlen(cstring_ptr_t str);
 int32_t sys_process_is_spu_lock_line_reservation_address(ps3_uintptr_t addr, uint64_t flags);
+uint32_t sys_process_getpid();
+int32_t sys_process_get_sdk_version(uint32_t pid, big_uint32_t* version);
+sys_prx_id_t sys_prx_get_module_id_by_name(cstring_ptr_t name,
+                                           uint64_t flags,
+                                           uint64_t pOpt,
+                                           PPUThread* thread);
+int32_t _sys_printf(cstring_ptr_t format, PPUThread* thread);

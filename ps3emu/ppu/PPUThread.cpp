@@ -196,3 +196,7 @@ uint64_t ps3call_then(PPUThread* thread) {
     // TODO: delete stub
     return thread->getGPR(3);
 }
+
+unsigned PPUThread::getId() {
+    return _id;
+}

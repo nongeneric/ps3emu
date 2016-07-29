@@ -288,23 +288,23 @@ void splitSpuRegisterAddress(uint32_t va, uint32_t& id, uint32_t& offset) {
 void MainMemory::writeSpuAddress(ps3_uintptr_t va, const void* src, uint32_t len) {
     uint32_t id, offset;
     splitSpuRegisterAddress(va, id, offset);
+    auto th = findRawSpuThread(id);
     if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
         assert(len == 4);
         auto val = *(big_uint32_t*)src;
-        sys_raw_spu_mmio_write(id, (TagClassId)offset, val, _proc);
+        th->channels()->mmio_write(offset, val);
         return;
     }
-    auto th = findRawSpuThread(id);
     memcpy(th->ptr(offset), src, len);
 }
 
 uint32_t MainMemory::readSpuAddress(ps3_uintptr_t va) {
     uint32_t id, offset;
     splitSpuRegisterAddress(va, id, offset);
-    if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
-        return sys_raw_spu_mmio_read(id, (TagClassId)offset, _proc);
-    }
     auto th = findRawSpuThread(id);
+    if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
+        return th->channels()->mmio_read(offset);
+    }
     return *(big_uint32_t*)th->ptr(offset);
 }
 

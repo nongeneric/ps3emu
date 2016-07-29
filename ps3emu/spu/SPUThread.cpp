@@ -80,6 +80,10 @@ void SPUThread::loop() {
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 
+std::atomic<uint32_t>& SPUThread::getStatus() {
+    return _status;
+}
+
 void SPUThread::singleStepBreakpoint() {
     _singleStep = true;
 }
@@ -93,6 +97,7 @@ SPUThread::SPUThread(Process* proc,
                      std::function<void(SPUThread*, SPUThreadEvent)> eventHandler)
     : _name(name),
       _proc(proc),
+      _channels(proc->mm(), this),
       _eventHandler(eventHandler),
       _dbgPaused(true),
       _singleStep(false),
@@ -102,9 +107,7 @@ SPUThread::SPUThread(Process* proc,
         r.dw<0>() = 0;
         r.dw<1>() = 0;
     }
-    std::fill(std::begin(_ch), std::end(_ch), 0);
     std::fill(std::begin(_ls), std::end(_ls), 0);
-    _ch[MFC_WrTagMask] = -1;
     _status = 0b11000; // BTHSM
 }
 
@@ -129,124 +132,17 @@ void SPUThread::setElfSource(uint32_t src) {
     _elfSource = src;
 }
 
-#define MFC_PUT_CMD          0x0020
-#define MFC_PUTS_CMD         0x0028   /*  PU Only */
-#define MFC_PUTR_CMD         0x0030
-#define MFC_PUTF_CMD         0x0022
-#define MFC_PUTB_CMD         0x0021
-#define MFC_PUTFS_CMD        0x002A   /*  PU Only */
-#define MFC_PUTBS_CMD        0x0029   /*  PU Only */
-#define MFC_PUTRF_CMD        0x0032
-#define MFC_PUTRB_CMD        0x0031
-#define MFC_PUTL_CMD         0x0024   /* SPU Only */
-#define MFC_PUTRL_CMD        0x0034   /* SPU Only */
-#define MFC_PUTLF_CMD        0x0026   /* SPU Only */
-#define MFC_PUTLB_CMD        0x0025   /* SPU Only */
-#define MFC_PUTRLF_CMD       0x0036   /* SPU Only */
-#define MFC_PUTRLB_CMD       0x0035   /* SPU Only */
-
-#define MFC_GET_CMD          0x0040
-#define MFC_GETS_CMD         0x0048   /*  PU Only */
-#define MFC_GETF_CMD         0x0042
-#define MFC_GETB_CMD         0x0041
-#define MFC_GETFS_CMD        0x004A   /*  PU Only */
-#define MFC_GETBS_CMD        0x0049   /*  PU Only */
-#define MFC_GETL_CMD         0x0044   /* SPU Only */
-#define MFC_GETLF_CMD        0x0046   /* SPU Only */
-#define MFC_GETLB_CMD        0x0045   /* SPU Only */
-
-#define MFC_GETLLAR_CMD      0x00d0
-#define MFC_PUTLLC_CMD       0x00b4
-#define MFC_PUTLLUC_CMD      0x00b0
-#define MFC_PUTQLLUC_CMD     0x00b8
-
 #define SYS_SPU_THREAD_EVENT_USER 0x1
 #define SYS_SPU_THREAD_EVENT_DMA  0x2
 #define SYS_SPU_THREAD_EVENT_USER_KEY 0xFFFFFFFF53505501ULL
 #define SYS_SPU_THREAD_EVENT_DMA_KEY  0xFFFFFFFF53505502ULL
 
-void SPUThread::command(uint32_t word) {
-    union {
-        uint32_t val;
-        BitField<0, 8> tid;
-        BitField<8, 16> rid;
-        BitField<16, 32> opcode;
-    } cmd = { word };
-    auto eal = ch(MFC_EAL);
-    auto lsa = ptr(ch(MFC_LSA));
-    auto size = ch(MFC_Size);
-    auto opcode = cmd.opcode.u();
-    switch (opcode) {
-        case MFC_GETLLAR_CMD: {
-            _proc->mm()->readReserve(eal, lsa, size);
-            // reservation always succeeds
-            ch(MFC_RdAtomicStat) |= 0b100; // G
-            break;
-        }
-        case MFC_GET_CMD:
-        case MFC_GETS_CMD:
-        case MFC_GETF_CMD:
-        case MFC_GETB_CMD:
-        case MFC_GETFS_CMD:
-        case MFC_GETBS_CMD: {
-            // readMemory always synchronizes
-            _proc->mm()->readMemory(eal, lsa, size);
-            break;
-        }
-        case MFC_PUTLLC_CMD: // TODO: handle sizes correctly
-        case MFC_PUTLLUC_CMD:
-        case MFC_PUTQLLUC_CMD: {
-            auto stored = _proc->mm()->writeCond(eal, lsa, size);
-            if (opcode == MFC_PUTLLUC_CMD) {
-                if (!stored) {
-                    _proc->mm()->writeMemory(eal, lsa, size);
-                } else {
-                    ch(MFC_RdAtomicStat) |= 0b010; // U
-                }
-            } else if (opcode == MFC_PUTLLC_CMD) {
-                ch(MFC_RdAtomicStat) |= !stored; // S
-            }
-            break;
-        }
-        case MFC_PUT_CMD:
-        case MFC_PUTS_CMD:
-        case MFC_PUTR_CMD:
-        case MFC_PUTF_CMD:
-        case MFC_PUTB_CMD:
-        case MFC_PUTFS_CMD:
-        case MFC_PUTBS_CMD:
-        case MFC_PUTRF_CMD:
-        case MFC_PUTRB_CMD: {
-            // writeMemory always synchronizes
-            _proc->mm()->writeMemory(eal, lsa, size);
-            break;
-        }
-        default: throw std::runtime_error("not implemented");
-    }
-}
-
 void SPUThread::setInterruptHandler(uint32_t mask2, std::function<void()> interruptHandler) {
     _interruptHandler = InterruptThreadInfo{mask2, interruptHandler};
 }
 
-std::atomic<uint32_t>& SPUThread::getStatus() {
-    return _status;
-}
-
 void SPUThread::setId(uint64_t id){
     _id = id;
-}
-
-ConcurrentFifoQueue<uint32_t>& SPUThread::getFromSpuMailbox() {
-    return _fromSpuMailbox;
-}
-
-ConcurrentFifoQueue<uint32_t>& SPUThread::getFromSpuInterruptMailbox() {
-    return _fromSpuInterruptMailbox;
-}
-
-ConcurrentFifoQueue<uint32_t>& SPUThread::getToSpuMailbox() {
-    return _toSpuMailbox;
 }
 
 void SPUThread::cancel() {
@@ -254,8 +150,8 @@ void SPUThread::cancel() {
 }
 
 void SPUThread::handleSendEvent() {
-    auto data1 = _fromSpuMailbox.receive(0);
-    auto spupData0 = _fromSpuInterruptMailbox.receive(0);
+    auto data1 = _channels.mmio_read(SPU_Out_MBox);
+    auto spupData0 = _channels.mmio_read(SPU_Out_Intr_Mbox);
     auto port = (spupData0 >> 24) & 0xff;
     auto data0 = spupData0 & 0xffffff;
     auto info = boost::find_if(_eventQueues, [=](auto& i) {
@@ -263,20 +159,20 @@ void SPUThread::handleSendEvent() {
     });
     assert(info != end(_eventQueues));
     info->queue->send({SYS_SPU_THREAD_EVENT_USER_KEY, _id, ((uint64_t)port << 32) | data0, data1});
-    _toSpuMailbox.send(0);
+    _channels.mmio_write(SPU_In_MBox, 0);
 }
 
 void SPUThread::handleReceiveEvent() {
-    uint32_t port = r(3).w_pref();
+    uint32_t port = _channels.mmio_read(SPU_Out_MBox);
     auto info = boost::find_if(_eventQueues, [=](auto& i) {
         return i.port == port;
     });
     assert(info != end(_eventQueues));
     auto event = info->queue->receive(0);
-    _toSpuMailbox.send(event.source);
-    _toSpuMailbox.send(event.data1);
-    _toSpuMailbox.send(event.data2);
-    _toSpuMailbox.send(event.data3);
+    _channels.mmio_write(SPU_In_MBox, event.source);
+    _channels.mmio_write(SPU_In_MBox, event.data1);
+    _channels.mmio_write(SPU_In_MBox, event.data2);
+    _channels.mmio_write(SPU_In_MBox, event.data3);
 }
 
 void SPUThread::connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
@@ -289,4 +185,16 @@ bool SPUThread::isAvailableQueuePort(uint8_t portNumber) {
         return i.port == portNumber;
     });
     return it == end(_eventQueues);
+}
+
+uint64_t SPUThread::getId() {
+    return _id;
+}
+
+std::string SPUThread::getName() {
+    return _name;
+}
+
+SPUChannels* SPUThread::channels() {
+    return &_channels;
 }

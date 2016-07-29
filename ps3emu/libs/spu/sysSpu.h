@@ -60,30 +60,6 @@ struct ThreadGroup {
     std::map<uint32_t, int32_t> errorCodes;
 };
 
-#define X(k, v) k = v,
-#define TagClassIdX \
-    X(_MFC_LSA, 0x3004U) \
-    X(_MFC_EAH, 0x3008U) \
-    X(_MFC_EAL, 0x300CU) \
-    X(MFC_Size_Tag, 0x3010U) \
-    X(MFC_Class_CMD, 0x3014U) \
-    X(MFC_QStatus, 0x3104U) \
-    X(Prxy_QueryType, 0x3204U) \
-    X(Prxy_QueryMask, 0x321CU) \
-    X(Prxy_TagStatus, 0x322CU) \
-    X(SPU_Out_MBox, 0x4004U) \
-    X(SPU_In_MBox, 0x400CU) \
-    X(SPU_MBox_Status, 0x4014U) \
-    X(SPU_RunCntl, 0x401CU) \
-    X(SPU_Status, 0x4024U) \
-    X(SPU_NPC, 0x4034U) \
-    X(SPU_Sig_Notify_1, 0x1400CU) \
-    X(SPU_Sig_Notify_2, 0x1C00CU)
-    
-enum class TagClassId : uint32_t {
-    TagClassIdX
-};
-
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu);
 int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
@@ -119,7 +95,7 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc);
 int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img);
 int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* entry, Process* proc);
 int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
-                                         TagClassId class_id,
+                                         unsigned class_id,
                                          uint32_t unused,
                                          sys_interrupt_tag_t* intrtag);
 int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
@@ -129,16 +105,18 @@ int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
                                        Process* proc);
 int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id, uint32_t class_id, uint64_t mask);
 int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
-                               TagClassId classId,
-                               uint32_t value,
-                               Process* proc);
-uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc);
+                               unsigned classId,
+                               uint32_t value);
+uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, unsigned classId);
 int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
                                  uint32_t class_id,
                                  big_uint64_t* stat);
 int32_t sys_raw_spu_read_puint_mb(sys_raw_spu_t id, big_uint32_t* value);
 int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t stat);
 emu_void_t sys_interrupt_thread_eoi();
+int32_t sys_spu_thread_group_connect_event(sys_spu_thread_group_t id,
+                                           sys_event_queue_t eq,
+                                           sys_event_type_t et);
 
 SPUThread* findRawSpuThread(sys_raw_spu_t id);
 std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id);

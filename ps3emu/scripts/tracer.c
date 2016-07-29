@@ -464,6 +464,17 @@ sn_address get_pc_addr(sn_uint32 process, sn_uint64 thread) {
 	return addr;
 }
 
+void runto(sn_uint32 process, sn_uint64 thread, sn_uint32 to) {
+	sn_address to_address;
+	to_address.word[0] = to;
+	
+	PS3AddBreakPoint(process, thread, to_address, 0);
+	PS3ThreadStart(process, thread);
+	while (to_address.word[0] != get_pc(process, thread)) {
+	}
+	PS3RemoveAllBreakPoints(process, thread);
+}
+
 // PS3ThreadStep doesn't work for SPU threads
 // this function emulates single stepping by interpreting
 // branch instructions and using breakpoints to stop at 
@@ -500,6 +511,17 @@ void step_in(sn_uint32 process, sn_uint64 thread) {
 				PS3EvaluateExpression(process, thread, &result, spuregstrs[ra]);
 				pc.word[0] = result.val.i128.word[3];
 				printf("bi to %08x\n", pc.word[0]);
+				break;
+			}
+			case 0x129:
+			case 0x128: {
+				PS3EvaluateExpression(process, thread, &result, spuregstrs[rt]);
+				if ((result.val.i128.word[3] == 0 && opcode11 == 0x128) ||
+				    (result.val.i128.word[3] != 0 && opcode11 == 0x129)) {
+					PS3EvaluateExpression(process, thread, &result, spuregstrs[ra]);
+					pc.word[0] = (result.val.i128.word[3] & 0xfffffffc);
+					printf("biz/binz to %08x\n", pc.word[0]);
+				}
 				break;
 			}
 			default: {
@@ -563,6 +585,142 @@ void step_over(sn_uint32 process, sn_uint64 thread) {
 	}
 }
 
+void spu_traceto(unsigned long to, unsigned long* steps, sn_uint32 uProcessID, sn_uint64 uThreadID, FILE* f) {
+	unsigned long pc;
+	sn_val result;
+	int i;
+	
+	while (pc != to) {
+		pc = get_pc(uProcessID, uThreadID);
+		
+		fprintf(f, "pc:%08x;", pc);
+		fflush(f);
+		
+		for (i = 0; i < 128; i++) {
+			if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, spuregstrs[i]))) {
+				printf("\nError: %s", GetLastErrorString());
+				break;
+			}
+			fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
+				result.val.i128.word[3],
+				result.val.i128.word[2],
+				result.val.i128.word[1],
+				result.val.i128.word[0]);
+			fflush(f);
+		}
+		
+		fprintf(f, "\n");
+		
+		step_in(uProcessID, uThreadID);
+		
+		if (*steps % 100 == 0) {
+			printf("steps = %d\n", *steps);
+		}
+		
+		(*steps)++;
+		
+		pc = get_pc(uProcessID, uThreadID);
+	}
+}
+
+void ppu_traceto(unsigned long to, unsigned long* steps, sn_uint32 uProcessID, sn_uint64 uThreadID, FILE* f) {
+	unsigned long pc, oldpc;
+	sn_val result;
+	int i;
+	
+	while (pc != to) {
+		PS3UpdateTargetInfo();
+		
+		if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, "pc"))) {
+			printf("\nError: %s", GetLastErrorString());
+			break;
+		}
+		
+		pc = result.val.i64.word[0];
+		oldpc = pc;
+		
+		fprintf(f, "pc:%08x;", pc);
+		fflush(f);
+		
+		for (i = 0; i < 32; i++) {
+			if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, regstrs[i]))) {
+				printf("\nError: %s", GetLastErrorString());
+				break;
+			}
+			fprintf(f, "r%d:%08x%08x;", i, result.val.i64.word[1], result.val.i64.word[0]);
+			fflush(f);
+		}
+		
+		for (i = 0; i < 32; i++) {
+			if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, vmregstrs[i]))) {
+				printf("\nError: %s", GetLastErrorString());
+				break;
+			}
+			fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
+				result.val.i128.word[3],
+				result.val.i128.word[2],
+				result.val.i128.word[1],
+				result.val.i128.word[0]);
+			fflush(f);
+		}
+		
+		fprintf(f, "\n");
+		
+		PS3UpdateTargetInfo();
+		
+		if (SN_FAILED(PS3ThreadStep(uProcessID, uThreadID, SM_DISASSEMBLY))) {
+			printf("\nError: %s", GetLastErrorString());
+			break;
+		}
+		
+		while (pc == oldpc) {
+			if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, "pc"))) {
+				printf("\nError: %s", GetLastErrorString());
+				break;
+			}
+			pc = result.val.i64.word[0];
+			PS3UpdateTargetInfo();
+		}
+		
+		if (*steps % 100 == 0) {
+			printf("steps = %d\n", *steps);
+		}
+		
+		(*steps)++;
+	}
+}
+
+int read_script_line(FILE* f, char* command, sn_uint32* address) {
+	char buf[200];
+	int i;
+	
+	fgets(buf, 200, f);
+	i = 0;
+	*address = 0;
+	
+	while (buf[i] == '\n' || buf[i] == ' ')
+		i++;
+	
+	if (buf[i] != 't' && buf[i] != 's')
+		return 1;
+	*command = buf[i++];
+	
+	while (buf[i] == '\n' || buf[i] == ' ')
+		i++;
+	for (;;) {
+		if (buf[i] < '0' || ('9' < buf[i] && buf[i] < 'A') || buf[i] > 'F')
+			return 0;
+		
+		*address <<= 4;
+		if ('0' <= buf[i] && buf[i] <= '9') {
+			*address |= buf[i] - '0';
+		} else {
+			*address |= buf[i] - 'A' + 0xa;
+		}
+		i++;
+	}
+}
+
 ////////////////////////////////////////////////////
 int main(int argc, char ** argv)
 {
@@ -613,7 +771,10 @@ int main(int argc, char ** argv)
 	sn_address sn_pc;
 	sn_address addr;
 	FILE* f;
+	FILE* scriptf;
 	const char* fpath = "/c/file.txt";
+	char chr;
+	unsigned long nextpc;
 
 	pAddress = malloc(uSize64);
 	pBuffIn[0] = 0xDE;
@@ -621,8 +782,8 @@ int main(int argc, char ** argv)
 	pBuffIn[2] = 0xBE;
 	pBuffIn[3] = 0xEF;
 	
-	AddMenuItem("!---------- Trace PPU", &uSrcItemId[0], "MemoryView");
-	AddMenuItem("!---------- Trace SPU", &uSrcItemId[1], "MemoryView");
+	AddMenuItem("!---------- Trace PPU (script)", &uSrcItemId[0], "MemoryView");
+	AddMenuItem("!---------- Trace SPU (script)", &uSrcItemId[1], "MemoryView");
 	AddMenuItem("!---------- Single Step", &uSrcItemId[2], "DisasmView");
 	AddMenuItem("!---------- Eval", &uSrcItemId[3], "DisasmView");
 
@@ -659,54 +820,33 @@ int main(int argc, char ** argv)
 			GetObjectData(LOWORD(Notify.pParam2), GVD_PROCESS, &uProcessID, uSize32);
 			printf("\nEvaluate in the Thread 0x%x and Process %x context\n", uThreadID.word[0], uProcessID);
 			
-			printf(">>");
-			GetInputLine(pInputBuffer, sizeof(pInputBuffer)/sizeof(char), &uInputLength);
-			to = strtoul(pInputBuffer, NULL, 16);
-			puts("\n");
-			
-			//FileSelectionDialog(filePath, fileName);
-			
-			//printf("%s\n", filePath);
-			//printf("%s\n", fileName);
+			//printf(">>");
+			//GetInputLine(pInputBuffer, sizeof(pInputBuffer)/sizeof(char), &uInputLength);
+			//to = strtoul(pInputBuffer, NULL, 16);
+			//puts("\n");
 			
 			f = fopen("C:\\Users\\tr\\Desktop\\ps3realtrace.txt", "w");
 			if (!f) {
 				printf("failed to open file %s\n", fpath);
 				break;
 			}
-			printf("\ntracing to %x\n", to);
+			
 			pc = 0;
 			steps = 1;
-			while (pc != to) {
-				pc = get_pc(uProcessID, uThreadID);
-				
-				fprintf(f, "pc:%08x;", pc);
-				fflush(f);
-				
-				for (i = 0; i < 128; i++) {
-					if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, spuregstrs[i]))) {
-						printf("\nError: %s", GetLastErrorString());
-						break;
-					}
-					fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
-						result.val.i128.word[3],
-						result.val.i128.word[2],
-						result.val.i128.word[1],
-						result.val.i128.word[0]);
-					fflush(f);
+			
+			scriptf = fopen("C:\\Users\\tr\\Desktop\\ps3_spu_trace_script.txt", "r");
+			
+			while (!read_script_line(scriptf, &chr, &to)) {
+				if (chr == 's') { // skip
+					printf("skipping to %x\n", to);
+					runto(uProcessID, uThreadID, to);
+				} else { // 't' trace
+					printf("tracing to %x\n", to);
+					spu_traceto(to, &steps, uProcessID, uThreadID, f);
 				}
-				
-				fprintf(f, "\n");
-				
-				step_in(uProcessID, uThreadID);
-				
-				if (steps % 100 == 0) {
-					printf("steps = %d\n", steps);
-				}
-				
-				steps++;
 			}
 			
+			fclose(scriptf);
 			fclose(f);
 		}
 		if ((sn_uint32)Notify.pParam1 == uSrcItemId[0])
@@ -714,91 +854,30 @@ int main(int argc, char ** argv)
 			GetObjectData(LOWORD(Notify.pParam2), GVD_THREAD, &uThreadID, uSize64);
 			GetObjectData(LOWORD(Notify.pParam2), GVD_PROCESS, &uProcessID, uSize32);
 			printf("\nEvaluate in the Thread 0x%x and Process %x context\n", uThreadID.word[0], uProcessID);
-			bContinueEval = TRUE;
-			while(bContinueEval)
-			{
-				printf(">>");
-				GetInputLine(pInputBuffer, sizeof(pInputBuffer)/sizeof(char), &uInputLength);
-				to = strtoul(pInputBuffer, NULL, 16);
-				puts("\n");
-				
-				//FileSelectionDialog(filePath, fileName);
-				
-				//printf("%s\n", filePath);
-				//printf("%s\n", fileName);
-				
-				f = fopen("C:\\Users\\tr\\Desktop\\ps3realtrace.txt", "w");
-				if (!f) {
-					printf("failed to open file %s\n", fpath);
-					break;
-				}
-				printf("\ntracing to %x\n", to);
-				pc = 0;
-				steps = 1;
-				while (pc != to) {
-					PS3UpdateTargetInfo();
-					
-					if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, "pc"))) {
-						printf("\nError: %s", GetLastErrorString());
-						break;
-					}
-					
-					pc = result.val.i64.word[0];
-					oldpc = pc;
-					
-					fprintf(f, "pc:%08x;", pc);
-					fflush(f);
-					
-					for (i = 0; i < 32; i++) {
-						if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, regstrs[i]))) {
-							printf("\nError: %s", GetLastErrorString());
-							break;
-						}
-						fprintf(f, "r%d:%08x%08x;", i, result.val.i64.word[1], result.val.i64.word[0]);
-						fflush(f);
-					}
-					
-					for (i = 0; i < 32; i++) {
-						if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, vmregstrs[i]))) {
-							printf("\nError: %s", GetLastErrorString());
-							break;
-						}
-						fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
-							result.val.i128.word[3],
-							result.val.i128.word[2],
-							result.val.i128.word[1],
-							result.val.i128.word[0]);
-						fflush(f);
-					}
-					
-					fprintf(f, "\n");
-					
-					PS3UpdateTargetInfo();
-					
-					if (SN_FAILED(PS3ThreadStep(uProcessID, uThreadID, SM_DISASSEMBLY))) {
-						printf("\nError: %s", GetLastErrorString());
-						break;
-					}
-					
-					while (pc == oldpc) {
-						if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, "pc"))) {
-							printf("\nError: %s", GetLastErrorString());
-							break;
-						}
-						pc = result.val.i64.word[0];
-						PS3UpdateTargetInfo();
-					}
-					
-					if (steps % 100 == 0) {
-						printf("steps = %d\n", steps);
-					}
-					
-					steps++;
-				}
-				
-				fclose(f);
+			
+			f = fopen("C:\\Users\\tr\\Desktop\\ps3realtrace.txt", "w");
+			if (!f) {
+				printf("failed to open file %s\n", fpath);
+				break;
 			}
-			printf("Finished evaluating\n\n");
+			
+			pc = 0;
+			steps = 1;
+			
+			scriptf = fopen("C:\\Users\\tr\\Desktop\\ps3_ppu_trace_script.txt", "r");
+			
+			while (!read_script_line(scriptf, &chr, &to)) {
+				if (chr == 's') { // skip
+					printf("skipping to %x\n", to);
+					runto(uProcessID, uThreadID, to);
+				} else { // 't' trace
+					printf("tracing to %x\n", to);
+					ppu_traceto(to, &steps, uProcessID, uThreadID, f);
+				}
+			}
+			
+			fclose(scriptf);
+			fclose(f);
 		}
 	}
 	free(pAddress);

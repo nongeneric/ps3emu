@@ -15,8 +15,22 @@ class Trace:
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--spu', action="store_true")
+parser.add_argument('--rebase_script', type=str)
 parser.add_argument('--changes', type=str)
+parser.add_argument('--rebase', type=str)
+parser.add_argument('--source_base', type=str)
+parser.add_argument('--target_base', type=str)
 args = parser.parse_args()
+
+if args.rebase_script:
+    source_base = int(args.source_base, 16)
+    target_base = int(args.target_base, 16)
+    with open(args.rebase_script) as f:
+        for line in f.readlines():
+            split = line.split(' ')
+            command = split[0]
+            va = int(split[1], 16)
+            print(command, hex(va - source_base + target_base)[2:].upper())
 
 def parse_regs(pairs):
     regs = []
@@ -24,6 +38,10 @@ def parse_regs(pairs):
         val = int(regstr.split(':')[1], 16)
         regs.append(val)
     return regs
+
+imagebase = 0
+if args.rebase:
+    imagebase = int(args.rebase, 16)
 
 if args.changes:
     traces = []
@@ -37,6 +55,7 @@ if args.changes:
             split = line.split(';')
             trace = Trace()
             trace.nip = int(split[0].split(':')[1], 16)
+            trace.nip -= imagebase
             if args.spu:
                 trace.regs = parse_regs(split[1:-1])
                 trace.vregs = []

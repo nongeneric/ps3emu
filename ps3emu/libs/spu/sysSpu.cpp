@@ -1,14 +1,15 @@
 #include "sysSpu.h"
 
 #include "SpuImage.h"
-#include "../../ELFLoader.h"
-#include "../../MainMemory.h"
-#include "../../IDMap.h"
-#include "../../ppu/InterruptPPUThread.h"
-#include "../../spu/SPUThread.h"
-#include "../../utils.h"
-#include "../../ContentManager.h"
-#include "../../log.h"
+#include "ps3emu/ELFLoader.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/IDMap.h"
+#include "ps3emu/ppu/InterruptPPUThread.h"
+#include "ps3emu/spu/SPUThread.h"
+#include "ps3emu/utils.h"
+#include "ps3emu/ContentManager.h"
+#include "ps3emu/log.h"
+#include "ps3emu/spu/SPUChannels.h"
 #include <boost/range/algorithm.hpp>
 #include <array>
 #include <vector>
@@ -60,6 +61,16 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
                              uint32_t type,
                              PPUThread* th) {
     LOG << __FUNCTION__;
+    
+#if DEBUG
+    std::ofstream f("/tmp/ps3emu_lastSpuImage.elf");
+    assert(f.is_open());
+    std::vector<char> bytes(1 << 20);
+    th->mm()->readMemory(src, &bytes[0], bytes.size(), true);
+    f.write(&bytes[0], bytes.size());
+    f.close();
+#endif
+    
     img->elf = new SpuImage([=](uint32_t ptr, void* buf, size_t size) {
         th->mm()->readMemory(ptr, buf, size);
     }, src);
@@ -251,12 +262,12 @@ int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* ent
 }
 
 int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
-                                         TagClassId class_id,
+                                         unsigned class_id,
                                          uint32_t unused,
                                          sys_interrupt_tag_t* intrtag) {
     LOG << __FUNCTION__;
     auto tag = std::make_shared<InterruptTag>();
-    tag->classId = class_id;
+    tag->classId = (TagClassId)class_id;
     tag->rawSpu = rawSpus.get(id);
     tag->rawSpu->tag = tag;
     *intrtag = interruptTags.create(tag);
@@ -288,91 +299,6 @@ int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id,
     return CELL_OK;
 }
 
-#undef X
-#define X(k, v) case TagClassId::k: return #k;
-const char* tagToString(TagClassId tag) {
-    switch (tag) { TagClassIdX }
-    return "";
-}
-
-int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
-                               TagClassId classId,
-                               uint32_t value,
-                               Process* proc) {
-    LOG << ssnprintf(
-        "ppu writes %x via mmio to spu %d tag %s", value, id, tagToString(classId));
-    auto rawSpu = rawSpus.get(id);
-    if (classId == TagClassId::SPU_RunCntl && value == 1) {
-        rawSpu->thread->run();
-        return CELL_OK;
-    }
-    if (classId == TagClassId::SPU_In_MBox) {
-        rawSpu->thread->getToSpuMailbox().send(value);
-        return CELL_OK;
-    }
-    if (classId == TagClassId::_MFC_LSA) {
-        rawSpu->thread->ch(MFC_LSA) = value;
-        return CELL_OK;
-    }
-    if (classId == TagClassId::_MFC_EAH) {
-        rawSpu->thread->ch(MFC_EAH) = value;
-        return CELL_OK;
-    }
-    if (classId == TagClassId::_MFC_EAL) {
-        rawSpu->thread->ch(MFC_EAL) = value;
-        return CELL_OK;
-    }
-    if (classId == TagClassId::MFC_Size_Tag) {
-        rawSpu->thread->ch(MFC_Size) = value >> 16;
-        rawSpu->thread->ch(MFC_TagID) = value & 0xff;
-        return CELL_OK;
-    }
-    if (classId == TagClassId::MFC_Class_CMD) {
-        rawSpu->thread->command(value);
-        return CELL_OK;
-    }
-    if (classId == TagClassId::Prxy_QueryMask) {
-        rawSpu->thread->ch(MFC_WrTagMask) = value;
-        return CELL_OK;
-    }
-    if (classId == TagClassId::Prxy_QueryType) {
-        // do nothing, every request is completed immediately and
-        // as such there is no difference between any (01) and all (10) tag groups
-        // also disabling completion (00) notifications makes no sense
-        return CELL_OK;
-    }
-    if (classId == TagClassId::SPU_NPC) {
-        rawSpu->thread->setNip(value);
-        return CELL_OK;
-    }
-    throw std::runtime_error("unknown mmio offset");
-}
-
-uint32_t sys_raw_spu_mmio_read_impl(sys_raw_spu_t id, TagClassId classId, Process* proc) {
-    auto rawSpu = rawSpus.get(id);
-    switch (classId) {
-        case TagClassId::SPU_Status: return rawSpu->thread->getStatus();
-        case TagClassId::SPU_Out_MBox:
-            return rawSpu->thread->getFromSpuMailbox().receive(0);
-        case TagClassId::MFC_Class_CMD: return rawSpu->thread->ch(MFC_Cmd);
-        case TagClassId::MFC_QStatus:
-            return 0x8000ffff; // all mfc requests complete immediately
-        // mailbox queues are implemented as blocking so there is no need for PPU to
-        // busy-wait on them
-        // 0x010101 means OutIntrMbox and OutMbox contain a single item; InMbox has
-        // at least one empty slot
-        case TagClassId::SPU_MBox_Status: return 0x010101;
-        default: throw std::runtime_error("unknown mmio offset");
-    }
-}
-
-uint32_t sys_raw_spu_mmio_read(sys_raw_spu_t id, TagClassId classId, Process* proc) {
-    uint32_t value = sys_raw_spu_mmio_read_impl(id, classId, proc);
-    LOG << ssnprintf(
-        "ppu reads %x via mmio from spu %d tag %s", value, id, tagToString(classId));
-    return value;
-}
-
 int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
                                  uint32_t class_id,
                                  big_uint64_t* stat) {
@@ -380,18 +306,23 @@ int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
         throw std::runtime_error("incorrect spu interrupt class");
     }
     auto rawSpu = rawSpus.get(id);
-    *stat = rawSpu->thread->getStatus();
+    // only privileged software
+    *stat = rawSpu->thread->channels()->mmio_read(Prxy_QueryType);
     return CELL_OK;
 }
 
 int32_t sys_raw_spu_read_puint_mb(sys_raw_spu_t id, big_uint32_t* value) {
     auto rawSpu = rawSpus.get(id);
-    *value = rawSpu->thread->getFromSpuInterruptMailbox().receive(0);
+    *value = rawSpu->thread->channels()->mmio_read(SPU_Out_Intr_Mbox);
     return CELL_OK;
 }
 
 int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t stat) {
+    if (class_id != 2) {
+        throw std::runtime_error("incorrect spu interrupt class");
+    }
     auto rawSpu = rawSpus.get(id);
+    // only privileged software
     rawSpu->thread->getStatus() = stat;
     return CELL_OK;
 }
@@ -406,4 +337,16 @@ SPUThread* findRawSpuThread(sys_raw_spu_t id) {
 
 std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id) {
     return groups.get(id);
+}
+
+#define SYS_SPU_THREAD_GROUP_EVENT_RUN               0x1
+#define SYS_SPU_THREAD_GROUP_EVENT_RUN_KEY           0xFFFFFFFF53505500ULL
+#define SYS_SPU_THREAD_GROUP_EVENT_EXCEPTION         0x2
+#define SYS_SPU_THREAD_GROUP_EVENT_EXCEPTION_KEY     0xFFFFFFFF53505503ULL
+
+int32_t sys_spu_thread_group_connect_event(sys_spu_thread_group_t id,
+                                           sys_event_queue_t eq,
+                                           sys_event_type_t et) {
+    assert(et == SYS_SPU_THREAD_GROUP_EVENT_EXCEPTION);
+    return CELL_OK;
 }

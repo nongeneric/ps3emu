@@ -19,6 +19,7 @@ set(SRC
     log.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
+    spu/SPUChannels.cpp
     ppu/PPUThread.h
     ppu/PPUThread.cpp
     ppu/InterruptPPUThread.h

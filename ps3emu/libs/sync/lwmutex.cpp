@@ -29,11 +29,12 @@ int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr, Ma
     mm->writeMemory(mutex_id, &type, sizeof(type));
     std::shared_ptr<IMutex> mutex;
     assert(attr->attr_recursive == SYS_SYNC_RECURSIVE ||
-           attr->attr_recursive == SYS_SYNC_NOT_RECURSIVE);
-    if (attr->attr_recursive == SYS_SYNC_NOT_RECURSIVE) {
-        mutex.reset(new Mutex<boost::timed_mutex>());
-    } else {
+           attr->attr_recursive == SYS_SYNC_NOT_RECURSIVE ||
+           attr->attr_recursive == 0);
+    if (attr->attr_recursive == SYS_SYNC_RECURSIVE) {
         mutex.reset(new Mutex<boost::recursive_timed_mutex>());
+    } else {
+        mutex.reset(new Mutex<boost::timed_mutex>());
     }
     boost::unique_lock<boost::mutex> lock(map_mutex);
     mutexes.emplace(mutex_id, std::move(mutex));

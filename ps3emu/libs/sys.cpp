@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdexcept>
 #include "../Process.h"
+#include "../ELFLoader.h"
 #include "../IDMap.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
@@ -384,7 +385,7 @@ emu_void_t sys_ppu_thread_yield(PPUThread* thread) {
     return emu_void;
 }
 
-int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, int32_t* prio, Process* proc) {
+int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, big_int32_t* prio, Process* proc) {
     auto thread = proc->getThread(thread_id);
     *prio = thread->priority();
     return CELL_OK;
@@ -402,5 +403,69 @@ int32_t _sys_strlen(cstring_ptr_t str) {
 }
 
 int32_t sys_process_is_spu_lock_line_reservation_address(ps3_uintptr_t addr, uint64_t flags) {
-    return 0;
+    return CELL_OK;
+}
+
+uint32_t sys_process_getpid() {
+    return 0x01000500;
+}
+
+int32_t sys_process_get_sdk_version(uint32_t pid, big_uint32_t* version) {
+    assert(pid == 0x01000500);
+    *version = 0x00400001;
+    return CELL_OK;
+}
+
+sys_prx_id_t sys_prx_get_module_id_by_name(cstring_ptr_t name,
+                                           uint64_t flags,
+                                           uint64_t pOpt,
+                                           PPUThread* thread) {
+    assert(!flags);
+    assert(!pOpt);
+    if (name.str == "cellLibprof") {
+        uint32_t CELL_PRX_ERROR_UNKNOWN_MODULE = 0x8001112e;
+        return CELL_PRX_ERROR_UNKNOWN_MODULE; // not a tuner
+    }
+    for (auto& s : thread->proc()->getSegments()) {
+        prx_export_t* exports;
+        int nexports;
+        std::tie(exports, nexports) = s.elf->exports(thread->mm());
+        for (auto i = 0; i < nexports; ++i) {
+            if (exports[i].name) {
+                std::string exportName;
+                readString(thread->mm(), exports[i].name, exportName);
+                if (name.str == exportName)
+                    return s.va;
+            }
+        }
+    }
+    return -1;
+}
+
+int32_t _sys_printf(cstring_ptr_t format, PPUThread* thread) {
+    std::string str;
+    auto arg = 4;
+    for (auto i = 0u; i < format.str.size(); ++i) {
+        auto ch = format.str[i];
+        if (ch == '%') {
+            i++;
+            ch = format.str[i];
+            if (ch == 'x' || ch == 'f' || ch == 'u' || ch == 'd') {
+                str += ssnprintf((std::string("%") + ch).c_str(), thread->getGPR(arg));
+                arg++;
+            } else if (ch == 's') {
+                std::string substr;
+                readString(thread->mm(), thread->getGPR(arg), substr);
+                str += substr;
+                arg++;
+            } else {
+                ERROR(libs) << "bad _sys_printf format";
+                break;
+            }
+        } else {
+            str += ch;
+        }
+    }
+    puts(str.c_str());
+    return CELL_OK;
 }

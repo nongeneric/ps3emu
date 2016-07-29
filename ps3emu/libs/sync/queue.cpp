@@ -33,7 +33,6 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                sys_event_queue_attribute_t* attr,
                                sys_ipc_key_t event_queue_key,
                                uint32_t size) {
-    LOG << __FUNCTION__;
     assert(1 <= size && size < 128);
     // TODO: handle unique key
     //assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
@@ -46,6 +45,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
         queue.reset(new ConcurrentFifoQueue<sys_event_t>);
     }
     *equeue_id = queues.create(std::move(queue));
+    INFO(libs) << ssnprintf("sys_event_queue_create(id = %d)", *equeue_id);
     return CELL_OK;
 }
 
@@ -63,12 +63,14 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
 {
     // TODO: handle timeout
     //assert(timeout == 0);
+    INFO(libs) << ssnprintf("sys_event_queue_receive(%d)", equeue_id);
     auto queue = queues.get(equeue_id);
     auto event = queue->receive(th->priority());
     th->setGPR(4, event.source);
     th->setGPR(5, event.data1);
     th->setGPR(6, event.data2);
     th->setGPR(7, event.data3);
+    INFO(libs) << ssnprintf("completed sys_event_queue_receive(%d)", equeue_id);
     return CELL_OK;
 }
 
@@ -78,28 +80,31 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
                                    big_uint32_t *number,
                                    PPUThread* th)
 {
+    INFO(libs) << ssnprintf("sys_event_queue_tryreceive(%d)", equeue_id);
     auto queue = queues.get(equeue_id);
     std::vector<sys_event_t> vec(size);
     size_t num;
     queue->tryReceive(&vec[0], vec.size(), &num);
     *number = num;
     th->mm()->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
+    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%d)", equeue_id);
     return CELL_OK;
 }
 
 int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uint64_t name) {
-    LOG << __FUNCTION__;
     auto port = std::make_shared<queue_port_t>();
     port->name = name;
     port->type = port_type;
     *eport_id = ports.create(port);
+    INFO(libs) << ssnprintf("sys_event_port_create(id = %d, name = %016llx)", *eport_id, name);
     return CELL_OK;
 }
 
 int32_t sys_event_port_connect_local(sys_event_port_t event_port_id, 
-                                 sys_event_queue_t event_queue_id)
+                                     sys_event_queue_t event_queue_id)
 {
-    LOG << __FUNCTION__;
+    INFO(libs) << ssnprintf("sys_event_port_connect_local(port = %d, queue = %d)",
+                            event_port_id, event_queue_id);
     assert(ports.get(event_port_id)->type == SYS_EVENT_PORT_LOCAL);
     ports.get(event_port_id)->queue = queues.get(event_queue_id).get();
     return CELL_OK;
@@ -110,6 +115,8 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
                             uint64_t data2,
                             uint64_t data3)
 {
+    INFO(libs) << ssnprintf("sys_event_port_send(port = %d, data = %016llx, %016llx, %016llx)",
+                            eport_id, data1, data2, data3);
     auto port = ports.get(eport_id);
     port->queue->send({ port->name, data1, data2, data3 });
     return CELL_OK;
@@ -135,7 +142,9 @@ int32_t sys_spu_thread_connect_event(uint32_t thread_id,
                                      sys_event_type_t et,
                                      uint8_t spup,
                                      Process* proc) {
-    assert(et ==  SYS_SPU_THREAD_EVENT_USER);
+    INFO(libs) << ssnprintf(
+        "sys_spu_thread_connect_event(thread = %d, queue = %d, spup = %02x)", thread_id, eq, spup);
+    assert(et == SYS_SPU_THREAD_EVENT_USER);
     auto thread = proc->getSpuThread(thread_id);
     auto queue = queues.get(eq);
     thread->connectOrBindQueue(queue, spup);
@@ -146,6 +155,8 @@ int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
                                   sys_event_queue_t spuq,
                                   uint32_t spuq_num,
                                   Process* proc) {
+    INFO(libs) << ssnprintf(
+        "sys_spu_thread_bind_queue(thread = %d, queue = %d, spuq = %02x)", thread_id, spuq, spuq_num);
     auto thread = proc->getSpuThread(thread_id);
     auto queue = queues.get(spuq);
     thread->connectOrBindQueue(queue, spuq_num);
@@ -157,6 +168,9 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        uint64_t req,
                                                        uint8_t* spup,
                                                        Process* proc) {
+    INFO(libs) << ssnprintf("sys_spu_thread_group_connect_event_all_threads"
+                            "(group = %d, queue = %d, req = %016llx)", 
+                            group_id, eq, req);
     auto group = findThreadGroup(group_id);
     std::vector<SPUThread*> threads;
     std::transform(begin(group->threads), end(group->threads), std::back_inserter(threads), [=](auto id) {
@@ -174,6 +188,7 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                 th->connectOrBindQueue(queue, i);
             }
             *spup = i;
+            INFO(libs) << ssnprintf("connected to spup %d", i);
             return CELL_OK;
         }
     }

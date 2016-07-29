@@ -575,6 +575,11 @@ STUB_2(sys_process_is_spu_lock_line_reservation_address);
 STUB_5(sys_spu_thread_connect_event);
 STUB_4(sys_spu_thread_bind_queue);
 STUB_5(sys_spu_thread_group_connect_event_all_threads);
+STUB_0(sys_process_getpid);
+STUB_2(sys_process_get_sdk_version);
+STUB_3(sys_spu_thread_group_connect_event);
+STUB_4(sys_prx_get_module_id_by_name);
+STUB_2(_sys_printf);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -760,6 +765,8 @@ NCallEntry ncallTable[] {
     ENTRY(cellSyncMutexUnlock),
     ENTRY(_cellSpursEventFlagInitialize),
     ENTRY(ps3call_then),
+    ENTRY(sys_prx_get_module_id_by_name),
+    ENTRY(_sys_printf),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -847,6 +854,10 @@ void PPUThread::scall() {
         case 191: nstub_sys_spu_thread_connect_event(this); break;
         case 193: nstub_sys_spu_thread_bind_queue(this); break;
         case 251: nstub_sys_spu_thread_group_connect_event_all_threads(this); break;
+        case 1: nstub_sys_process_getpid(this); break;
+        case 25: nstub_sys_process_get_sdk_version(this); break;
+        case 185: nstub_sys_spu_thread_group_connect_event(this); break;
+        case 95: nstub_sys_lwmutex_create(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

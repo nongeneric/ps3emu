@@ -390,6 +390,7 @@ public:
     }
     
     void setId(unsigned id);
+    unsigned getId();
     void ncall(uint32_t index);
     void scall();
     void yield();

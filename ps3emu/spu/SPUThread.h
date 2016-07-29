@@ -4,6 +4,7 @@
 #include "../libs/sync/queue.h"
 #include "../constants.h"
 #include "../BitField.h"
+#include "SPUChannels.h"
 #include <boost/thread.hpp>
 #include <boost/noncopyable.hpp>
 #include <atomic>
@@ -50,8 +51,6 @@ public:
         return _cause;
     }
 };
-
-class SPUThreadInterruptException : public virtual std::exception {};
 
 enum class SPUThreadEvent {
     Breakpoint,
@@ -158,40 +157,6 @@ public:
 #pragma GCC diagnostic pop
 };
 
-#define X(k, v) k = v,
-#define SpuMfcClassIdX \
-    X(SPU_RdEventStat    , 0) \
-    X(SPU_WrEventMask    , 1) \
-    X(SPU_WrEventAck     , 2) \
-    X(SPU_RdSigNotify1   , 3) \
-    X(SPU_RdSigNotify2   , 4) \
-    X(SPU_WrDec          , 7) \
-    X(SPU_RdDec          , 8) \
-    X(SPU_RdEventMask    ,11) \
-    X(SPU_RdMachStat     ,13) \
-    X(SPU_WrSRR0         ,14) \
-    X(SPU_RdSRR0         ,15) \
-    X(SPU_WrOutMbox      ,28) \
-    X(SPU_RdInMbox       ,29) \
-    X(SPU_WrOutIntrMbox  ,30) \
-    X(MFC_WrMSSyncReq    , 9) \
-    X(MFC_RdTagMask      ,12) \
-    X(MFC_LSA            ,16) \
-    X(MFC_EAH            ,17) \
-    X(MFC_EAL            ,18) \
-    X(MFC_Size           ,19) \
-    X(MFC_TagID          ,20) \
-    X(MFC_Cmd            ,21) \
-    X(MFC_WrTagMask      ,22) \
-    X(MFC_WrTagUpdate    ,23) \
-    X(MFC_RdTagStat      ,24) \
-    X(MFC_RdListStallStat,25) \
-    X(MFC_WrListStallAck ,26) \
-    X(MFC_RdAtomicStat   ,27)
-    
-enum SpuMfcClassId { SpuMfcClassIdX };
-#undef X
-
 class Process;
 
 struct SPUThreadExitInfo {
@@ -209,16 +174,16 @@ struct EventQueueInfo {
     std::shared_ptr<IConcurrentQueue<sys_event_t>> queue;
 };
 
-class SPUThread : boost::noncopyable {
+class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     uint32_t _nip;
     R128 _rs[128];
-    uint32_t _ch[32];
     uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
     uint32_t _spu;
     std::string _name;
     boost::thread _thread;
     Process* _proc;
+    SPUChannels _channels;
     std::function<void(SPUThread*, SPUThreadEvent)> _eventHandler;
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
@@ -226,9 +191,6 @@ class SPUThread : boost::noncopyable {
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
     std::experimental::optional<InterruptThreadInfo> _interruptHandler;
-    ConcurrentFifoQueue<uint32_t> _toSpuMailbox;
-    ConcurrentFifoQueue<uint32_t> _fromSpuMailbox;
-    ConcurrentFifoQueue<uint32_t> _fromSpuInterruptMailbox;
     std::atomic<uint32_t> _status;
     uint64_t _id;
     std::vector<EventQueueInfo> _eventQueues;
@@ -245,11 +207,6 @@ public:
     inline R128& r(V i) {
         assert(getUValue(i) < 128);
         return _rs[getUValue(i)];
-    }
-    
-    template <typename V>
-    inline uint32_t& ch(V i) {
-        return _ch[getUValue(i)];
     }
     
     inline uint8_t* ptr(uint32_t lsa) {
@@ -292,15 +249,18 @@ public:
     SPUThreadExitInfo join();
     void setElfSource(uint32_t src);
     uint32_t getElfSource();
-    void command(uint32_t word);
     void setInterruptHandler(uint32_t mask2, std::function<void()> interruptHandler);
     // TODO: removeInterruptHandler
-    ConcurrentFifoQueue<uint32_t>& getFromSpuMailbox();
-    ConcurrentFifoQueue<uint32_t>& getFromSpuInterruptMailbox();
-    ConcurrentFifoQueue<uint32_t>& getToSpuMailbox();
     std::atomic<uint32_t>& getStatus();
     void setId(uint64_t id);
+    uint64_t getId();
     void connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
                             uint32_t portNumber);
     bool isAvailableQueuePort(uint8_t portNumber);
+    std::string getName();
+    SPUChannels* channels();
+    
+    // ISPUChannelsThread
+    inline uint8_t* ls() override { return ptr(0); }
+    inline std::atomic<uint32_t>& status() override { return getStatus(); }
 };

@@ -541,6 +541,9 @@ void DebuggerModel::exec(QString command) {
     } else if (name == "imports") {
         dumpImports();
         return;
+    } else if (name == "threads") {
+        dumpThreads();
+        return;
     }
     
     auto expr = command.section(':', 1, 1);
@@ -551,11 +554,9 @@ void DebuggerModel::exec(QString command) {
     
     uint64_t exprVal;
     try {
-        exprVal = _activeThread
-                      ? evalExpr(expr.toStdString(), _activeThread)
-                      : _activeSPUThread
-                            ? evalExpr(expr.toStdString(), _activeSPUThread)
-                            : 0;
+        exprVal = _activeThread ? evalExpr(expr.toStdString(), _activeThread)
+                : _activeSPUThread ? evalExpr(expr.toStdString(), _activeSPUThread)
+                : 0;
     } catch (std::exception& e) {
         emit message(QString("expr eval failed: ") + e.what());
         return;
@@ -607,10 +608,50 @@ void DebuggerModel::exec(QString command) {
             }
             updateUI();
             return;
+        } else if (name == "thread") {
+            changeThread(exprVal);
+            return;
         }
     } catch (...) {
         emit message("command failed");
         return;
+    }
+}
+
+void DebuggerModel::changeThread(uint32_t index) {
+    unsigned i = 0;
+    for (auto th : _proc->dbgPPUThreads()) {
+        if (i == index) {
+            switchThread(th);
+        }
+        i++;
+    }
+    for (auto th : _proc->dbgSPUThreads()) {
+        if (i == index) {
+            switchThread(th);
+        }
+        i++;
+    }
+    updateUI();
+}
+
+void DebuggerModel::dumpThreads() {
+    unsigned i = 0;
+    emit message("PPU Threads (id, nip)");
+    for (auto th : _proc->dbgPPUThreads()) {
+        emit message(QString::asprintf(
+            "[%d]  %08x  %08x",
+            i, (uint32_t)th->getId(), (uint32_t)th->getNIP()
+        ));
+        i++;
+    }
+    emit message("SPU Threads (id, nip, source, name)");
+    for (auto th : _proc->dbgSPUThreads()) {
+        emit message(QString::asprintf(
+            "[%d]  %08x  %08x  %08x  %s",
+            i, (uint32_t)th->getId(), th->getNip(), th->getElfSource(), th->getName().c_str()
+        ));
+        i++;
     }
 }
 
@@ -688,12 +729,9 @@ void printFrequencies(FILE* f, std::map<std::string, int>& counts) {
     }
 }
 
-void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
-    auto tracefile = "/tmp/ps3trace-spu";
-    auto f = fopen(tracefile, "w");
+void DebuggerModel::spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
     ps3_uintptr_t nip;
     std::string str;
-    std::map<std::string, int> counts;
     while ((nip = _activeSPUThread->getNip()) != va) {
         auto instr = _activeSPUThread->ptr(nip);
         SPUDasm<DasmMode::Print>(instr, nip, &str);
@@ -716,16 +754,40 @@ void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
         _activeSPUThread->singleStepBreakpoint();
         _proc->run();
     }
-    printFrequencies(f, counts);
-    fclose(f);
 }
 
-void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
-    auto tracefile = "/tmp/ps3trace";
+void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
+    auto tracefile = "/tmp/ps3trace-spu";
+    auto traceScript = "/tmp/ps3trace-spu-script";
     auto f = fopen(tracefile, "w");
+    std::map<std::string, int> counts;
+    
+    auto scriptf = fopen(traceScript, "r");
+    if (va == 0 && scriptf) {
+        char command;
+        while (fscanf(scriptf, "%c %X\n", &command, &va) == 2) {
+            if (command == 's') {
+                printf("skipping to %x\n", va);
+                runto(va);
+            } else {
+                printf("tracing to %x\n", va);
+                spuTraceTo(f, va, counts);
+            }
+        }
+    } else {
+        spuTraceTo(f, va, counts);
+    }
+    
+    printFrequencies(f, counts);
+    
+    fclose(f);
+    fclose(scriptf);
+    message(QString("trace completed and saved to ") + tracefile);
+}
+
+void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
     ps3_uintptr_t nip;
     std::string str;
-    std::map<std::string, int> counts;
     while ((nip = _activeThread->getNIP()) != va) {
         uint32_t instr;
         _proc->mm()->readMemory(nip, &instr, sizeof instr);
@@ -754,7 +816,33 @@ void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
         _proc->run();
     }
     printFrequencies(f, counts);
+}
+
+void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
+    auto tracefile = "/tmp/ps3trace";
+    auto f = fopen(tracefile, "w");
+    auto traceScript = "/tmp/ps3trace-ppu-script";
+    std::map<std::string, int> counts;
+    
+    auto scriptf = fopen(traceScript, "r");
+    if (va == 0 && scriptf) {
+        char command;
+        while (fscanf(scriptf, "%c %X\n", &command, &va) == 2) {
+            if (command == 's') {
+                printf("skipping to %x\n", va);
+                runto(va);
+            } else {
+                printf("tracing to %x\n", va);
+                ppuTraceTo(f, va, counts);
+            }
+        }
+    } else {
+        ppuTraceTo(f, va, counts);
+    }
+    
     fclose(f);
+    fclose(scriptf);
+    message(QString("trace completed and saved to ") + tracefile);
 }
 
 void DebuggerModel::traceTo(ps3_uintptr_t va) {
@@ -789,6 +877,10 @@ void DebuggerModel::runto(ps3_uintptr_t va) {
 }
 
 void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
+    if (_activeSPUThread) {
+        setSPUSoftBreak(_activeSPUThread->getElfSource(), va);
+        return;
+    }
     auto bytes = _proc->mm()->load<4>(va);
     _proc->mm()->store<4>(va, 0x7fe00088);
     _softBreaks.push_back({va, bytes});

@@ -2492,38 +2492,16 @@ EMU(dsync) {
     __sync_synchronize();
 }
 
-#undef X
-#define X(k, v) case k: return #k;
-const char* classIdToString(int id) {
-    switch (id) { SpuMfcClassIdX }
-    return "unknown";
-}
-
 PRINT(rdch) {
     *result = format_nn("rdch", i->CA, i->RT);
 }
 
 EMU(rdch) {
     auto ch = i->CA.u();
-    auto& rt = th->r(i->RT); 
-    rt.w<1>() = 0;
+    auto& rt = th->r(i->RT);
+    rt.dw<0>() = 0;
     rt.dw<1>() = 0;
-    if (ch == SPU_RdInMbox) {
-        rt.w<0>() = th->getToSpuMailbox().receive(0);
-    } else if (ch == MFC_RdAtomicStat) {
-        rt.w<0>() = th->ch(ch);
-        th->ch(ch) = 0;
-    } else {
-        if (ch == MFC_RdTagStat) {
-            // as every MFC request completes immediately
-            // it is possible to just always return the mask set last
-            ch = MFC_WrTagMask;
-        }
-        auto& ca = th->ch(ch);
-        rt.w<0>() = ca;
-    }
-    INFO(spu) << ssnprintf(
-        "spu reads %x from channel %s", rt.w<0>(), classIdToString(ch));
+    rt.w_pref() = th->channels()->read(ch);
 }
 
 PRINT(rchcnt) {
@@ -2533,22 +2511,9 @@ PRINT(rchcnt) {
 EMU(rchcnt) {
     auto ch = i->CA.u();
     auto& rt = th->r(i->RT);
-    rt.w<1>() = 0;
+    rt.dw<0>() = 0;
     rt.dw<1>() = 0;
-    if (ch == SPU_RdInMbox) {
-        rt.w<0>() = th->getToSpuMailbox().size();
-    } else if (ch == MFC_RdTagStat) {
-        rt.w<0>() = 1;
-    } else if (ch == MFC_WrTagUpdate) {
-        // dma complete immediately so it's always 1
-        rt.w<0>() = 1; 
-    } else {
-        throw std::runtime_error("rchcnt of unknown channel");
-    }
-    if (rt.w<0>() == 0 && ch == SPU_RdInMbox)
-        return;
-    INFO(spu) << ssnprintf(
-        "spu reads count %d from channel %s", rt.w<0>(), classIdToString(ch));
+    rt.w_pref() = th->channels()->readCount(ch);
 }
 
 PRINT(wrch) {
@@ -2558,24 +2523,7 @@ PRINT(wrch) {
 EMU(wrch) {
     auto ch = i->CA.u();
     auto& rt = th->r(i->RT);
-    if (ch == SPU_WrOutIntrMbox) {
-        th->getFromSpuInterruptMailbox().send(rt.w<0>());
-        th->getStatus() |= 1;
-        INFO(spu) << ssnprintf("spu writes %x to interrupt mailbox", rt.w<0>());
-        throw SPUThreadInterruptException();
-    } else if (ch == SPU_WrOutMbox) {
-        th->getFromSpuMailbox().send(rt.w<0>());
-        th->getStatus() |= 1;
-    } else {
-        auto& ca = th->ch(ch);
-        if (i->CA.u() == MFC_Cmd) {
-            th->command(rt.w<0>());
-        } else {
-            ca = rt.w<0>();
-        }
-    }
-    INFO(spu) << ssnprintf(
-        "spu writes %x to channel %s", rt.w<0>(), classIdToString(ch));
+    th->channels()->write(ch, rt.w_pref());
 }
 
 template <DasmMode M, typename S>

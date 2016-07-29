@@ -26,8 +26,8 @@ class Rsx;
 class DebuggerModel : public QWidget {
     Q_OBJECT
 
-    PPUThread* _activeThread;
-    SPUThread* _activeSPUThread;
+    PPUThread* _activeThread = nullptr;
+    SPUThread* _activeSPUThread = nullptr;
     std::unique_ptr<GPRModel> _gprModel;
     std::unique_ptr<DasmModel> _dasmModel;
     std::unique_ptr<MemoryDumpModel> _memoryDumpModel;
@@ -37,6 +37,8 @@ class DebuggerModel : public QWidget {
     bool _elfLoaded = false;
     void log(std::string str);
     void traceTo(ps3_uintptr_t va);
+    void spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts);
+    void ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts);
     void spuTraceTo(ps3_uintptr_t va);
     void ppuTraceTo(ps3_uintptr_t va);
     void updateUI();
@@ -49,6 +51,8 @@ class DebuggerModel : public QWidget {
     void switchThread(SPUThread* spu);
     void dumpSegments();
     void dumpImports();
+    void dumpThreads();
+    void changeThread(uint32_t index);
 
 public:
     DebuggerModel();

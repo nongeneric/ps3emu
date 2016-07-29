@@ -102,11 +102,6 @@ void MainWindow::setupMenu() {
     connect(run, &QAction::triggered, this, [=]() { _model.run(); });
     trace->addAction(run);
     
-    auto runto = new QAction("Run to 0", this);
-    runto->setShortcut(QKeySequence(Qt::Key_F6));
-    connect(runto, &QAction::triggered, this, [=]() { _model.runto(0); });
-    trace->addAction(runto);
-    
 //     auto restart = new QAction("Restart", this);
 //     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
 //     connect(restart, &QAction::triggered, this, [=]() { _model.restart(); });
