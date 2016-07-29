@@ -15,15 +15,23 @@ static constexpr auto PagePtrMask = ~uintptr_t() - 1;
 bool MainMemory::storeMemoryWithReservation(void* dest, 
                                             const void* source, 
                                             uint size,
+                                            uint32_t va,
                                             bool cond) {
     
     boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
-    if (!cond || (_reservationThread == boost::this_thread::get_id())) {
-        memcpy(dest, source, size);
-        _reservationThread = boost::thread::id();
-        return true;
+    bool success = false;
+    auto thread = boost::this_thread::get_id();
+    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
+        auto& r = _reservations[i];
+        if (r.va <= va && r.va + r.size >= va + size) {
+            success |= r.thread == thread;
+            _reservations.erase(begin(_reservations) + i);
+        }
     }
-    return false;
+    if (!cond || success) {
+        memcpy(dest, source, size);
+    }
+    return success;
 }
 
 template <bool Read>
@@ -69,7 +77,7 @@ void MainMemory::copy(ps3_uintptr_t va,
             if (locked)
                 _storeLock.unlock();
         } else {
-            storeMemoryWithReservation(dest, source, size, false);
+            storeMemoryWithReservation(dest, source, size, curVa, false);
         }
         curVa = end;
     }

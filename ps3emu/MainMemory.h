@@ -11,6 +11,7 @@
 #include <bitset>
 #include <memory>
 #include <atomic>
+#include <vector>
 
 class PPUThread;
 class Process;
@@ -67,6 +68,12 @@ struct BytesToBEType<8> {
     typedef int64_t stype;
 };
 
+struct Reservation {
+    uint32_t va;
+    uint32_t size;
+    boost::thread::id thread;
+};
+
 class MainMemory {
     std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;    
     std::unique_ptr<MemoryPage[]> _pages;
@@ -75,7 +82,7 @@ class MainMemory {
     Process* _proc;
     boost::mutex _pageMutex;
     boost::detail::spinlock _storeLock = BOOST_DETAIL_SPINLOCK_INIT;
-    boost::thread::id _reservationThread;
+    std::vector<Reservation> _reservations;
     
     template <bool Read>
     void copy(ps3_uintptr_t va, 
@@ -83,9 +90,10 @@ class MainMemory {
         uint len, 
         bool allocate,
         bool locked);
-    bool storeMemoryWithReservation(void* dest, 
+    bool storeMemoryWithReservation(void* dest,
                                     const void* buf, 
                                     uint len,
+                                    uint32_t va,
                                     bool cond);
     void writeSpuAddress(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readSpuAddress(ps3_uintptr_t va);
@@ -159,13 +167,13 @@ public:
 
     void readReserve(ps3_uintptr_t va, void* buf, uint len) {
         boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
-        _reservationThread = boost::this_thread::get_id();
+        _reservations.push_back({va, len, boost::this_thread::get_id()});
         readMemory(va, buf, len, false, false);
     }
 
     bool writeCond(ps3_uintptr_t va, const void* buf, uint len) {
         auto dest = getMemoryPointer(va, len);
-        return storeMemoryWithReservation(dest, buf, len, true);
+        return storeMemoryWithReservation(dest, buf, len, va, true);
     }
 };
 
