@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include "ps3emu/log.h"
+#include "Config.h"
 #include <boost/program_options.hpp>
 #include <string>
 #include <QApplication>
@@ -8,7 +9,11 @@
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    log_init(log_file | log_console, log_info, log_spu | log_rsx | log_libs | log_debugger);
+    g_config.load();
+    log_init(log_file | log_console,
+             log_info,
+             (g_config.config().LogSpu ? log_spu : 0) | log_rsx | log_libs |
+                 log_debugger);
     log_set_thread_name("dbg_main");
 
     std::string elfPath;

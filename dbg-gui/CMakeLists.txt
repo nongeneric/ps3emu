@@ -17,6 +17,8 @@ set(SRC
     CommandLineEdit.cpp
     DebugExpr.h
     DebugExpr.cpp
+    Config.h
+    Config.cpp
 )
 add_executable(dbg-gui ${SRC} ${QT_RESOURCES})
 target_link_libraries(dbg-gui Qt5::Core Qt5::Widgets ps3emu)

@@ -5,6 +5,7 @@
 #include "ps3emu/rsx/Rsx.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/spu/SPUDasm.h"
+#include "Config.h"
 #include <QStringList>
 #include "stdio.h"
 #include <boost/regex.hpp>
@@ -521,8 +522,10 @@ void DebuggerModel::run() {
             switchThread(ev->thread);
         } else if (auto ev = boost::get<SPUThreadStartedEvent>(&untyped)) {
             trySetPendingSPUBreaks();
-            cont = false;
-            switchThread(ev->thread);
+            if (g_config.config().StopAtNewSpuThread) {
+                cont = false;
+                switchThread(ev->thread);
+            }
         }
     }
     updateUI();

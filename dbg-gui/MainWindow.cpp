@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "CommandLineEdit.h"
+#include "Config.h"
 
 #include <QDockWidget>
 #include <QMenuBar>
@@ -112,6 +113,28 @@ void MainWindow::setupMenu() {
     toggleFPR->setShortcut(QKeySequence(Qt::Key_Tab));
     connect(toggleFPR, &QAction::triggered, this, [=]() { _model.toggleFPR(); });
     view->addAction(toggleFPR);
+    
+    auto settings = menuBar()->addMenu("Settings");
+    { 
+        auto action = new QAction("Stop at new SPU Thread", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().StopAtNewSpuThread);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().StopAtNewSpuThread = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
+        auto action = new QAction("Log SPU", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().LogSpu);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().LogSpu = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
 }
 
 void MainWindow::openFile() {

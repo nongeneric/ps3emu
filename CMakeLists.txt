@@ -40,6 +40,7 @@ set(CMAKE_CXX_FLAGS "-ggdb3 -O0 -Wall -Werror -std=c++17 ${CMAKE_CXX_FLAGS}")
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_TARGET_COMMON_INCLUDE})
+include_directories(SYSTEM thirdparty/cereal/include)
 
 add_subdirectory(ps3emu)
 add_subdirectory(dbg-gui)
