@@ -17,6 +17,7 @@ set(SRC
     Process.h
     Process.cpp
     log.cpp
+    state.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
     spu/SPUChannels.cpp

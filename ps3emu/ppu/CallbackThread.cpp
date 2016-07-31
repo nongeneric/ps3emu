@@ -4,6 +4,7 @@
 #include "../ELFLoader.h"
 #include "../MainMemory.h"
 #include "../InternalMemoryManager.h"
+#include "../state.h"
 #include "ppu_dasm_forms.h"
 #include <boost/endian/arithmetic.hpp>
 #include <utility>
@@ -28,13 +29,12 @@ std::future<void> CallbackThread::schedule(std::vector<uint64_t> args,
 
 CallbackThread::CallbackThread(Process* proc) {
     _lastCallback.terminate = true;
-    auto internal = proc->internalMemoryManager();
     
     uint32_t index;
     findNCallEntry(calcFnid("callbackThreadQueueWait"), index);
     
     uint32_t bodyEa;
-    auto body = internal->internalAlloc<2, ThreadBody>(&bodyEa);
+    auto body = g_state.memalloc->internalAlloc<2, ThreadBody>(&bodyEa);
 
     body->ncall = (1 << 26) | index;
     
@@ -54,7 +54,7 @@ CallbackThread::CallbackThread(Process* proc) {
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
     auto lr = ppuThread->getLR();
-    auto thread = (CallbackThread*)ppuThread->mm()->load<8>(lr);
+    auto thread = (CallbackThread*)g_state.mm->load<8>(lr);
     
     if (!thread->_lastCallback.terminate)
         thread->_lastCallback.promise->set_value();

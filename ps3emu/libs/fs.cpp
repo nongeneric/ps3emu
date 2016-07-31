@@ -4,6 +4,7 @@
 #include "../Process.h"
 #include "../IDMap.h"
 #include "../ContentManager.h"
+#include "../state.h"
 #include <stdexcept>
 #include "string.h"
 #include <string>
@@ -16,7 +17,9 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
+struct contentManager;
 using namespace boost::filesystem;
+class contentManager;
 
 CellFsErrno sys_fs_open(const char* path,
                         uint32_t flags,
@@ -84,7 +87,7 @@ void copy(CellFsStat& sb, struct stat& st) {
 }
 
 CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc) {
-    auto hostPath = proc->contentManager()->toHost(path);
+    auto hostPath = g_state.content->toHost(path);
     LOG << ssnprintf("cellFsStat(%s (%s), ...)", path, hostPath);
     struct stat st;
     auto err = stat(hostPath.c_str(), &st);
@@ -136,7 +139,7 @@ FILE* openFile(const char* path, int flags) {
 }
 
 CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, Process* proc) {
-    auto hostPath = proc->contentManager()->toHost(path);
+    auto hostPath = g_state.content->toHost(path);
     LOG << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
     auto f = openFile(hostPath.c_str(), flags);
     if (!f) {
@@ -198,7 +201,7 @@ CellFsErrno cellFsMkdir(const char* path, uint32_t mode, Process* proc) {
     LOG << ssnprintf("cellFsMkdir(%s, ...)", path);
     if (exists(path))
         return CELL_FS_EEXIST;
-    auto res = create_directory(proc->contentManager()->toHost(path));
+    auto res = create_directory(g_state.content->toHost(path));
     assert(res);
     (void)res;
     return CELL_FS_SUCCEEDED;
@@ -210,7 +213,7 @@ CellFsErrno cellFsGetFreeSize(const char* directory_path,
                               Process* proc)
 {
     *block_size = 4096;
-    auto host = proc->contentManager()->toHost(directory_path);
+    auto host = g_state.content->toHost(directory_path);
     LOG << ssnprintf("cellFsGetFreeSize(%s (%s), ...)", 
                                           directory_path,
                                           host);
@@ -228,7 +231,7 @@ CellFsErrno cellFsFsync(int32_t fd) {
 
 CellFsErrno cellFsUnlink(const char* path, Process* proc) {
     LOG << ssnprintf("cellFsUnlink(%s, ...)", path);
-    remove(proc->contentManager()->toHost(path));
+    remove(g_state.content->toHost(path));
     return CELL_FS_SUCCEEDED;
 }
 
@@ -239,7 +242,7 @@ CellFsErrno cellFsUnlink(const char* path, Process* proc) {
 
 CellFsErrno cellFsOpendir(const char* path, big_int32_t* fd, Process* proc) {
     LOG << ssnprintf("cellFsOpendir(%s, ...)", path);
-    auto host = proc->contentManager()->toHost(path);
+    auto host = g_state.content->toHost(path);
     auto dir = opendir(host.c_str());
     if (!dir)
         return toCellErrno(errno);

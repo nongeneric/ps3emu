@@ -23,6 +23,7 @@
 #include "libs/audio/configuration.h"
 #include "libs/audio/libaudio.h"
 #include "ppu/CallbackThread.h"
+#include "state.h"
 #include "log.h"
 #include <openssl/sha.h>
 #include <boost/type_traits.hpp>
@@ -122,14 +123,14 @@ struct get_arg<ArgN, PPUThread*> {
 template <int ArgN>
 struct get_arg<ArgN, Process*> {
     inline Process* value(PPUThread* thread) {
-        return thread->proc();
+        return g_state.proc;
     }
 };
 
 template <int ArgN>
 struct get_arg<ArgN, MainMemory*> {
     inline MainMemory* value(PPUThread* thread) {
-        return thread->mm();
+        return g_state.mm;
     }
 };
 
@@ -137,7 +138,7 @@ template <int ArgN>
 struct get_arg<ArgN, cstring_ptr_t> {
     inline cstring_ptr_t value(PPUThread* thread) {
         cstring_ptr_t cstr;
-        readString(thread->mm(), thread->getGPR(3 + ArgN), cstr.str);
+        readString(g_state.mm, thread->getGPR(3 + ArgN), cstr.str);
         return cstr;
     }
 };
@@ -152,14 +153,14 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
         _va = (ps3_uintptr_t)thread->getGPR(3 + ArgN);
         if (_va == 0)
             return nullptr;
-        thread->mm()->readMemory(_va, &_t, sizeof(elem_type));
+        g_state.mm->readMemory(_va, &_t, sizeof(elem_type));
         _thread = thread;
         return &_t; 
     }
     inline ~get_arg() {
         if (_va == 0 || boost::is_const<T>::value)
             return;
-        _thread->mm()->writeMemory(_va, &_t, sizeof(elem_type));
+        g_state.mm->writeMemory(_va, &_t, sizeof(elem_type));
     }
 };
 
@@ -223,7 +224,7 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
     auto va = thread->getGPR(3 + 1); \
     auto len = thread->getGPR(3 + 2); \
     std::unique_ptr<char[]> buf(new char[len]); \
-    thread->mm()->readMemory(va, buf.get(), len); \
+    g_state.mm->readMemory(va, buf.get(), len); \
     thread->setGPR(3, f(ARG(1, f), buf.get(), len, ARG(4, f))); \
 }
 
@@ -236,19 +237,19 @@ uint32_t sys_fs_open_proxy(uint32_t path,
                            PPUThread* thread)
 {
     std::string pathStr;
-    readString(thread->mm(), path, pathStr);
+    readString(g_state.mm, path, pathStr);
     std::vector<uint8_t> argVec(size + 1);
     if (arg) {
-        thread->mm()->readMemory(arg, &argVec[0], size);
+        g_state.mm->readMemory(arg, &argVec[0], size);
     } else {
         argVec[0] = 0;
     }
-    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size, thread->proc());
+    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size, g_state.proc);
 }
 
 CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, Process* proc) {
     std::string pathStr;
-    readString(proc->mm(), path, pathStr);
+    readString(g_state.mm, path, pathStr);
     return cellFsStat(pathStr.c_str(), sb, proc);
 }
 
@@ -260,7 +261,7 @@ CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path,
                              Process* proc)
 {
     std::string pathStr;
-    readString(proc->mm(), path, pathStr);
+    readString(g_state.mm, path, pathStr);
     return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, proc);
 }
 
@@ -269,7 +270,7 @@ CellFsErrno cellFsMkdir_proxy(ps3_uintptr_t path,
                               Process* proc)
 {
     std::string pathStr;
-    readString(proc->mm(), path, pathStr);
+    readString(g_state.mm, path, pathStr);
     return cellFsMkdir(pathStr.c_str(), mode, proc);
 }
 
@@ -277,7 +278,7 @@ CellFsErrno cellFsUnlink_proxy(ps3_uintptr_t path,
                                Process* proc)
 {
     std::string pathStr;
-    readString(proc->mm(), path, pathStr);
+    readString(g_state.mm, path, pathStr);
     return cellFsUnlink(pathStr.c_str(), proc);
 }
 
@@ -287,13 +288,13 @@ CellFsErrno cellFsGetFreeSize_proxy(ps3_uintptr_t directory_path,
                               Process* proc)
 {
     std::string pathStr;
-    readString(proc->mm(), directory_path, pathStr);
+    readString(g_state.mm, directory_path, pathStr);
     return cellFsGetFreeSize(pathStr.c_str(), block_size, free_block_count, proc);
 }
 
 CellFsErrno cellFsOpendir_proxy(ps3_uintptr_t path, big_int32_t *fd, Process* proc) {
     std::string pathStr;
-    readString(proc->mm(), path, pathStr);
+    readString(g_state.mm, path, pathStr);
     return cellFsOpendir(pathStr.c_str(), fd, proc);
 }
 
@@ -308,7 +309,7 @@ int32_t sys_ppu_thread_create_proxy(
     Process* proc)
 {
     std::string namestr;
-    readString(proc->mm(), threadname, namestr);
+    readString(g_state.mm, threadname, namestr);
     return sys_ppu_thread_create(thread_id, entry, arg, prio, stacksize, flags, namestr.c_str(), proc);
 }
 

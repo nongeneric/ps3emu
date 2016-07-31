@@ -1,12 +1,14 @@
-#include "../ps3emu/MainMemory.h"
-#include "../ps3emu/ppu/PPUThread.h"
-#include "../ps3emu/ppu/ppu_dasm.h"
-#include "../ps3emu/libs/sys.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/ppu/PPUThread.h"
+#include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/libs/sys.h"
+#include "ps3emu/state.h"
 #include <catch.hpp>
 
 TEST_CASE("sys_memory_allocate") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     mm.setMemory(0x400000, 0, 4, true);
     th.setGPR(11, 348);
     th.setGPR(3, 1 << 21);

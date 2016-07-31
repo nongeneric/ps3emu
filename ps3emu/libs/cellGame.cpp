@@ -4,13 +4,14 @@
 #include "../MainMemory.h"
 #include <boost/filesystem.hpp>
 #include "../log.h"
+#include "ps3emu/state.h"
 
 using namespace boost::filesystem;
 
 namespace {
     void init(CellGameContentSize* size, Process* proc) {
         auto gb2 = 2 * 1024 * 1024;
-        auto cm = proc->contentManager();
+        auto cm = g_state.content;
         auto host = cm->toHost(cm->contentDir().c_str());
         size->hddFreeSizeKB = space(host).available / 1024;
         size->sizeKB = -1; // not calculated
@@ -25,8 +26,8 @@ int32_t cellGamePatchCheck(CellGameContentSize *size, uint64_t reserved) {
 
 int32_t cellGameContentPermit(cell_game_path_t* contentPath, cell_game_path_t* usrdirPath, Process* proc) {
     LOG << __FUNCTION__;
-    auto usrDir = proc->contentManager()->usrDir();
-    auto contentDir = proc->contentManager()->contentDir();
+    auto usrDir = g_state.content->usrDir();
+    auto contentDir = g_state.content->contentDir();
     std::copy(begin(usrDir), end(usrDir), begin(*usrdirPath));
     std::copy(begin(contentDir), end(contentDir), begin(*contentPath));
     return CELL_OK;
@@ -34,19 +35,19 @@ int32_t cellGameContentPermit(cell_game_path_t* contentPath, cell_game_path_t* u
 
 int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize, Process* proc) {
     LOG << __FUNCTION__;
-    auto sfo = proc->contentManager()->sfo();
+    auto sfo = g_state.content->sfo();
     auto entry = std::find_if(begin(sfo), end(sfo), [=] (auto& entry) {
         return entry.id == id;
     });
     if (entry == end(sfo)) {
         assert(bufsize > 0);
-        proc->mm()->setMemory(buf, 0, 1);
+        g_state.mm->setMemory(buf, 0, 1);
         return CELL_OK;
     }
     assert(entry->id != (uint32_t)-1);
     auto data = boost::get<std::string>(entry->data);
     assert(bufsize >= data.size());
-    proc->mm()->writeMemory(buf, data.c_str(), data.size());
+    g_state.mm->writeMemory(buf, data.c_str(), data.size());
     return CELL_OK;
 }
 

@@ -4,6 +4,7 @@
 #include "../InternalMemoryManager.h"
 #include "ppu_dasm.h"
 #include "../log.h"
+#include "../state.h"
 
 #ifdef DEBUG
 #define dbgpause(value) _dbgPaused = value
@@ -11,12 +12,9 @@
 #define dbgpause(value)
 #endif
 
-PPUThread::PPUThread(Process* proc,
-                     std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
+PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
                      bool primaryThread)
-    : _proc(proc),
-      _mm(proc->mm()),
-      _eventHandler(eventHandler),
+    : _eventHandler(eventHandler),
       _init(false),
       _isStackInfoSet(false),
       _threadFinishedGracefully(primaryThread),
@@ -53,7 +51,7 @@ void PPUThread::innerLoop() {
         try {
             uint32_t instr;
             cia = getNIP();
-            _mm->readMemory(cia, &instr, sizeof instr);
+            g_state.mm->readMemory(cia, &instr, sizeof instr);
             setNIP(cia + sizeof instr);
             ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
         } catch (BreakpointException& e) {
@@ -98,15 +96,7 @@ void PPUThread::loop() {
     _eventHandler(this, PPUThreadEvent::Finished);
 }
 
-MainMemory* PPUThread::mm() {
-    return _mm;
-}
-
-Process* PPUThread::proc() {
-    return _proc;
-}
-
-PPUThread::PPUThread(MainMemory* mm) : _mm(mm) {}
+PPUThread::PPUThread() {}
 
 #ifdef DEBUG
 void PPUThread::singleStepBreakpoint() {
@@ -177,14 +167,14 @@ void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
     _ps3calls.push({getNIP(), getLR(), then});
     
     uint32_t stubVa;
-    _proc->internalMemoryManager()->internalAlloc<4, CallStub>(&stubVa);
+    g_state.memalloc->internalAlloc<4, CallStub>(&stubVa);
     setLR(stubVa);
     setNIP(va);
     
     uint32_t ncallIndex;
     auto entry = findNCallEntry(calcFnid("ps3call_then"), ncallIndex);
     assert(entry);
-    encodeNCall(_mm, stubVa + offsetof(CallStub, ncall), ncallIndex);
+    encodeNCall(g_state.mm, stubVa + offsetof(CallStub, ncall), ncallIndex);
 }
 
 uint64_t ps3call_then(PPUThread* thread) {

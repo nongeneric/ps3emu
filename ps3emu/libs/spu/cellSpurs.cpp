@@ -6,6 +6,7 @@
 #include "ps3emu/spu/SPUThread.h"
 #include "ps3emu/utils.h"
 #include "ps3emu/log.h"
+#include "ps3emu/state.h"
 
 #define CELL_SPURS_EVENT_FLAG_SIZE		128
 
@@ -188,10 +189,10 @@ int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
                                         uint64_t __reserved__,
                                         Process* proc) {
     sys_spu_image_t image;
-    spuImageInit(proc->mm(), proc->internalMemoryManager(), &image, binInfo->eaElf);
+    spuImageInit(g_state.mm, g_state.memalloc, &image, binInfo->eaElf);
     auto spuThreadId = proc->createSpuThread(name.str);
     auto spuThread = proc->getSpuThread(spuThreadId);
-    spuImageMap(proc->mm(), &image, spuThread->ptr(0));
+    spuImageMap(g_state.mm, &image, spuThread->ptr(0));
     spuThread->setNip(image.entry_point);
     spuThread->setElfSource(image.segs);
     spuThread->r(3).dw<0>() = argument->u64[0];

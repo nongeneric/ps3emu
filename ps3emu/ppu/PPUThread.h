@@ -118,11 +118,7 @@ struct ps3call_info_t {
     std::function<void()> then;
 };
 
-class MainMemory;
-class Process;
 class PPUThread {
-    Process* _proc;
-    MainMemory* _mm;
     std::function<void(PPUThread*, PPUThreadEvent)> _eventHandler;
     boost::thread _thread;
     bool _init;
@@ -168,9 +164,8 @@ class PPUThread {
 protected:
     virtual void innerLoop();
 public:
-    PPUThread(MainMemory* mm);
-    PPUThread(Process* proc,
-              std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
+    PPUThread();
+    PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
               bool primaryThread);
     void setStackInfo(uint32_t base, uint32_t size);
     void setPriority(int priority);
@@ -184,8 +179,6 @@ public:
 #endif
     
     void run();
-    MainMemory* mm();
-    Process* proc();
     uint64_t join(bool unique = true);
     
     template <typename V>

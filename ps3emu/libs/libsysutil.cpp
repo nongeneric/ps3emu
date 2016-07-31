@@ -3,6 +3,7 @@
 #include "../ContentManager.h"
 #include "assert.h"
 #include "../log.h"
+#include "../state.h"
 
 #define CELL_SYSUTIL_SYSTEMPARAM_ID_LANG                                                        (0x0111)
 #define CELL_SYSUTIL_SYSTEMPARAM_ID_ENTER_BUTTON_ASSIGN                         (0x0112)
@@ -88,8 +89,8 @@ int32_t cellSysutilGetSystemParamString(int32_t id, ps3_uintptr_t buf, uint32_t 
 
 int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
     LOG << ssnprintf("cellSysCacheMount(id = %s)", param->cacheId);
-    auto cacheDir = proc->contentManager()->cacheDir();
-    auto hostCacheDir = proc->contentManager()->toHost(cacheDir.c_str());
+    auto cacheDir = g_state.content->cacheDir();
+    auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
     system(ssnprintf("mkdir -p \"%s\"", hostCacheDir).c_str());
     strcpy(param->getCachePath, cacheDir.c_str());
     cellSysCacheClear(proc);
@@ -98,8 +99,8 @@ int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
 
 int32_t cellSysCacheClear(Process* proc) {
     LOG << ssnprintf("cellSysCacheClear");
-    auto cacheDir = proc->contentManager()->cacheDir();
-    auto hostCacheDir = proc->contentManager()->toHost(cacheDir.c_str());
+    auto cacheDir = g_state.content->cacheDir();
+    auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
     system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());
     return CELL_OK;
 }

@@ -5,6 +5,7 @@
 #include "../dasm_utils.h"
 #include "ppu_dasm_forms.h"
 #include "../utils.h"
+#include "ps3emu/state.h"
 
 #include <boost/type_traits.hpp>
 #include <boost/endian/conversion.hpp>
@@ -20,7 +21,7 @@
 
 using namespace boost::endian;
 
-#define MM thread->mm()
+#define MM g_state.mm
 #define TH thread
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPUThread* thread)
@@ -2529,7 +2530,7 @@ PRINT(MFTB, XFXForm_2) {
 
 EMU(MFTB, XFXForm_2) {
     auto tbr = i->tbr.u();
-    auto tb = TH->proc()->getTimeBase();
+    auto tb = g_state.proc->getTimeBase();
     assert(tbr == 392 || tbr == 424);
     if (tbr == 424)
         tb &= 0xffffffff;

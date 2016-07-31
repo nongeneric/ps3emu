@@ -10,6 +10,7 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/ContentManager.h"
 #include "ps3emu/log.h"
+#include "ps3emu/state.h"
 #include "ps3emu/spu/SPUChannels.h"
 #include <boost/range/algorithm.hpp>
 #include <array>
@@ -153,18 +154,18 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
     FILE* f = fopen("/tmp/ps3emu_lastSpuImage.elf", "w");
     assert(f);
     std::vector<char> bytes(1 << 20);
-    th->mm()->readMemory(src, &bytes[0], bytes.size(), true);
+    g_state.mm->readMemory(src, &bytes[0], bytes.size(), true);
     fwrite(&bytes[0], 1, bytes.size(), f);
     fclose(f);
 #endif
     
-    spuImageInit(th->mm(), th->proc()->internalMemoryManager(), img, src);
+    spuImageInit(g_state.mm, g_state.memalloc, img, src);
     return CELL_OK;
 }
 
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc) {
     LOG << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
-    auto hostPath = proc->contentManager()->toHost(path.str.c_str());
+    auto hostPath = g_state.content->toHost(path.str.c_str());
     auto elfPath = hostPath;
     if (hostPath.substr(hostPath.size() - 4) != ".elf") {
         elfPath += ".elf";
@@ -180,12 +181,11 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* pr
     uint32_t fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
     
-    auto ialloc = proc->internalMemoryManager();
     uint32_t elfVa;
-    auto elf = ialloc->allocInternalMemory(&elfVa, fsize, 16);
+    auto elf = g_state.memalloc->allocInternalMemory(&elfVa, fsize, 16);
     fread((char*)elf, 1, fsize, f);
     
-    spuImageInit(proc->mm(), ialloc, img, elfVa);
+    spuImageInit(g_state.mm, g_state.memalloc, img, elfVa);
     
     fclose(f);
     return CELL_OK;
@@ -193,7 +193,7 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* pr
 
 int32_t sys_spu_image_close(sys_spu_image_t* img, Process* proc) {
     LOG << __FUNCTION__;
-    spuImageDestroy(proc->internalMemoryManager(), img);
+    spuImageDestroy(g_state.memalloc, img);
     return CELL_OK;
 }
 
@@ -228,12 +228,12 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     auto group = groups.get(group_id);
     std::string name;
     name.resize(attr->nsize);
-    proc->mm()->readMemory(attr->name, &name[0], attr->nsize);
+    g_state.mm->readMemory(attr->name, &name[0], attr->nsize);
     
     *thread_id = proc->createSpuThread(name);
     auto thread = proc->getSpuThread(*thread_id);
     thread->setSpu(spu_num);
-    initThread(proc->mm(), thread, img);
+    initThread(g_state.mm, thread, img);
     thread->r(3).dw<0>() = arg->arg1;
     thread->r(4).dw<0>() = arg->arg2;
     thread->r(5).dw<0>() = arg->arg3;
@@ -342,7 +342,7 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
 
 int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img, PPUThread* th) {
     auto rawSpu = rawSpus.get(id);
-    initThread(th->mm(), rawSpu->thread, img);
+    initThread(g_state.mm, rawSpu->thread, img);
     return CELL_OK;
 }
 
@@ -351,7 +351,7 @@ int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* ent
     sys_spu_image_t img;
     sys_spu_image_open(&img, path, proc);
     *entry = img.entry_point;
-    initThread(proc->mm(), rawSpu->thread, &img);
+    initThread(g_state.mm, rawSpu->thread, &img);
     return CELL_OK;
 }
 

@@ -1,8 +1,9 @@
-#include "../ps3emu/MainMemory.h"
-#include "../ps3emu/ppu/ppu_dasm.h"
-#include "../ps3emu/ppu/PPUThread.h"
-#include "../ps3emu/InternalMemoryManager.h"
-#include "../ps3emu/rsx/GLTexture.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/ppu/PPUThread.h"
+#include "ps3emu/InternalMemoryManager.h"
+#include "ps3emu/rsx/GLTexture.h"
+#include "ps3emu/state.h"
 #include <vector>
 #include <catch.hpp>
 
@@ -145,7 +146,8 @@ TEST_CASE("fixed loads") {
 104fc:       7d 01 10 6a     ldux    r8,r1,r2
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     mm.setMemory(0x300000, 0, 200, true);
     mm.setMemory(32, 0, 16, true);
     uint8_t instr[] = { 
@@ -329,7 +331,8 @@ TEST_CASE("fixed stores") {
 10568:       7c 61 11 6a     stdux   r3,r1,r2
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x98, 0x60, 0x00, 0x10
         , 0x98, 0x61, 0xff, 0xf0
@@ -440,7 +443,8 @@ TEST_CASE("fixed load store with reversal") {
 1058c:       7c e1 15 2c     stwbrx  r7,r1,r2
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = {
           0x7c, 0x60, 0x0e, 0x2c
         , 0x7c, 0x81, 0x16, 0x2c
@@ -498,7 +502,8 @@ TEST_CASE("fixed arithmetic") {
 105bc:       7d 81 04 50     subfo   r12,r1,r0
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = {
           0x38, 0x40, 0x00, 0x10
         , 0x38, 0x61, 0x00, 0x10
@@ -538,7 +543,8 @@ TEST_CASE("list1") {
 1035c:       7c 83 12 14     add     r4,r3,r2
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint64_t cia = 0x10350;
     uint8_t instr[] = {
         0x38, 0x40, 0x00, 0x0c,
@@ -569,7 +575,8 @@ TEST_CASE("list2") {
 10374:       60 00 00 00     nop
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;;
     auto base = 0x10350;
     th.setNIP(base);
     uint8_t instr[] = {
@@ -595,7 +602,8 @@ TEST_CASE("list2") {
 
 TEST_CASE("emu stw") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(29, 0x1122334455667788);
     th.setGPR(11, 0x400000);
     mm.setMemory(0x400000, 0, 8, true);
@@ -606,7 +614,8 @@ TEST_CASE("emu stw") {
 
 TEST_CASE("emu mtctr") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(0, 0x11223344);
     uint8_t instr[] = { 0x7c, 0x09, 0x03, 0xa6 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -638,7 +647,8 @@ TEST_CASE("bit_test") {
 
 TEST_CASE("emu cmpld") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setCR(0);
     th.setGPR(30, 10);
     th.setGPR(8, 10);
@@ -673,7 +683,8 @@ TEST_CASE("list3") {
    10370:       60 00 00 00     nop
      */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto base = 0x10350;
     auto mem = 0x400000;
     th.setNIP(base);
@@ -705,7 +716,8 @@ TEST_CASE("list3") {
 
 TEST_CASE("set crf") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setCR(0);
     th.setCRF_sign(7, 4);
     REQUIRE(th.getCR() == 8);
@@ -716,7 +728,8 @@ TEST_CASE("set crf") {
 
 TEST_CASE("branch info bge") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(10, ~0ull);
     // bge cr7,103b4
     uint8_t instr[] = { 0x40, 0x9c, 0xff, 0xe0 };
@@ -730,7 +743,8 @@ TEST_CASE("branch info bge") {
 
 TEST_CASE("neg") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(3, ~0ull);
     // neg r0,r3
     uint8_t instr[] = { 0x7c, 0x03, 0x00, 0xd0 };
@@ -800,7 +814,8 @@ TEST_CASE("strlen") {
         0x7c, 0x63, 0x20, 0x50, 0x4e, 0x80, 0x00, 0x20
     };
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto base = 0x17ff4;
     th.setNIP(base);
     th.setLR(0);
@@ -819,7 +834,8 @@ TEST_CASE("strlen") {
 
 TEST_CASE("clrldi r0,r0,61") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(0, ~0ull);
     uint8_t instr[] = { 0x78, 0x00, 0x07, 0x60 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -829,7 +845,8 @@ TEST_CASE("clrldi r0,r0,61") {
 TEST_CASE("cntlzd r0,r11") {
     uint8_t instr[] = { 0x7d, 0x60, 0x00, 0x74 };
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(0, 100);
     th.setGPR(11, 0);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -844,7 +861,8 @@ TEST_CASE("cntlzd r0,r11") {
 
 TEST_CASE("nor r11,r9,r10") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(11, 500);
     th.setGPR(9, 0x7f7f7f7f7f7f7f7full);
     th.setGPR(10, 0xf2eeece49feef4f3ull);
@@ -855,7 +873,8 @@ TEST_CASE("nor r11,r9,r10") {
 
 TEST_CASE("subf r3,r3,r4") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(3, 500);
     th.setGPR(4, 700);
     uint8_t instr[] = { 0x7c, 0x63, 0x20, 0x50 };
@@ -865,7 +884,8 @@ TEST_CASE("subf r3,r3,r4") {
 
 TEST_CASE("lwz r11,0(r10)") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint32_t i = 0x66778899;
     mm.writeMemory(0x400000, &i, 4, true);
     th.setGPR(10, 0x400000);
@@ -876,7 +896,8 @@ TEST_CASE("lwz r11,0(r10)") {
 
 TEST_CASE("lis r9,22616") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x3d, 0x20, 0x58, 0x58 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
     REQUIRE( th.getGPR(9) == 0x58580000 );
@@ -884,7 +905,8 @@ TEST_CASE("lis r9,22616") {
 
 TEST_CASE("sradi r0,r1,3") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x7c, 0x20, 0x1e, 0x74 };
 
     th.setGPR(1, 27);
@@ -908,7 +930,8 @@ TEST_CASE("sradi r0,r1,3") {
 
 TEST_CASE("sradi r0,r1,0") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x7c, 0x20, 0x06, 0x74 };
     
     th.setGPR(1, 0xffffffffffffffff);
@@ -926,7 +949,8 @@ TEST_CASE("sradi r0,r1,0") {
 
 TEST_CASE("addic r0,r1,2") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x30, 0x01, 0x00, 0x02 };
     th.setGPR(1, 10);
     th.setCA(0);
@@ -943,7 +967,8 @@ TEST_CASE("addic r0,r1,2") {
 
 TEST_CASE("addic. r0,r1,2") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x34, 0x01, 0x00, 0x02 };
     th.setGPR(1, 10);
     th.setCA(0);
@@ -962,7 +987,8 @@ TEST_CASE("addic. r0,r1,2") {
 
 TEST_CASE("subfic r0,r1,2") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x20, 0x01, 0x00, 0x02 };
     th.setGPR(1, 1);
     th.setCA(0);
@@ -1087,7 +1113,8 @@ TEST_CASE("memcpy") {
         0x38, 0x84, 0x00, 0x18, 0x90, 0xcb, 0x00, 0x10, 0x91, 0x8b, 0x00, 0x14, 0x39, 0x6b, 
         0x00, 0x18, 0x4b, 0xff, 0xff, 0xb4 };
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto base = 0x17a30;
     uint64_t src = 0x400000;
     uint64_t dest = 0x600000;
@@ -1113,7 +1140,8 @@ TEST_CASE("memcpy") {
 
 TEST_CASE("lwz r27,112(r1)") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto mem = 0x400000;
     mm.setMemory(mem, 0, 8, true);
     mm.store<8>(mem, 0x11223344aabbccdd);
@@ -1125,7 +1153,8 @@ TEST_CASE("lwz r27,112(r1)") {
 
 TEST_CASE("fadd f31,f31,f0") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setFPRd(31, 1.);
     th.setFPRd(0, 2.);
     uint8_t instr[] = { 0xff, 0xff, 0x00, 0x2a };
@@ -1135,7 +1164,8 @@ TEST_CASE("fadd f31,f31,f0") {
 
 TEST_CASE("fcmpu cr7,f1,f30") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setFPRd(1, 1.);
     th.setFPRd(30, 2.);
     uint8_t instr[] = { 0xff, 0x81, 0xf0, 0x00 };
@@ -1155,7 +1185,8 @@ TEST_CASE("float loads") {
 10458:       7d 02 04 ee     lfdux   f8,r2,r0
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto mem = 0x400000;
     mm.setMemory(mem, 0, 16, true);
     mm.store<8>(mem,     0x3f92339c00000000); // float
@@ -1189,7 +1220,8 @@ TEST_CASE("float loads with update") {
    10660:       7d 02 04 ee     lfdux   f8,r2,r0
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto mem = 0x400000;
     mm.setMemory(mem, 0, 16, true);
     uint8_t instr[] = { 
@@ -1228,7 +1260,8 @@ TEST_CASE("float stores") {
 10434:  7c 29 07 ae     stfiwx  f1,r9,r0
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     auto mem = 0x400000;
     mm.setMemory(mem, 0, 100, true);
     th.setFPRd(1, 1.1);
@@ -1267,7 +1300,8 @@ TEST_CASE("float moves") {
 1046c:       fc 40 09 10     fnabs   f2,f1
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0xfc, 0x40, 0x08, 0x90
         , 0xfc, 0x40, 0x08, 0x50
@@ -1288,7 +1322,8 @@ TEST_CASE("float moves") {
 
 TEST_CASE("mtocrf 8,r17") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x7e, 0x30, 0x81, 0x20 };
     th.setGPR(17, 0x1111111123456789);
     th.setCR(0);
@@ -1316,7 +1351,8 @@ TEST_CASE("arithmetic_shifts") {
 105e0:       7c 41 0e 74     sradi   r1,r2,1
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x7c, 0xa0, 0xfe, 0x70
         , 0x7c, 0xa5, 0x07, 0xb4
@@ -1372,7 +1408,8 @@ TEST_CASE("shifts") {
 105f4:       7c 41 1c 30     srw     r1,r2,r3
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x7c, 0x41, 0x18, 0x36
         , 0x7c, 0x41, 0x18, 0x30
@@ -1452,7 +1489,8 @@ TEST_CASE("fixed mulls") {
    10618:       1d 62 ff 38     mulli   r11,r2,-200             # ffffff38
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x1c, 0x82, 0x00, 0x78
         , 0x7c, 0xa2, 0x19, 0xd2
@@ -1492,7 +1530,8 @@ TEST_CASE("fixed mulls") {
 
 TEST_CASE("rlwinm r0,r9,0,17,27") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(9, 0xffffffff);
     uint8_t instr[] = { 0x55, 0x20, 0x04, 0x76 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1507,7 +1546,8 @@ TEST_CASE("fixed divs") {
    10630:       7c e2 1b 96     divwu   r7,r2,r3
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x7c, 0x82, 0x1b, 0xd2
         , 0x7c, 0xa2, 0x1b, 0xd6
@@ -1540,7 +1580,8 @@ TEST_CASE("fixed divs") {
 
 TEST_CASE("fcfid f1,f2") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0xfc, 0x20, 0x16, 0x9c };
     th.setFPR(2, 0x12345678abcdef90);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1554,7 +1595,8 @@ TEST_CASE("mtspr") {
    1064c:       7c 29 03 a6     mtctr   r1
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = {
           0x7c, 0x21, 0x03, 0xa6
         , 0x7c, 0x28, 0x03, 0xa6
@@ -1574,7 +1616,8 @@ TEST_CASE("mtspr") {
 
 TEST_CASE("mfcr r1") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x7c, 0x20, 0x00, 0x26 };
     th.setCR(0x12345678);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1583,7 +1626,8 @@ TEST_CASE("mfcr r1") {
 
 TEST_CASE("fctiwz f1,f2") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0xfc, 0x20, 0x10, 0x1e };
     th.setFPRd(2, 0);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1624,7 +1668,8 @@ TEST_CASE("fixed logical") {
    106b8:       7c 34 13 38     orc     r20,r1,r2
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x70, 0x43, 0x00, 0x71
         , 0x74, 0x44, 0x03, 0xd6
@@ -1682,7 +1727,8 @@ TEST_CASE("extend sign") {
    106d4:       7c 48 07 b4     extsw   r8,r2
 */
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 
           0x7c, 0x23, 0x07, 0x74
         , 0x7c, 0x44, 0x07, 0x74
@@ -1708,7 +1754,8 @@ TEST_CASE("extend sign") {
 
 TEST_CASE("blrl") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setLR(0x33114450);
     uint8_t instr[] = { 0x4e, 0x80, 0x00, 0x21 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1717,7 +1764,8 @@ TEST_CASE("blrl") {
 
 TEST_CASE("bctrl") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setCTR(0x33114450);
     uint8_t instr[] = { 0x4e, 0x80, 0x04, 0x21 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1726,7 +1774,8 @@ TEST_CASE("bctrl") {
 
 TEST_CASE("cntlzw r11,r11") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     th.setGPR(11, 0x8000);
     uint8_t instr[] = { 0x7d, 0x6b, 0x00, 0x34 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1735,7 +1784,8 @@ TEST_CASE("cntlzw r11,r11") {
 
 TEST_CASE("vsldoi") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     unsigned __int128 i = 0x1122334455667788ull;
     i <<= 64;
     i |= 0xaabbccddeeff0099ull;
@@ -1758,7 +1808,8 @@ TEST_CASE("vsldoi") {
 
 TEST_CASE("vxor v0,v0,v0") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     unsigned __int128 i = 0x1122334455667788ull;
     i <<= 64;
     i |= 0xaabbccddeeff0099ull;
@@ -1770,7 +1821,8 @@ TEST_CASE("vxor v0,v0,v0") {
 
 TEST_CASE("addc r5,r4,r3") {
     MainMemory mm;
-    PPUThread th(&mm);
+    g_state.mm = &mm;
+    PPUThread th;
     uint8_t instr[] = { 0x7C, 0xA4, 0x18, 0x14 };
     
     th.setGPR(3, 100);

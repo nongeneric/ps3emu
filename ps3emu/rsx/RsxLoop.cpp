@@ -6,6 +6,7 @@
 #include "../libs/graphics/graphics.h"
 #include "Tracer.h"
 #include "../log.h"
+#include "ps3emu/state.h"
 
 #include <vector>
 
@@ -63,11 +64,11 @@ float fixedUint16ToFloat(uint16_t val) {
 }
 
 int64_t Rsx::interpret(uint32_t get) {
-    MethodHeader header { _mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get)) };
+    MethodHeader header { g_state.mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get)) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
         assert(n != 0);\
-        return _mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get) + 4 * n);\
+        return g_state.mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get) + 4 * n);\
     })(x)
     
     auto parseTextureAddress = [&](int argi, int index) {
@@ -1663,7 +1664,7 @@ void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
     MethodHeader header { 0 };
     header.prefix.set(1);
     header.jumpoffset.set(destOffset);
-    _mm->store<4>(va, header.val);
+    g_state.mm->store<4>(va, header.val);
 }
 
 void Rsx::sendCommand(GcmCommandReplayInfo info) {

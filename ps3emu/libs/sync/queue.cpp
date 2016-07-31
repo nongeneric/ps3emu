@@ -1,10 +1,12 @@
 #include "queue.h"
 
 #include "../ConcurrentQueue.h"
-#include "../../IDMap.h"
-#include "../../MainMemory.h"
+#include "ps3emu/IDMap.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/ContentManager.h"
 #include "../spu/sysSpu.h"
 #include "ps3emu/log.h"
+#include "ps3emu/state.h"
 #include "ps3emu/Process.h"
 #include <boost/thread.hpp>
 #include <algorithm>
@@ -86,7 +88,7 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
     size_t num;
     queue->tryReceive(&vec[0], vec.size(), &num);
     *number = num;
-    th->mm()->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
+    g_state.mm->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
     INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%d)", equeue_id);
     return CELL_OK;
 }

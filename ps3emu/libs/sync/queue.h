@@ -22,6 +22,8 @@ typedef big_uint32_t sys_event_type_t;
 
 static_assert(sizeof(sys_event_t) == 32, "");
 
+class Process;
+
 int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                sys_event_queue_attribute_t* attr,
                                sys_ipc_key_t event_queue_key,

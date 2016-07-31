@@ -3,6 +3,7 @@
 #include "../IDMap.h"
 #include "../ppu/PPUThread.h"
 #include "../MainMemory.h"
+#include "../state.h"
 
 #include <iconv.h>
 #include <errno.h>
@@ -97,7 +98,7 @@ uint32_t l10n_convert_str(l10n_conv_t cd,
     assert(src && dst);
     std::vector<char> src_buf(*src_len);
     std::vector<char> dest_buf(*dst_len);
-    thread->mm()->readMemory(src, &src_buf[0], src_buf.size());
+    g_state.mm->readMemory(src, &src_buf[0], src_buf.size());
     auto converter = converters.get(cd);
     auto src_ptr = &src_buf[0];
     auto dest_ptr = &dest_buf[0];

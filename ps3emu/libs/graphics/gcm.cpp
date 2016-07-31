@@ -8,6 +8,7 @@
 #include "ps3emu/ELFLoader.h"
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/log.h"
+#include "ps3emu/state.h"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -35,9 +36,6 @@ struct CellGcmZcullInfo {
   
 struct OffsetTable;
 struct {
-    Process* proc;
-    MainMemory* mm;
-    Rsx* rsx;
     TargetCellGcmContextData* defaultContext = nullptr;
     uint32_t defaultContextDataEa;
     ps3_uintptr_t gCellGcmCurrentContext = 0;
@@ -93,7 +91,7 @@ struct OffsetTable {
             eaAddress[io + i] = 0xffff;
         }
         count = 0;
-        emuGcmState.rsx->updateOffsetTableForReplay();
+        g_state.rsx->updateOffsetTableForReplay();
     }
     
     void unmapOffset(uint32_t offset) {
@@ -111,7 +109,7 @@ struct OffsetTable {
             ioIndex++;
             eaIndex++;
         }
-        emuGcmState.rsx->updateOffsetTableForReplay();
+        g_state.rsx->updateOffsetTableForReplay();
     }
 };
 
@@ -144,43 +142,39 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
                           Process* proc) {
     INFO(libs) << __FUNCTION__;
     
-    auto internalMemory = proc->internalMemoryManager();
-    emuGcmState.offsetTable = internalMemory->internalAlloc<128, OffsetTable>(&emuGcmState.offsetTableEmuEa);
+    emuGcmState.offsetTable = g_state.memalloc->internalAlloc<128, OffsetTable>(&emuGcmState.offsetTableEmuEa);
     emuGcmState.ioSize = ioSize;
     
     emuGcmState.tileInfos =
-        internalMemory->internalAlloc<128, std::array<CellGcmTileInfo, 16>>(
+        g_state.memalloc->internalAlloc<128, std::array<CellGcmTileInfo, 16>>(
             &emuGcmState.tileInfosOffset);
         
     emuGcmState.zcullInfos =
-        internalMemory->internalAlloc<128, std::array<CellGcmZcullInfo, 8>>(
+        g_state.memalloc->internalAlloc<128, std::array<CellGcmZcullInfo, 8>>(
             &emuGcmState.zcullInfosOffset);
     
-    proc->rsx()->setGcmContext(ioSize, ioAddress);
-    proc->rsx()->init(proc);
-    proc->mm()->setMemory(GcmLabelBaseOffset, 0, 1, true);
+    g_state.rsx->setGcmContext(ioSize, ioAddress);
+    g_state.rsx->init(proc);
+    g_state.mm->setMemory(GcmLabelBaseOffset, 0, 1, true);
     
     emuGcmState.defaultContext =
-        internalMemory->internalAlloc<128, TargetCellGcmContextData>(
+        g_state.memalloc->internalAlloc<128, TargetCellGcmContextData>(
             &emuGcmState.defaultContextDataEa);
     
     emuGcmState.defaultCommandBufferSize = cmdSize;
     emuGcmState.gCellGcmCurrentContext = defaultGcmContextSymbolVa;
-    setCurrentCommandBuffer(proc->mm(), emuGcmState.defaultContextDataEa);
-    emuGcmState.proc = proc;
-    emuGcmState.mm = proc->mm();
-    emuGcmState.rsx = proc->rsx();
+    setCurrentCommandBuffer(g_state.mm, emuGcmState.defaultContextDataEa);
     
     emuGcmState.offsetTable->map(ioAddress, 0, ioSize);
-    proc->mm()->provideMemory(ioAddress, ioSize, proc->rsx()->context()->mainMemoryBuffer.mapped());
-    proc->mm()->writeMemory(ioAddress, gcmResetCommands, gcmResetCommandsSize);
-    proc->mm()->writeMemory(ioAddress + gcmResetCommandsSize, gcmInitCommands, gcmInitCommandsSize);
+    g_state.mm->provideMemory(ioAddress, ioSize, g_state.rsx->context()->mainMemoryBuffer.mapped());
+    g_state.mm->writeMemory(ioAddress, gcmResetCommands, gcmResetCommandsSize);
+    g_state.mm->writeMemory(ioAddress + gcmResetCommandsSize, gcmInitCommands, gcmInitCommandsSize);
     emuGcmState.defaultContext->begin = ioAddress + gcmResetCommandsSize;
     emuGcmState.defaultContext->end = emuGcmState.defaultContext->begin + 0x1bff * 4;
     emuGcmState.defaultContext->current = ioAddress + gcmResetCommandsSize + gcmInitCommandsSize;
     
     uint32_t callbackDescrEa;
-    auto callbackDescr = internalMemory->internalAlloc<128, fdescr>(&callbackDescrEa);
+    auto callbackDescr = g_state.memalloc->internalAlloc<128, fdescr>(&callbackDescrEa);
     emuGcmState.defaultContext->callback = callbackDescrEa;
     
     uint32_t callbackNCallIndex;
@@ -190,16 +184,16 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     
     // gCellGcmCurrentContext -> context -> callback-fun-descr -> callback-code
     uint32_t callbackNcallInstrEa;
-    internalMemory->internalAlloc<128, uint32_t>(&callbackNcallInstrEa);
-    encodeNCall(proc->mm(), callbackNcallInstrEa, callbackNCallIndex);
+    g_state.memalloc->internalAlloc<128, uint32_t>(&callbackNcallInstrEa);
+    encodeNCall(g_state.mm, callbackNcallInstrEa, callbackNCallIndex);
     
     callbackDescr->va = callbackNcallInstrEa;
     callbackDescr->tocBase = 0;
 
-    emuGcmState.rsx->setGet(emuGcmState.defaultContext->begin - ioAddress);
-    emuGcmState.rsx->setPut(emuGcmState.defaultContext->current - ioAddress);
+    g_state.rsx->setGet(emuGcmState.defaultContext->begin - ioAddress);
+    g_state.rsx->setPut(emuGcmState.defaultContext->current - ioAddress);
     auto rsxPrimaryDmaLabel = 3;
-    emuGcmState.rsx->setLabel(rsxPrimaryDmaLabel, 1, false);
+    g_state.rsx->setLabel(rsxPrimaryDmaLabel, 1, false);
     return CELL_OK;  
 }
 
@@ -244,14 +238,14 @@ emu_void_t cellGcmResetFlipStatus(Process* proc) {
 }
 
 void setFlipCommand(Process* proc, uint32_t contextEa, uint32_t label, uint32_t labelValue, uint32_t buffer) {
-    auto context = (TargetCellGcmContextData*)proc->mm()->getMemoryPointer(
+    auto context = (TargetCellGcmContextData*)g_state.mm->getMemoryPointer(
         contextEa, sizeof(TargetCellGcmContextData));
     assert(context->end - context->current >= 4);
     uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
-    emuGcmState.mm->store<4>(context->current, header);
-    emuGcmState.mm->store<4>(context->current + 4, buffer);
-    emuGcmState.mm->store<4>(context->current + 8, label);
-    emuGcmState.mm->store<4>(context->current + 12, labelValue);
+    g_state.mm->store<4>(context->current, header);
+    g_state.mm->store<4>(context->current + 4, buffer);
+    g_state.mm->store<4>(context->current + 8, label);
+    g_state.mm->store<4>(context->current + 12, labelValue);
     context->current += 4 * sizeof(uint32_t);
 }
 
@@ -324,13 +318,13 @@ int32_t cellGcmUnbindZcull(uint8_t index) {
 
 emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler) {
     INFO(libs) << __FUNCTION__;
-    emuGcmState.rsx->setFlipHandler(handler);
+    g_state.rsx->setFlipHandler(handler);
     return emu_void;
 }
 
 emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
     INFO(libs) << __FUNCTION__;
-    setCurrentCommandBuffer(proc->mm(), emuGcmState.defaultContextDataEa);
+    setCurrentCommandBuffer(g_state.mm, emuGcmState.defaultContextDataEa);
     return emu_void;
 }
 
@@ -348,14 +342,14 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
         nextSize = k32;
     }
     
-    emuGcmState.rsx->setPut(data->current - ioBase);
-    while ((emuGcmState.rsx->getGet() > nextBuffer - ioBase &&
-           emuGcmState.rsx->getGet() < nextBuffer - ioBase + nextSize) ||
-           emuGcmState.rsx->isCallActive()) {
+    g_state.rsx->setPut(data->current - ioBase);
+    while ((g_state.rsx->getGet() > nextBuffer - ioBase &&
+           g_state.rsx->getGet() < nextBuffer - ioBase + nextSize) ||
+           g_state.rsx->isCallActive()) {
         sys_timer_usleep(20);
     }
     
-    emuGcmState.rsx->encodeJump(data->current, nextBuffer - ioBase);
+    g_state.rsx->encodeJump(data->current, nextBuffer - ioBase);
     
     INFO(libs) <<
         ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, jump = %x, dest = %x, defsize = %x)",
@@ -407,7 +401,7 @@ int32_t cellGcmMapEaIoAddress(uint32_t ea, uint32_t io, uint32_t size, Process* 
         return CELL_GCM_ERROR_FAILURE;
     }
     emuGcmState.offsetTable->map(ea, io, size);
-    proc->mm()->provideMemory(ea, size, (uint8_t*)proc->rsx()->context()->mainMemoryBuffer.mapped() + io);
+    g_state.mm->provideMemory(ea, size, (uint8_t*)proc->rsx()->context()->mainMemoryBuffer.mapped() + io);
     return CELL_OK;
 }
 

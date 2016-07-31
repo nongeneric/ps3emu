@@ -14,6 +14,7 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/optional.hpp>
 #include "../log.h"
+#include "../state.h"
 #include <memory>
 #include <map>
 
@@ -34,7 +35,7 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
 
 cell_system_time_t sys_time_get_system_time(PPUThread* thread) {
     LOG << __FUNCTION__;
-    auto sec = (float)thread->proc()->getTimeBase() / (float)thread->proc()->getFrequency();
+    auto sec = (float)g_state.proc->getTimeBase() / (float)g_state.proc->getFrequency();
     return sec * 1000000;
 }
 
@@ -151,16 +152,16 @@ int32_t executeExportedFunction(sys_prx_id_t id,
                                 ps3_uintptr_t modres, // big_int32_t*
                                 PPUThread* thread,
                                 const char* name) {
-    auto& segments = thread->proc()->getSegments();
+    auto& segments = g_state.proc->getSegments();
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == id; });
     assert(segment != end(segments));
-    auto func = findExport(thread->mm(), segment->elf.get(), calcEid(name));
+    auto func = findExport(g_state.mm, segment->elf.get(), calcEid(name));
     assert(func);
     thread->setGPR(2, func->tocBase);
     thread->setGPR(3, args);
     thread->setGPR(4, argp);
     thread->ps3call(func->va,
-                    [=] { thread->mm()->store<4>(modres, thread->getGPR(3)); });
+                    [=] { g_state.mm->store<4>(modres, thread->getGPR(3)); });
     return thread->getGPR(3);
 }
 
@@ -180,7 +181,7 @@ sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t op
     assert(flags == 0);
     assert(opt == 0);
     LOG << ssnprintf("sys_prx_load_module(%s)", path.str);
-    auto hostPath = proc->contentManager()->toHost(path.str.c_str()) + ".elf";
+    auto hostPath = g_state.content->toHost(path.str.c_str()) + ".elf";
     return proc->loadPrx(hostPath);
 }
 
@@ -211,13 +212,13 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
     (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
-    *alloc_addr = thread->mm()->malloc(size);
+    *alloc_addr = g_state.mm->malloc(size);
     return CELL_OK;
 }
 
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
     LOG << ssnprintf("sys_memory_free(%x)", start_addr);
-    thread->mm()->free(start_addr);
+    g_state.mm->free(start_addr);
     return CELL_OK;
 }
 
@@ -228,7 +229,7 @@ int sys_timer_usleep(usecond_t sleep_time) {
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
     LOG << __FUNCTION__;
-    return thread->proc()->getFrequency();
+    return g_state.proc->getFrequency();
 }
 
 uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec) {
@@ -426,14 +427,14 @@ sys_prx_id_t sys_prx_get_module_id_by_name(cstring_ptr_t name,
         uint32_t CELL_PRX_ERROR_UNKNOWN_MODULE = 0x8001112e;
         return CELL_PRX_ERROR_UNKNOWN_MODULE; // not a tuner
     }
-    for (auto& s : thread->proc()->getSegments()) {
+    for (auto& s : g_state.proc->getSegments()) {
         prx_export_t* exports;
         int nexports;
-        std::tie(exports, nexports) = s.elf->exports(thread->mm());
+        std::tie(exports, nexports) = s.elf->exports(g_state.mm);
         for (auto i = 0; i < nexports; ++i) {
             if (exports[i].name) {
                 std::string exportName;
-                readString(thread->mm(), exports[i].name, exportName);
+                readString(g_state.mm, exports[i].name, exportName);
                 if (name.str == exportName)
                     return s.va;
             }
@@ -455,7 +456,7 @@ int32_t _sys_printf(cstring_ptr_t format, PPUThread* thread) {
                 arg++;
             } else if (ch == 's') {
                 std::string substr;
-                readString(thread->mm(), thread->getGPR(arg), substr);
+                readString(g_state.mm, thread->getGPR(arg), substr);
                 str += substr;
                 arg++;
             } else {

@@ -5,6 +5,7 @@
 #include "../Process.h"
 #include "../MainMemory.h"
 #include "../log.h"
+#include "../state.h"
 #include <assert.h>
 
 void InterruptPPUThread::innerLoop() {
@@ -14,7 +15,7 @@ void InterruptPPUThread::innerLoop() {
         if (ev.type == InterruptType::Disestablish)
             return;
         fdescr entryDescr;
-        proc()->mm()->readMemory(_entry, &entryDescr, sizeof(fdescr));
+        g_state.mm->readMemory(_entry, &entryDescr, sizeof(fdescr));
 
         setNIP(entryDescr.va);
         setGPR(2, entryDescr.tocBase);
@@ -48,7 +49,7 @@ void InterruptPPUThread::setArg(uint64_t arg) {
 }
 
 InterruptPPUThread::InterruptPPUThread(
-    Process* proc, std::function<void(PPUThread*, PPUThreadEvent)> eventHandler)
-    : PPUThread(proc, eventHandler, false), _mask2(0) {}
+    std::function<void(PPUThread*, PPUThreadEvent)> eventHandler)
+    : PPUThread(eventHandler, false), _mask2(0) {}
 
     

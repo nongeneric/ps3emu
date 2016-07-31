@@ -5,6 +5,7 @@
 #include "ps3emu/rsx/Rsx.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/spu/SPUDasm.h"
+#include "ps3emu/state.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
@@ -71,7 +72,7 @@ public:
     }
 
     virtual QString getCell(uint64_t row, int col) override {
-        bool ppu = _thread && _thread->mm()->isAllocated(row);
+        bool ppu = _thread && g_state.mm->isAllocated(row);
         bool spu = _spuThread && row <= LocalStorageSize - 16;
         if (!ppu && !spu)
             return "";
@@ -80,7 +81,7 @@ public:
         } else {
             uint8_t buf[16];
             if (ppu) {
-                _thread->mm()->readMemory(row, buf, sizeof buf);
+                g_state.mm->readMemory(row, buf, sizeof buf);
             } else if (spu) {
                 memcpy(buf, _spuThread->ptr(row), 16);
             }
@@ -202,7 +203,7 @@ public:
                 case 6: return printBit(_thread->getSO());
                 case 17: return print(_thread->getNIP());
                 case 19: {
-                    auto pages = _thread->mm()->allocatedPages();
+                    auto pages = g_state.mm->allocatedPages();
                     auto usage = pages * DefaultMainMemoryPageSize;
                     auto measure = "";
                     if (usage > (1 << 30)) {
@@ -325,7 +326,7 @@ public:
     void setThread(PPUThread* thread) {
         _thread = thread;
         _spuThread = nullptr;
-        _elf = thread->proc()->elfLoader();
+        _elf = g_state.proc->elfLoader();
     }
     
     void setThread(SPUThread* thread) {
@@ -340,14 +341,14 @@ public:
         if (col == 0) {
             return QString("%1").arg(row, 8, 16, QChar('0'));
         }
-        auto ppu = _thread && _thread->mm()->isAllocated(row);
+        auto ppu = _thread && g_state.mm->isAllocated(row);
         auto spu = _spuThread && row < LocalStorageSize - 4;
         if ((!ppu && !spu) || col == 2)
             return "";
         
         uint32_t instr;
         if (ppu) {
-            _thread->mm()->readMemory(row, &instr, sizeof instr);
+            g_state.mm->readMemory(row, &instr, sizeof instr);
         } else {
             memcpy(&instr, _spuThread->ptr(row), 4);
         }
@@ -402,10 +403,10 @@ public:
     }
     
     virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) override {
-        if (!_thread || !_thread->mm()->isAllocated(row))
+        if (!_thread || !g_state.mm->isAllocated(row))
             return false;
         uint32_t instr;
-        _thread->mm()->readMemory(row, &instr, sizeof instr);
+        g_state.mm->readMemory(row, &instr, sizeof instr);
         if (isAbsoluteBranch(&instr)) {
             to = getTargetAddress(&instr, row);
             highlighted = row == _thread->getNIP() && isTaken(&instr, row, _thread);
@@ -680,27 +681,27 @@ void DebuggerModel::dumpImports() {
         
         prx_import_t* imports;
         int count;
-        std::tie(imports, count) = s.elf->imports(_proc->mm());
+        std::tie(imports, count) = s.elf->imports(g_state.mm);
         
         for (auto i = 0; i < count; ++i) {
             std::string name;
-            readString(_proc->mm(), imports[i].name, name);
+            readString(g_state.mm, imports[i].name, name);
             emit message(ssnprintf("  import %s", name).c_str());
             
             auto printImports = [&](auto idsVa, auto stubsVa, auto count, auto type, auto isVar) {
-                auto fnids = (big_uint32_t*)_proc->mm()->getMemoryPointer(idsVa, count * 4);
-                auto stubs = (big_uint32_t*)_proc->mm()->getMemoryPointer(stubsVa, count * 4);
+                auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(idsVa, count * 4);
+                auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(stubsVa, count * 4);
                 for (auto j = 0; j < count; ++j) {
                     auto segment = boost::find_if(segments, [=](auto& s) {
                         auto stub = stubs[j];
                         if (isVar) {
-                            auto tocVa = _proc->mm()->load<4>(stubs[j] + 4);
-                            stub = _proc->mm()->load<4>(tocVa);
+                            auto tocVa = g_state.mm->load<4>(stubs[j] + 4);
+                            stub = g_state.mm->load<4>(tocVa);
                         }
                         return s.va <= stub && stub < s.va + s.size;
                     });
                     auto resolution = segment == end(segments) ? "NCALL" : segment->elf->shortName();
-                    emit message(ssnprintf("    %s fnid_%08X | %s", type, fnids[j], resolution).c_str());
+                    emit message(QString(ssnprintf("    %s fnid_%08X | %s", type, fnids[j], resolution).c_str()));
                 }
             };
             printImports(imports[i].fnids, imports[i].fstubs, imports[i].functions, "FUNC    ", false);
@@ -793,7 +794,7 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
     std::string str;
     while ((nip = _activeThread->getNIP()) != va) {
         uint32_t instr;
-        _proc->mm()->readMemory(nip, &instr, sizeof instr);
+        g_state.mm->readMemory(nip, &instr, sizeof instr);
         ppu_dasm<DasmMode::Print>(&instr, nip, &str);
         std::string name;
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
@@ -884,8 +885,8 @@ void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
         setSPUSoftBreak(_activeSPUThread->getElfSource(), va);
         return;
     }
-    auto bytes = _proc->mm()->load<4>(va);
-    _proc->mm()->store<4>(va, 0x7fe00088);
+    auto bytes = g_state.mm->load<4>(va);
+    g_state.mm->store<4>(va, 0x7fe00088);
     _softBreaks.push_back({va, bytes});
 }
 
@@ -897,7 +898,7 @@ void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {
             QString::fromStdString(ssnprintf("there is no breakpoint at %x", va)));
         return;
     }
-    _proc->mm()->store<4>(va, it->bytes);
+    g_state.mm->store<4>(va, it->bytes);
     _softBreaks.erase(it);
 }
 

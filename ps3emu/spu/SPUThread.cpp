@@ -3,6 +3,7 @@
 #include "../Process.h"
 #include "../MainMemory.h"
 #include "../log.h"
+#include "ps3emu/state.h"
 #include "SPUDasm.h"
 #include <stdio.h>
 #include <signal.h>
@@ -97,7 +98,7 @@ SPUThread::SPUThread(Process* proc,
                      std::function<void(SPUThread*, SPUThreadEvent)> eventHandler)
     : _name(name),
       _proc(proc),
-      _channels(proc->mm(), this),
+      _channels(g_state.mm, this),
       _eventHandler(eventHandler),
       _dbgPaused(true),
       _singleStep(false),

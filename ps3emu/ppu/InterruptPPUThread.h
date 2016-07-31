@@ -24,8 +24,7 @@ class InterruptPPUThread : public PPUThread {
     SPUThread* _establishedThread = nullptr;
     
 public:
-    InterruptPPUThread(Process* proc,
-                       std::function<void(PPUThread*, PPUThreadEvent)> eventHandler);
+    InterruptPPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandler);
     void establish(SPUThread* thread);
     void disestablish();
     void setEntry(uint32_t entry);

@@ -5,6 +5,7 @@
 #include "InternalMemoryManager.h"
 #include "ELFLoader.h"
 #include "ppu/CallbackThread.h"
+#include "state.h"
 
 #include "ppu/InterruptPPUThread.h"
 #include <boost/thread/locks.hpp>
@@ -15,10 +16,6 @@
 #include <cstdlib>
 
 using namespace boost::filesystem;
-
-MainMemory* Process::mm() {
-    return _mainMemory.get();
-}
 
 ELFLoader* Process::elfLoader() {
     return _elf.get();
@@ -43,7 +40,7 @@ void Process::loadPrxStore() {
 
 void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threads.emplace_back(std::make_unique<PPUThread>(
-        this, [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
+        [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
     _rsx.reset(new Rsx());
     _mainMemory->setRsx(_rsx.get());
     _mainMemory->setProc(this);
@@ -70,6 +67,13 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     thread->setGPR(3, args.size());
     thread->setGPR(4, vaArgs);
     _threadIds.create(std::move(thread));
+    
+    g_state.proc = this;
+    g_state.mm = _mainMemory.get();
+    g_state.memalloc = _internalMemoryManager.get();
+    g_state.content = _contentManager.get();
+    g_state.rsx = _rsx.get();
+    g_state.elf = _elf.get();
 }
 
 uint32_t Process::loadPrx(std::string path) {
@@ -177,7 +181,7 @@ uint64_t Process::createThread(uint32_t stackSize,
                                uint64_t arg) {
     boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
     _threads.emplace_back(std::make_unique<PPUThread>(
-        this, [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, false));
+        [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, false));
     auto t = _threads.back().get();
     initNewThread(t, entryPointDescriptorVa, stackSize);
     t->setGPR(3, arg);
@@ -193,7 +197,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
                                         uint64_t arg) {
     boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
     auto t = new InterruptPPUThread(
-        this, [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); });
+        [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); });
     t->setArg(arg);
     t->setEntry(entryPointDescriptorVa);
     initNewThread(t, entryPointDescriptorVa, stackSize);
@@ -212,12 +216,10 @@ void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, 
     
     // PPU_ABI-Specifications_e
 
-    auto mm = thread->mm();
-    
     fdescr entryDescr;
-    mm->readMemory(entryDescriptorVa, &entryDescr, sizeof(fdescr));
+    _mainMemory->readMemory(entryDescriptorVa, &entryDescr, sizeof(fdescr));
     
-    mm->setMemory(stack, 0, stackSize, true);
+    _mainMemory->setMemory(stack, 0, stackSize, true);
     thread->setGPR(1, stack + stackSize - 2 * sizeof(uint64_t));
     thread->setGPR(2, entryDescr.tocBase);
     
@@ -227,8 +229,8 @@ void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, 
     thread->setGPR(8, entryDescriptorVa);
     thread->setGPR(12, DefaultMainMemoryPageSize);
     
-    mm->writeMemory(tls, _threadInitInfo->tlsBase, _threadInitInfo->tlsFileSize, true);
-    mm->setMemory(tls + _threadInitInfo->tlsFileSize, 0, 
+    _mainMemory->writeMemory(tls, _threadInitInfo->tlsBase, _threadInitInfo->tlsFileSize, true);
+    _mainMemory->setMemory(tls + _threadInitInfo->tlsFileSize, 0, 
                   _threadInitInfo->tlsMemSize - _threadInitInfo->tlsFileSize, true);
     thread->setGPR(13, tls + 0x7000);
     thread->setFPSCR(0);
@@ -255,10 +257,6 @@ ps3_uintptr_t Process::storeArgs(std::vector<std::string> const& args) {
 PPUThread* Process::getThread(uint64_t id) {
     boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
     return _threadIds.get(id);
-}
-
-ContentManager* Process::contentManager() {
-    return _contentManager.get();
 }
 
 uint32_t Process::createSpuThread(std::string name) {
@@ -306,10 +304,6 @@ std::vector<SPUThread*> Process::dbgSPUThreads() {
     for (auto& th : _spuThreads)
         vec.push_back(th.get());
     return vec;
-}
-
-InternalMemoryManager* Process::internalMemoryManager() {
-    return _internalMemoryManager.get();
 }
 
 CallbackThread* Process::getCallbackThread() {

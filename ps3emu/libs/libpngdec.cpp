@@ -3,6 +3,7 @@
 #include "../utils.h"
 #include "../IDMap.h"
 #include "../Process.h"
+#include "../state.h"
 #include "../ContentManager.h"
 
 #include <png.h>
@@ -206,8 +207,8 @@ int32_t cellPngDecOpen(CellPngDecMainHandle mainHandle,
     auto decoder = decoders.get(mainHandle);
     assert(src->srcSelect == CELL_PNGDEC_FILE);
     std::string fileName;
-    readString(proc->mm(), src->fileName, fileName);
-    auto hostPath = proc->contentManager()->toHost(fileName.c_str());
+    readString(g_state.mm, src->fileName, fileName);
+    auto hostPath = g_state.content->toHost(fileName.c_str());
     auto f = fopen(hostPath.c_str(), "rb");
     if (!f)
         return CELL_PNGDEC_ERROR_OPEN_FILE;

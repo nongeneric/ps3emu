@@ -11,6 +11,7 @@
 #include "../shaders/ShaderGenerator.h"
 #include "../shaders/shader_dasm.h"
 #include "../utils.h"
+#include "ps3emu/state.h"
 #include <atomic>
 #include <vector>
 #include <fstream>
@@ -68,7 +69,7 @@ void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
     }
     auto offset = index * 0x10;
     INFO(rsx) << ssnprintf("setting rsx label at offset %x", offset);
-    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     atomic->store(boost::endian::native_to_big(value));
 }
@@ -86,7 +87,7 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     INFO(rsx) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
-    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     while (boost::endian::big_to_native(atomic->load()) != value) ;
     INFO(rsx) << ssnprintf("acquired");
@@ -97,7 +98,7 @@ void Rsx::SemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("releasing semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
-    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     atomic->store(boost::endian::native_to_big(value));
 }
@@ -107,7 +108,7 @@ void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, offset, value
     );
-    auto ptr = _mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
+    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
     auto atomic = (std::atomic<uint32_t>*)ptr;
     atomic->store(boost::endian::native_to_big(value));
 }
@@ -213,7 +214,7 @@ void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
     if (_mode == RsxOperationMode::Replay) {
         source = _currentReplayBlob.data();
     } else {
-        source = _mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, locationOffset), bytes);
+        source = g_state.mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, locationOffset), bytes);
     }
     
     _context->tracer.pushBlob(source, bytes);
@@ -504,8 +505,8 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
 
 void Rsx::invokeHandler(uint32_t descrEa) {
     fdescr descr;
-    _mm->readMemory(descrEa, &descr, sizeof(descr));
-    auto future = _proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
+    g_state.mm->readMemory(descrEa, &descr, sizeof(descr));
+    auto future = g_state.proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
     future.get();
 }
 
@@ -584,7 +585,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _isFlipInProgress = true;
     
     _window.swapBuffers();
-    _lastFlipTime = _proc->getTimeBaseMicroseconds().count();
+    _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
     _context->frame++;
     _context->commandNum = 0;
     
@@ -629,7 +630,7 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count
         source = _currentReplayBlob;
     } else {
         source.resize(size);
-        _mm->readMemory(
+        g_state.mm->readMemory(
             rsxOffsetToEa(MemoryLocation::Main, offset), &source[0], source.size());
     }
     
@@ -739,7 +740,7 @@ FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size, bool m
         size,
         mrt,
         _context.get(),
-        _mm
+        g_state.mm
     );
     _context->fragmentShaderCache.insert(key, shader, updater);
     return shader;
@@ -866,7 +867,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
         va, size,
         [=](auto t) {
             std::vector<uint8_t> buf(size);
-            _mm->readMemory(va, &buf[0], size);
+            g_state.mm->readMemory(va, &buf[0], size);
             t->update(buf);
             
             _context->tracer.pushBlob(&buf[0], buf.size());
@@ -1005,9 +1006,6 @@ void Rsx::updateTextures() {
 }
 
 void Rsx::init(Process* proc) {
-    _proc = proc;
-    _mm = proc->mm();
-    
     INFO(rsx) << "waiting for rsx loop to initialize";
     
     // lock the thread until Rsx has initialized the buffer
@@ -1337,7 +1335,7 @@ void Rsx::initGcm() {
         _context->tracer.enable();
     }
     
-    _mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
+    g_state.mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
     _context->pipeline.bind();
     
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
@@ -1355,7 +1353,7 @@ void Rsx::initGcm() {
     _context->localMemoryBuffer = GLPersistentCpuBuffer(256 * (1u << 20));
     _context->mainMemoryBuffer = GLPersistentCpuBuffer(256 * (1u << 20));
     
-    _mm->provideMemory(
+    g_state.mm->provideMemory(
         RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemoryBuffer.mapped());
     
     _context->elementArrayIndexBuffer = GLPersistentCpuBuffer(10 * (1u << 20));
@@ -1464,7 +1462,7 @@ void Rsx::waitForIdle() {
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
     waitForIdle();
-    _mm->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
+    g_state.mm->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
     __sync_synchronize();
 }
 
@@ -1493,7 +1491,7 @@ uint32_t Rsx::getPut() {
 void Rsx::watchCaches() {
     if (_mode == RsxOperationMode::Replay)
         return;
-    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { _mm->memoryBreak(va, size); };
+    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { g_state.mm->memoryBreak(va, size); };
     _context->textureCache.syncAll();
     _context->textureCache.watch(setMemoryBreak);
     _context->fragmentShaderCache.syncAll();
@@ -1577,8 +1575,8 @@ void Rsx::Color(uint32_t ptr, uint32_t count) {
     assert(~(ptr & 0xfffff) > count && "mid page writes aren't supported");
     static std::vector<uint8_t> vec;
     vec.resize(count * 4);
-    _mm->readMemory(ptr, &vec[0], count * 4);
-    _mm->writeMemory(dest, &vec[0], count * 4);
+    g_state.mm->readMemory(ptr, &vec[0], count * 4);
+    g_state.mm->writeMemory(dest, &vec[0], count * 4);
     memoryBreakHandler(dest, count * 4);
 }
 
@@ -1631,8 +1629,8 @@ void Rsx::startCopy2d() {
     uint32_t srcLine = sourceEa;
     uint32_t destLine = destEa;
     for (auto line = 0u; line < c.lineCount; ++line) {
-        uint8_t* src = _mm->getMemoryPointer(srcLine, c.lineLength);
-        uint8_t* dest = _mm->getMemoryPointer(destLine, c.lineLength);
+        uint8_t* src = g_state.mm->getMemoryPointer(srcLine, c.lineLength);
+        uint8_t* dest = g_state.mm->getMemoryPointer(destLine, c.lineLength);
         auto srcLineEnd = src + c.lineLength;
         while (src < srcLineEnd) {
             *dest = *src;
@@ -1753,8 +1751,8 @@ void Rsx::transferImage() {
     auto destEa = isSwizzle
                       ? rsxOffsetToEa(swizzle.location, swizzle.offset)
                       : rsxOffsetToEa(surface.destLocation, surface.destOffset);
-    auto src = _mm->getMemoryPointer(sourceEa, 1);
-    auto dest = _mm->getMemoryPointer(destEa, 1);
+    auto src = g_state.mm->getMemoryPointer(sourceEa, 1);
+    auto dest = g_state.mm->getMemoryPointer(destEa, 1);
     
 //     if (_context->framebuffer->findTexture(sourceEa)) {
 //         auto it =
@@ -2037,8 +2035,8 @@ void Rsx::GetReport(uint8_t type, uint32_t offset) {
     TRACE2(GetReport, type, offset);
     // TODO: report zpass/zcull
     auto ea = getReportDataAddressLocation(offset / 16, _context->reportLocation);
-    _mm->store<8>(ea, _proc->getTimeBaseNanoseconds().count());
-    _mm->store<8>(ea + 8 + 4, 0);
+    g_state.mm->store<8>(ea, g_state.proc->getTimeBaseNanoseconds().count());
+    g_state.mm->store<8>(ea + 8 + 4, 0);
     __sync_synchronize();
 }
 

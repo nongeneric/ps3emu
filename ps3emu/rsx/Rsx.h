@@ -54,8 +54,6 @@ class Rsx {
     std::atomic<uint32_t> _lastFlipTime;
     bool _shutdown = false;
     bool _initialized = false;
-    MainMemory* _mm;
-    Process* _proc;
     mutable boost::mutex _mutex;
     boost::condition_variable _cv;
     mutable boost::mutex _initMutex;

@@ -1,9 +1,10 @@
 #include "DebugExpr.h"
 
-#include "../ps3emu/ppu/PPUThread.h"
-#include "../ps3emu/spu/SPUThread.h"
-#include "../ps3emu/MainMemory.h"
-#include "../ps3emu/utils.h"
+#include "ps3emu/ppu/PPUThread.h"
+#include "ps3emu/spu/SPUThread.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/utils.h"
+#include "ps3emu/state.h"
 #include <memory>
 #include <boost/regex.hpp>
 #include <boost/endian/arithmetic.hpp>
@@ -218,7 +219,7 @@ public:
     MemExpr(Expr* expr) : expr(expr) { }
     Expr* expr;
     uint64_t eval(PPUThread* th) override {
-        return th->mm()->load<4>(expr->eval(th));
+        return g_state.mm->load<4>(expr->eval(th));
     }
     
     uint64_t eval(SPUThread* th) override {
