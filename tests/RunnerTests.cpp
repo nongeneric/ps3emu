@@ -1358,3 +1358,29 @@ TEST_CASE("spu_queue") {
     );
 }
 
+TEST_CASE("spu_image") {
+    auto output = startWaitGetOutput({"./binaries/spu_image/a.elf"});
+    REQUIRE( output ==
+        "type: 00000000\n"
+        "entry point: 00003050\n"
+        "nsegs: 00000004\n"
+        "type: 00000001\n"
+        "ls start: 00003000\n"
+        "size: 00000310\n"
+        "pa_start/value: 0001f100\n"
+        "type: 00000001\n"
+        "ls start: 00003380\n"
+        "size: 00000030\n"
+        "pa_start/value: 0001f480\n"
+        "type: 00000002\n"
+        "ls start: 000033b0\n"
+        "size: 00000170\n"
+        "pa_start/value: 00000000\n"
+        "type: 00000004\n"
+        "ls start: 00000000\n"
+        "size: 00000020\n"
+        "pa_start/value: 0001f4c4\n"
+    );
+}
+
+

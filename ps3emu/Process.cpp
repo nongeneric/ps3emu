@@ -126,16 +126,15 @@ Event Process::run() {
             case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
             case PPUThreadEvent::ProcessFinished: {
                 dbgPause(false, false);
-                for (auto& t : _spuThreads) {
-                    t->cancel();
-                }
                 _rsx->shutdown();
                 _callbackThread->terminate();
                 for (auto& t : _threads) {
                     t->join();
                 }
                 for (auto& t : _spuThreads) {
-                    t->tryJoin();
+                    if (t->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
+                        t->cancel();
+                    }
                 }
                 return ProcessFinishedEvent();
             }

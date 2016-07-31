@@ -175,6 +175,7 @@ void MainMemory::reset() {
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
 }
 
+// TODO: preallocate the same area for both the internal memory manager and the heap
 ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
     VirtualAddress split{HeapArea};
     VirtualAddress maxSplit{HeapArea + HeapAreaSize};

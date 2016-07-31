@@ -245,7 +245,7 @@ public:
     void dbgPause(bool val);
     void run();
     void cancel();
-    SPUThreadExitInfo tryJoin();
+    SPUThreadExitInfo tryJoin(unsigned ms);
     SPUThreadExitInfo join();
     void setElfSource(uint32_t src);
     uint32_t getElfSource();

@@ -187,18 +187,17 @@ int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
                                         cstring_ptr_t name,
                                         uint64_t __reserved__,
                                         Process* proc) {
-    SpuImage image([=](uint32_t ptr, void* buf, size_t size) {
-        proc->mm()->readMemory(ptr, buf, size);
-    }, binInfo->eaElf);
+    sys_spu_image_t image;
+    spuImageInit(proc->mm(), proc->internalMemoryManager(), &image, binInfo->eaElf);
     auto spuThreadId = proc->createSpuThread(name.str);
     auto spuThread = proc->getSpuThread(spuThreadId);
-    memcpy(spuThread->ptr(0), image.localStorage(), LocalStorageSize);
-    spuThread->setNip(image.entryPoint());
-    spuThread->setElfSource(image.source());
+    spuImageMap(proc->mm(), &image, spuThread->ptr(0));
+    spuThread->setNip(image.entry_point);
+    spuThread->setElfSource(image.segs);
     spuThread->r(3).dw<0>() = argument->u64[0];
     spuThread->r(3).dw<1>() = argument->u64[1];
     // set r4 to taskset argument
-    spuThread->setInterruptHandler(-1, [&] {
+    spuThread->setInterruptHandler(-1, [=] {
         auto size = spuThread->channels()->mmio_read(SPU_Out_Intr_Mbox);
         auto regs = spuThread->ptr(spuThread->channels()->mmio_read(SPU_Out_MBox));
         spuPrintf(spuThread->ptr(0), regs, size);

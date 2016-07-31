@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <utility>
 
+
 class MainMemory;
 
 class InternalMemoryManager {
-    uint32_t _current;
     MainMemory* _mm;
 public:
     InternalMemoryManager();
@@ -18,4 +18,7 @@ public:
         auto ptr = allocInternalMemory(ea, sizeof(T), Alignment);
         return new (ptr) T(std::forward<Args>(args)...);
     }
+    
+    void free(uint32_t ea);
+    void free(void* ptr);
 };

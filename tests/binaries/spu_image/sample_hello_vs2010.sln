@@ -1,0 +1,35 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample_hello", "sample_hello.vcxproj", "{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "task_hello.spu", "task\task_hello.spu.vcxproj", "{4B7786BE-4F10-4FAA-A75A-631DF39570DD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.Debug|PS3.ActiveCfg = Debug|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.Debug|PS3.Build.0 = Debug|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.Release|PS3.ActiveCfg = Release|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.Release|PS3.Build.0 = Release|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{B7B4FF84-5604-4A9F-BA04-EE7A669EFC9F}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.Debug|PS3.ActiveCfg = Debug|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.Debug|PS3.Build.0 = Debug|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.Release|PS3.ActiveCfg = Release|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.Release|PS3.Build.0 = Release|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.SNC Debug|PS3.ActiveCfg = Debug|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.SNC Debug|PS3.Build.0 = Debug|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.SNC Release|PS3.ActiveCfg = Release|PS3
+		{4B7786BE-4F10-4FAA-A75A-631DF39570DD}.SNC Release|PS3.Build.0 = Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

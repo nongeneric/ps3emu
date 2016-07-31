@@ -6,7 +6,7 @@ struct DbgConfig {
     
     template<class Archive>
     void serialize(Archive& ar) {
-        ar(StopAtNewSpuThread);
+        ar(StopAtNewSpuThread, LogSpu);
     }
 };
 

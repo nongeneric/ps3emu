@@ -111,8 +111,8 @@ SPUThread::SPUThread(Process* proc,
     _status = 0b11000; // BTHSM
 }
 
-SPUThreadExitInfo SPUThread::tryJoin() {
-    if (_thread.try_join_for( boost::chrono::milliseconds(0) )) {
+SPUThreadExitInfo SPUThread::tryJoin(unsigned ms) {
+    if (_thread.try_join_for( boost::chrono::milliseconds(ms) )) {
         return SPUThreadExitInfo{ SPUThreadExitCause::StillRunning, 0 };
     }
     return SPUThreadExitInfo{_cause, _exitCode};
