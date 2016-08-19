@@ -496,8 +496,12 @@ void DebuggerModel::run() {
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             emit message("process finished");
             cont = false;
-        } else if (boost::get<PPUThreadStartedEvent>(&untyped)) {
+        } else if (auto ev = boost::get<PPUThreadStartedEvent>(&untyped)) {
             emit message("thread started");
+            if (g_config.config().StopAtNewPpuThread) {
+                cont = false;
+                switchThread(ev->thread);
+            }
         } else if (boost::get<PPUThreadFinishedEvent>(&untyped)) {
             emit message("thread finished");
         } else if (auto ev = boost::get<PPUBreakpointEvent>(&untyped)) {
@@ -537,6 +541,12 @@ void DebuggerModel::log(std::string str) {
 }
 
 void DebuggerModel::exec(QString command) {
+    for (auto c : command.split(';', QString::SkipEmptyParts)) {
+        execSingleCommand(c);
+    }
+}
+
+void DebuggerModel::execSingleCommand(QString command) {
     auto name = command.section(':', 0, 0).trimmed();
     
     if (name == "segments") {
@@ -547,6 +557,15 @@ void DebuggerModel::exec(QString command) {
         return;
     } else if (name == "threads") {
         dumpThreads();
+        return;
+    } else if (name == "clearbps") {
+        clearSoftBreaks();
+        return;
+    } else if (name == "so") {
+        stepIn();
+        return;
+    } else if (name == "run") {
+        run();
         return;
     }
     
@@ -593,7 +612,7 @@ void DebuggerModel::exec(QString command) {
             setSPUSoftBreak(elfSource, exprVal);
             return;
         } else if (name == "p") {
-            emit message(QString(" : #%1").arg(exprVal, 0, 16));
+            emit message(QString(" : 0x%1").arg(exprVal, 0, 16));
             return;
         } else if (name == "put") {
             auto id = command.section(':', 2, 2).trimmed().toStdString();
@@ -615,10 +634,25 @@ void DebuggerModel::exec(QString command) {
         } else if (name == "thread") {
             changeThread(exprVal);
             return;
+        } else if (name == "segment") {
+            printSegment(exprVal);
         }
     } catch (...) {
         emit message("command failed");
         return;
+    }
+}
+
+void DebuggerModel::printSegment(uint32_t ea) {
+    for (auto& segment : _proc->getSegments()) {
+        if (intersects(segment.va, segment.size, ea, 0u)) {
+            auto msg = ssnprintf("base: %08x, rva: %08x, name: %s",
+                                 segment.va,
+                                 ea - segment.va,
+                                 segment.elf->shortName());
+            emit message(QString::fromStdString(msg));
+            return;
+        }
     }
 }
 
@@ -643,18 +677,25 @@ void DebuggerModel::dumpThreads() {
     unsigned i = 0;
     emit message("PPU Threads (id, nip)");
     for (auto th : _proc->dbgPPUThreads()) {
-        emit message(QString::asprintf(
-            "[%d]  %08x  %08x",
-            i, (uint32_t)th->getId(), (uint32_t)th->getNIP()
-        ));
+        auto current = th == _activeThread;
+        emit message(QString::asprintf("[%d]%s %08x  %08x  %s",
+                                       i,
+                                       current ? "*" : " ",
+                                       (uint32_t)th->getId(),
+                                       (uint32_t)th->getNIP(),
+                                       th->getName().c_str()));
         i++;
     }
     emit message("SPU Threads (id, nip, source, name)");
     for (auto th : _proc->dbgSPUThreads()) {
-        emit message(QString::asprintf(
-            "[%d]  %08x  %08x  %08x  %s",
-            i, (uint32_t)th->getId(), th->getNip(), th->getElfSource(), th->getName().c_str()
-        ));
+        auto current = th == _activeSPUThread;
+        emit message(QString::asprintf("[%d]%s %08x  %08x  %08x  %s",
+                                       i,
+                                       current ? "*" : " ",
+                                       (uint32_t)th->getId(),
+                                       th->getNip(),
+                                       th->getElfSource(),
+                                       th->getName().c_str()));
         i++;
     }
 }
@@ -845,7 +886,8 @@ void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
     }
     
     fclose(f);
-    fclose(scriptf);
+    if (scriptf)
+        fclose(scriptf);
     message(QString("trace completed and saved to ") + tracefile);
 }
 
@@ -877,7 +919,6 @@ void DebuggerModel::updateUI() {
 void DebuggerModel::runto(ps3_uintptr_t va) {
     setSoftBreak(va);
     run();
-    updateUI();
 }
 
 void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
@@ -888,6 +929,13 @@ void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
     auto bytes = g_state.mm->load<4>(va);
     g_state.mm->store<4>(va, 0x7fe00088);
     _softBreaks.push_back({va, bytes});
+}
+
+void DebuggerModel::clearSoftBreaks() {
+    auto breaks = _softBreaks;
+    for (auto& bp : breaks) {
+        clearSoftBreak(bp.va);
+    }
 }
 
 void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {

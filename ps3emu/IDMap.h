@@ -13,7 +13,7 @@ class IDMap {
     std::map<ID, T> _map;
 public:
     ID create(T&& t) {
-        assert(_maxId <= 2000); // TODO: implement id reuse
+        assert(_maxId <= 2000 + InitialID); // TODO: implement id reuse
         _map.insert(std::make_pair(_maxId, std::move(t)));
         return _maxId++;
     }

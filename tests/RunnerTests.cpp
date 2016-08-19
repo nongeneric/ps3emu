@@ -1383,4 +1383,10 @@ TEST_CASE("spu_image") {
     );
 }
 
-
+TEST_CASE("fiber_hello") {
+    auto output = startWaitGetOutput({"./binaries/fiber_hello/a.elf"});
+    REQUIRE( output ==
+        "Hello, fiber!\n"
+        "## libfiber : sample_fiber_hello SUCCEEDED ##\n"
+    );
+}

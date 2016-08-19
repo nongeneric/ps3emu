@@ -1,12 +1,13 @@
 #pragma once
 
 struct DbgConfig {
+    bool StopAtNewPpuThread = true;
     bool StopAtNewSpuThread = true;
     bool LogSpu = true;
     
     template<class Archive>
     void serialize(Archive& ar) {
-        ar(StopAtNewSpuThread, LogSpu);
+        ar(StopAtNewPpuThread, StopAtNewSpuThread, LogSpu);
     }
 };
 

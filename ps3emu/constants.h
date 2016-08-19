@@ -27,10 +27,7 @@ static constexpr uint32_t RsxMemoryFrequency = 650000000;
 static constexpr uint32_t RsxCoreFrequency = 500000000;
 
 static constexpr ps3_uintptr_t StackArea = 0xd0000000u;
-static constexpr uint32_t StackAreaSize = 0x8000000u;
-
-static constexpr ps3_uintptr_t TLSArea = StackArea + StackAreaSize;
-static constexpr uint32_t TLSAreaSize = 0x7000000u;
+static constexpr uint32_t StackAreaSize = 32u << 20;
 
 static constexpr uint32_t DefaultStackSize = 0x10000u;
 
@@ -54,3 +51,8 @@ static constexpr unsigned FragmentShaderConstantBinding = VertexShaderConstantBi
 static constexpr unsigned VertexShaderSamplesInfoBinding = FragmentShaderConstantBinding + 1;
 static constexpr unsigned FragmentShaderSamplesInfoBinding = VertexShaderSamplesInfoBinding + 1;
 static constexpr unsigned VertexShaderViewportMatrixBinding =  FragmentShaderSamplesInfoBinding + 1;
+
+static constexpr unsigned MutexIdBase = 0x1000;
+static constexpr unsigned LwMutexIdBase = 0x2000;
+static constexpr unsigned LwCondIdBase = 0x3000;
+static constexpr unsigned QueueIdBase = 0x4000;

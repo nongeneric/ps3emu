@@ -3,14 +3,11 @@
 #include <cstdint>
 #include <utility>
 
-
-class MainMemory;
-
 class InternalMemoryManager {
-    MainMemory* _mm;
+    uint32_t _base;
+    
 public:
-    InternalMemoryManager();
-    void setMainMemory(MainMemory* mm);
+    InternalMemoryManager(uint32_t base, uint32_t size);
     void* allocInternalMemory(uint32_t* ea, uint32_t size, uint32_t alignment);
     
     template <int Alignment, typename T, typename... Args>

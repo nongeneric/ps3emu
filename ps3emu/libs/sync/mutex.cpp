@@ -9,7 +9,7 @@
 #include <assert.h>
 
 namespace {
-    ThreadSafeIDMap<sys_mutex_t, std::shared_ptr<IMutex>> mutexes;
+    ThreadSafeIDMap<sys_mutex_t, std::shared_ptr<IMutex>, MutexIdBase> mutexes;
 }
 
 int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {

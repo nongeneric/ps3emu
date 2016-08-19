@@ -34,6 +34,9 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
 }
 
 void PPUThread::innerLoop() {
+    assert(getNIP());
+    g_state.th = this;
+    
     for (;;) {
 #ifdef DEBUG
         if (_singleStep) {
@@ -83,8 +86,12 @@ void PPUThread::innerLoop() {
 }
 
 void PPUThread::loop() {
-    log_set_thread_name(ssnprintf("ppu_%d", (unsigned)_id));
+    log_set_thread_name(ssnprintf("ppu_%s_%d", _name, (unsigned)_id));
     LOG << ssnprintf("thread loop started");
+    
+    _running = true;
+    _cvRunning.notify_all();
+    
     _eventHandler(this, PPUThreadEvent::Started);
     dbgpause(true);
     
@@ -109,9 +116,12 @@ void PPUThread::dbgPause(bool val) {
 #endif
 
 void PPUThread::run() {
+    boost::unique_lock<boost::mutex> lock(_mutexRunning);
     if (!_init) {
         _thread = boost::thread([=] { loop(); });
         _init = true;
+        while (!_running)
+            _cvRunning.wait(lock);
     }
 }
 
@@ -155,8 +165,9 @@ void PPUThread::yield() {
     boost::this_thread::yield();
 }
 
-void PPUThread::setId(unsigned id) {
+void PPUThread::setId(unsigned id, std::string name) {
     _id = id;
+    _name = name;
 }
 
 struct CallStub {
@@ -173,7 +184,7 @@ void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
     
     uint32_t ncallIndex;
     auto entry = findNCallEntry(calcFnid("ps3call_then"), ncallIndex);
-    assert(entry);
+    assert(entry); (void)entry;
     encodeNCall(g_state.mm, stubVa + offsetof(CallStub, ncall), ncallIndex);
 }
 
@@ -189,4 +200,8 @@ uint64_t ps3call_then(PPUThread* thread) {
 
 unsigned PPUThread::getId() {
     return _id;
+}
+
+std::string PPUThread::getName() {
+    return _name;
 }

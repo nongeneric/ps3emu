@@ -3,7 +3,6 @@
 #include "rsx/Rsx.h"
 #include "ppu/PPUThread.h"
 #include "spu/SPUThread.h"
-#include "MemoryBlockManager.h"
 #include "IDMap.h"
 #include "libs/ConcurrentQueue.h"
 
@@ -121,13 +120,13 @@ struct ModuleSegment {
 class Process {
     ConcurrentFifoQueue<ThreadEvent> _eventQueue;
     std::unique_ptr<ThreadInitInfo> _threadInitInfo;
-    MemoryBlockManager<StackArea, StackAreaSize, 1 * 1024 * 1024> _stackBlocks;
-    MemoryBlockManager<TLSArea, TLSAreaSize, 1 * 1024 * 1024> _tlsBlocks;
     std::unique_ptr<Rsx> _rsx;
     std::shared_ptr<ELFLoader> _elf;
     std::unique_ptr<MainMemory> _mainMemory;
     std::unique_ptr<ContentManager> _contentManager;
     std::unique_ptr<InternalMemoryManager> _internalMemoryManager;
+    std::unique_ptr<InternalMemoryManager> _heapMemoryManager;
+    std::unique_ptr<InternalMemoryManager> _stackBlocks;
     std::unique_ptr<CallbackThread> _callbackThread;
     std::vector<std::unique_ptr<PPUThread>> _threads;
     boost::mutex _ppuThreadMutex;
@@ -140,7 +139,11 @@ class Process {
     std::vector<ModuleSegment> _segments;
     std::vector<std::shared_ptr<ELFLoader>> _prxs;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
-    void initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
+    void initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
+    void initNewThread(PPUThread* thread,
+                       ps3_uintptr_t entryDescriptorVa,
+                       uint32_t stackSize,
+                       uint32_t tls);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
     void dbgPause(bool pause, bool takeMutex = true);
     void loadPrxStore();
@@ -157,10 +160,16 @@ public:
     Event run();
     uint64_t createThread(uint32_t stackSize,
                           ps3_uintptr_t entryPointDescriptorVa,
-                          uint64_t arg);
+                          uint64_t arg,
+                          std::string name,
+                          uint32_t tls,
+                          bool start = true);
     uint64_t createInterruptThread(uint32_t stackSize,
                                    ps3_uintptr_t entryPointDescriptorVa,
-                                   uint64_t arg);
+                                   uint64_t arg,
+                                   std::string name,
+                                   uint32_t tls,
+                                   bool start = true);
     PPUThread* getThread(uint64_t id);
     uint32_t createSpuThread(std::string name);
     SPUThread* getSpuThread(uint32_t id);
@@ -174,3 +183,12 @@ public:
     boost::chrono::nanoseconds getTimeBaseNanoseconds();
     std::vector<ModuleSegment>& getSegments();
 };
+
+int32_t executeExportedFunction(uint32_t imageBase,
+                                size_t args,
+                                ps3_uintptr_t argp,
+                                ps3_uintptr_t modres, // big_int32_t*
+                                PPUThread* thread,
+                                const char* name);
+int32_t EmuInitLoadedPrxModules(PPUThread* thread);
+uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name);

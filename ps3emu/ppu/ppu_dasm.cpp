@@ -1042,61 +1042,54 @@ EMU(EXTSW, XForm_11) {
 
 // Move To/From System Register Instructions, p81
 
-inline bool isXER(BitField<11, 21> spr) {
-    return spr.u() == 1u << 5;
-}
-
-inline bool isLR(BitField<11, 21> spr) {
-    return spr.u() == 8u << 5;
-}
-
-inline bool isCTR(BitField<11, 21> spr) {
-    return spr.u() == 9u << 5;
-}
+enum {
+    SPR_XER = 1u << 5,
+    SPR_LR = 8u << 5,
+    SPR_CTR = 9u << 5,
+    SPR_VRSAVE = 8,
+};
 
 PRINT(MTSPR, XFXForm_7) {
-    auto mnemonic = isXER(i->spr) ? "mtxer"
-                  : isLR(i->spr) ? "mtlr"
-                  : isCTR(i->spr) ? "mtctr"
-                  : nullptr;
-    if (mnemonic) {
-        *result = format_n(mnemonic, i->RS);
-    } else {
-        throw IllegalInstructionException();
+    switch (i->spr.u()) {
+        case SPR_XER: *result = format_n("mtxer", i->RS); break;
+        case SPR_LR: *result = format_n("mtlr", i->RS); break;
+        case SPR_CTR: *result = format_n("mtctr", i->RS); break;
+        case SPR_VRSAVE: *result = format_n("mfvrsave", i->RS); break;
+        default: throw IllegalInstructionException();
     }
 }
 
 EMU(MTSPR, XFXForm_7) {
     auto rs = TH->getGPR(i->RS);
-    if (isXER(i->spr)) {
-        TH->setXER(rs);
-    } else if (isLR(i->spr)) {
-        TH->setLR(rs);
-    } else if (isCTR(i->spr)) {
-        TH->setCTR(rs);
-    } else {
-        throw IllegalInstructionException();
+    switch (i->spr.u()) {
+        case SPR_XER: TH->setXER(rs); break;
+        case SPR_LR: TH->setLR(rs); break;
+        case SPR_CTR: TH->setCTR(rs); break;
+        case SPR_VRSAVE: TH->setVRSAVE(rs); break;
+        default: throw IllegalInstructionException();
     }
 }
 
 PRINT(MFSPR, XFXForm_7) {
-    auto mnemonic = isXER(i->spr) ? "mfxer"
-                  : isLR(i->spr) ? "mflr"
-                  : isCTR(i->spr) ? "mfctr"
-    : nullptr;
-    if (mnemonic) {
-        *result = format_n(mnemonic, i->RS);
-    } else {
-        throw IllegalInstructionException();
+    switch (i->spr.u()) {
+        case SPR_XER: *result = format_n("mfxer", i->RS); break;
+        case SPR_LR: *result = format_n("mflr", i->RS); break;
+        case SPR_CTR: *result = format_n("mfctr", i->RS); break;
+        case SPR_VRSAVE: *result = format_n("mfvrsave", i->RS); break;
+        default: throw IllegalInstructionException();
     }
 }
 
 EMU(MFSPR, XFXForm_7) {
-    auto v = isXER(i->spr) ? TH->getXER()
-           : isLR(i->spr) ? TH->getLR()
-           : isCTR(i->spr) ? TH->getCTR()
-           : (throw std::runtime_error("illegal"), 0);
-     TH->setGPR(i->RS, v);
+    uint32_t v;
+    switch (i->spr.u()) {
+        case SPR_XER: v = TH->getXER(); break;
+        case SPR_LR: v = TH->getLR(); break;
+        case SPR_CTR: v = TH->getCTR(); break;
+        case SPR_VRSAVE: v = TH->getVRSAVE(); break;
+        default: throw IllegalInstructionException();
+    }
+    TH->setGPR(i->RS, v);
 }
 
 template <int Pos04, int Pos5>

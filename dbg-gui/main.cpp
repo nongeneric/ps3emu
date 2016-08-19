@@ -16,12 +16,13 @@ int main(int argc, char *argv[]) {
                  log_debugger);
     log_set_thread_name("dbg_main");
 
-    std::string elfPath;
+    std::string elfPath, arguments;
     options_description consoleDescr("Allowed options");
     try {
         consoleDescr.add_options()
             ("help", "produce help message")
             ("elf,e", value<std::string>(&elfPath), "elf file")
+            ("args,a", value<std::string>(&arguments), "arguments")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);
@@ -40,7 +41,8 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     MainWindow w;
     if (!elfPath.empty()) {
-        w.loadElf(QString::fromStdString(elfPath), QStringList());
+        auto list = QString::fromStdString(arguments).split(' ', QString::SkipEmptyParts);
+        w.loadElf(QString::fromStdString(elfPath), list);
     }
     w.show();
     return app.exec();

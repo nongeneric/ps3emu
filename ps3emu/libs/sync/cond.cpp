@@ -21,7 +21,7 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
     auto info = std::make_shared<cv_info_t>();
     info->m = find_mutex(lwmutex).get();
     *cond_id = cvs.create(std::move(info));
-    LOG << ssnprintf("sys_cond_create(%x, %s)", *cond_id, attr->name);
+    LOG << ssnprintf("sys_cond_create(%d, %d, %s)", *cond_id, lwmutex, attr->name);
     return CELL_OK;
 }
 

@@ -133,6 +133,10 @@ class PPUThread {
     bool _threadFinishedGracefully;
     int _priority;
     std::atomic<unsigned> _id;
+    std::atomic<bool> _running;
+    boost::condition_variable _cvRunning;
+    boost::mutex _mutexRunning;
+    std::string _name;
     
     uint64_t _NIP;
     uint64_t _LR = 0;
@@ -144,6 +148,7 @@ class PPUThread {
     FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
+    uint32_t _VRSAVE;
     
     std::stack<ps3call_info_t> _ps3calls;
     
@@ -315,6 +320,14 @@ public:
         _XER.v = value;
     }
     
+    inline uint32_t getVRSAVE() {
+        return _VRSAVE;
+    }
+    
+    inline void setVRSAVE(uint32_t value) {
+        _VRSAVE = value;
+    }
+    
     inline void setCTR(uint64_t value) {
         _CTR = value;
     }
@@ -382,8 +395,9 @@ public:
         return _NIP;
     }
     
-    void setId(unsigned id);
+    void setId(unsigned id, std::string name);
     unsigned getId();
+    std::string getName();
     void ncall(uint32_t index);
     void scall();
     void yield();

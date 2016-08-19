@@ -3,6 +3,7 @@
 #include "libs/spu/sysSpu.h"
 #include "rsx/Rsx.h"
 #include "log.h"
+#include "utils.h"
 
 using namespace boost::endian;
 
@@ -17,7 +18,6 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
                                             uint size,
                                             uint32_t va,
                                             bool cond) {
-    
     boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
     bool success = false;
     auto thread = boost::this_thread::get_id();
@@ -173,24 +173,6 @@ void MainMemory::reset() {
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
-}
-
-// TODO: preallocate the same area for both the internal memory manager and the heap
-ps3_uintptr_t MainMemory::malloc(ps3_uintptr_t size) {
-    VirtualAddress split{HeapArea};
-    VirtualAddress maxSplit{HeapArea + HeapAreaSize};
-    
-    auto gap = findGap<MemoryPage>(&_pages[split.page.u()],
-                                   &_pages[maxSplit.page.u()],
-                                   size / DefaultMainMemoryPageSize,
-                                   [](auto& page) { return !page.ptr; });
-    auto va = std::distance(_pages.get(), gap) * DefaultMainMemoryPageSize;
-    setMemory(va, 0, size, true);
-    return va;
-}
-
-void MainMemory::free(ps3_uintptr_t addr) {
-    LOG << "free() not implemented";
 }
 
 void MainMemory::setRsx(Rsx* rsx) {

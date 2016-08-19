@@ -11,6 +11,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/optional.hpp>
 #include "log.h"
 #include <set>
 #include <cstdlib>
@@ -25,9 +26,83 @@ Rsx* Process::rsx() {
     return _rsx.get();
 }
 
+boost::optional<fdescr> findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva = nullptr) {
+    prx_export_t* exports;
+    int count;
+    std::tie(exports, count) = prx->exports(mm);
+    for (auto i = 0; i < count; ++i) {
+        if (exports[i].name)
+            continue;
+        auto fnids = (big_uint32_t*)mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
+        auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
+        for (auto j = 0; j < exports[i].functions; ++j) {
+            if (fnids[j] == eid) {
+                if (fdescrva) {
+                    *fdescrva = stubs[j];
+                }
+                fdescr descr;
+                mm->readMemory(stubs[j], &descr, sizeof(descr));
+                return descr;
+            }
+        }
+    }
+    return {};
+}
+
+uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name) {
+    auto& segments = g_state.proc->getSegments();
+    auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
+    assert(segment != end(segments));
+    auto elfName = segment->elf->shortName();
+    for (auto name : {"libaudio.sprx.elf",
+                      "libgcm_sys.sprx.elf",
+                      "libsysutil.sprx.elf",
+                      "libsysutil_np_trophy.sprx.elf",
+                      "libsysutil_game.sprx.elf"}) {
+        if (name == elfName) {
+            INFO(libs) << ssnprintf("ignoring function %s for module %s", name, elfName);
+            return 0;
+        }
+    }
+    ps3_uintptr_t fdescrva;
+    if (findExport(g_state.mm, segment->elf.get(), calcEid(name), &fdescrva))
+        return fdescrva;
+    return 0;
+}
+
+int32_t executeExportedFunction(uint32_t imageBase,
+                                size_t args,
+                                ps3_uintptr_t argp,
+                                ps3_uintptr_t modres, // big_int32_t*
+                                PPUThread* thread,
+                                const char* name) {
+    auto& segments = g_state.proc->getSegments();
+    auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
+    assert(segment != end(segments));
+    auto elfName = segment->elf->shortName();
+    for (auto elf : { "libaudio.sprx.elf", "libgcm_sys.sprx.elf", "libsysutil.sprx.elf" }) {
+        if (elf == elfName) {
+            INFO(libs) << ssnprintf("ignoring function %s for module %s", name, elfName);
+            return CELL_OK;
+        }
+    }
+    auto func = findExport(g_state.mm, segment->elf.get(), calcEid(name));
+    if (!func) {
+        INFO(libs) << ssnprintf("module %08x has no %s function", imageBase, name);
+        return CELL_OK;
+    }
+    INFO(libs) << ssnprintf("calling %s for module %s", name, elfName);
+    thread->setGPR(2, func->tocBase);
+    //thread->setGPR(3, args);
+    //thread->setGPR(4, argp);
+    thread->ps3call(func->va,
+                    [=] { /*g_state.mm->store<4>(modres, thread->getGPR(3));*/ });
+    return thread->getGPR(3);
+}
+
 void Process::loadPrxStore() {
-    auto storePath = std::getenv("PS3_PRX_STORE");
-    if (!storePath)
+    auto storePath = g_state.content->prxStore();
+    if (storePath.empty())
         return;
     for (auto f = directory_iterator(storePath); f != directory_iterator(); ++f) {
         if (is_directory(*f))
@@ -36,6 +111,22 @@ void Process::loadPrxStore() {
             continue;
         loadPrx(f->path().string());
     }
+}
+
+int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
+    uint32_t modresVa;
+    g_state.memalloc->internalAlloc<4, uint32_t>(&modresVa);
+    auto& segments = g_state.proc->getSegments();
+    // make the recursive ps3call using continuations instead of the for loop
+    // when prx store contains modules other than lv2
+    for (auto i = 1u; i < segments.size(); ++i) {
+        auto& s = segments[i];
+        if (s.index != 0)
+            continue;
+        thread->setGPR(11, g_state.elf->entryPoint());
+        executeExportedFunction(s.va, 0, 0, modresVa, thread, "module_start");
+    }
+    return thread->getGPR(3);
 }
 
 void Process::init(std::string elfPath, std::vector<std::string> args) {
@@ -50,30 +141,34 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
         _segments.push_back({_elf, index, va, size});
     });
     _prxs.push_back(_elf);
-    _elf->link(_mainMemory.get(), _prxs);
     loadPrxStore();
-    _internalMemoryManager.reset(new InternalMemoryManager());
-    _internalMemoryManager->setMainMemory(_mainMemory.get());
+    g_state.proc = this;
+    g_state.mm = _mainMemory.get();
+    _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
+                                                           EmuInternalAreaSize));
+    _heapMemoryManager.reset(new InternalMemoryManager(HeapArea, HeapAreaSize));
+    _stackBlocks.reset(new InternalMemoryManager(StackArea, StackAreaSize));
     _contentManager.reset(new ContentManager());
     _contentManager->setElfPath(elfPath);
     _threadInitInfo.reset(new ThreadInitInfo());
     *_threadInitInfo = _elf->getThreadInitInfo(_mainMemory.get());
     auto thread = _threads.back().get();
-    thread->setId(0);
-    initNewThread(thread,
-                  _threadInitInfo->entryPointDescriptorVa,
-                  _threadInitInfo->primaryStackSize);
+    thread->setId(0, "main");
+    
+    g_state.memalloc = _internalMemoryManager.get();
+    g_state.heapalloc = _heapMemoryManager.get();
+    g_state.content = _contentManager.get();
+    g_state.rsx = _rsx.get();
+    g_state.elf = _elf.get();
+    
+    initPrimaryThread(thread,
+                      _threadInitInfo->entryPointDescriptorVa,
+                      _threadInitInfo->primaryStackSize);
+    args.insert(begin(args), elfPath);
     auto vaArgs = storeArgs(args);
     thread->setGPR(3, args.size());
     thread->setGPR(4, vaArgs);
     _threadIds.create(std::move(thread));
-    
-    g_state.proc = this;
-    g_state.mm = _mainMemory.get();
-    g_state.memalloc = _internalMemoryManager.get();
-    g_state.content = _contentManager.get();
-    g_state.rsx = _rsx.get();
-    g_state.elf = _elf.get();
 }
 
 uint32_t Process::loadPrx(std::string path) {
@@ -178,40 +273,72 @@ Event Process::run() {
 
 uint64_t Process::createThread(uint32_t stackSize,
                                ps3_uintptr_t entryPointDescriptorVa,
-                               uint64_t arg) {
+                               uint64_t arg,
+                               std::string name,
+                               uint32_t tls,
+                               bool start) {
     boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
     _threads.emplace_back(std::make_unique<PPUThread>(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, false));
     auto t = _threads.back().get();
-    initNewThread(t, entryPointDescriptorVa, stackSize);
+    initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     t->setGPR(3, arg);
     auto id = _threadIds.create(std::move(t));
     LOG << ssnprintf("thread %d created", id);
-    t->setId(id);
-    t->run();
+    t->setId(id, name);
+    if (start)
+        t->run();
     return id;
 }
 
 uint64_t Process::createInterruptThread(uint32_t stackSize,
                                         ps3_uintptr_t entryPointDescriptorVa,
-                                        uint64_t arg) {
+                                        uint64_t arg,
+                                        std::string name,
+                                        uint32_t tls,
+                                        bool start) {
     boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
     auto t = new InterruptPPUThread(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); });
     t->setArg(arg);
     t->setEntry(entryPointDescriptorVa);
-    initNewThread(t, entryPointDescriptorVa, stackSize);
+    initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     auto id = _threadIds.create(std::move(t));
     LOG << ssnprintf("interrupt thread %d created", id);
-    t->run();
+    if (start)
+        t->run();
     _threads.emplace_back(std::unique_ptr<PPUThread>(t));
     return id;
 }
 
-void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize) {
-    auto stack = _stackBlocks.alloc(stackSize);
-    auto tls = _tlsBlocks.alloc(_threadInitInfo->tlsMemSize);
+struct InitPrxStub {
+    big_uint32_t ncall_EmuInitLoadedPrxModules;
+};
+
+void Process::initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize) {
+    uint32_t newEntryDescrVa;
+    auto newEntryDescr = g_state.memalloc->internalAlloc<4, fdescr>(&newEntryDescrVa);
+    _mainMemory->readMemory(entryDescriptorVa, newEntryDescr, sizeof(fdescr));
     
+    uint32_t initPrxStubVa;
+    g_state.memalloc->internalAlloc<4, InitPrxStub>(&initPrxStubVa);
+    uint32_t index;
+    auto entry = findNCallEntry(calcFnid("EmuInitLoadedPrxModules"), index);
+    assert(entry); (void)entry;
+    encodeNCall(g_state.mm, initPrxStubVa, index);
+    
+    thread->setLR(newEntryDescr->va);
+    newEntryDescr->va = initPrxStubVa;
+    
+    initNewThread(thread, newEntryDescrVa, stackSize, 0x10);
+}
+
+void Process::initNewThread(PPUThread* thread,
+                            ps3_uintptr_t entryDescriptorVa,
+                            uint32_t stackSize,
+                            uint32_t tls) {
+    uint32_t stack;
+    _stackBlocks->allocInternalMemory(&stack, stackSize + 0xf0, 64);
     thread->setStackInfo(stack, stackSize);
     
     // PPU_ABI-Specifications_e
@@ -219,20 +346,18 @@ void Process::initNewThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, 
     fdescr entryDescr;
     _mainMemory->readMemory(entryDescriptorVa, &entryDescr, sizeof(fdescr));
     
-    _mainMemory->setMemory(stack, 0, stackSize, true);
-    thread->setGPR(1, stack + stackSize - 2 * sizeof(uint64_t));
+    thread->setGPR(1, stack + stackSize - 0xf0);
     thread->setGPR(2, entryDescr.tocBase);
     
     // undocumented:
     thread->setGPR(5, stack);
     thread->setGPR(6, 0);
-    thread->setGPR(8, entryDescriptorVa);
+    thread->setGPR(8, _threadInitInfo->tlsSegmentVa);
+    thread->setGPR(9, _threadInitInfo->tlsFileSize);
+    thread->setGPR(10, _threadInitInfo->tlsMemSize);
     thread->setGPR(12, DefaultMainMemoryPageSize);
     
-    _mainMemory->writeMemory(tls, _threadInitInfo->tlsBase, _threadInitInfo->tlsFileSize, true);
-    _mainMemory->setMemory(tls + _threadInitInfo->tlsFileSize, 0, 
-                  _threadInitInfo->tlsMemSize - _threadInitInfo->tlsFileSize, true);
-    thread->setGPR(13, tls + 0x7000);
+    thread->setGPR(13, tls);
     thread->setFPSCR(0);
     thread->setNIP(entryDescr.va);
 }

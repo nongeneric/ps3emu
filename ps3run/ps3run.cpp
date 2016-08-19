@@ -56,9 +56,7 @@ int main(int argc, char* argv[]) {
 
     try {
         std::vector<std::string> argvec;
-        boost::split(
-              argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);
-        argvec.insert(begin(argvec), argv[0]);
+        boost::split(argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);
         emulate(elfPath, argvec);
     } catch(std::exception& e) {
         return 1;

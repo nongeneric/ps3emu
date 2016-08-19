@@ -1,8 +1,9 @@
 #include "heap.h"
-#include "../MainMemory.h"
 #include "../IDMap.h"
 #include "../utils.h"
 #include "../log.h"
+#include "../state.h"
+#include "../InternalMemoryManager.h"
 
 namespace {
 
@@ -10,9 +11,9 @@ class SysHeap {
     ps3_uintptr_t _cur;
     ps3_uintptr_t _end;
 public:
-    SysHeap(uint32_t size, MainMemory* mm) {
+    SysHeap(uint32_t size) {
         assert(size < (1 << 20));
-        _cur = mm->malloc(1 << 20);
+        g_state.heapalloc->allocInternalMemory(&_cur, 1 << 20, 16);
         _end = _cur + size;
     }
     
@@ -29,7 +30,8 @@ ThreadSafeIDMap<uint32_t, SysHeap*> map;
 }
 
 uint32_t _sys_heap_create_heap(uint64_t unk1, uint32_t size, uint64_t unk2, uint64_t unk3, MainMemory* mm) {
-    auto heap = new SysHeap(size, mm);
+    INFO(libs) << ssnprintf("_sys_heap_create_heap(%d, %d, %d, %d)", unk1, size, unk2, unk3);
+    auto heap = new SysHeap(size);
     return map.create(heap);
 }
 

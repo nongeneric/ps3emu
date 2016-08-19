@@ -49,7 +49,7 @@ CallbackThread::CallbackThread(Process* proc) {
     body->descr.tocBase = 0;
     body->thread = (uint64_t)this;
     
-    proc->createThread(0x1000, bodyEa, 0);
+    proc->createThread(0x1000, bodyEa, 0, "callback", 0);
 }
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {

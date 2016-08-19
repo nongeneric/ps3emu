@@ -78,7 +78,7 @@ Token makeToken(std::string const& text, int start) {
         std::make_tuple(regex("\\)"), TokenType::RightParen),
         std::make_tuple(regex("=="), TokenType::Equals),
         std::make_tuple(regex("="), TokenType::Assign),
-        std::make_tuple(regex("#[0-9a-fA-F]+"), TokenType::Hex),
+        std::make_tuple(regex("(#|0x)[0-9a-fA-F]+"), TokenType::Hex),
         std::make_tuple(regex("[0-9]+"), TokenType::Int),
         std::make_tuple(regex("\\+"), TokenType::Plus),
         std::make_tuple(regex("-"), TokenType::Minus),
@@ -311,7 +311,9 @@ public:
     }
     
     Expr* hex() {
-        auto n = std::stoul(curnext().val().substr(1), nullptr, 16);
+        auto val = curnext().val();
+        auto prefix = val[0] == '#' ? 1 : 2;
+        auto n = std::stoul(val.substr(prefix), nullptr, 16);
         return _context.make<NumExpr>(n);
     }
     

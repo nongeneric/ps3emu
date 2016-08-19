@@ -6,23 +6,19 @@
 #include <stdio.h>
 #include <stdexcept>
 #include "../Process.h"
+#include "../InternalMemoryManager.h"
 #include "../ELFLoader.h"
 #include "../IDMap.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/range/algorithm.hpp>
-#include <boost/optional.hpp>
 #include "../log.h"
 #include "../state.h"
 #include <memory>
 #include <map>
 
 void init_sys_lib() {
-    LOG << __FUNCTION__;
-}
-
-void sys_initialize_tls(uint64_t undef, uint32_t unk1, uint32_t unk2) {
     LOG << __FUNCTION__;
 }
 
@@ -46,11 +42,6 @@ int _sys_process_atexitspawn() {
 
 int _sys_process_at_Exitspawn() {
     LOG << __FUNCTION__;
-    return CELL_OK;
-}
-
-int sys_ppu_thread_get_id(sys_ppu_thread_t* thread_id) {
-    *thread_id = 7;
     return CELL_OK;
 }
 
@@ -122,59 +113,39 @@ int sys_prx_exitspawn_with_level(uint64_t level) {
     return CELL_OK;
 }
 
-int32_t sys_prx_register_library(ps3_uintptr_t library) {
+uint32_t emuEmptyModuleStart() {
     return CELL_OK;
 }
 
-boost::optional<fdescr> findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid) {
-    prx_export_t* exports;
-    int count;
-    std::tie(exports, count) = prx->exports(mm);
-    for (auto i = 0; i < count; ++i) {
-        if (exports[i].name)
-            continue;
-        auto fnids = (big_uint32_t*)mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
-        auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
-        for (auto j = 0; j < exports[i].functions; ++j) {
-            if (fnids[j] == eid) {
-                fdescr descr;
-                mm->readMemory(stubs[j], &descr, sizeof(descr));
-                return descr;
-            }
-        }
-    }
-    return {};
-}
-
-int32_t executeExportedFunction(sys_prx_id_t id,
-                                size_t args,
-                                ps3_uintptr_t argp,
-                                ps3_uintptr_t modres, // big_int32_t*
-                                PPUThread* thread,
-                                const char* name) {
-    auto& segments = g_state.proc->getSegments();
-    auto segment = boost::find_if(segments, [=](auto& s) { return s.va == id; });
-    assert(segment != end(segments));
-    auto func = findExport(g_state.mm, segment->elf.get(), calcEid(name));
-    assert(func);
-    thread->setGPR(2, func->tocBase);
-    thread->setGPR(3, args);
-    thread->setGPR(4, argp);
-    thread->ps3call(func->va,
-                    [=] { g_state.mm->store<4>(modres, thread->getGPR(3)); });
-    return thread->getGPR(3);
-}
-
 int32_t sys_prx_start_module(sys_prx_id_t id,
-                             size_t args,
-                             ps3_uintptr_t argp,
-                             ps3_uintptr_t modres, // big_int32_t*
                              uint64_t flags,
-                             uint64_t pOpt,
+                             sys_prx_start_module_t* opt,
                              PPUThread* thread) {
     assert(flags == 0);
-    assert(pOpt == 0);
-    return executeExportedFunction(id, args, argp, modres, thread, "module_start");
+    assert(opt->struct_size == sizeof(sys_prx_start_module_t));
+    assert(opt->neg1 == -1ull);
+    assert(opt->mode == 1 || opt->mode == 2);
+    if (opt->mode == 1) {
+        INFO(libs) << ssnprintf("sys_prx_start_module(find, %08x, %s)",
+                                id,
+                                (char*)&opt->name_or_fdescrva);
+        opt->name_or_fdescrva = findExportedModuleFunction(id, "module_start");
+        if (!opt->name_or_fdescrva) {
+            uint32_t descrva;
+            auto descr = g_state.memalloc->internalAlloc<4, fdescr>(&descrva);
+            descr->va = descrva + 4;
+            uint32_t index;
+            auto entry = findNCallEntry(calcFnid("emuEmptyModuleStart"), index);
+            assert(entry); (void)entry;
+            encodeNCall(g_state.mm, descrva + 4, index);
+            opt->name_or_fdescrva = descrva;
+        }
+        return CELL_OK;
+    } else {
+        return CELL_OK;
+    }
+    
+    return executeExportedFunction(id, 0, 0, 0, thread, "module_start");
 }
 
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc) {
@@ -186,15 +157,20 @@ sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t op
 }
 
 int32_t sys_prx_stop_module(sys_prx_id_t id,
-                            size_t args,
-                            ps3_uintptr_t argp,
-                            ps3_uintptr_t modres,
                             uint64_t flags,
-                            uint64_t pOpt,
+                            sys_prx_start_module_t* opt,
                             PPUThread* thread) {
-    assert(flags == 0);
-    assert(pOpt == 0);
-    return executeExportedFunction(id, args, argp, modres, thread, "module_stop");
+    WARNING(libs) << "sys_prx_stop_module not implemented";
+    uint32_t descrva;
+    auto descr = g_state.memalloc->internalAlloc<4, fdescr>(&descrva);
+    descr->va = descrva + 4;
+    uint32_t index;
+    auto entry = findNCallEntry(calcFnid("emuEmptyModuleStart"), index);
+    assert(entry); (void)entry;
+    encodeNCall(g_state.mm, descrva + 4, index);
+    opt->name_or_fdescrva = descrva;
+    return 0;
+    //return executeExportedFunction(id, args, argp, modres, thread, "module_stop");
 }
 
 int32_t sys_prx_unload_module(sys_prx_id_t id, uint64_t flags, uint64_t pOpt) {
@@ -212,13 +188,15 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
     (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
-    *alloc_addr = g_state.mm->malloc(size);
+    uint32_t ea;
+    g_state.heapalloc->allocInternalMemory(&ea, size, 256);
+    *alloc_addr = ea;
     return CELL_OK;
 }
 
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
     LOG << ssnprintf("sys_memory_free(%x)", start_addr);
-    g_state.mm->free(start_addr);
+    g_state.heapalloc->free(start_addr);
     return CELL_OK;
 }
 
@@ -310,6 +288,7 @@ int32_t sys_semaphore_create(sys_semaphore_t* sem,
                              sys_semaphore_value_t max_val) {
     auto csem = std::make_unique<CellSemaphore>(initial_val, max_val);
     *sem = semaphores.create(std::move(csem));
+    INFO(libs) << ssnprintf("sys_semaphore_create(%d)", *sem);
     return CELL_OK;
 }
 
@@ -340,22 +319,32 @@ int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
 #define SYS_PPU_THREAD_CREATE_INTERRUPT 0x0000000000000002
 
 int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
-                              ps3_uintptr_t entry,
+                              const ppu_thread_create_t* info,
                               uint64_t arg,
+                              uint64_t unk,
                               uint32_t prio,
                               uint32_t stacksize,
                               uint64_t flags,
-                              const char *threadname,
-                              Process* proc)
+                              cstring_ptr_t threadname)
 {
+    assert(unk == 0);
     assert(flags == 0 ||
            flags == SYS_PPU_THREAD_CREATE_JOINABLE ||
            flags == SYS_PPU_THREAD_CREATE_INTERRUPT);
     if (flags == SYS_PPU_THREAD_CREATE_INTERRUPT) {
-        *thread_id = proc->createInterruptThread(stacksize, entry, arg);
+        *thread_id = g_state.proc->createInterruptThread(
+            stacksize, info->entry_fdescr_va, arg, threadname.str, info->tls_va, false);
     } else {
-        *thread_id = proc->createThread(stacksize, entry, arg);
+        *thread_id = g_state.proc->createThread(
+            stacksize, info->entry_fdescr_va, arg, threadname.str, info->tls_va, false);
     }
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_start(sys_ppu_thread_t id) {
+    INFO(libs) << ssnprintf("sys_ppu_thread_start(%d)", id);
+    auto thread = g_state.proc->getThread(id);
+    thread->run();
     return CELL_OK;
 }
 
@@ -371,14 +360,6 @@ int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread) {
 
 emu_void_t sys_process_exit(PPUThread* thread) {
     throw ProcessFinishedException();
-}
-
-emu_void_t sys_initialize_tls(uint64_t undef, uint64_t unk1, uint64_t unk2, PPUThread* thread) {
-    return emu_void;
-}
-
-int32_t sys_process_is_stack(ps3_uintptr_t p) {
-    return StackArea <= p && p < StackArea + StackAreaSize;
 }
 
 emu_void_t sys_ppu_thread_yield(PPUThread* thread) {
@@ -468,5 +449,114 @@ int32_t _sys_printf(cstring_ptr_t format, PPUThread* thread) {
         }
     }
     puts(str.c_str());
+    return CELL_OK;
+}
+
+int32_t _sys_process_get_paramsfo(std::array<char, 0x40>* sfo) {
+    memset(&(*sfo)[0], 0, sfo->size());
+    (*sfo)[0] = 1;
+    for (auto& p : g_state.content->sfo()) {
+        if (p.id != CELL_GAME_PARAMID_TITLE_DEFAULT)
+            continue;
+        strcpy(&(*sfo)[1], boost::get<std::string>(p.data).c_str());
+    }
+    return CELL_OK;
+}
+
+int32_t sys_get_process_info(process_info_t* info) {
+    assert(info->size == 0x50);
+    WARNING(libs) << "sys_get_process_info not implemented";
+    return CELL_OK;
+}
+
+int32_t sys_prx_register_module(cstring_ptr_t name, uint64_t opts) {
+    INFO(libs) << ssnprintf("sys_prx_register_module(%s)", name.str);
+    return CELL_OK;
+}
+
+int32_t sys_prx_register_library(uint32_t va) {
+    INFO(libs) << ssnprintf("sys_prx_register_library(%08x)", va);
+    return CELL_OK;
+}
+
+int32_t sys_ss_access_control_engine(uint64_t unk1, uint64_t unk2, uint64_t unk3) {
+    WARNING(libs) << "sys_ss_access_control_engine not implemented";
+    return CELL_OK;
+}
+
+int32_t sys_prx_load_module_list(int32_t n,
+                                 ps3_uintptr_t path_list_va,
+                                 uint64_t flags,
+                                 uint64_t pOpt,
+                                 ps3_uintptr_t idlist,
+                                 PPUThread* thread) {
+    assert(flags == 0);
+    for (auto i = 0; i < n; ++i) {
+        auto pathVa = g_state.mm->load<8>(path_list_va);
+        std::string path;
+        readString(g_state.mm, pathVa, path);
+        uint32_t id = sys_prx_load_module({path}, flags, pOpt, g_state.proc);
+        g_state.mm->store<4>(idlist, id);
+        path_list_va += 8;
+        idlist += 4;
+    }
+    return CELL_OK;
+}
+
+int32_t sys_mmapper_allocate_shared_memory(uint32_t id,
+                                           uint32_t size,
+                                           uint32_t alignment,
+                                           big_uint32_t* mem) {
+    INFO(libs) << ssnprintf("sys_mmapper_allocate_shared_memory(%08x, %08x, %02x)",
+                            id,
+                            size,
+                            alignment);
+    uint32_t va;
+    g_state.memalloc->allocInternalMemory(&va, size, alignment);
+    *mem = va;
+    return CELL_OK;
+}
+
+int32_t sys_mmapper_allocate_address(uint32_t size,
+                                     uint64_t flags,
+                                     uint32_t alignment,
+                                     big_uint32_t* addr) {
+    INFO(libs) << ssnprintf(
+        "sys_mmapper_allocate_address(%08x, %08x, %02x)", size, flags, alignment);
+    *addr = 0xbadbad10;
+    return CELL_OK;
+}
+
+int32_t sys_mmapper_search_and_map(uint32_t start_addr,
+                                   uint32_t mem_id,
+                                   uint64_t flags,
+                                   big_uint32_t* alloc_addr) {
+    INFO(libs) << ssnprintf("sys_mmapper_search_and_map(%08x, %08x, %02x)",
+                            start_addr,
+                            mem_id,
+                            flags);
+    assert(start_addr == 0xbadbad10);
+    *alloc_addr = mem_id;
+    return CELL_OK;
+}
+
+#define SYS_MODULE_STOP_LEVEL_USER	0x00000000
+#define SYS_MODULE_STOP_LEVEL_SYSTEM	0x00004000
+
+int32_t sys_prx_get_module_list(uint32_t flags, sys_prx_get_module_list_t* info) {
+    assert(flags == 2);
+    auto& segments = g_state.proc->getSegments();
+    assert(info->max_ids_size >= segments.size() / 2);
+    info->out_count = segments.size() / 2;
+    if (info->max_levels_size) {
+        WARNING(libs) << "sys_prx_get_module_list doesn't assign levels correctly";
+    }
+    for (auto i = 0u; i < segments.size() / 2 - 1; ++i) {
+        auto& segment = segments.at((i + 1) * 2);
+        g_state.mm->store<4>(info->ids_va + 4 * i, segment.va);
+        if (i < info->max_levels_size) {
+            g_state.mm->store<4>(info->levels_va + 4 * i, SYS_MODULE_STOP_LEVEL_SYSTEM);
+        }
+    }
     return CELL_OK;
 }

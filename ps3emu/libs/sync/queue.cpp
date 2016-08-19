@@ -20,7 +20,7 @@ namespace {
         IQueue* queue = nullptr;
     };
 
-    ThreadSafeIDMap<sys_event_queue_t, std::shared_ptr<IQueue>> queues;
+    ThreadSafeIDMap<sys_event_queue_t, std::shared_ptr<IQueue>, QueueIdBase> queues;
     ThreadSafeIDMap<sys_event_port_t, std::shared_ptr<queue_port_t>> ports;
 }
 

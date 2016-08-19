@@ -94,8 +94,8 @@ TEST_CASE("provide memory") {
 
 TEST_CASE("internal alloc") {
     MainMemory mm;
-    InternalMemoryManager internal;
-    internal.setMainMemory(&mm);
+    g_state.mm = &mm;
+    InternalMemoryManager internal(EmuInternalArea, EmuInternalAreaSize);
     uint32_t ea;
     auto pair = internal.internalAlloc<128, std::pair<uint32_t, uint32_t>>(&ea, 10, 20);
     REQUIRE( pair->first == 10 );

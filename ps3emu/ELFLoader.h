@@ -145,6 +145,7 @@ static_assert(sizeof(prx_import_t) == 0x2c, "");
 
 struct ThreadInitInfo {
     void* tlsBase;
+    uint32_t tlsSegmentVa;
     uint32_t tlsFileSize;
     uint32_t tlsMemSize;
     uint32_t primaryStackSize;

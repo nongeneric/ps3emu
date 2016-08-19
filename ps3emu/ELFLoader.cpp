@@ -100,7 +100,7 @@ struct vdescr {
 void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase) {
     uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
-        if (ph->p_type != PT_LOAD)
+        if (ph->p_type != PT_LOAD && ph->p_type != PT_TLS)
             continue;
         if (ph->p_vaddr % ph->p_align != 0)
             throw std::runtime_error("complex alignment not supported");
@@ -122,7 +122,9 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
         mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
         mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
         
-        makeSegment(va, ph->p_memsz, index);
+        if (ph->p_type != PT_TLS) {
+            makeSegment(va, ph->p_memsz, index);
+        }
     }
     
     if (!imageBase)
@@ -192,32 +194,21 @@ std::tuple<prx_export_t*, int> ELFLoader::exports(MainMemory* mm) {
 bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     auto name = prx->shortName();
     if (name == "liblv2.prx") {
-        const char* allowed[] {
-            "_sys_strncmp",
-            "_sys_memset",
-            "_sys_strcat",
-            "_sys_vsnprintf",
-            "_sys_snprintf",
-            "_sys_strrchr",
-            "_sys_memcpy",
-            "_sys_strcpy",
-            "_sys_strncat",
-            "_sys_strncpy",
-            "_sys_spu_printf_attach_group",
-            "_sys_spu_printf_initialize",
-            "_sys_spu_printf_finalize",
-            "_sys_spu_printf_detach_group",
-        };
-        for (auto s : allowed) {
-            if (id == calcFnid(s))
-                return true;
-        }
-        return false;
+        return true;
     }
     if (name == "libsre.prx") {
-        return false;
+        return true;
     }
     if (name == "libsync2.prx") {
+        return true;
+    }
+    if (name == "libfiber.prx") {
+        return true;
+    }
+    if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
+        name == "libsysutil.sprx.elf" || name == "libaudio.sprx.elf" ||
+        name == "libio.sprx.elf" || name == "libfs.sprx.elf" ||
+        name == "libsysutil_np_trophy.sprx.elf") {
         return false;
     }
     return true;
@@ -398,6 +389,7 @@ ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type == PT_TLS) {
             info.tlsBase = &_file[0] + ph->p_offset;
+            info.tlsSegmentVa = ph->p_vaddr;
             info.tlsFileSize = ph->p_filesz;
             info.tlsMemSize = ph->p_memsz;
         } else if (ph->p_type == PT_TYPE_PARAMS) {

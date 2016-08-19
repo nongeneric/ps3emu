@@ -125,6 +125,16 @@ void MainWindow::setupMenu() {
         });
         settings->addAction(action);
     }
+        { 
+        auto action = new QAction("Stop at new PPU Thread", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().StopAtNewPpuThread);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().StopAtNewPpuThread = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
     {
         auto action = new QAction("Log SPU", this);
         action->setCheckable(true);

@@ -82,18 +82,16 @@ void spuImageInit(MainMemory* mm, InternalMemoryManager* ialloc, sys_spu_image_t
             pos += 4;
             auto type = mm->load<4>(pos);
             pos += 4;
-            assert(type == 1);
+            assert(type == 1); (void)type;
             std::string name, desc;
             readString(mm, pos, name);
             readString(mm, pos + namesz, desc);
             assert(name == "SPUNAME");
-            assert(12 + namesz + descsz == ph.p_filesz);
+            assert(12 + namesz + descsz == ph.p_filesz); (void)descsz;
             INFO(libs) << ssnprintf("initialized spu image SPUNAME = %s", desc);
             seg.size -= 12 + namesz;
             seg.src.pa_start += 12 + namesz;
-        }
-        
-        if (ph.p_memsz != ph.p_filesz) {
+        } else if (ph.p_memsz != ph.p_filesz) {
             assert(ph.p_memsz > ph.p_filesz);
             sys_spu_segment_t nextSeg;
             nextSeg.size = ph.p_memsz - ph.p_filesz;

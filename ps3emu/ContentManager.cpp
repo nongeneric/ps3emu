@@ -14,7 +14,8 @@ enum class MountPoint {
     Usb,
     Bluray,
     HostHome,
-    HostAbsolute
+    HostAbsolute,
+    DevFlash
 };
 
 MountPoint splitPathImpl(const char* path, const char** point, const char** relative) {
@@ -33,6 +34,7 @@ MountPoint splitPathImpl(const char* path, const char** point, const char** rela
     check("/dev_bdvd", MountPoint::Bluray);
     check("/app_home", MountPoint::HostHome);
     check("/host_root", MountPoint::HostAbsolute);
+    check("/dev_flash", MountPoint::DevFlash);
 #undef check
     throw std::runtime_error("illegal mount point");
 }
@@ -56,6 +58,10 @@ std::string ContentManager::cacheDir() {
     return dir;
 }
 
+std::string ContentManager::prxStore() {
+    return std::getenv("PS3_PRX_STORE");
+}
+
 std::string ContentManager::toHost(std::experimental::string_view path) {
     const char* point;
     const char* relative;
@@ -71,6 +77,7 @@ std::string ContentManager::toHost(std::experimental::string_view path) {
         case MountPoint::HostAbsolute: return absolute(elfdir / "host_root" / relative).string();
         case MountPoint::GameData: return absolute(approot / relative).string();
         case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
+        case MountPoint::DevFlash: return absolute(prxStore() / relative).string();
         default: throw std::runtime_error("unknown mount point");
     }
 }

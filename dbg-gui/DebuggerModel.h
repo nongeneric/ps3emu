@@ -44,6 +44,7 @@ class DebuggerModel : public QWidget {
     void updateUI();
     void setSoftBreak(ps3_uintptr_t va);
     void clearSoftBreak(ps3_uintptr_t va);
+    void clearSoftBreaks();
     void setSPUSoftBreak(uint32_t elfSource, ps3_uintptr_t va);
     void clearSPUSoftBreak(ps3_uintptr_t va);
     void trySetPendingSPUBreaks();
@@ -53,6 +54,8 @@ class DebuggerModel : public QWidget {
     void dumpImports();
     void dumpThreads();
     void changeThread(uint32_t index);
+    void printSegment(uint32_t ea);
+    void execSingleCommand(QString command);
 
 public:
     DebuggerModel();
@@ -64,7 +67,7 @@ public:
     MonospaceGridModel* getOtherAuxRegistersModel();
     void toggleFPR();
     void loadFile(QString path, QStringList args);
-    void exec(QString command);
+    void exec(QString commands);
     void stepIn();
     void stepOver();
     void run();
