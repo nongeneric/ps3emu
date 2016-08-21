@@ -50,6 +50,10 @@ CellFsErrno sys_fs_close(int32_t fd) {
     return cellFsClose(fd);
 }
 
+CellFsErrno sys_fs_fstat(int32_t fd, CellFsStat* sb, Process* proc) {
+    return cellFsFstat(fd, sb, proc);
+}
+
 CellFsErrno toCellErrno(int err) {
     switch (err) {
         case EACCES: return CELL_FS_EACCES;

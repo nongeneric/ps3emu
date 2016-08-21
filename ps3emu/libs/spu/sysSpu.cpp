@@ -29,7 +29,7 @@
 struct InterruptTag;
 
 struct RawSpu {
-    SPUThread* thread;
+    std::shared_ptr<SPUThread> thread;
     std::shared_ptr<InterruptTag> tag;
 };
 
@@ -53,12 +53,17 @@ namespace {
 #define SYS_SPU_IMAGE_PROTECT       0x0U
 #define SYS_SPU_IMAGE_DIRECT        0x1U
 
-void spuImageInit(MainMemory* mm, InternalMemoryManager* ialloc, sys_spu_image_t* image, ps3_uintptr_t elf) {
+std::vector<sys_spu_segment_t> spuImageInit(MainMemory* mm,
+                                            InternalMemoryManager* ialloc,
+                                            sys_spu_image_t* image,
+                                            ps3_uintptr_t elf,
+                                            bool storeSegments) {
     Elf32_be_Ehdr header;
     mm->readMemory(elf, &header, sizeof(header));
 
     image->entry_point = header.e_entry;
-    image->type = SYS_SPU_IMAGE_TYPE_USER;
+    // memory is allocated by emu, this prevents lv2 from freeing it
+    image->type = SYS_SPU_IMAGE_TYPE_KERNEL;
 
     assert(sizeof(Elf32_Phdr) == header.e_phentsize);
     std::vector<Elf32_be_Phdr> phs(header.e_phnum);
@@ -102,16 +107,15 @@ void spuImageInit(MainMemory* mm, InternalMemoryManager* ialloc, sys_spu_image_t
         }
     }
     
-    uint32_t segsVa;
-    auto size = segs.size() * sizeof(sys_spu_segment_t);
-    auto isegs = ialloc->allocInternalMemory(&segsVa, size, 16);
-    memcpy(isegs, &segs[0], size);
-    image->segs = segsVa;
-    image->nsegs = segs.size();
-}
-
-void spuImageDestroy(InternalMemoryManager* ialloc, sys_spu_image_t* image) {
-    ialloc->free(image->segs);
+    if (storeSegments) {
+        uint32_t segsVa;
+        auto size = segs.size() * sizeof(sys_spu_segment_t);
+        auto isegs = ialloc->allocInternalMemory(&segsVa, size, 16);
+        memcpy(isegs, &segs[0], size);
+        image->segs = segsVa;
+        image->nsegs = segs.size();
+    }
+    return segs;
 }
 
 void spuImageMap(MainMemory* mm, sys_spu_image_t* image, void* ls) {
@@ -157,7 +161,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
     fclose(f);
 #endif
     
-    spuImageInit(g_state.mm, g_state.memalloc, img, src);
+    spuImageInit(g_state.mm, g_state.memalloc, img, src, true);
     return CELL_OK;
 }
 
@@ -182,16 +186,34 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* pr
     uint32_t elfVa;
     auto elf = g_state.memalloc->allocInternalMemory(&elfVa, fsize, 16);
     fread((char*)elf, 1, fsize, f);
-    
-    spuImageInit(g_state.mm, g_state.memalloc, img, elfVa);
-    
     fclose(f);
+    
+    img->type = SYS_SPU_IMAGE_TYPE_KERNEL;
+    img->nsegs = 0;
+    img->segs = 0;
+    img->entry_point = elfVa;
+    
     return CELL_OK;
 }
 
-int32_t sys_spu_image_close(sys_spu_image_t* img, Process* proc) {
-    LOG << __FUNCTION__;
-    spuImageDestroy(g_state.memalloc, img);
+int32_t sys_spu_image_get_info(const sys_spu_image_t *img, big_uint32_t* entry_point, big_uint32_t* nsegs) {
+    sys_spu_image_t image_copy = *img;
+    auto segs = spuImageInit(g_state.mm, g_state.memalloc, &image_copy, image_copy.entry_point, false);
+    *nsegs = segs.size();
+    *entry_point = image_copy.entry_point;
+    return CELL_OK;
+}
+
+int32_t sys_spu_image_get_modules(const sys_spu_image_t *img, ps3_uintptr_t buf, uint32_t nsegs) {
+    sys_spu_image_t image_copy = *img;
+    auto segs = spuImageInit(g_state.mm, g_state.memalloc, &image_copy, image_copy.entry_point, false);
+    assert(nsegs == segs.size());
+    g_state.mm->writeMemory(buf, &segs[0], segs.size() * sizeof(sys_spu_segment_t));
+    return CELL_OK;
+}
+
+int32_t sys_spu_image_close(sys_spu_image_t* img) {
+    g_state.memalloc->free(img->entry_point);
     return CELL_OK;
 }
 
@@ -231,7 +253,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     *thread_id = proc->createSpuThread(name);
     auto thread = proc->getSpuThread(*thread_id);
     thread->setSpu(spu_num);
-    initThread(g_state.mm, thread, img);
+    initThread(g_state.mm, thread.get(), img);
     thread->r(3).dw<0>() = arg->arg1;
     thread->r(4).dw<0>() = arg->arg2;
     thread->r(5).dw<0>() = arg->arg3;
@@ -294,7 +316,7 @@ int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc) {
     auto group = groups.get(id);
     for (auto id : group->threads) {
         auto th = proc->getSpuThread(id);
-        proc->destroySpuThread(th);
+        proc->destroySpuThread(th.get());
     }
     groups.destroy(id);
     return CELL_OK;
@@ -331,7 +353,7 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
     if (rawSpu->thread->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
         // leave a hanging thread if couldn't join
         assert(hangingRawSpuThreads < 10);
-        proc->destroySpuThread(rawSpu->thread);
+        proc->destroySpuThread(rawSpu->thread.get());
         rawSpus.destroy(id);
         hangingRawSpuThreads++;
     }
@@ -340,7 +362,7 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
 
 int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img, PPUThread* th) {
     auto rawSpu = rawSpus.get(id);
-    initThread(g_state.mm, rawSpu->thread, img);
+    initThread(g_state.mm, rawSpu->thread.get(), img);
     return CELL_OK;
 }
 
@@ -349,7 +371,7 @@ int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* ent
     sys_spu_image_t img;
     sys_spu_image_open(&img, path, proc);
     *entry = img.entry_point;
-    initThread(g_state.mm, rawSpu->thread, &img);
+    initThread(g_state.mm, rawSpu->thread.get(), &img);
     return CELL_OK;
 }
 
@@ -376,7 +398,7 @@ int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
     auto tag = interruptTags.get(intrtag);
     tag->interruptThread = th;
     th->setArg(arg);
-    th->establish(tag->rawSpu->thread);
+    th->establish(tag->rawSpu->thread.get());
     return CELL_OK;
 }
 
@@ -399,7 +421,7 @@ int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
     }
     auto rawSpu = rawSpus.get(id);
     // only privileged software
-    *stat = rawSpu->thread->channels()->mmio_read(Prxy_QueryType);
+    *stat = rawSpu->thread->channels()->interrupt();
     return CELL_OK;
 }
 
@@ -415,7 +437,7 @@ int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t s
     }
     auto rawSpu = rawSpus.get(id);
     // only privileged software
-    rawSpu->thread->getStatus() = stat;
+    rawSpu->thread->channels()->interrupt() = stat;
     return CELL_OK;
 }
 
@@ -423,7 +445,7 @@ emu_void_t sys_interrupt_thread_eoi() {
     throw ThreadFinishedException(0);
 }
 
-SPUThread* findRawSpuThread(sys_raw_spu_t id) {
+std::shared_ptr<SPUThread> findRawSpuThread(sys_raw_spu_t id) {
     return rawSpus.get(id)->thread;
 }
 

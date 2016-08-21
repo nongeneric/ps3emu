@@ -133,7 +133,7 @@ class Process {
     std::vector<std::shared_ptr<SPUThread>> _spuThreads;
     boost::mutex _spuThreadMutex;
     IDMap<uint64_t, PPUThread*> _threadIds;
-    IDMap<uint32_t, SPUThread*> _spuThreadIds;
+    IDMap<uint32_t, std::shared_ptr<SPUThread>> _spuThreadIds;
     bool _firstRun = true;
     boost::chrono::high_resolution_clock::time_point _systemStart;
     std::vector<ModuleSegment> _segments;
@@ -172,7 +172,7 @@ public:
                                    bool start = true);
     PPUThread* getThread(uint64_t id);
     uint32_t createSpuThread(std::string name);
-    SPUThread* getSpuThread(uint32_t id);
+    std::shared_ptr<SPUThread> getSpuThread(uint32_t id);
     CallbackThread* getCallbackThread();
     void destroySpuThread(SPUThread* thread);
     std::vector<PPUThread*> dbgPPUThreads();

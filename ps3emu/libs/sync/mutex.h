@@ -11,32 +11,39 @@ public:
     virtual bool lock(usecond_t timeout = 0) = 0;
     virtual void unlock() = 0;
     virtual bool try_lock(usecond_t timeout) = 0;
+    virtual void destroy() = 0;
     virtual ~IMutex() = default;
 };
 
 template <typename M>
 class Mutex : public IMutex {
-    M _m;
+    M* _m;
 public:
+    Mutex() : _m(new M()) { }
+    
     bool lock(usecond_t timeout) override {
         if (timeout == 0) {
-            _m.lock();
+            _m->lock();
             return true;
         } else {
-            return _m.try_lock_for( boost::chrono::microseconds(timeout) );
+            return _m->try_lock_for( boost::chrono::microseconds(timeout) );
         }
     }
     
     void unlock() override {
-        _m.unlock();
+        _m->unlock();
     }
     
     bool try_lock(usecond_t timeout) override {
         if (timeout == 0) {
-            return _m.try_lock();
+            return _m->try_lock();
         } else {
-            return _m.try_lock_for( boost::chrono::microseconds(timeout) );
+            return _m->try_lock_for( boost::chrono::microseconds(timeout) );
         }
+    }
+    
+    void destroy() override {
+        delete _m;
     }
 };
 

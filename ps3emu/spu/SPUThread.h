@@ -191,7 +191,6 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
     std::experimental::optional<InterruptThreadInfo> _interruptHandler;
-    std::atomic<uint32_t> _status;
     uint64_t _id;
     std::vector<EventQueueInfo> _eventQueues;
     void loop();
@@ -251,7 +250,6 @@ public:
     uint32_t getElfSource();
     void setInterruptHandler(uint32_t mask2, std::function<void()> interruptHandler);
     // TODO: removeInterruptHandler
-    std::atomic<uint32_t>& getStatus();
     void setId(uint64_t id);
     uint64_t getId();
     void connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
@@ -262,5 +260,4 @@ public:
     
     // ISPUChannelsThread
     inline uint8_t* ls() override { return ptr(0); }
-    inline std::atomic<uint32_t>& status() override { return getStatus(); }
 };

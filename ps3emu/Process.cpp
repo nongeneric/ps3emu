@@ -58,7 +58,8 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name) {
                       "libgcm_sys.sprx.elf",
                       "libsysutil.sprx.elf",
                       "libsysutil_np_trophy.sprx.elf",
-                      "libsysutil_game.sprx.elf"}) {
+                      "libsysutil_game.sprx.elf",
+                      "libresc.sprx.elf"}) {
         if (name == elfName) {
             INFO(libs) << ssnprintf("ignoring function %s for module %s", name, elfName);
             return 0;
@@ -392,14 +393,14 @@ uint32_t Process::createSpuThread(std::string name) {
                                     [=](auto t, auto e) {
                                         _eventQueue.send(SPUThreadEventInfo{e, t});
                                     }));
-    auto t = _spuThreads.back().get();
+    auto t = _spuThreads.back();
     auto id = _spuThreadIds.create(std::move(t));
-    t->setId(id);
+    _spuThreadIds.get(id)->setId(id);
     LOG << ssnprintf("spu thread %d created", id);
     return id;
 }
 
-SPUThread* Process::getSpuThread(uint32_t id) {
+std::shared_ptr<SPUThread> Process::getSpuThread(uint32_t id) {
     boost::unique_lock<boost::mutex> _(_spuThreadMutex);
     return _spuThreadIds.get(id);
 }

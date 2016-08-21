@@ -189,7 +189,7 @@ int32_t cellSpursCreateTask2WithBinInfo(CellSpursTaskset2* taskset,
                                         uint64_t __reserved__,
                                         Process* proc) {
     sys_spu_image_t image;
-    spuImageInit(g_state.mm, g_state.memalloc, &image, binInfo->eaElf);
+    //spuImageInit(g_state.mm, g_state.memalloc, &image, binInfo->eaElf);
     auto spuThreadId = proc->createSpuThread(name.str);
     auto spuThread = proc->getSpuThread(spuThreadId);
     spuImageMap(g_state.mm, &image, spuThread->ptr(0));

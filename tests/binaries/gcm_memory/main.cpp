@@ -63,16 +63,20 @@ extern "C" int32_t userMain(void);
 
 #define CB_SIZE	(0x10000)
 
+CellGcmConfig gcmConfig;
+
 void printTable(CellGcmOffsetTable table) {
+	//uint32_t iobase = (uint32_t)gcmConfig.ioAddress >> 20;
+	uint32_t iobase = 0;
 	for (int i = 0; i < 0xbff; ++i) {
 		if (table.ioAddress[i] != 0xffff) {
-			printf("va to io: %x -> %x\n", i, table.ioAddress[i]);
+			printf("va to io: ? -> %x\n", /*i - iobase, */table.ioAddress[i]);
 		}
 	}
 
 	for (int i = 0; i < 511; ++i) {
 		if (table.eaAddress[i] != 0xffff) {
-			printf("io to va: %x -> %x\n", i, table.eaAddress[i]);
+			printf("io to va: %x -> ?\n", i/*, table.eaAddress[i] - iobase*/);
 		}
 	}
 }
@@ -85,10 +89,9 @@ int userMain(void)
 	CELL_GCMUTIL_ASSERTS(host_addr != NULL,"memalign()");
 	CELL_GCMUTIL_CHECK_ASSERT(cellGcmInit(CB_SIZE, HOST_SIZE, host_addr));
 	
-	CellGcmConfig gcmConfig;
 	cellGcmGetConfiguration(&gcmConfig);
 	printf("* vidmem base: 0x%p\n", gcmConfig.localAddress);
-	printf("* IO base    : 0x%p\n", gcmConfig.ioAddress);
+	//printf("* IO base    : 0x%p\n", gcmConfig.ioAddress);
 	printf("* vidmem size: 0x%x\n", gcmConfig.localSize);
 	printf("* IO size    : 0x%x\n", gcmConfig.ioSize);
 
@@ -113,7 +116,7 @@ int userMain(void)
 	printTable(table);
 
 	CELL_GCMUTIL_CHECK_ASSERT(cellGcmIoOffsetToAddress(offset, &ea));
-	printf("va: %x\n", ea);
+	printf("va: %x\n", (uint32_t)ea - (uint32_t)gcmConfig.ioAddress);
 	
 	void* ea2 = memalign(MB(1), MB(3));
 	CELL_GCMUTIL_CHECK_ASSERT(cellGcmMapEaIoAddress(ea2, MB(5), MB(3)));

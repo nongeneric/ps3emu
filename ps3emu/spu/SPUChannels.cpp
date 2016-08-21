@@ -175,12 +175,11 @@ unsigned SPUChannels::readCount(unsigned ch) {
 void SPUChannels::write(unsigned ch, uint32_t data) {
     if (ch == SPU_WrOutIntrMbox) {
         _outboundInterruptMailbox.enqueue(data);
-        _thread->status() |= 1;
+        _interrupt2 |= INT_Mask_class2_M;
         INFO(spu) << ssnprintf("spu writes %x to interrupt mailbox", data);
         throw SPUThreadInterruptException();
     } else if (ch == SPU_WrOutMbox) {
         _outboundMailbox.enqueue(data);
-        _thread->status() |= 1;
     } else {
         if (ch == MFC_Cmd) {
             command(data);
@@ -219,13 +218,14 @@ uint32_t SPUChannels::read(unsigned ch) {
 }
 
 void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
-    LOG << ssnprintf("ppu writes %x via mmio to spu %d tag %s",
-                    data,
-                    -1,
-                    tagToString((TagClassId)offset));
+    INFO(spu) << ssnprintf("ppu writes %x via mmio to spu %d tag %s",
+                           data,
+                           -1,
+                           tagToString((TagClassId)offset));
 
     if (offset == TagClassId::SPU_RunCntl && data == 1) {
         _thread->run();
+        _spuStatus |= SPU_Status_R;
         return;
     }
     if (offset == TagClassId::SPU_In_MBox) {
@@ -273,7 +273,7 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
 uint32_t SPUChannels::mmio_read(unsigned offset) {
     auto res = [&] {
         switch (offset) {
-            case TagClassId::SPU_Status: return _thread->status().load();
+            case TagClassId::SPU_Status: return _spuStatus.load();
             case TagClassId::SPU_Out_MBox: return _outboundMailbox.dequeue();
             case TagClassId::SPU_Out_Intr_Mbox: return _outboundInterruptMailbox.dequeue();
             case TagClassId::MFC_Class_CMD: return _channels[MFC_Cmd].load();
@@ -284,11 +284,14 @@ uint32_t SPUChannels::mmio_read(unsigned offset) {
                        (mmio_readCount(SPU_In_MBox) << 8) |
                        mmio_readCount(SPU_Out_MBox);
             case TagClassId::Prxy_QueryType: return 0x01u;
+            case TagClassId::Prxy_TagStatus: return -1u;
             default: throw std::runtime_error("unknown mmio offset");
         }
     }();
-    LOG << ssnprintf(
-        "ppu reads %x via mmio from spu %d tag %s", res, -1, tagToString((TagClassId)offset));
+    INFO(spu) << ssnprintf("ppu reads %x via mmio from spu %d tag %s",
+                           res,
+                           -1,
+                           tagToString((TagClassId)offset));
     return res;
 }
 

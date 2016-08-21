@@ -13,6 +13,12 @@ using namespace boost::endian;
 static const uint32_t PT_TYPE_PARAMS = PT_LOOS + 1;
 static const uint32_t PT_TYPE_PRXINFO = PT_LOOS + 2;
 
+uint32_t findExportedSymbol(MainMemory* mm,
+                            std::vector<ELFLoader*> const& prxs,
+                            uint32_t id,
+                            std::string library,
+                            prx_symbol_type_t type);
+
 void ELFLoader::load(std::string filePath) {
     _elfName = filePath;
     FILE* f = fopen(filePath.c_str(), "rb");
@@ -97,6 +103,11 @@ struct vdescr {
     big_uint32_t toc;
 };
 
+struct Replacement {
+    std::string lib;
+    std::string name;
+};
+
 void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase) {
     uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
@@ -166,6 +177,32 @@ void ELFLoader::map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t im
     
     _module = (module_info_t*)mm->getMemoryPointer(
         _pheaders->p_paddr - _pheaders->p_offset + imageBase, sizeof(module_info_t));
+    
+    std::vector<Replacement> replacements = {
+        { "sysPrxForUser", "sys_lwmutex_create" },
+        { "sysPrxForUser", "sys_lwmutex_lock" },
+        { "sysPrxForUser", "sys_lwmutex_unlock" },
+        { "sysPrxForUser", "sys_lwmutex_trylock" },
+        { "sysPrxForUser", "sys_lwmutex_destroy" },
+        { "sysPrxForUser", "sys_lwcond_create" },
+        { "sysPrxForUser", "sys_lwcond_destroy" },
+        { "sysPrxForUser", "sys_lwcond_wait" },
+        { "sysPrxForUser", "sys_lwcond_signal_all" },
+        { "sysPrxForUser", "sys_lwcond_signal" },
+    };
+    
+    for (auto&& repl : replacements) {
+        auto fnid = calcFnid(repl.name.c_str());
+        auto stub =
+            findExportedSymbol(mm, {this}, fnid, repl.lib, prx_symbol_type_t::function);
+        if (stub == 0)
+            continue;
+        auto codeVa = mm->load<4>(stub);
+        uint32_t index;
+        auto entry = findNCallEntry(fnid, index);
+        assert(entry); (void)entry;
+        encodeNCall(mm, codeVa, index);
+    }
 }
 
 std::tuple<prx_import_t*, int> ELFLoader::prxImports(MainMemory* mm) {
@@ -208,14 +245,15 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libaudio.sprx.elf" ||
         name == "libio.sprx.elf" || name == "libfs.sprx.elf" ||
-        name == "libsysutil_np_trophy.sprx.elf") {
+        name == "libsysutil_np_trophy.sprx.elf" || name == "libresc.sprx.elf" ||
+        name == "libpngdec.sprx.elf") {
         return false;
     }
     return true;
 }
 
 uint32_t findExportedSymbol(MainMemory* mm,
-                            std::vector<std::shared_ptr<ELFLoader>> const& prxs,
+                            std::vector<ELFLoader*> const& prxs,
                             uint32_t id,
                             std::string library,
                             prx_symbol_type_t type) {
@@ -246,7 +284,7 @@ uint32_t findExportedSymbol(MainMemory* mm,
             
             for (auto j = first; j < last; ++j) {
                 if (fnids[j] == id) {
-                    if (!isSymbolWhitelisted(prx.get(), fnids[j]))
+                    if (!isSymbolWhitelisted(prx, fnids[j]))
                         continue;
                     return stubs[j];
                 }
@@ -274,6 +312,18 @@ uint32_t findExportedSymbol(MainMemory* mm,
     }
     
     return 0;
+}
+
+uint32_t findExportedSymbol(MainMemory* mm,
+                            std::vector<std::shared_ptr<ELFLoader>> const& prxs,
+                            uint32_t id,
+                            std::string library,
+                            prx_symbol_type_t type) {
+    std::vector<ELFLoader*> vec;
+    for (auto& prx : prxs) {
+        vec.push_back(prx.get());
+    }
+    return findExportedSymbol(mm, vec, id, library, type);
 }
 
 Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {

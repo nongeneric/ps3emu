@@ -2,76 +2,82 @@
 
 #include <map>
 #include <memory>
-#include "ps3emu/IDMap.h"
-#include "ps3emu/log.h"
-#include "ps3emu/utils.h"
+#include "../../utils.h"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/recursive_mutex.hpp>
+#include "../../log.h"
 #include <assert.h>
 
 namespace {
-    ThreadSafeIDMap<uint32_t, std::shared_ptr<pthread_mutex_t>, LwMutexIdBase> mutexes;
+    using mutex_map_t = std::map<ps3_uintptr_t, std::shared_ptr<IMutex>>;
+    mutex_map_t mutexes;
+    boost::mutex map_mutex;
 }
 
-int sys_sleep_queue_create(big_uint32_t* queue,
-                           uint32_t attr_protocol,
-                           uint32_t channel,
-                           uint32_t unk,
-                           big_uint64_t name) {
-    assert(unk == 0x80000001);
-    auto mutex = std::make_shared<pthread_mutex_t>();
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-    auto res = pthread_mutex_init(mutex.get(), &attr);
-    assert(res == 0);
-    *queue = mutexes.create(mutex);
-    LOG << ssnprintf("sys_lwmutex_create(%x, %s)", *queue, (char*)&name);
+mutex_map_t::const_iterator find_mutex_iter(ps3_uintptr_t mutex_id) {
+    auto it = mutexes.find(mutex_id);
+    if (it == end(mutexes))
+        throw std::runtime_error("destroying uninitialized mutex");
+    return it;
+}
+
+int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr, MainMemory* mm) {
+    LOG << ssnprintf("sys_lwmutex_create(%x, %s)", mutex_id, attr->name);
+    sys_lwmutex_t type = { 0 };
+    type.sleep_queue = 0x11223344;
+    type.attribute = attr->attr_protocol | attr->attr_recursive;
+    mm->writeMemory(mutex_id, &type, sizeof(type));
+    std::shared_ptr<IMutex> mutex;
+    assert(attr->attr_recursive == SYS_SYNC_RECURSIVE ||
+           attr->attr_recursive == SYS_SYNC_NOT_RECURSIVE ||
+           attr->attr_recursive == 0);
+    if (attr->attr_recursive == SYS_SYNC_RECURSIVE) {
+        mutex.reset(new Mutex<boost::recursive_timed_mutex>());
+    } else {
+        mutex.reset(new Mutex<boost::timed_mutex>());
+    }
+    boost::unique_lock<boost::mutex> lock(map_mutex);
+    mutexes.emplace(mutex_id, std::move(mutex));
     return CELL_OK;
 }
 
-int sys_sleep_queue_destroy(ps3_uintptr_t lwmutex_id) {
+int sys_lwmutex_destroy(ps3_uintptr_t lwmutex_id) {
     LOG << ssnprintf("sys_lwmutex_destroy(%x)", lwmutex_id);
-    auto mutex = mutexes.get(lwmutex_id);
-    //auto res = pthread_mutex_destroy(mutex.get());
-    //assert(res == 0);
-//     if (res == EBUSY) { // assume by me
-//         res = pthread_mutex_unlock(mutex.get());
-//         assert(res == 0);
-//         res = pthread_mutex_destroy(mutex.get());
-//         assert(res == 0);
-//     }
-    mutexes.destroy(lwmutex_id);
+    boost::unique_lock<boost::mutex> lock(map_mutex);
+    auto m = find_mutex_iter(lwmutex_id);
+    m->second->destroy();
+    mutexes.erase(m);
     return CELL_OK;
 }
 
-int sys_sleep_queue_lock(ps3_uintptr_t lwmutex_id, usecond_t timeout) {
-    auto mutex = mutexes.get(lwmutex_id);
+int sys_lwmutex_lock(ps3_uintptr_t lwmutex_id, usecond_t timeout) {
+    boost::unique_lock<boost::mutex> lock(map_mutex);
+    auto mutex = find_mutex_iter(lwmutex_id)->second;
+    lock.unlock();
     if (timeout == 0) {
-        auto res = pthread_mutex_lock(mutex.get());
-        assert(res == 0);
+        mutex->lock();
         return CELL_OK;
     } else {
-        struct timespec time;
-        time.tv_sec = timeout / 1000000000ull;
-        time.tv_nsec = timeout % 1000000000ull;
-        auto res = pthread_mutex_timedlock(mutex.get(), &time);
-        if (res ==  ETIMEDOUT)
-            return CELL_ETIMEDOUT;
-        assert(res == 0);
-        return CELL_OK;
+        return mutex->try_lock(timeout) ? CELL_OK : CELL_ETIMEDOUT;
     }
 }
 
-int sys_sleep_queue_unlock(ps3_uintptr_t lwmutex_id) {
-    auto res = pthread_mutex_unlock(mutexes.get(lwmutex_id).get());
-    assert(res == 0);
+int sys_lwmutex_unlock(ps3_uintptr_t lwmutex_id) {
+    boost::unique_lock<boost::mutex> lock(map_mutex);
+    find_mutex_iter(lwmutex_id)->second->unlock();
     return CELL_OK;
 }
 
-int sys_sleep_queue_trylock(ps3_uintptr_t lwmutex_id) {
-    auto mutex = mutexes.get(lwmutex_id);
-    return pthread_mutex_trylock(mutex.get()) ? CELL_EBUSY : CELL_OK;
+int sys_lwmutex_trylock(ps3_uintptr_t lwmutex_id) {
+    boost::unique_lock<boost::mutex> lock(map_mutex);
+    auto mutex = find_mutex_iter(lwmutex_id)->second;
+    lock.unlock();
+    bool locked = mutex->try_lock(0);
+    return locked ? CELL_OK : CELL_EBUSY;
+    return CELL_OK;
 }
 
-std::shared_ptr<pthread_mutex_t> find_lwmutex(ps3_uintptr_t id) {
-    return mutexes.get(id);
+std::shared_ptr<IMutex> find_lwmutex(ps3_uintptr_t id) {
+    boost::unique_lock<boost::mutex> lock(map_mutex);
+    return find_mutex_iter(id)->second;
 }

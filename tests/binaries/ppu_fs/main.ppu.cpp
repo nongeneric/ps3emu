@@ -9,7 +9,7 @@ void print_file(FILE* file, int n) {
 	printf("\t_Idx = %d\n", file->_Idx);
 	printf("\t_Wstate = %d\n", file->_Wstate);
 	printf("\t_Cbuf = %d\n", file->_Cbuf);
-	printf("\tfpos = %d\n", file->fpos);
+	//printf("\tfpos = %d\n", file->fpos);
 	printf("\t_Rsize = %d\n", file->_Rsize);
 	printf("\t_offset = %d\n", file->_offset);
 	printf("\n\n");

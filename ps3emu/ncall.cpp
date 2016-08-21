@@ -311,21 +311,21 @@ int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t 
 }
 
 STUB_2(defaultContextCallback);
-STUB_5(sys_lwcond_create);
+STUB_4(sys_lwcond_create);
 STUB_1(sys_lwcond_destroy);
-STUB_3(sys_lwcond_queue_wait);
-STUB_4(sys_lwcond_signal_to);
-STUB_3(sys_lwcond_signal_all);
+STUB_2(sys_lwcond_wait);
+STUB_1(sys_lwcond_signal);
+STUB_1(sys_lwcond_signal_all);
 STUB_3(sys_cond_create);
 STUB_1(sys_cond_destroy);
 STUB_2(sys_cond_wait);
 STUB_1(sys_cond_signal);
 STUB_1(sys_cond_signal_all);
-STUB_5(sys_sleep_queue_create);
-STUB_1(sys_sleep_queue_destroy);
-STUB_2(sys_sleep_queue_lock);
-STUB_1(sys_sleep_queue_trylock);
-STUB_1(sys_sleep_queue_unlock);
+STUB_3(sys_lwmutex_create);
+STUB_1(sys_lwmutex_destroy);
+STUB_2(sys_lwmutex_lock);
+STUB_1(sys_lwmutex_trylock);
+STUB_1(sys_lwmutex_unlock);
 STUB_1(sys_time_get_system_time);
 STUB_0(_sys_process_atexitspawn);
 STUB_0(_sys_process_at_Exitspawn);
@@ -473,7 +473,7 @@ STUB_1(cellSpursRunJobChain);
 STUB_4(sys_spu_thread_read_ls);
 STUB_2(sys_spu_initialize);
 STUB_4(sys_spu_image_import);
-STUB_2(sys_spu_image_close);
+STUB_1(sys_spu_image_close);
 STUB_5(sys_spu_thread_group_create);
 STUB_7(sys_spu_thread_initialize);
 STUB_2(sys_spu_thread_group_start);
@@ -504,6 +504,7 @@ STUB_1(cellGcmUnmapIoAddress);
 STUB_1(callbackThreadQueueWait);
 STUB_2(cellGcmSetVBlankHandler);
 STUB_4(sys_fs_lseek);
+STUB_3(sys_fs_fstat);
 STUB_5(sys_fs_read);
 STUB_1(sys_fs_close);
 STUB_3(cellGcmGetReportDataLocation);
@@ -575,6 +576,8 @@ STUB_4(sys_mmapper_allocate_address);
 STUB_4(sys_mmapper_search_and_map);
 STUB_0(emuEmptyModuleStart);
 STUB_2(sys_prx_get_module_list);
+STUB_3(sys_spu_image_get_info);
+STUB_3(sys_spu_image_get_modules);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -681,10 +684,6 @@ NCallEntry ncallTable[] {
     ENTRY(_cellSpursJobChainAttributeInitialize),
     ENTRY(cellSpursJoinJobChain),
     ENTRY(cellSpursRunJobChain),
-    ENTRY(sys_spu_image_import),
-    ENTRY(sys_spu_image_close),
-    ENTRY(sys_raw_spu_image_load),
-    ENTRY(sys_raw_spu_load),
     ENTRY(cellGcmSetGraphicsHandler),
     ENTRY(cellGcmGetMaxIoMapSize),
     ENTRY(cellGcmGetOffsetTable),
@@ -741,9 +740,18 @@ NCallEntry ncallTable[] {
     ENTRY(cellSyncMutexUnlock),
     ENTRY(_cellSpursEventFlagInitialize),
     ENTRY(ps3call_then),
-    ENTRY(sys_prx_get_module_id_by_name),
     ENTRY(_sys_printf),
     ENTRY(emuEmptyModuleStart),
+    ENTRY(sys_lwmutex_create),
+    ENTRY(sys_lwmutex_destroy),
+    ENTRY(sys_lwmutex_lock),
+    ENTRY(sys_lwmutex_trylock),
+    ENTRY(sys_lwmutex_unlock),
+    ENTRY(sys_lwcond_create),
+    ENTRY(sys_lwcond_destroy),
+    ENTRY(sys_lwcond_wait),
+    ENTRY(sys_lwcond_signal),
+    ENTRY(sys_lwcond_signal_all),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -818,12 +826,16 @@ void PPUThread::scall() {
         case 151: nstub_sys_raw_spu_set_int_mask(this); break;
         case 84: nstub_sys_interrupt_thread_establish(this); break;
         case 154: nstub_sys_raw_spu_get_int_stat(this); break;
+        case 155: nstub_sys_spu_image_get_info(this); break;
+        case 158: nstub_sys_spu_image_close(this); break;
+        case 159: nstub_sys_spu_image_get_modules(this); break;
         case 163: nstub_sys_raw_spu_read_puint_mb(this); break;
         case 153: nstub_sys_raw_spu_set_int_stat(this); break;
         case 88: nstub_sys_interrupt_thread_eoi(this); break;
         case 161: nstub_sys_raw_spu_destroy(this); break;
         case 43: nstub_sys_ppu_thread_yield(this); break;
         case 818: nstub_sys_fs_lseek(this); break;
+        case 809: nstub_sys_fs_fstat(this); break;
         case 802: nstub_sys_fs_read(this); break;
         case 804: nstub_sys_fs_close(this); break;
         case 137: nstub_sys_event_port_disconnect(this); break;
@@ -838,11 +850,6 @@ void PPUThread::scall() {
         case 30: nstub__sys_process_get_paramsfo(this); break;
         case 52: nstub_sys_ppu_thread_create(this); break;
         case 53: nstub_sys_ppu_thread_start(this); break;
-        case 95: nstub_sys_sleep_queue_create(this); break;
-        case 96: nstub_sys_sleep_queue_destroy(this); break;
-        case 97: nstub_sys_sleep_queue_lock(this); break;
-        case 98: nstub_sys_sleep_queue_unlock(this); break;
-        case 99: nstub_sys_sleep_queue_trylock(this); break;
         case 22: nstub_sys_process_exit(this); break;
         case 462: nstub_sys_get_process_info(this); break;
         case 484: nstub_sys_prx_register_module(this); break;
@@ -856,12 +863,8 @@ void PPUThread::scall() {
         case 337: nstub_sys_mmapper_search_and_map(this); break;
         case 494: nstub_sys_prx_get_module_list(this); break;
         case 482: nstub_sys_prx_stop_module(this); break;
-        case 111: nstub_sys_lwcond_create(this); break;
-        case 112: nstub_sys_lwcond_destroy(this); break;
-        case 113: nstub_sys_lwcond_queue_wait(this); break;
-        case 115: nstub_sys_lwcond_signal_to(this); break;
-        case 116: nstub_sys_lwcond_signal_all(this); break;
         case 483: nstub_sys_prx_unload_module(this); break;
+        case 496: nstub_sys_prx_get_module_id_by_name(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

@@ -174,7 +174,7 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                             "(group = %d, queue = %d, req = %016llx)", 
                             group_id, eq, req);
     auto group = findThreadGroup(group_id);
-    std::vector<SPUThread*> threads;
+    std::vector<std::shared_ptr<SPUThread>> threads;
     std::transform(begin(group->threads), end(group->threads), std::back_inserter(threads), [=](auto id) {
         return proc->getSpuThread(id);
     });

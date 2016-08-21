@@ -59,12 +59,13 @@ void SPUThread::loop() {
             if (e.type() == 0x110) {
                 handleReceiveEvent();
             } else {
-                _status |= 0b10;
+                SPU_Status_SetStopCode(_channels.spuStatus(), e.type());
+                _channels.spuStatus() |= SPU_Status_P;
                 _cause = SPUThreadExitCause::Exit;
                 break;
             }
         } catch (SPUThreadInterruptException& e) {
-            if (_interruptHandler && (_interruptHandler->mask2 & getStatus())) {
+            if (_interruptHandler && (_interruptHandler->mask2 & _channels.interrupt())) {
                 _interruptHandler->handler();
             } else {
                 handleSendEvent();
@@ -79,10 +80,6 @@ void SPUThread::loop() {
     
     INFO(spu) << ssnprintf("spu thread loop finished");
     _eventHandler(this, SPUThreadEvent::Finished);
-}
-
-std::atomic<uint32_t>& SPUThread::getStatus() {
-    return _status;
 }
 
 void SPUThread::singleStepBreakpoint() {
@@ -109,7 +106,7 @@ SPUThread::SPUThread(Process* proc,
         r.dw<1>() = 0;
     }
     std::fill(std::begin(_ls), std::end(_ls), 0);
-    _status = 0b11000; // BTHSM
+    _channels.interrupt() = INT_Mask_class2_B | INT_Mask_class2_T;
 }
 
 SPUThreadExitInfo SPUThread::tryJoin(unsigned ms) {
@@ -142,7 +139,7 @@ void SPUThread::setInterruptHandler(uint32_t mask2, std::function<void()> interr
     _interruptHandler = InterruptThreadInfo{mask2, interruptHandler};
 }
 
-void SPUThread::setId(uint64_t id){
+void SPUThread::setId(uint64_t id) {
     _id = id;
 }
 

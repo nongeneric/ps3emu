@@ -57,6 +57,7 @@ CellFsErrno sys_fs_read(int32_t fd,
                         uint64_t nbytes,
                         big_uint64_t* nread,
                         MainMemory* mm);
+CellFsErrno sys_fs_fstat(int32_t fd, CellFsStat* sb, Process* proc);
 CellFsErrno sys_fs_close(int32_t fd);
 CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc);
 CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc);

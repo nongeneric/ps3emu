@@ -144,8 +144,8 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
     } else {
         return CELL_OK;
     }
-    
-    return executeExportedFunction(id, 0, 0, 0, thread, "module_start");
+    assert(false);
+    return 0;
 }
 
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc) {
@@ -160,17 +160,35 @@ int32_t sys_prx_stop_module(sys_prx_id_t id,
                             uint64_t flags,
                             sys_prx_start_module_t* opt,
                             PPUThread* thread) {
-    WARNING(libs) << "sys_prx_stop_module not implemented";
-    uint32_t descrva;
-    auto descr = g_state.memalloc->internalAlloc<4, fdescr>(&descrva);
-    descr->va = descrva + 4;
-    uint32_t index;
-    auto entry = findNCallEntry(calcFnid("emuEmptyModuleStart"), index);
-    assert(entry); (void)entry;
-    encodeNCall(g_state.mm, descrva + 4, index);
-    opt->name_or_fdescrva = descrva;
+    assert(flags == 0);
+    assert(opt->struct_size == sizeof(sys_prx_start_module_t));
+    assert(opt->neg1 == -1ull);
+    assert(opt->mode == 1 || opt->mode == 2 || opt->mode == 4 || opt->mode == 8);
+    
+    if (opt->mode == 4 || opt->mode == 8) {
+        INFO(libs) << ssnprintf("sys_prx_stop_module: modes 4 and 8 not implemented");
+    }
+    
+    if (opt->mode == 1 || opt->mode == 4) {
+        INFO(libs) << ssnprintf("sys_prx_stop_module(find, %08x, %s)",
+                                id,
+                                (char*)&opt->name_or_fdescrva);
+        opt->name_or_fdescrva = id == 0 ? 0 : findExportedModuleFunction(id, "module_stop");
+        if (!opt->name_or_fdescrva) {
+            uint32_t descrva;
+            auto descr = g_state.memalloc->internalAlloc<4, fdescr>(&descrva);
+            descr->va = descrva + 4;
+            uint32_t index;
+            auto entry = findNCallEntry(calcFnid("emuEmptyModuleStart"), index);
+            assert(entry); (void)entry;
+            encodeNCall(g_state.mm, descrva + 4, index);
+            opt->name_or_fdescrva = descrva;
+        }
+        return CELL_OK;
+    } else if (opt->mode == 2 || opt->mode == 8) {
+        return CELL_OK;
+    }
     return 0;
-    //return executeExportedFunction(id, args, argp, modres, thread, "module_stop");
 }
 
 int32_t sys_prx_unload_module(sys_prx_id_t id, uint64_t flags, uint64_t pOpt) {
@@ -189,7 +207,8 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
     uint32_t ea;
-    g_state.heapalloc->allocInternalMemory(&ea, size, 256);
+    auto alignment = SYS_MEMORY_PAGE_SIZE_1M ? (1ul << 20) : (64u << 10);
+    g_state.heapalloc->allocInternalMemory(&ea, size, alignment);
     *alloc_addr = ea;
     return CELL_OK;
 }
@@ -333,7 +352,7 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
            flags == SYS_PPU_THREAD_CREATE_INTERRUPT);
     if (flags == SYS_PPU_THREAD_CREATE_INTERRUPT) {
         *thread_id = g_state.proc->createInterruptThread(
-            stacksize, info->entry_fdescr_va, arg, threadname.str, info->tls_va, false);
+            stacksize, info->entry_fdescr_va, arg, threadname.str, info->tls_va, true);
     } else {
         *thread_id = g_state.proc->createThread(
             stacksize, info->entry_fdescr_va, arg, threadname.str, info->tls_va, false);
@@ -358,8 +377,8 @@ int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread) {
     throw ThreadFinishedException(code);
 }
 
-emu_void_t sys_process_exit(PPUThread* thread) {
-    throw ProcessFinishedException();
+emu_void_t sys_process_exit(int32_t status) {
+    throw ProcessFinishedException(status);
 }
 
 emu_void_t sys_ppu_thread_yield(PPUThread* thread) {

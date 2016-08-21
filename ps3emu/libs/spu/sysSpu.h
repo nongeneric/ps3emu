@@ -69,7 +69,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
                              uint32_t type,
                              PPUThread* proc);
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc);
-int32_t sys_spu_image_close(sys_spu_image_t* img, Process* proc);
+int32_t sys_spu_image_close(sys_spu_image_t* img);
 int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     uint32_t num,
                                     int32_t prio,
@@ -117,12 +117,13 @@ int32_t sys_spu_thread_group_connect_event(sys_spu_thread_group_t id,
                                            sys_event_queue_t eq,
                                            sys_event_type_t et);
 
-SPUThread* findRawSpuThread(sys_raw_spu_t id);
+int32_t sys_spu_image_get_info(const sys_spu_image_t *img, big_uint32_t* entry_point, big_uint32_t* nsegs);
+int32_t sys_spu_image_get_modules(const sys_spu_image_t *img, ps3_uintptr_t buf, uint32_t nsegs);
+
+std::shared_ptr<SPUThread> findRawSpuThread(sys_raw_spu_t id);
 std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id);
 
 class MainMemory;
 class InternalMemoryManager;
 
-void spuImageInit(MainMemory* mm, InternalMemoryManager* ialloc, sys_spu_image_t* image, ps3_uintptr_t elf);
-void spuImageDestroy(InternalMemoryManager* ialloc, sys_spu_image_t* image);
 void spuImageMap(MainMemory* mm, sys_spu_image_t* image, void* ls);

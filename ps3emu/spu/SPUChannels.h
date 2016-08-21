@@ -66,6 +66,30 @@ enum TagClassId {
 };
 #undef X
 
+enum SPU_Status_Flags {
+    SPU_Status_E = 1u << (31u - 21u),
+    SPU_Status_L = 1u << (31u - 22u),
+    SPU_Status_IS = 1u << (31u - 24u),
+    SPU_Status_C= 1u << (31u - 25u),
+    SPU_Status_I = 1u << (31u - 26u),
+    SPU_Status_S = 1u << (31u - 27u),
+    SPU_Status_W = 1u << (31u - 28u),
+    SPU_Status_H = 1u << (31u - 29u),
+    SPU_Status_P = 1u << (31u - 30u),
+    SPU_Status_R = 1u << (31u - 31u)
+};
+
+#define SPU_Status_SetStopCode(status, code) ((status & 0xffff) | (code << 16u))
+#define SPU_Status_GetStopCode(status) ((status >> 16) & 0xffff)
+
+enum INT_Mask_class2_Flags {
+    INT_Mask_class2_B = 1u << (63u - 59u),
+    INT_Mask_class2_T = 1u << (63u - 60u),
+    INT_Mask_class2_H = 1u << (63u - 61u),
+    INT_Mask_class2_S = 1u << (63u - 62u),
+    INT_Mask_class2_M = 1u << (63u - 63u)
+};
+
 class SPUThreadInterruptException : public virtual std::exception {};
 
 class ISPUChannelsThread {
@@ -73,7 +97,6 @@ public:
     virtual void run() = 0;
     virtual void setNip(uint32_t) = 0;
     virtual uint8_t* ls() = 0;
-    virtual std::atomic<uint32_t>& status() = 0;
     virtual ~ISPUChannelsThread() = default;
 };
 
@@ -85,6 +108,8 @@ class SPUChannels {
     ConcurrentBoundedQueue<uint32_t> _outboundInterruptMailbox;
     ConcurrentBoundedQueue<uint32_t> _inboundMailbox;
     std::array<std::atomic<uint32_t>, 28> _channels;
+    std::atomic<uint32_t> _spuStatus;
+    std::atomic<uint32_t> _interrupt2;
     void command(uint32_t word);
     
 public:
@@ -95,4 +120,6 @@ public:
     void mmio_write(unsigned offset, uint64_t data);
     uint32_t mmio_read(unsigned offset);
     unsigned mmio_readCount(unsigned offset);
+    inline std::atomic<uint32_t>& spuStatus() { return _spuStatus; }
+    inline std::atomic<uint32_t>& interrupt() { return _interrupt2; }
 };

@@ -10,12 +10,9 @@ public:
     bool _run = false;
     uint32_t _nip = 0;
     std::array<uint8_t, LocalStorageSize> _ls;
-    std::atomic<uint32_t> _status;
-    
     void run() override { _run = true; }
     void setNip(uint32_t nip) override { _nip = nip; }
     uint8_t* ls() override { return &_ls[0]; }
-    std::atomic<uint32_t>& status() override { return _status; }
 };
 
 TEST_CASE("spuchannels_mailbox_basic") {

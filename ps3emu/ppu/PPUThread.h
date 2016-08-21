@@ -23,7 +23,15 @@ enum class PPUThreadEvent {
     Failure
 };
 
-class ProcessFinishedException : public virtual std::exception { };
+class ProcessFinishedException : public virtual std::exception {
+    int32_t _status;
+public:
+    ProcessFinishedException(int32_t status) : _status(status) { }
+    inline int32_t status() {
+        return _status;
+    }
+};
+
 class ThreadFinishedException : public virtual std::exception {
     uint64_t _errorCode;
 public:
