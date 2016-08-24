@@ -1382,3 +1382,21 @@ TEST_CASE("fiber_hello") {
         "## libfiber : sample_fiber_hello SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("ppu_threads_event_flag") {
+    auto output = startWaitGetOutput({"./binaries/ppu_threads_event_flag/a.elf"});
+    REQUIRE( output ==
+        "p = 8008, flag = 8005\n"
+        "flag value: 8000\n"
+        "p = 40158118, flag = 801c\n"
+        "flag value: 0\n"
+        "p = 67bb8558, flag = 1d6\n"
+        "flag value: 1c0\n"
+        "test_event_flag: 0; p: 1740342616\n"
+        "flag value (clear 0): 1c0\n"
+        "flag value (clear 1): c0\n"
+        "p = 17d36230, flag = cf\n"
+        "flag value: ca\n"
+        "test_event_flag: 0; p: 399729200\n"
+    );
+}

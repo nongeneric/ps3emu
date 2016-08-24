@@ -56,3 +56,4 @@ static constexpr unsigned MutexIdBase = 0x1000;
 static constexpr unsigned LwMutexIdBase = 0x2000;
 static constexpr unsigned LwCondIdBase = 0x3000;
 static constexpr unsigned QueueIdBase = 0x4000;
+static constexpr unsigned EventFlagIdBase = 0x5000;

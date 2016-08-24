@@ -18,6 +18,7 @@
 #include "libs/sync/cond.h"
 #include "libs/sync/rwlock.h"
 #include "libs/sync/queue.h"
+#include "libs/sync/event_flag.h"
 #include "libs/libpngdec.h"
 #include "libs/libl10n.h"
 #include "libs/audio/configuration.h"
@@ -578,6 +579,12 @@ STUB_0(emuEmptyModuleStart);
 STUB_2(sys_prx_get_module_list);
 STUB_3(sys_spu_image_get_info);
 STUB_3(sys_spu_image_get_modules);
+STUB_3(sys_event_flag_create);
+STUB_1(sys_event_flag_destroy);
+STUB_5(sys_event_flag_wait);
+STUB_2(sys_event_flag_set);
+STUB_2(sys_event_flag_get);
+STUB_2(sys_event_flag_clear);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -865,6 +872,12 @@ void PPUThread::scall() {
         case 482: nstub_sys_prx_stop_module(this); break;
         case 483: nstub_sys_prx_unload_module(this); break;
         case 496: nstub_sys_prx_get_module_id_by_name(this); break;
+        case 82: nstub_sys_event_flag_create(this); break;
+        case 83: nstub_sys_event_flag_destroy(this); break;
+        case 85: nstub_sys_event_flag_wait(this); break;
+        case 87: nstub_sys_event_flag_set(this); break;
+        case 118: nstub_sys_event_flag_clear(this); break;
+        case 139: nstub_sys_event_flag_get(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

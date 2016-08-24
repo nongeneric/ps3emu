@@ -74,6 +74,7 @@ set(SRC
     libs/sync/lwcond.cpp
     libs/sync/rwlock.cpp
     libs/sync/queue.cpp
+    libs/sync/event_flag.cpp
     libs/graphics/gcm.cpp
     libs/graphics/gcm_buffers.cpp
     libs/graphics/sysutil_sysparam.cpp

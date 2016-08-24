@@ -150,6 +150,7 @@ void SPUThread::cancel() {
 void SPUThread::handleSendEvent() {
     auto data1 = _channels.mmio_read(SPU_Out_MBox);
     auto spupData0 = _channels.mmio_read(SPU_Out_Intr_Mbox);
+    assert((spupData0 >> 16) != 0x8001 && (spupData0 >> 16) != 0x8000); // not a syscall, not implemented
     auto port = (spupData0 >> 24) & 0xff;
     auto data0 = spupData0 & 0xffffff;
     auto info = boost::find_if(_eventQueues, [=](auto& i) {
