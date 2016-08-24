@@ -133,9 +133,13 @@ void spuImageMap(MainMemory* mm, sys_spu_image_t* image, void* ls) {
 
 int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
-                               big_uint64_t* value,
+                               uint64_t value,
                                size_t type) {
     LOG << __FUNCTION__;
+    auto thread = g_state.proc->getSpuThread(id);
+    big_uint64_t v = 0;
+    memcpy((char*)&v + 8 - type, thread->ptr(address), type);
+    g_state.mm->store<8>(value, v);
     return CELL_OK;
 }
 
@@ -431,6 +435,12 @@ int32_t sys_raw_spu_read_puint_mb(sys_raw_spu_t id, big_uint32_t* value) {
     return CELL_OK;
 }
 
+int32_t sys_spu_thread_write_spu_mb(uint32_t thread_id, uint32_t value) {
+    auto thread = g_state.proc->getSpuThread(thread_id);
+    thread->channels()->mmio_write(SPU_In_MBox, value);
+    return CELL_OK;
+}
+
 int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t stat) {
     if (class_id != 2) {
         throw std::runtime_error("incorrect spu interrupt class");
@@ -461,6 +471,19 @@ std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id) {
 int32_t sys_spu_thread_group_connect_event(sys_spu_thread_group_t id,
                                            sys_event_queue_t eq,
                                            sys_event_type_t et) {
+    // emu doesn't expect exceptions
     assert(et == SYS_SPU_THREAD_GROUP_EVENT_EXCEPTION);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_group_disconnect_event(sys_spu_thread_group_t id,
+                                              sys_event_queue_t eq,
+                                              sys_event_type_t et) {
+    // emu doesn't expect exceptions
+    //assert(et == SYS_SPU_THREAD_GROUP_EVENT_EXCEPTION);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_group_disconnect_event_all_threads(sys_spu_thread_group_t id, uint8_t spup) {
     return CELL_OK;
 }

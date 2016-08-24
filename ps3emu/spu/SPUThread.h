@@ -236,6 +236,10 @@ public:
         _spu = num;
     }
     
+    inline uint32_t getSpu() {
+        return _spu;
+    }
+    
     inline Process* proc() {
         return _proc;
     }

@@ -62,7 +62,7 @@ struct ThreadGroup {
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu);
 int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
-                               big_uint64_t* value,
+                               uint64_t value,
                                size_t type);
 int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
@@ -111,12 +111,16 @@ int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
                                  uint32_t class_id,
                                  big_uint64_t* stat);
 int32_t sys_raw_spu_read_puint_mb(sys_raw_spu_t id, big_uint32_t* value);
+int32_t sys_spu_thread_write_spu_mb(uint32_t thread_id, uint32_t value);
 int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t stat);
 emu_void_t sys_interrupt_thread_eoi();
 int32_t sys_spu_thread_group_connect_event(sys_spu_thread_group_t id,
                                            sys_event_queue_t eq,
                                            sys_event_type_t et);
-
+int32_t sys_spu_thread_group_disconnect_event(sys_spu_thread_group_t id,
+                                              sys_event_queue_t eq,
+                                              sys_event_type_t et);
+int32_t sys_spu_thread_group_disconnect_event_all_threads(sys_spu_thread_group_t id, uint8_t spup);
 int32_t sys_spu_image_get_info(const sys_spu_image_t *img, big_uint32_t* entry_point, big_uint32_t* nsegs);
 int32_t sys_spu_image_get_modules(const sys_spu_image_t *img, ps3_uintptr_t buf, uint32_t nsegs);
 

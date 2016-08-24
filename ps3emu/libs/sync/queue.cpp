@@ -53,7 +53,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
 
 int32_t sys_event_queue_destroy(sys_event_queue_t equeue_id, int32_t mode) {
     LOG << __FUNCTION__;
-    assert(!mode);
+    // TODO: wakeup threads and make them return ECANCELED
     queues.destroy(equeue_id);
     return CELL_OK;
 }
@@ -65,14 +65,19 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
 {
     // TODO: handle timeout
     //assert(timeout == 0);
-    INFO(libs) << ssnprintf("sys_event_queue_receive(%d)", equeue_id);
+    INFO(libs) << ssnprintf("sys_event_queue_receive(%x)", equeue_id);
     auto queue = queues.get(equeue_id);
     auto event = queue->receive(th->priority());
     th->setGPR(4, event.source);
     th->setGPR(5, event.data1);
     th->setGPR(6, event.data2);
     th->setGPR(7, event.data3);
-    INFO(libs) << ssnprintf("completed sys_event_queue_receive(%d)", equeue_id);
+    INFO(libs) << ssnprintf("completed sys_event_queue_receive(%x): %x, %x, %x, %x",
+                            equeue_id,
+                            event.source,
+                            event.data1,
+                            event.data2,
+                            event.data3);
     return CELL_OK;
 }
 
@@ -82,14 +87,14 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
                                    big_uint32_t *number,
                                    PPUThread* th)
 {
-    INFO(libs) << ssnprintf("sys_event_queue_tryreceive(%d)", equeue_id);
+    INFO(libs) << ssnprintf("sys_event_queue_tryreceive(%x)", equeue_id);
     auto queue = queues.get(equeue_id);
     std::vector<sys_event_t> vec(size);
     size_t num;
     queue->tryReceive(&vec[0], vec.size(), &num);
     *number = num;
     g_state.mm->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
-    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%d)", equeue_id);
+    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%x)", equeue_id);
     return CELL_OK;
 }
 

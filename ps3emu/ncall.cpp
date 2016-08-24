@@ -562,6 +562,7 @@ STUB_5(sys_spu_thread_group_connect_event_all_threads);
 STUB_0(sys_process_getpid);
 STUB_2(sys_process_get_sdk_version);
 STUB_3(sys_spu_thread_group_connect_event);
+STUB_3(sys_spu_thread_group_disconnect_event);
 STUB_4(sys_prx_get_module_id_by_name);
 STUB_2(_sys_printf);
 STUB_1(_sys_process_get_paramsfo);
@@ -585,6 +586,8 @@ STUB_5(sys_event_flag_wait);
 STUB_2(sys_event_flag_set);
 STUB_2(sys_event_flag_get);
 STUB_2(sys_event_flag_clear);
+STUB_2(sys_spu_thread_write_spu_mb);
+STUB_2(sys_spu_thread_group_disconnect_event_all_threads);
 
 #define ENTRY(name) { #name, calcFnid(#name), nstub_##name }
 
@@ -854,6 +857,7 @@ void PPUThread::scall() {
         case 1: nstub_sys_process_getpid(this); break;
         case 25: nstub_sys_process_get_sdk_version(this); break;
         case 185: nstub_sys_spu_thread_group_connect_event(this); break;
+        case 186: nstub_sys_spu_thread_group_disconnect_event(this); break;
         case 30: nstub__sys_process_get_paramsfo(this); break;
         case 52: nstub_sys_ppu_thread_create(this); break;
         case 53: nstub_sys_ppu_thread_start(this); break;
@@ -878,6 +882,8 @@ void PPUThread::scall() {
         case 87: nstub_sys_event_flag_set(this); break;
         case 118: nstub_sys_event_flag_clear(this); break;
         case 139: nstub_sys_event_flag_get(this); break;
+        case 190: nstub_sys_spu_thread_write_spu_mb(this); break;
+        case 252: nstub_sys_spu_thread_group_disconnect_event_all_threads(this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

@@ -3,6 +3,7 @@
 #include "../Process.h"
 #include "../MainMemory.h"
 #include "../log.h"
+#include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/state.h"
 #include "SPUDasm.h"
 #include <stdio.h>
@@ -153,6 +154,14 @@ void SPUThread::handleSendEvent() {
     assert((spupData0 >> 16) != 0x8001 && (spupData0 >> 16) != 0x8000); // not a syscall, not implemented
     auto port = (spupData0 >> 24) & 0xff;
     auto data0 = spupData0 & 0xffffff;
+    
+    if (port == 0xc0) {
+        auto flag_id = data1;
+        auto bit = data0;
+        sys_event_flag_set(flag_id, 1u << bit);
+        return;
+    }
+    
     auto info = boost::find_if(_eventQueues, [=](auto& i) {
         return i.port == port;
     });
