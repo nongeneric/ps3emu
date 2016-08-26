@@ -1410,3 +1410,53 @@ TEST_CASE("spurs_task_signal") {
         "## libspurs : sample_spurs_task_signal SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("spurs_task_yield") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_yield/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#1 exited with code 0\n"
+        "Task#2 exited with code 0\n"
+        "Task#3 exited with code 0\n"
+        "Task#4 exited with code 0\n"
+        "PPU: destroy taskset\n"
+        "## libspurs : sample_spurs_yield SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_semaphore") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_semaphore/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#1 exited with code 0\n"
+        "PPU: destroy taskset\n"
+        "## libspurs : sample_spurs_semaphore SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_event_flag") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_event_flag/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#1 exited with code 0\n"
+        "Task#2 exited with code 0\n"
+        "Task#3 exited with code 0\n"
+        "Task#4 exited with code 0\n"
+        "Task#5 exited with code 0\n"
+        "Task#6 exited with code 0\n"
+        "Task#7 exited with code 0\n"
+        "Task#8 exited with code 0\n"
+        "Task#9 exited with code 0\n"
+        "Task#10 exited with code 0\n"
+        "Task#11 exited with code 0\n"
+        "Task#12 exited with code 0\n"
+        "Task#13 exited with code 0\n"
+        "Task#14 exited with code 0\n"
+        "Task#15 exited with code 0\n"
+        "Task#16 exited with code 0\n"
+        "## libspurs : sample_spurs_event_flag SUCCEEDED ##\n"
+    );
+}

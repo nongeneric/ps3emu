@@ -1,0 +1,35 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample_semaphore", "sample_semaphore.vcxproj", "{16A1E755-C2A9-4171-918E-62368391A3A6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "task_semaphore.spu", "task\task_semaphore.spu.vcxproj", "{41651285-9DE4-4174-824D-E4DD8D59921B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.Debug|PS3.ActiveCfg = Debug|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.Debug|PS3.Build.0 = Debug|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.Release|PS3.ActiveCfg = Release|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.Release|PS3.Build.0 = Release|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{16A1E755-C2A9-4171-918E-62368391A3A6}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.Debug|PS3.ActiveCfg = Debug|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.Debug|PS3.Build.0 = Debug|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.Release|PS3.ActiveCfg = Release|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.Release|PS3.Build.0 = Release|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.SNC Debug|PS3.ActiveCfg = Debug|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.SNC Debug|PS3.Build.0 = Debug|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.SNC Release|PS3.ActiveCfg = Release|PS3
+		{41651285-9DE4-4174-824D-E4DD8D59921B}.SNC Release|PS3.Build.0 = Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
