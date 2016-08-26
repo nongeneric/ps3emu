@@ -22,7 +22,7 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
         mutex.reset(new Mutex<boost::recursive_timed_mutex>());
     }
     *mutex_id = mutexes.create(std::move(mutex));
-    LOG << ssnprintf("sys_mutex_create(%x, ...)", *mutex_id);
+    LOG << ssnprintf("sys_mutex_create(%x, %s)", *mutex_id, attr->name);
     return CELL_OK;
 }
 

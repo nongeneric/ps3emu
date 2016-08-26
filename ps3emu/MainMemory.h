@@ -25,7 +25,7 @@ public:
 struct NCallEntry {
     const char* name;
     uint32_t fnid;
-    void (*stub)(PPUThread*);
+    std::function<void(PPUThread*)> stub;
 };
 
 union VirtualAddress {

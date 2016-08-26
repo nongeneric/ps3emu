@@ -82,21 +82,26 @@ int _sys_process_at_Exitspawn() {
 #define  SYS_TTYP_USER12       (SYS_TTYP14)
 #define  SYS_TTYP_USER13       (SYS_TTYP15)
 
-int sys_tty_write(unsigned int ch, const void* buf, unsigned int len, unsigned int* pwritelen) {
-    if (len == 0)
+int sys_tty_write(uint32_t ch,
+                  uint32_t buf_va,
+                  uint32_t buf_len,
+                  uint32_t* pwritelen) {
+    if (buf_len == 0)
         return CELL_OK;
+    
+    auto buf = g_state.mm->getMemoryPointer(buf_va, buf_len);
     if (ch == SYS_TTYP_PPU_STDOUT) {
-        fwrite(buf, 1, len, stdout);
+        fwrite(buf, 1, buf_len, stdout);
         fflush(stdout);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_PPU_STDERR) {
-        fwrite(buf, 1, len, stderr);
+        fwrite(buf, 1, buf_len, stderr);
         fflush(stderr);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_SPU_STDOUT) {
-        fwrite(buf, 1, len, stdout);
+        fwrite(buf, 1, buf_len, stdout);
         fflush(stdout);
         return CELL_OK;
     }

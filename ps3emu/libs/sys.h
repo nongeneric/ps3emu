@@ -23,8 +23,10 @@ extern int _sys_process_at_Exitspawn();
 
 typedef big_uint64_t sys_ppu_thread_t;
 
-extern int sys_tty_write(unsigned int ch, const void *buf,
-                         unsigned int len, unsigned int *pwritelen);
+int sys_tty_write(uint32_t ch,
+                  uint32_t buf_va,
+                  uint32_t buf_len,
+                  uint32_t* pwritelen);
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags);
 
