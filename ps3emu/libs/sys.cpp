@@ -404,10 +404,6 @@ int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Pr
     return CELL_OK;
 }
 
-int32_t _sys_strlen(cstring_ptr_t str) {
-    return str.str.size();
-}
-
 int32_t sys_process_is_spu_lock_line_reservation_address(ps3_uintptr_t addr, uint64_t flags) {
     return CELL_OK;
 }

@@ -130,7 +130,6 @@ int32_t sys_ppu_thread_get_priority(sys_ppu_thread_t thread_id, big_int32_t* pri
 
 emu_void_t sys_process_exit(int32_t status);
 
-int32_t _sys_strlen(cstring_ptr_t str);
 int32_t sys_process_is_spu_lock_line_reservation_address(ps3_uintptr_t addr, uint64_t flags);
 uint32_t sys_process_getpid();
 int32_t sys_process_get_sdk_version(uint32_t pid, big_uint32_t* version);

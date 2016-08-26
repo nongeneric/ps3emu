@@ -9,7 +9,8 @@ set(SRC
     ppu/ppu_dasm.cpp
     ppu/ppu_dasm.h
     ppu/ppu_dasm_forms.h
-    ncall.cpp
+    exports/ncall.cpp
+    exports/syscall.cpp
     utils.h
     utils.cpp
     MainMemory.h
@@ -60,10 +61,8 @@ set(SRC
     libs/cellGame.cpp
     libs/sceNp2.cpp
     libs/sceNp.cpp
-    libs/spu/cellSpurs.cpp
     libs/spu/sysSpu.cpp
     libs/spu/libSync.cpp
-    libs/heap.cpp
     libs/libpngdec.cpp
     libs/libl10n.cpp
     libs/audio/configuration.cpp
