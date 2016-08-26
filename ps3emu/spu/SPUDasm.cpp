@@ -2437,7 +2437,7 @@ PRINT(fscrwr) {
 }
 
 EMU(fscrwr) {
-    throw IllegalInstructionException();
+    th->fpscr() = th->r(i->RA);
 }
 
 PRINT(fscrrd) {
@@ -2445,7 +2445,7 @@ PRINT(fscrrd) {
 }
 
 EMU(fscrrd) {
-    throw IllegalInstructionException();
+    th->r(i->RT) = th->fpscr();
 }
 
 PRINT(stop) {

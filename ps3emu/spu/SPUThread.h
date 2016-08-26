@@ -177,6 +177,7 @@ struct EventQueueInfo {
 class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     uint32_t _nip;
     R128 _rs[128];
+    R128 _fpscr;
     uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
     uint32_t _spu;
@@ -234,6 +235,10 @@ public:
     inline void setSpu(uint32_t num) {
         assert(num <= 255);
         _spu = num;
+    }
+    
+    inline R128& fpscr() {
+        return _fpscr;
     }
     
     inline uint32_t getSpu() {

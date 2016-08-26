@@ -1,0 +1,35 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample_task_signal", "sample_task_signal.vcxproj", "{C10AD255-FA83-41FF-8980-6F0593136D07}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "signal.spu", "task\signal.spu.vcxproj", "{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.Debug|PS3.ActiveCfg = Debug|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.Debug|PS3.Build.0 = Debug|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.Release|PS3.ActiveCfg = Release|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.Release|PS3.Build.0 = Release|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{C10AD255-FA83-41FF-8980-6F0593136D07}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.Debug|PS3.ActiveCfg = Debug|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.Debug|PS3.Build.0 = Debug|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.Release|PS3.ActiveCfg = Release|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.Release|PS3.Build.0 = Release|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.SNC Debug|PS3.ActiveCfg = Debug|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.SNC Debug|PS3.Build.0 = Debug|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.SNC Release|PS3.ActiveCfg = Release|PS3
+		{DB2FBE15-FC8F-4484-8E41-BBE611359B8A}.SNC Release|PS3.Build.0 = Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

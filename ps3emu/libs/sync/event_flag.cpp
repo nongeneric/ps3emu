@@ -24,7 +24,7 @@ int32_t sys_event_flag_create(big_uint32_t* id,
     flag->name = attr->name;
     flag->value = init;
     *id = map.create(flag);
-    INFO(libs) << ssnprintf("sys_event_flag_create(%x, %x, %s)", *id, init, attr->name);
+    INFO(libs) << ssnprintf("sys_event_flag_create(%x, %x, %s)", *id, init, std::string(attr->name, 8));
     return CELL_OK;
 }
 

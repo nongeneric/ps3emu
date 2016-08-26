@@ -1400,3 +1400,13 @@ TEST_CASE("ppu_threads_event_flag") {
         "test_event_flag: 0; p: 399729200\n"
     );
 }
+
+TEST_CASE("spurs_task_signal") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_signal/a.elf"});
+    REQUIRE( output ==
+        "SPU: Signal task start!\n"
+        "SPU: Waiting for a signal....\n"
+        "SPU: Receiving a signal succeeded.\n"
+        "## libspurs : sample_spurs_task_signal SUCCEEDED ##\n"
+    );
+}
