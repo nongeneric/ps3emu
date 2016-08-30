@@ -1657,3 +1657,45 @@ TEST_CASE("sample_sheap_key_mutex") {
         "## libsheap : sample_sheap_key_mutex_ppu SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("libatomic_xor64") {
+    auto output = startWaitGetOutput({"./binaries/libatomic_xor64/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "Initializing SPU thread 1\n"
+        "Initializing SPU thread 2\n"
+        "Initializing SPU thread 3\n"
+        "Initializing SPU thread 4\n"
+        "Initializing SPU thread 5\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "SPU thread 1's exit status = 0\n"
+        "SPU thread 2's exit status = 0\n"
+        "SPU thread 3's exit status = 0\n"
+        "SPU thread 4's exit status = 0\n"
+        "SPU thread 5's exit status = 0\n"
+        "result=0000022001e7c4e0\n"
+        "## libatomic : sample_atomic_xor64 SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("libatomic_semaphore") {
+    auto output = startWaitGetOutput({"./binaries/libatomic_semaphore/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "Initializing SPU thread 1\n"
+        "Initializing SPU thread 2\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "SPU thread 1's exit status = 0\n"
+        "SPU thread 2's exit status = 0\n"
+        "result=00000bb8\n"
+        "## libatomic : sample_atomic_semaphore SUCCEEDED ##\n"
+    );
+}
