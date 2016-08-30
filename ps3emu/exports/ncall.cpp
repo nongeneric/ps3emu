@@ -10,7 +10,6 @@
 #include "ps3emu/libs/sceNp2.h"
 #include "ps3emu/libs/sceNp.h"
 #include "ps3emu/libs/spu/sysSpu.h"
-#include "ps3emu/libs/spu/libSync.h"
 #include "ps3emu/libs/sync/lwmutex.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwcond.h"
@@ -251,10 +250,6 @@ NCallEntry ncallTable[] {
     ENTRY(cellAudioPortStart),
     ENTRY(cellAudioSetNotifyEventQueue),
     ENTRY(sys_event_port_disconnect),
-    ENTRY(cellSyncMutexInitialize),
-    ENTRY(cellSyncMutexTryLock),
-    ENTRY(cellSyncMutexLock),
-    ENTRY(cellSyncMutexUnlock),
     ENTRY(ps3call_then),
     ENTRY(_sys_printf),
     ENTRY(emuEmptyModuleStart),

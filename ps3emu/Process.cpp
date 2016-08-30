@@ -187,12 +187,10 @@ uint32_t Process::loadPrx(std::string path) {
     return imageBase;
 }
 
-void Process::dbgPause(bool pause, bool takeMutex) {
+void Process::dbgPause(bool pause) {
 #ifdef DEBUG
-    std::unique_ptr<boost::unique_lock<boost::mutex>> _;
-    if (takeMutex) {
-        _.reset(new boost::unique_lock<boost::mutex>(_ppuThreadMutex));
-    }
+    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
     for (auto& t : _threads) {
         t->dbgPause(pause);
     }
@@ -225,7 +223,7 @@ Event Process::run() {
         switch (ev->event) {
             case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
             case PPUThreadEvent::ProcessFinished: {
-                dbgPause(false, false);
+                dbgPause(false);
                 _rsx->shutdown();
                 _callbackThread->terminate();
                 for (auto& t : _threads) {
@@ -247,7 +245,7 @@ Event Process::run() {
             case PPUThreadEvent::MemoryAccessError:
                 return MemoryAccessErrorEvent{ev->thread};
             case PPUThreadEvent::Joined: {
-                boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
+                boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
                 auto it =
                     std::find_if(begin(_threads),
                                  end(_threads),
@@ -278,7 +276,7 @@ uint64_t Process::createThread(uint32_t stackSize,
                                std::string name,
                                uint32_t tls,
                                bool start) {
-    boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     _threads.emplace_back(std::make_unique<PPUThread>(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, false));
     auto t = _threads.back().get();
@@ -298,7 +296,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
                                         std::string name,
                                         uint32_t tls,
                                         bool start) {
-    boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     auto t = new InterruptPPUThread(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); });
     t->setArg(arg);
@@ -381,12 +379,12 @@ ps3_uintptr_t Process::storeArgs(std::vector<std::string> const& args) {
 }
 
 PPUThread* Process::getThread(uint64_t id) {
-    boost::unique_lock<boost::mutex> _(_ppuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     return _threadIds.get(id);
 }
 
 uint32_t Process::createSpuThread(std::string name) {
-    boost::unique_lock<boost::mutex> _(_spuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
     _spuThreads.emplace_back(
         std::make_shared<SPUThread>(this,
                                     name,
@@ -401,7 +399,7 @@ uint32_t Process::createSpuThread(std::string name) {
 }
 
 std::shared_ptr<SPUThread> Process::getSpuThread(uint32_t id) {
-    boost::unique_lock<boost::mutex> _(_spuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
     return _spuThreadIds.get(id);
 }
 
@@ -410,7 +408,7 @@ void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
 }
 
 void Process::destroySpuThread(SPUThread* thread) {
-    boost::unique_lock<boost::mutex> lock(_spuThreadMutex);
+    boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
     auto it = std::find_if(begin(_spuThreads),
                            end(_spuThreads),
                            [=](auto& th) { return th.get() == thread; });

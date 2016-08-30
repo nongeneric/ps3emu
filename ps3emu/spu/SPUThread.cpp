@@ -14,6 +14,13 @@ void SPUThread::run() {
     _thread = boost::thread([=] { loop(); });
 }
 
+#define SYS_SPU_THREAD_STOP_YIELD                 0x0100
+#define SYS_SPU_THREAD_STOP_GROUP_EXIT            0x0101
+#define SYS_SPU_THREAD_STOP_THREAD_EXIT           0x0102
+#define SYS_SPU_THREAD_STOP_RECEIVE_EVENT         0x0110
+#define SYS_SPU_THREAD_STOP_TRY_RECEIVE_EVENT     0x0111
+#define SYS_SPU_THREAD_STOP_SWITCH_SYSTEM_MODULE  0x0120
+
 void SPUThread::loop() {
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
@@ -57,19 +64,24 @@ void SPUThread::loop() {
             _cause = e.cause();
             break;
         } catch (StopSignalException& e) {
-            if (e.type() == 0x110) {
+            if (e.type() == SYS_SPU_THREAD_STOP_RECEIVE_EVENT) {
                 handleReceiveEvent();
-            } else {
+            } else if (e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT ||
+                       e.type() == SYS_SPU_THREAD_STOP_THREAD_EXIT) {
                 SPU_Status_SetStopCode(_channels.spuStatus(), e.type());
                 _channels.spuStatus() |= SPU_Status_P;
-                _cause = SPUThreadExitCause::Exit;
+                _cause = e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT
+                             ? SPUThreadExitCause::GroupExit
+                             : SPUThreadExitCause::Exit;
                 break;
+            } else {
+                throw std::runtime_error("not implemented");
             }
         } catch (SPUThreadInterruptException& e) {
             if (_interruptHandler && (_interruptHandler->mask2 & _channels.interrupt())) {
                 _interruptHandler->handler();
             } else {
-                handleSendEvent();
+                handleSyscall();
             }
         } catch (std::exception& e) {
             INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
@@ -148,7 +160,8 @@ void SPUThread::cancel() {
     pthread_cancel(_thread.native_handle());
 }
 
-void SPUThread::handleSendEvent() {
+void SPUThread::handleSyscall() {
+    INFO(libs) << "handling spu syscall";
     auto data1 = _channels.mmio_read(SPU_Out_MBox);
     auto spupData0 = _channels.mmio_read(SPU_Out_Intr_Mbox);
     assert((spupData0 >> 16) != 0x8001 && (spupData0 >> 16) != 0x8000); // not a syscall, not implemented

@@ -129,9 +129,9 @@ class Process {
     std::unique_ptr<InternalMemoryManager> _stackBlocks;
     std::unique_ptr<CallbackThread> _callbackThread;
     std::vector<std::unique_ptr<PPUThread>> _threads;
-    boost::mutex _ppuThreadMutex;
+    boost::recursive_mutex _ppuThreadMutex;
     std::vector<std::shared_ptr<SPUThread>> _spuThreads;
-    boost::mutex _spuThreadMutex;
+    boost::recursive_mutex _spuThreadMutex;
     IDMap<uint64_t, PPUThread*> _threadIds;
     IDMap<uint32_t, std::shared_ptr<SPUThread>> _spuThreadIds;
     bool _firstRun = true;
@@ -145,7 +145,7 @@ class Process {
                        uint32_t stackSize,
                        uint32_t tls);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
-    void dbgPause(bool pause, bool takeMutex = true);
+    void dbgPause(bool pause);
     void loadPrxStore();
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;

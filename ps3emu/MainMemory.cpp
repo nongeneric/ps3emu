@@ -23,8 +23,8 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
     auto thread = boost::this_thread::get_id();
     for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
         auto& r = _reservations[i];
-        if (r.va <= va && r.va + r.size >= va + size) {
-            success |= r.thread == thread;
+        if (intersects(r.va, r.size, va, size)) {
+            success |= (r.va <= va && r.va + r.size >= va + size) && r.thread == thread;
             _reservations.erase(begin(_reservations) + i);
         }
     }

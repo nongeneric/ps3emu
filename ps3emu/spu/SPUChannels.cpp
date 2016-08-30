@@ -78,6 +78,8 @@ void SPUChannels::command(uint32_t word) {
         BitField<8, 16> rid;
         BitField<16, 32> opcode;
     } cmd = { word };
+    assert(cmd.tid.u() == 0);
+    assert(cmd.rid.u() == 0);
     auto eal = _channels[MFC_EAL].load();
     auto lsa = &_thread->ls()[_channels[MFC_LSA]];
     auto size = _channels[MFC_Size].load();
@@ -102,6 +104,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTLLC_CMD: // TODO: handle sizes correctly when calling writeCond
         case MFC_PUTLLUC_CMD:
         case MFC_PUTQLLUC_CMD: {
+            assert(opcode != MFC_PUTQLLUC_CMD);
             auto stored = _mm->writeCond(eal, lsa, size);
             if (opcode == MFC_PUTLLUC_CMD) {
                 if (!stored) {

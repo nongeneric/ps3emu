@@ -1460,3 +1460,85 @@ TEST_CASE("spurs_task_event_flag") {
         "## libspurs : sample_spurs_event_flag SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("sample_sync_queue") {
+    auto output = startWaitGetOutput({"./binaries/sample_sync_queue/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "SPU Start\n"
+        "Send S\n"
+        "Send C\n"
+        "Send E\n"
+        "Send I\n"
+        "receive [SPU] Sony\n"
+        "\n"
+        "receive [SPU] Computer\n"
+        "\n"
+        "receive [SPU] Entertainment\n"
+        "\n"
+        "receive [SPU] Inc\n"
+        "\n"
+        "The SPU thread group exited by sys_spu_thread_group_exit().\n"
+        "The group's exit status = 0\n"
+        "## libsync : sample_sync_queue_ppu SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("sample_sync_mutex") {
+    auto output = startWaitGetOutput({"./binaries/sample_sync_mutex/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "Initializing SPU thread 1\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "SPU thread 1's exit status = 0\n"
+        "count = 200\n"
+        "message : \n"
+        "## libsync : sample_sync_mutex_ppu SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("sample_sync_lfqueue") {
+    auto output = startWaitGetOutput({"./binaries/sample_sync_lfqueue/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "Initializing SPU thread 1\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "SPU Start\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "SPU thread 1's exit status = 0\n"
+        "## libsync : sample_sync_lfqueue_ppu SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("sample_sync_barrier") {
+    auto output = startWaitGetOutput({"./binaries/sample_sync_barrier/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "Initializing SPU thread 1\n"
+        "Initializing SPU thread 2\n"
+        "Initializing SPU thread 3\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "SPU thread 1's exit status = 0\n"
+        "SPU thread 2's exit status = 0\n"
+        "SPU thread 3's exit status = 0\n"
+        "result(0): SPU 0 reads \"SPU 1\"\n"
+        "result(1): SPU 1 reads \"SPU 2\"\n"
+        "result(2): SPU 2 reads \"SPU 3\"\n"
+        "result(3): SPU 3 reads \"SPU 0\"\n"
+        "## libsync : sample_sync_barrier_ppu SUCCEEDED ##\n"
+    );
+}

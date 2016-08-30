@@ -62,7 +62,6 @@ set(SRC
     libs/sceNp2.cpp
     libs/sceNp.cpp
     libs/spu/sysSpu.cpp
-    libs/spu/libSync.cpp
     libs/libpngdec.cpp
     libs/libl10n.cpp
     libs/audio/configuration.cpp

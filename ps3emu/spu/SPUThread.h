@@ -24,7 +24,6 @@ public:
     StopSignalException(uint32_t type) : std::runtime_error("stop signal"), _type(type) { }
     uint32_t type() {
         return _type;
-        
     }
 };
 
@@ -195,7 +194,7 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     uint64_t _id;
     std::vector<EventQueueInfo> _eventQueues;
     void loop();
-    void handleSendEvent();
+    void handleSyscall();
     void handleReceiveEvent();
 
 public:

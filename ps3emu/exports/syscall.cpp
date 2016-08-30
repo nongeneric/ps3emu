@@ -3,7 +3,6 @@
 #include "ps3emu/libs/sys.h"
 #include "ps3emu/libs/fs.h"
 #include "ps3emu/libs/spu/sysSpu.h"
-#include "ps3emu/libs/spu/libSync.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwcond.h"
 #include "ps3emu/libs/sync/cond.h"

@@ -79,7 +79,7 @@ enum SPU_Status_Flags {
     SPU_Status_R = 1u << (31u - 31u)
 };
 
-#define SPU_Status_SetStopCode(status, code) ((status & 0xffff) | (code << 16u))
+#define SPU_Status_SetStopCode(status, code) (status = ((status & 0xffff) | (code << 16u)))
 #define SPU_Status_GetStopCode(status) ((status >> 16) & 0xffff)
 
 enum INT_Mask_class2_Flags {
