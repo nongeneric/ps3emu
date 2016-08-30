@@ -132,7 +132,7 @@ class Process {
     boost::recursive_mutex _ppuThreadMutex;
     std::vector<std::shared_ptr<SPUThread>> _spuThreads;
     boost::recursive_mutex _spuThreadMutex;
-    IDMap<uint64_t, PPUThread*> _threadIds;
+    IDMap<uint64_t, PPUThread*, 0> _threadIds;
     IDMap<uint32_t, std::shared_ptr<SPUThread>> _spuThreadIds;
     bool _firstRun = true;
     boost::chrono::high_resolution_clock::time_point _systemStart;

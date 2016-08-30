@@ -1,0 +1,54 @@
+	.align	3
+	.global	__wrap_rand_middle_square
+	.type	__wrap_rand_middle_square, @function
+	.extern	__real_rand_middle_square
+	.extern	_ovly_table_t
+	.extern	__ovly_info_sec_rand_middle_square
+	.extern	_novlys
+__wrap_rand_middle_square:
+	stqd	$126,-32($sp)
+	ila	$2,.+8
+	brsl	$126,4
+	stqd	$lr,16($sp)
+	stqd	$80,-16($sp)
+	ori	$80,$3,0
+	stqd	$sp,-64($sp)
+	sf	$126,$2,$126
+	ai	$sp,$sp,-64
+	ila	$3,__ovly_info_sec_rand_middle_square
+	a	$3,$3,$126,__ovly_info_sec_rand_middle_square
+	nop	127
+	brsl	$lr,_cellOvisUpdateAndMapSection
+	ori	$3,$80,0
+	lqd	$lr,80($sp)
+	ai	$sp,$sp,64
+	lqd	$126,-32($sp)
+	lqd	$80,-16($sp)
+	br	__real_rand_middle_square
+	.align	3
+	.global	__wrap_rand_park_and_miller
+	.type	__wrap_rand_park_and_miller, @function
+	.extern	__real_rand_park_and_miller
+	.extern	_ovly_table_t
+	.extern	__ovly_info_sec_rand_park_and_miller
+	.extern	_novlys
+__wrap_rand_park_and_miller:
+	stqd	$126,-32($sp)
+	ila	$2,.+8
+	brsl	$126,4
+	stqd	$lr,16($sp)
+	stqd	$80,-16($sp)
+	ori	$80,$3,0
+	stqd	$sp,-64($sp)
+	sf	$126,$2,$126
+	ai	$sp,$sp,-64
+	ila	$3,__ovly_info_sec_rand_park_and_miller
+	a	$3,$3,$126,__ovly_info_sec_rand_park_and_miller
+	nop	127
+	brsl	$lr,_cellOvisUpdateAndMapSection
+	ori	$3,$80,0
+	lqd	$lr,80($sp)
+	ai	$sp,$sp,64
+	lqd	$126,-32($sp)
+	lqd	$80,-16($sp)
+	br	__real_rand_park_and_miller

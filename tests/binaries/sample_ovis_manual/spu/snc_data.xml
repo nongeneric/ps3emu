@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<ovis_config>
+   <overlay>
+      <sections>
+         <section name="sec_quicksort">
+            <object name="objs/snc/quicksort.spu.o"/>
+         </section>
+      </sections>
+      <sections>
+         <section name="sec_bubblesort">
+            <object name="objs/snc/bubblesort.spu.o"/>
+         </section>
+      </sections>
+   </overlay>
+   <overlay>
+      <sections>
+        <section name="sec_rand_middle_square">
+           <object name="objs/snc/rand_middle_square.spu.o"/>
+        </section>
+      </sections>
+      <sections>
+        <section name="sec_rand_park_and_miller">
+           <object name="objs/snc/rand_park_and_miller.spu.o"/>
+        </section>
+      </sections>
+   </overlay>
+</ovis_config>
