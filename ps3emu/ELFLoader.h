@@ -158,6 +158,13 @@ enum class prx_symbol_type_t {
 
 using make_segment_t = std::function<void(ps3_uintptr_t va, uint32_t size, unsigned index)>;
 
+struct StolenFuncInfo {
+    uint32_t va;
+    uint32_t exportStubVa;
+    uint32_t bytes;
+    uintptr_t ncallIndex;
+};
+
 class ELFLoader {
     std::string _elfName;
     std::vector<uint8_t> _file;
@@ -179,7 +186,9 @@ public:
     Elf64_be_Sym* getGlobalSymbolByValue(uint32_t value, uint32_t section);
     uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
-    void map(MainMemory* mm, make_segment_t makeSegment, ps3_uintptr_t imageBase = 0);
+    std::vector<StolenFuncInfo> map(MainMemory* mm,
+                                    make_segment_t makeSegment,
+                                    ps3_uintptr_t imageBase = 0);
     void link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
     std::string elfName();
@@ -188,3 +197,8 @@ public:
     std::tuple<prx_export_t*, int> exports(MainMemory* mm);
     std::tuple<prx_import_t*, int> imports(MainMemory* mm);
 };
+
+uint32_t findExportedSymbol(std::vector<std::shared_ptr<ELFLoader>> const& prxs,
+                            uint32_t id,
+                            std::string library,
+                            prx_symbol_type_t type);

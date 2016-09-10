@@ -263,6 +263,8 @@ NCallEntry ncallTable[] {
     ENTRY(sys_lwcond_wait),
     ENTRY(sys_lwcond_signal),
     ENTRY(sys_lwcond_signal_all),
+    ENTRY(cellSpursInitializeWithAttribute2),
+    ENTRY(cellSpursFinalize),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -282,6 +284,3 @@ const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index) {
     }
     return nullptr;
 }
-
-
-

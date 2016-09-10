@@ -1,6 +1,7 @@
 #include "MainMemory.h"
 
 #include "libs/spu/sysSpu.h"
+#include "state.h"
 #include "rsx/Rsx.h"
 #include "log.h"
 #include "utils.h"
@@ -25,7 +26,11 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
         auto& r = _reservations[i];
         if (intersects(r.va, r.size, va, size)) {
             success |= (r.va <= va && r.va + r.size >= va + size) && r.thread == thread;
-            _reservations.erase(begin(_reservations) + i);
+            if (r.thread != thread) {
+                if (r.notify)
+                    r.notify();
+                _reservations.erase(begin(_reservations) + i);
+            }
         }
     }
     if (!cond || success) {
@@ -89,15 +94,15 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool a
         return;
     }
     if (coversRsxRegsRange(va, len)) {
-        if (!_rsx) {
+        if (!g_state.rsx) {
             throw std::runtime_error("rsx not set");
         }
         if (len == 4) {
             uint32_t val = *(boost::endian::big_uint32_t*)buf;
             if (va == GcmControlRegisters) {
-                _rsx->setPut(val);
+                g_state.rsx->setPut(val);
             } else if (va == GcmControlRegisters + 4) {
-                _rsx->setGet(val);
+                g_state.rsx->setGet(val);
             } else {
                 throw std::runtime_error("only put and get rsx registers are supported");
             }
@@ -133,13 +138,13 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
     if (coversRsxRegsRange(va, len)) {
         assert(len == 4);
         if (va == GcmControlRegisters) {
-            *(big_uint32_t*)buf = _rsx->getPut();
+            *(big_uint32_t*)buf = g_state.rsx->getPut();
             return;
         } else if (va == GcmControlRegisters + 4) {
-            *(big_uint32_t*)buf = _rsx->getGet();
+            *(big_uint32_t*)buf = g_state.rsx->getGet();
             return;
         } else if (va == GcmControlRegisters + 8) {
-            *(big_uint32_t*)buf = _rsx->getRef();
+            *(big_uint32_t*)buf = g_state.rsx->getRef();
             return;
         }
         throw std::runtime_error("unknown rsx register");
@@ -173,10 +178,6 @@ void MainMemory::reset() {
         }
     }
     _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
-}
-
-void MainMemory::setRsx(Rsx* rsx) {
-    _rsx = rsx;
 }
 
 struct alignas(2) page_byte { uint8_t v; };
@@ -265,10 +266,6 @@ void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
 
 MainMemory::MainMemory() {
     reset();
-}
-
-void MainMemory::setProc(Process* proc) {
-    _proc = proc;
 }
 
 void splitSpuRegisterAddress(uint32_t va, uint32_t& id, uint32_t& offset) {

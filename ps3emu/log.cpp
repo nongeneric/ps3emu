@@ -11,7 +11,7 @@ namespace {
     std::shared_ptr<spdlog::logger> logger;
 }
 
-void log_init(int sink_flags, log_severity_t severity, int types) {
+void log_init(int sink_flags, log_severity_t severity, int types, bool date) {
     active_severity = severity;
     active_types = types;
 
@@ -28,7 +28,11 @@ void log_init(int sink_flags, log_severity_t severity, int types) {
     }
     logger = std::make_shared<spdlog::logger>("name", begin(sinks), end(sinks));
     spdlog::register_logger(logger);
-    spdlog::set_pattern("%M:%S.%f %v");
+    if (date) {
+        spdlog::set_pattern("%M:%S.%f %v");
+    } else {
+        spdlog::set_pattern("%v");
+    }
 }
 
 void log_set_thread_name(std::string name) {

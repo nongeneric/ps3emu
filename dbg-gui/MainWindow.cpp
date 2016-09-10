@@ -145,6 +145,26 @@ void MainWindow::setupMenu() {
         });
         settings->addAction(action);
     }
+    {
+        auto action = new QAction("Log Dates", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().LogDates);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().LogDates = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
+        auto action = new QAction("SPURS Trace", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().EnableSpursTrace);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().EnableSpursTrace = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
 }
 
 void MainWindow::openFile() {

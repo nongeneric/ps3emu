@@ -43,6 +43,12 @@ namespace {
     ThreadSafeIDMap<sys_spu_thread_group_t, std::shared_ptr<ThreadGroup>> groups;
     ThreadSafeIDMap<sys_raw_spu_t, std::shared_ptr<RawSpu>, 0> rawSpus;
     ThreadSafeIDMap<sys_interrupt_tag_t, std::shared_ptr<InterruptTag>> interruptTags;
+    struct {
+        uint32_t bufferVa = 0;
+        char* buffer = nullptr;
+        bool enabled = false;
+    } spursTrace;
+    constexpr uint32_t spursTraceBufferSize = 0x10000;
 }
 
 #define SYS_SPU_IMAGE_TYPE_USER     0x0U
@@ -486,4 +492,369 @@ int32_t sys_spu_thread_group_disconnect_event(sys_spu_thread_group_t id,
 
 int32_t sys_spu_thread_group_disconnect_event_all_threads(sys_spu_thread_group_t id, uint8_t spup) {
     return CELL_OK;
+}
+
+#define CELL_SPURS_TRACE_MODE_FLAG_WRAP_BUFFER 0x1
+#define CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP 0x2
+#define CELL_SPURS_TRACE_MODE_FLAG_MASK 0x3
+
+int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
+    uint32_t index;
+    auto entry =
+        findNCallEntry(calcFnid("cellSpursInitializeWithAttribute2"), index);
+    assert(entry);
+    auto info = g_state.proc->getStolenInfo(index);
+    auto ncall = g_state.mm->load<4>(info.va);
+    g_state.mm->store<4>(info.va, info.bytes);
+
+    auto modules = g_state.proc->loadedModules();
+    auto initSpursStubVa =
+        findExportedSymbol(modules,
+                           calcFnid("cellSpursInitializeWithAttribute2"),
+                           "cellSpurs",
+                           prx_symbol_type_t::function);
+    auto initTraceStubVa = findExportedSymbol(modules,
+                                              calcFnid("cellSpursTraceInitialize"),
+                                              "cellSpurs",
+                                              prx_symbol_type_t::function);
+    auto startTraceStubVa = findExportedSymbol(modules,
+                                              calcFnid("cellSpursTraceStart"),
+                                              "cellSpurs",
+                                              prx_symbol_type_t::function);
+
+    g_state.th->ps3call(g_state.mm->load<4>(initSpursStubVa), [=] {
+        g_state.mm->store<4>(info.va, ncall);
+        if (!spursTrace.enabled)
+            return g_state.th->getGPR(3);
+        spursTrace.buffer = (char*)g_state.memalloc->allocInternalMemory(
+            &spursTrace.bufferVa, spursTraceBufferSize, 128);
+        g_state.th->setGPR(3, spurs_va);
+        g_state.th->setGPR(4, spursTrace.bufferVa);
+        g_state.th->setGPR(5, spursTraceBufferSize);
+        g_state.th->setGPR(6, CELL_SPURS_TRACE_MODE_FLAG_WRAP_BUFFER |
+                              CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP);
+        g_state.th->ps3call(g_state.mm->load<4>(initTraceStubVa), [&] {
+            assert(g_state.th->getGPR(3) == 0);
+            g_state.th->setGPR(3, spurs_va);
+            g_state.th->ps3call(g_state.mm->load<4>(startTraceStubVa), [&] {
+                assert(g_state.th->getGPR(3) == 0);
+                return g_state.th->getGPR(3);
+            });
+            return g_state.th->getGPR(3);
+        });
+        return g_state.th->getGPR(3);
+    });
+    return g_state.th->getGPR(3);
+}
+
+int32_t cellSpursFinalize(uint32_t spurs_va) {
+    return 0;
+//     uint32_t index;
+//     auto entry = findNCallEntry(calcFnid("cellSpursFinalize"), index);
+//     assert(entry);
+//     auto info = g_state.proc->getStolenInfo(index);
+//     auto ncall = g_state.mm->load<4>(info.va);
+//     g_state.mm->store<4>(info.va, info.bytes);
+// 
+//     auto modules = g_state.proc->loadedModules();
+//     auto spursFinalizeStubVa =
+//         findExportedSymbol(modules,
+//                            calcFnid("cellSpursFinalize"),
+//                            "cellSpurs",
+//                            prx_symbol_type_t::function);
+//     auto stopTraceStubVa = findExportedSymbol(modules,
+//                                               calcFnid("cellSpursTraceStop"),
+//                                               "cellSpurs",
+//                                               prx_symbol_type_t::function);
+// 
+//     if (!spursTrace.enabled) {
+//         g_state.th->ps3call(g_state.mm->load<4>(spursFinalizeStubVa), [=] {
+//             g_state.mm->store<4>(info.va, ncall);
+//             return g_state.th->getGPR(3);
+//         });
+//     } else {
+//         g_state.th->ps3call(g_state.mm->load<4>(stopTraceStubVa), [=] {
+//             assert(g_state.th->getGPR(3) == 0);
+//             g_state.mm->store<4>(info.va, ncall);
+//             g_state.th->setGPR(3, spurs_va);
+//             g_state.th->ps3call(g_state.mm->load<4>(spursFinalizeStubVa), [&] {
+//                 return g_state.th->getGPR(3);
+//             });
+//             return g_state.th->getGPR(3);
+//         });
+//     }
+// 
+//     return g_state.th->getGPR(3);
+}
+
+struct CellSpursTraceInfo {
+    big_uint32_t spu_thread[8];
+    big_uint32_t count[8];
+    big_uint32_t spu_thread_grp;
+    big_uint32_t nspu;
+    uint8_t padding[128 - sizeof(uint32_t) * (8 + 8 + 2)];
+};
+static_assert(sizeof(CellSpursTraceInfo) == 128, "");
+
+typedef struct CellSpursTraceHeader {
+    uint8_t tag;
+    uint8_t length;
+    uint8_t spu;
+    uint8_t workload;
+    big_uint32_t time;
+} CellSpursTraceHeader;
+
+#define CELL_SPURS_TRACE_TAG_KERNEL 0x20
+#define CELL_SPURS_TRACE_TAG_SERVICE 0x21
+#define CELL_SPURS_TRACE_TAG_TASK 0x22
+#define CELL_SPURS_TRACE_TAG_JOB 0x23
+#define CELL_SPURS_TRACE_TAG_OVIS 0x24
+#define CELL_SPURS_TRACE_TAG_LOAD 0x2a
+#define CELL_SPURS_TRACE_TAG_MAP 0x2b
+#define CELL_SPURS_TRACE_TAG_START 0x2c
+#define CELL_SPURS_TRACE_TAG_STOP 0x2d
+#define CELL_SPURS_TRACE_TAG_USER 0x2e
+#define CELL_SPURS_TRACE_TAG_GUID 0x2f
+#define CELL_TRACE_TAG_LOAD 0x50
+#define CELL_TRACE_TAG_MAP 0x51
+#define CELL_TRACE_TAG_DISPATCH 0x52
+#define CELL_TRACE_TAG_RESUME 0x53
+#define CELL_TRACE_TAG_EXIT 0x54
+#define CELL_TRACE_TAG_YIELD 0x55
+#define CELL_TRACE_TAG_SLEEP 0x56
+#define CELL_TRACE_TAG_USER 0x57
+#define CELL_TRACE_TAG_GUID 0x58
+
+
+#define CELL_SPURS_TRACE_TAG_CONTROL 0xf0
+
+typedef struct CellSpursTraceControlData {
+    big_uint32_t incident;
+    big_uint32_t idSpuThread;
+} CellSpursTraceControlData;
+
+#define CELL_SPURS_TRACE_CONTROL_START 0x01
+#define CELL_SPURS_TRACE_CONTROL_STOP 0x02
+
+typedef struct CellSpursTraceServiceData {
+    big_uint32_t incident;
+    big_uint32_t __reserved__;
+} CellSpursTraceServiceData;
+
+#define CELL_SPURS_TRACE_SERVICE_INIT 0x01
+#define CELL_SPURS_TRACE_SERVICE_WAIT 0x02
+#define CELL_SPURS_TRACE_SERVICE_EXIT 0x03
+
+typedef struct CellSpursTraceTaskData {
+    big_uint32_t incident;
+    big_uint32_t task;
+} CellSpursTraceTaskData;
+
+#define CELL_SPURS_TRACE_TASK_DISPATCH 0x01
+#define CELL_SPURS_TRACE_TASK_YIELD 0x03
+#define CELL_SPURS_TRACE_TASK_WAIT 0x04
+#define CELL_SPURS_TRACE_TASK_EXIT 0x05
+
+
+typedef struct CellSpursTraceJobData {
+    uint8_t __reserved__[3];
+    uint8_t binLSAhigh8;
+    big_uint32_t jobDescriptor;
+} CellSpursTraceJobData;
+
+typedef struct CellSpursTraceLoadData {
+    big_uint32_t ea;
+    big_uint16_t ls;
+    big_uint16_t size;
+} CellSpursTraceLoadData;
+
+typedef struct CellSpursTraceMapData {
+    big_uint32_t offset;
+    big_uint16_t ls;
+    big_uint16_t size;
+} CellSpursTraceMapData;
+
+typedef struct CellSpursTraceStartData {
+    char module[4];
+    big_uint16_t level;
+    uint16_t ls;
+} CellSpursTraceStartData;
+
+struct CellTraceDispatchData {
+    char name[4];
+    big_uint32_t va;
+};
+
+typedef struct CellSpursTracePacket {
+    CellSpursTraceHeader header;
+    union {
+        CellSpursTraceControlData control;
+        CellSpursTraceServiceData service;
+        CellSpursTraceTaskData task;
+        CellSpursTraceJobData job;
+        CellSpursTraceLoadData load;
+        CellSpursTraceMapData map;
+        CellSpursTraceStartData start;
+        CellTraceDispatchData dispatch;
+        CellTraceDispatchData resume;
+        big_uint64_t stop;
+        big_uint64_t user;
+        big_uint64_t guid;
+        big_uint64_t rawData;
+    } data;
+} CellSpursTracePacket;
+
+#define CELL_SPURS_TRACE_PACKET_SIZE 16
+#define CELL_SPURS_TRACE_BUFFER_ALIGN 16
+
+#define CELL_SPURS_TRACE_MODE_FLAG_WRAP_BUFFER 0x1
+#define CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP 0x2
+#define CELL_SPURS_TRACE_MODE_FLAG_MASK 0x3
+
+void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint32_t buffer_size) {
+    if (!buffer) buffer = spursTrace.buffer;
+    if (!buffer_size) buffer_size = spursTraceBufferSize;
+    
+    if (!buffer) {
+        logLine("No trace yet");
+        return;
+    }
+    
+    auto info = (CellSpursTraceInfo*)buffer;
+    if (!info->nspu) {
+        logLine("No spus initialized yet");
+        return;
+    }
+    logLine(ssnprintf("Tracing SPURS with %d SPUs, buffer va: %08x",
+                  info->nspu,
+                  spursTrace.bufferVa));
+    auto traceAreaSize = ((buffer_size - sizeof(CellSpursTraceInfo)) / info->nspu) & 0xfff0;
+    for (auto i = 0u; i < info->nspu; ++i) {
+        logLine(ssnprintf("SPU %d trace", i));
+        auto packet = (CellSpursTracePacket*)(buffer +
+                                              sizeof(CellSpursTraceInfo) + i * traceAreaSize);
+        for (;;) {
+            if (packet->header.tag == 0)
+                break;
+            auto log = [&](auto&& msg) {
+                logLine(ssnprintf("[SPU%d W:%02x T:%08x] %s",
+                                  packet->header.spu,
+                                  packet->header.workload,
+                                  packet->header.time,
+                                  msg));
+            };
+            switch (packet->header.tag) {
+                case CELL_SPURS_TRACE_TAG_SERVICE: {
+                    switch (packet->data.service.incident) {
+                        case CELL_SPURS_TRACE_SERVICE_INIT:
+                            log("SERVICE_INIT");
+                            break;
+                        case CELL_SPURS_TRACE_SERVICE_WAIT:
+                            log("SERVICE_WAIT");
+                            break;
+                        case CELL_SPURS_TRACE_SERVICE_EXIT:
+                            log("SERVICE_EXIT");
+                            break;
+                        default: assert(false);
+                    }
+                    break;
+                }
+                case CELL_SPURS_TRACE_TAG_TASK: {
+                    switch (packet->data.task.incident) {
+                        case CELL_SPURS_TRACE_TASK_DISPATCH:
+                            log(ssnprintf("TASK_DISPATCH: %04x", packet->data.task.task));
+                            break;
+                        case CELL_SPURS_TRACE_TASK_WAIT:
+                            log(ssnprintf("TASK_WAIT: %04x", packet->data.task.task));
+                            break;
+                        case CELL_SPURS_TRACE_TASK_EXIT:
+                            log(ssnprintf("TASK_EXIT: %04x", packet->data.task.task));
+                            break;
+                        case CELL_SPURS_TRACE_TASK_YIELD:
+                            log(ssnprintf("TASK_YIELD: %04x", packet->data.task.task));
+                            break;
+                        default: assert(false);
+                    }
+                    break;
+                }
+                case CELL_SPURS_TRACE_TAG_GUID:
+                    log(ssnprintf("TASK_YIELD: %016llx", packet->data.guid));
+                    break;
+                case CELL_SPURS_TRACE_TAG_LOAD:
+                    log(ssnprintf("USER_LOAD: ea=%08u, ls=%06x, size=%04x",
+                                  packet->data.load.ea,
+                                  packet->data.load.ls * 16,
+                                  packet->data.load.size));
+                    break;
+                case CELL_SPURS_TRACE_TAG_MAP:
+                    log(ssnprintf("USER_MAP: offset=%08u, ls=%06x, size=%04x",
+                                  packet->data.map.offset,
+                                  packet->data.map.ls * 16,
+                                  packet->data.map.size));
+                    break;
+                case CELL_SPURS_TRACE_TAG_START: {
+                    auto level = packet->data.start.level == 0 ? "kernel"
+                               : packet->data.start.level == 1 ? "policy" 
+                               : "job/task";
+                    log(ssnprintf("USER_START: name=%s, level=%04x(%s), ls=%04x",
+                                  std::string(packet->data.start.module, 4),
+                                  packet->data.start.level,
+                                  level,
+                                  packet->data.start.ls));
+                    break;
+                }
+                case CELL_SPURS_TRACE_TAG_STOP:
+                    log(ssnprintf("USER_STOP: %016llx", packet->data.stop));
+                    break;
+                case CELL_SPURS_TRACE_TAG_KERNEL:
+                    log(ssnprintf("KERNEL: %016llx", packet->data.guid));
+                    break;
+                case CELL_TRACE_TAG_LOAD:
+                    log(ssnprintf("LOAD: ea=%08u, ls=%06x, size=%04x",
+                        packet->data.load.ea,
+                        packet->data.load.ls * 16,
+                        packet->data.load.size));
+                    break;
+                case CELL_TRACE_TAG_MAP:
+                    log(ssnprintf("MAP: offset=%08u, ls=%06x, size=%04x",
+                                  packet->data.map.offset,
+                                  packet->data.map.ls * 16,
+                                  packet->data.map.size));
+                    break;
+                case CELL_TRACE_TAG_DISPATCH:
+                    log(ssnprintf("DISPATCH: name=%s, va=%08x",
+                                  std::string(packet->data.dispatch.name, 4),
+                                  packet->data.dispatch.va));
+                    break;
+                case CELL_TRACE_TAG_RESUME:
+                    log(ssnprintf("RESUME: name=%s, va=%08x",
+                                  std::string(packet->data.dispatch.name, 4),
+                                  packet->data.dispatch.va));
+                    break;
+                case CELL_TRACE_TAG_EXIT:
+                    log(ssnprintf("EXIT: %016llx", packet->data.guid));
+                    break;
+                case CELL_TRACE_TAG_YIELD:
+                    log(ssnprintf("YIELD: %016llx", packet->data.guid));
+                    break;
+                case CELL_TRACE_TAG_SLEEP:
+                    log(ssnprintf("SLEEP: %016llx", packet->data.guid));
+                    break;
+                case CELL_TRACE_TAG_GUID:
+                    log(ssnprintf("GUID: %016llx", packet->data.guid));
+                    break;
+                case CELL_TRACE_TAG_USER:
+                    log(ssnprintf("USER: %016llx", packet->data.guid));
+                    break;
+                default:
+                    log(ssnprintf("UNKNOWN TAG: %02x, %016llx", packet->header.tag, packet->data.guid));
+                    break;
+            }
+            packet++;
+        }
+    }
+}
+
+void enableSpursTrace() {
+    spursTrace.enabled = true;
 }

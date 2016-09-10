@@ -72,13 +72,13 @@ struct Reservation {
     uint32_t va;
     uint32_t size;
     boost::thread::id thread;
+    std::function<void()> notify;
 };
 
 class MainMemory {
     std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;    
     std::unique_ptr<MemoryPage[]> _pages;
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
-    Rsx* _rsx;
     Process* _proc;
     boost::mutex _pageMutex;
     boost::detail::spinlock _storeLock = BOOST_DETAIL_SPINLOCK_INIT;
@@ -111,8 +111,6 @@ public:
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
     void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
     void memoryBreak(uint32_t va, uint32_t size);
-    void setRsx(Rsx* rsx);
-    void setProc(Process* proc);
     
     void store16(uint64_t va, unsigned __int128 value) {
         uint8_t *bytes = (uint8_t*)&value;
@@ -163,9 +161,12 @@ public:
         return union_cast<uint64_t, double>(f);
     }
 
-    void readReserve(ps3_uintptr_t va, void* buf, uint len) {
+    void loadReserve(ps3_uintptr_t va,
+                     void* buf,
+                     uint len,
+                     std::function<void()> notify = {}) {
         boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
-        _reservations.push_back({va, len, boost::this_thread::get_id()});
+        _reservations.push_back({va, len, boost::this_thread::get_id(), notify});
         readMemory(va, buf, len, false, false);
     }
 

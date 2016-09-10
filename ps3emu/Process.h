@@ -3,6 +3,7 @@
 #include "rsx/Rsx.h"
 #include "ppu/PPUThread.h"
 #include "spu/SPUThread.h"
+#include "ELFLoader.h"
 #include "IDMap.h"
 #include "libs/ConcurrentQueue.h"
 
@@ -102,7 +103,6 @@ using ThreadEvent = boost::variant<PPUThreadEventInfo, SPUThreadEventInfo>;
 
 struct ThreadInitInfo;
 class Rsx;
-class ELFLoader;
 class MainMemory;
 class ContentManager;
 class InternalMemoryManager;
@@ -138,6 +138,7 @@ class Process {
     boost::chrono::high_resolution_clock::time_point _systemStart;
     std::vector<ModuleSegment> _segments;
     std::vector<std::shared_ptr<ELFLoader>> _prxs;
+    std::vector<StolenFuncInfo> _stolenInfos;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
     void initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     void initNewThread(PPUThread* thread,
@@ -182,6 +183,8 @@ public:
     boost::chrono::microseconds getTimeBaseMicroseconds();
     boost::chrono::nanoseconds getTimeBaseNanoseconds();
     std::vector<ModuleSegment>& getSegments();
+    std::vector<std::shared_ptr<ELFLoader>> loadedModules();
+    StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
 };
 
 int32_t executeExportedFunction(uint32_t imageBase,

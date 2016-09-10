@@ -6,40 +6,6 @@
 #include <stdexcept>
 #include <algorithm>
 
-#define X(k, v) k = v,
-#define MfcCommandX \
-    X(MFC_PUT_CMD     ,0x0020)                 \
-    X(MFC_PUTS_CMD    ,0x0028)  /*  PU Only */ \
-    X(MFC_PUTR_CMD    ,0x0030)                 \
-    X(MFC_PUTF_CMD    ,0x0022)                 \
-    X(MFC_PUTB_CMD    ,0x0021)                 \
-    X(MFC_PUTFS_CMD   ,0x002A)  /*  PU Only */ \
-    X(MFC_PUTBS_CMD   ,0x0029)  /*  PU Only */ \
-    X(MFC_PUTRF_CMD   ,0x0032)                 \
-    X(MFC_PUTRB_CMD   ,0x0031)                 \
-    X(MFC_PUTL_CMD    ,0x0024)  /* SPU Only */ \
-    X(MFC_PUTRL_CMD   ,0x0034)  /* SPU Only */ \
-    X(MFC_PUTLF_CMD   ,0x0026)  /* SPU Only */ \
-    X(MFC_PUTLB_CMD   ,0x0025)  /* SPU Only */ \
-    X(MFC_PUTRLF_CMD  ,0x0036)  /* SPU Only */ \
-    X(MFC_PUTRLB_CMD  ,0x0035)  /* SPU Only */ \
-    X(MFC_GET_CMD     ,0x0040)                 \
-    X(MFC_GETS_CMD    ,0x0048)  /*  PU Only */ \
-    X(MFC_GETF_CMD    ,0x0042)                 \
-    X(MFC_GETB_CMD    ,0x0041)                 \
-    X(MFC_GETFS_CMD   ,0x004A)  /*  PU Only */ \
-    X(MFC_GETBS_CMD   ,0x0049)  /*  PU Only */ \
-    X(MFC_GETL_CMD    ,0x0044)  /* SPU Only */ \
-    X(MFC_GETLF_CMD   ,0x0046)  /* SPU Only */ \
-    X(MFC_GETLB_CMD   ,0x0045)  /* SPU Only */ \
-    X(MFC_GETLLAR_CMD ,0x00d0)                 \
-    X(MFC_PUTLLC_CMD  ,0x00b4)                 \
-    X(MFC_PUTLLUC_CMD ,0x00b0)                 \
-    X(MFC_PUTQLLUC_CMD,0x00b8)
-
-enum MfcCommands { MfcCommandX };
-#undef X
-
 #define X(k, v) case k: return #k;
 const char* mfcCommandToString(int command) {
     switch (command) { MfcCommandX }
@@ -61,6 +27,46 @@ const char* tagToString(TagClassId tag) {
 }
 #undef X
 
+void SpuEvent::set(unsigned flags) {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _pending |= flags;
+    updateCount();
+    _cv.notify_all();
+}
+
+unsigned SpuEvent::count() {
+    boost::unique_lock<boost::mutex> lock(_m);
+    return _count;
+}
+
+unsigned SpuEvent::wait() {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _cv.wait(lock, [&] { return _count; });
+    _count = 0;
+    return _pending & _mask;
+}
+
+void SpuEvent::acknowledge(unsigned mask) {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _pending &= ~mask;
+}
+
+void SpuEvent::setMask(unsigned mask) {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _mask = mask;
+    updateCount();
+    _cv.notify_all();
+}
+
+unsigned SpuEvent::mask() {
+    boost::unique_lock<boost::mutex> lock(_m);
+    return _mask;
+}
+
+void SpuEvent::updateCount() {
+    _count |= (_pending & _mask) != 0;
+}
+
 SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread)
     : _mm(mm),
       _thread(thread),
@@ -81,14 +87,27 @@ void SPUChannels::command(uint32_t word) {
     assert(cmd.tid.u() == 0);
     assert(cmd.rid.u() == 0);
     auto eal = _channels[MFC_EAL].load();
+    assert(_channels[MFC_EAH] == 0);
     auto lsa = &_thread->ls()[_channels[MFC_LSA]];
     auto size = _channels[MFC_Size].load();
     auto opcode = cmd.opcode.u();
+    auto name = mfcCommandToString(opcode);
+    auto log = [&] {
+        INFO(spu) << ssnprintf(
+            "%s(%x, %x, %x) %x", name, size, lsa, eal, _channels[MFC_TagID].load());
+    };
+    auto logAtomic = [&](bool stored) {
+        INFO(spu) << ssnprintf(
+            "%s(%x, %x, %x) %s", name, size, lsa, eal, stored ? "OK" : "FAIL");
+    };
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
-            _mm->readReserve(eal, lsa, size);
+            _mm->loadReserve(eal, lsa, size, [&] {
+                _event.set(1u << 10);
+            });
             // reservation always succeeds
             _channels[MFC_RdAtomicStat] |= 0b100; // G
+            log();
             break;
         }
         case MFC_GET_CMD:
@@ -99,6 +118,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_GETBS_CMD: {
             // readMemory always synchronizes
             _mm->readMemory(eal, lsa, size);
+            log();
             break;
         }
         case MFC_PUTLLC_CMD: // TODO: handle sizes correctly when calling writeCond
@@ -107,6 +127,7 @@ void SPUChannels::command(uint32_t word) {
             assert(opcode != MFC_PUTQLLUC_CMD);
             auto stored = _mm->writeCond(eal, lsa, size);
             if (opcode == MFC_PUTLLUC_CMD) {
+                assert(size == 0x80); // cache line
                 if (!stored) {
                     _mm->writeMemory(eal, lsa, size);
                 } else {
@@ -115,6 +136,7 @@ void SPUChannels::command(uint32_t word) {
             } else if (opcode == MFC_PUTLLC_CMD) {
                 _channels[MFC_RdAtomicStat] |= !stored; // S
             }
+            logAtomic(stored);
             break;
         }
         case MFC_PUT_CMD:
@@ -128,6 +150,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTRB_CMD: {
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
+            log();
             break;
         }
         default: throw std::runtime_error("not implemented");
@@ -137,7 +160,7 @@ void SPUChannels::command(uint32_t word) {
 unsigned SPUChannels::readCount(unsigned ch) {
     auto count = ([ch, this] {
         switch (ch) {
-            //case SPU_RdEventStat: return 0;
+            case SPU_RdEventStat: return _event.count();
             case SPU_WrEventMask: return 1u;
             case SPU_WrEventAck: return 1u;
             //case SPU_RdSigNotify1: return 0;
@@ -169,17 +192,19 @@ unsigned SPUChannels::readCount(unsigned ch) {
             default: assert(false); return 0u;
         }
     })();
-    INFO(spu) << ssnprintf("spu reads count %d from channel %s",
-                           count,
-                           classIdToString(ch));
+    INFO(spu) << ssnprintf("read count %d from channel %s", count, classIdToString(ch));
     return count;
 }
 
 void SPUChannels::write(unsigned ch, uint32_t data) {
-    if (ch == SPU_WrOutIntrMbox) {
+    if (ch == SPU_WrEventMask) {
+        _event.setMask(data);
+    } else if (ch == SPU_WrEventAck) {
+        _event.acknowledge(data);
+    } else if (ch == SPU_WrOutIntrMbox) {
         _outboundInterruptMailbox.enqueue(data);
         _interrupt2 |= INT_Mask_class2_M;
-        INFO(spu) << ssnprintf("spu writes %x to interrupt mailbox", data);
+        INFO(spu) << ssnprintf("write %x to interrupt mailbox", data);
         throw SPUThreadInterruptException();
     } else if (ch == SPU_WrOutMbox) {
         _outboundMailbox.enqueue(data);
@@ -190,22 +215,26 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
             _channels.at(ch) = data;
         }
     }
-    INFO(spu) << ssnprintf("spu writes %x%s to channel %d (%s)",
-                           data,
-                           ch == MFC_Cmd ? ssnprintf(" (%s)", mfcCommandToString(data))
-                                         : "",
-                           ch,
-                           classIdToString(ch));
+    if (ch == MFC_Cmd || ch == MFC_EAH || ch == MFC_EAL || ch == MFC_LSA ||
+        ch == MFC_Size || ch == MFC_TagID)
+        return;
+    INFO(spu) << ssnprintf("write %x to channel %d (%s)", data, ch, classIdToString(ch));
 }
 
 uint32_t SPUChannels::read(unsigned ch) {
     auto data = ([&ch, this] {
-        if (ch == SPU_RdInMbox) {
+        if (ch == SPU_RdEventMask) {
+            return _event.mask();
+        } else if (ch == SPU_RdEventStat) {
+            return _event.wait();
+        } else if (ch == SPU_RdInMbox) {
             return _inboundMailbox.dequeue();
         } else if (ch == MFC_RdAtomicStat) {
             auto res = _channels[ch].load();
             _channels[ch] = 0;
             return res;
+        } else if (ch == SPU_RdDec) {
+            return 0x1234u;
         } else {
             if (ch == MFC_RdTagStat) {
                 // as every MFC request completes immediately
@@ -215,8 +244,14 @@ uint32_t SPUChannels::read(unsigned ch) {
             return _channels[ch].load();
         }
     })();
-    INFO(spu) << ssnprintf(
-        "spu reads %x from channel %d (%s)", data, ch, classIdToString(ch));
+    if (ch == SPU_RdEventStat) {
+        INFO(spu) << ssnprintf("SPU_RdEventStat(mask: %x, ret: %x)", _event.mask(), data);
+    } else if (ch != MFC_RdAtomicStat) {
+        INFO(spu) << ssnprintf("spu reads %x from channel %d (%s)",
+                               data,
+                               ch,
+                               classIdToString(ch));
+    }
     return data;
 }
 
@@ -251,7 +286,8 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
         _channels[MFC_Size] = data >> 16;
         _channels[MFC_TagID] = data & 0xff;
         return;
-    }
+    }    
+
     if (offset == TagClassId::MFC_Class_CMD) {
         command(data);
         return;
@@ -291,7 +327,7 @@ uint32_t SPUChannels::mmio_read(unsigned offset) {
             default: throw std::runtime_error("unknown mmio offset");
         }
     }();
-    INFO(spu) << ssnprintf("ppu reads %x via mmio from spu %d tag %s",
+    INFO(spu) << ssnprintf("read %x via mmio from spu %d tag %s",
                            res,
                            -1,
                            tagToString((TagClassId)offset));
@@ -309,4 +345,8 @@ unsigned SPUChannels::mmio_readCount(unsigned offset) {
         return 4u - _inboundMailbox.size();
     }
     throw std::runtime_error("unknown mmio offset");
+}
+
+void SPUChannels::setEvent(unsigned flags) {
+    _event.set(flags);
 }

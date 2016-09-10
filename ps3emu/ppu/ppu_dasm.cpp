@@ -2433,7 +2433,7 @@ EMU(LWARX, XForm_1) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
     big_uint32_t val;
-    MM->readReserve(ea, &val, 4);
+    MM->loadReserve(ea, &val, 4);
     TH->setGPR(i->RT, val);
 }
 
@@ -2457,7 +2457,7 @@ EMU(LDARX, XForm_1) {
     auto ra = getB(i->RA, TH);
     auto ea = ra + TH->getGPR(i->RB);
     big_uint64_t val;
-    MM->readReserve(ea, &val, 8);
+    MM->loadReserve(ea, &val, 8);
     TH->setGPR(i->RT, val);
 }
 

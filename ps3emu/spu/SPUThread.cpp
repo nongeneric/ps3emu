@@ -161,7 +161,7 @@ void SPUThread::cancel() {
 }
 
 void SPUThread::handleSyscall() {
-    INFO(libs) << "handling spu syscall";
+    INFO(spu) << "handling spu syscall";
     auto data1 = _channels.mmio_read(SPU_Out_MBox);
     auto spupData0 = _channels.mmio_read(SPU_Out_Intr_Mbox);
     assert((spupData0 >> 16) != 0x8001 && (spupData0 >> 16) != 0x8000); // not a syscall, not implemented
@@ -184,6 +184,7 @@ void SPUThread::handleSyscall() {
 }
 
 void SPUThread::handleReceiveEvent() {
+    INFO(spu) << "receive event";
     uint32_t port = _channels.mmio_read(SPU_Out_MBox);
     auto info = boost::find_if(_eventQueues, [=](auto& i) {
         return i.port == port;

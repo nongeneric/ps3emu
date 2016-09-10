@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include "ps3emu/log.h"
+#include "ps3emu/libs/spu/sysSpu.h"
 #include "Config.h"
 #include <boost/program_options.hpp>
 #include <string>
@@ -13,8 +14,12 @@ int main(int argc, char *argv[]) {
     log_init(log_file | log_console,
              log_info,
              (g_config.config().LogSpu ? log_spu : 0) | log_rsx | log_libs |
-                 log_debugger);
+                 log_debugger,
+             g_config.config().LogDates);
     log_set_thread_name("dbg_main");
+    if (g_config.config().EnableSpursTrace) {
+        enableSpursTrace();
+    }
 
     std::string elfPath, arguments;
     options_description consoleDescr("Allowed options");

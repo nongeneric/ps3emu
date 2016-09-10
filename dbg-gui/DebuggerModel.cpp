@@ -6,6 +6,7 @@
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/spu/SPUDasm.h"
 #include "ps3emu/state.h"
+#include "ps3emu/libs/spu/sysSpu.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
@@ -566,6 +567,9 @@ void DebuggerModel::execSingleCommand(QString command) {
         return;
     } else if (name == "run") {
         run();
+        return;
+    } else if (name == "spurs") {
+        dumpSpursTrace([&](auto line) { this->message(QString::fromStdString(line)); });
         return;
     }
     

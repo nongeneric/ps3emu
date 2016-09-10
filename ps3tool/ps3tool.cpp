@@ -7,7 +7,12 @@
 
 using namespace boost::program_options;
 
-typedef boost::variant<ShaderDasmCommand, UnsceCommand, RestoreElfCommand, ReadPrxCommand> Command;
+typedef boost::variant<ShaderDasmCommand,
+                       UnsceCommand,
+                       RestoreElfCommand,
+                       ReadPrxCommand,
+                       ParseSpursTraceCommand>
+    Command;
 
 Command ParseOptions(int argc, const char *argv[])
 {
@@ -86,6 +91,18 @@ Command ParseOptions(int argc, const char *argv[])
         notify(vm);
         command.writeIdaScript = vm.count("script");
         return command;
+    } else if (commandName == "parse-spurs-trace") {
+        ParseSpursTraceCommand command;
+        options_description desc("parse-spurs-trace");
+
+        desc.add_options()
+            ("dump", value<std::string>(&command.dump)->required(), "trace buffer dump file");
+
+        auto opts = collect_unrecognized(parsed.options, include_positional);
+        opts.erase(opts.begin());
+        store(command_line_parser(opts).options(desc).run(), vm);
+        notify(vm);
+        return command;
     } else {
         throw std::runtime_error("unknown command");
     }
@@ -107,6 +124,10 @@ public:
 
     void operator()(ReadPrxCommand& command) const {
         HandleReadPrx(command);
+    }
+    
+    void operator()(ParseSpursTraceCommand& command) const {
+        HandleParseSpursTrace(command);
     }
 };
 

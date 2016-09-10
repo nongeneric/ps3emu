@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <array>
 #include <atomic>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include "stdint.h"
 
 #define X(k, v) k = v,
@@ -66,6 +68,40 @@ enum TagClassId {
 };
 #undef X
 
+#define X(k, v) k = v,
+#define MfcCommandX \
+    X(MFC_PUT_CMD     ,0x0020)                 \
+    X(MFC_PUTS_CMD    ,0x0028)  /*  PU Only */ \
+    X(MFC_PUTR_CMD    ,0x0030)                 \
+    X(MFC_PUTF_CMD    ,0x0022)                 \
+    X(MFC_PUTB_CMD    ,0x0021)                 \
+    X(MFC_PUTFS_CMD   ,0x002A)  /*  PU Only */ \
+    X(MFC_PUTBS_CMD   ,0x0029)  /*  PU Only */ \
+    X(MFC_PUTRF_CMD   ,0x0032)                 \
+    X(MFC_PUTRB_CMD   ,0x0031)                 \
+    X(MFC_PUTL_CMD    ,0x0024)  /* SPU Only */ \
+    X(MFC_PUTRL_CMD   ,0x0034)  /* SPU Only */ \
+    X(MFC_PUTLF_CMD   ,0x0026)  /* SPU Only */ \
+    X(MFC_PUTLB_CMD   ,0x0025)  /* SPU Only */ \
+    X(MFC_PUTRLF_CMD  ,0x0036)  /* SPU Only */ \
+    X(MFC_PUTRLB_CMD  ,0x0035)  /* SPU Only */ \
+    X(MFC_GET_CMD     ,0x0040)                 \
+    X(MFC_GETS_CMD    ,0x0048)  /*  PU Only */ \
+    X(MFC_GETF_CMD    ,0x0042)                 \
+    X(MFC_GETB_CMD    ,0x0041)                 \
+    X(MFC_GETFS_CMD   ,0x004A)  /*  PU Only */ \
+    X(MFC_GETBS_CMD   ,0x0049)  /*  PU Only */ \
+    X(MFC_GETL_CMD    ,0x0044)  /* SPU Only */ \
+    X(MFC_GETLF_CMD   ,0x0046)  /* SPU Only */ \
+    X(MFC_GETLB_CMD   ,0x0045)  /* SPU Only */ \
+    X(MFC_GETLLAR_CMD ,0x00d0)                 \
+    X(MFC_PUTLLC_CMD  ,0x00b4)                 \
+    X(MFC_PUTLLUC_CMD ,0x00b0)                 \
+    X(MFC_PUTQLLUC_CMD,0x00b8)
+
+enum MfcCommands { MfcCommandX };
+#undef X
+
 enum SPU_Status_Flags {
     SPU_Status_E = 1u << (31u - 21u),
     SPU_Status_L = 1u << (31u - 22u),
@@ -100,6 +136,23 @@ public:
     virtual ~ISPUChannelsThread() = default;
 };
 
+class SpuEvent {
+    boost::mutex _m;
+    boost::condition_variable _cv;
+    unsigned _pending = 0;
+    unsigned _mask = 0;
+    unsigned _count = 1;
+    void updateCount();
+        
+public:
+    void setMask(unsigned mask);
+    unsigned mask();
+    void acknowledge(unsigned mask);
+    unsigned wait();
+    unsigned count();
+    void set(unsigned flags);
+};
+
 class MainMemory;
 class SPUChannels {
     MainMemory* _mm;
@@ -110,6 +163,7 @@ class SPUChannels {
     std::array<std::atomic<uint32_t>, 28> _channels;
     std::atomic<uint32_t> _spuStatus;
     std::atomic<uint32_t> _interrupt2;
+    SpuEvent _event;
     void command(uint32_t word);
     
 public:
@@ -120,6 +174,7 @@ public:
     void mmio_write(unsigned offset, uint64_t data);
     uint32_t mmio_read(unsigned offset);
     unsigned mmio_readCount(unsigned offset);
+    void setEvent(unsigned flags);
     inline std::atomic<uint32_t>& spuStatus() { return _spuStatus; }
     inline std::atomic<uint32_t>& interrupt() { return _interrupt2; }
 };

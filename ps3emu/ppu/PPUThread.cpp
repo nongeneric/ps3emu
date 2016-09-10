@@ -191,9 +191,9 @@ void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
 uint64_t ps3call_then(PPUThread* thread) {
     auto top = thread->_ps3calls.top();
     thread->_ps3calls.pop();
-    top.then();
     thread->setLR(top.lr);
     thread->setNIP(top.ret);
+    top.then();
     // TODO: delete stub
     return thread->getGPR(3);
 }

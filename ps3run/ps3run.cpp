@@ -52,7 +52,8 @@ int main(int argc, char* argv[]) {
     
     log_init(log_parse_sinks(sinks),
              log_parse_verbosity(verbosity),
-             log_parse_filter(filter));
+             log_parse_filter(filter),
+             false);
 
     try {
         std::vector<std::string> argvec;

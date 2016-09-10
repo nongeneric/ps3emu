@@ -23,7 +23,12 @@ struct ReadPrxCommand {
     bool writeIdaScript;
 };
 
+struct ParseSpursTraceCommand {
+    std::string dump;
+};
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
 void HandleReadPrx(ReadPrxCommand const& command);
+void HandleParseSpursTrace(ParseSpursTraceCommand const& command);

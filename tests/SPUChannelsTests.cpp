@@ -69,3 +69,67 @@ TEST_CASE("spuchannels_mailbox_two_threads_blocking") {
     spu.join();
     ppu.join();
 }
+
+TEST_CASE("spuchannels_event_basic") {
+    MainMemory mm;
+    TestSPUChannelsThread thread;
+    SPUChannels channels(&mm, &thread);
+    
+    // initial count is 1
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
+    channels.read(SPU_RdEventStat);
+    
+    boost::thread spu([&] {
+        channels.write(SPU_WrEventMask, 0b1000);
+        REQUIRE(channels.read(SPU_RdEventMask) == 0b1000);
+        REQUIRE(channels.read(SPU_RdEventStat) == 0b1000);
+        channels.write(SPU_WrEventAck, 0b1000);
+        REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+        channels.write(SPU_WrEventMask, 0b0111);
+        REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
+        REQUIRE(channels.read(SPU_RdEventStat) == 0b111);
+        channels.write(SPU_WrEventAck, 0b0111);
+        REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    });
+    
+    boost::thread ppu([&] {
+        channels.setEvent(0b110111);
+        channels.setEvent(0b001000);
+    });
+    
+    spu.join();
+    ppu.join();
+}
+
+TEST_CASE("spuchannels_event_reservation") {
+    MainMemory mm;
+    TestSPUChannelsThread thread;
+    SPUChannels channels(&mm, &thread);
+    
+    mm.setMemory(0x10000, 0, 1000, true);
+    
+    // initial count is 1
+    channels.read(SPU_RdEventStat);
+    
+    channels.write(SPU_WrEventMask, 1u << 10);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+ 
+    // the same threads doesn't destroy reservation
+    mm.store<4>(0x10000, 0);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    
+    // another thread destroys reservation and sets event
+    boost::thread ppu([&] {
+        mm.store<4>(0x10000, 0);
+    });
+    ppu.join();
+    
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
+    REQUIRE(channels.read(SPU_RdEventStat) == 1u << 10);
+}

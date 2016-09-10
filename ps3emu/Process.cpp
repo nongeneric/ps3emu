@@ -131,11 +131,11 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
 }
 
 void Process::init(std::string elfPath, std::vector<std::string> args) {
+    g_state.proc = this;
+    g_state.mm = _mainMemory.get();
     _threads.emplace_back(std::make_unique<PPUThread>(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
     _rsx.reset(new Rsx());
-    _mainMemory->setRsx(_rsx.get());
-    _mainMemory->setProc(this);
     _elf.reset(new ELFLoader());
     _elf->load(elfPath);
     _elf->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
@@ -143,8 +143,6 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     });
     _prxs.push_back(_elf);
     loadPrxStore();
-    g_state.proc = this;
-    g_state.mm = _mainMemory.get();
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
                                                            EmuInternalAreaSize));
     _heapMemoryManager.reset(new InternalMemoryManager(HeapArea, HeapAreaSize));
@@ -178,9 +176,10 @@ uint32_t Process::loadPrx(std::string path) {
     prx->load(path);
     assert(_segments.size());
     auto imageBase = ::align(_segments.back().va + _segments.back().size, 1 << 10);
-    prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
+    auto stolen = prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
     }, imageBase);
+    std::copy(begin(stolen), end(stolen), std::back_inserter(_stolenInfos));
     for (auto p : _prxs) {
         p->link(_mainMemory.get(), _prxs);
     }
@@ -463,4 +462,16 @@ boost::chrono::nanoseconds Process::getTimeBaseNanoseconds() {
 
 std::vector<ModuleSegment>& Process::getSegments() {
     return _segments;
+}
+
+std::vector<std::shared_ptr<ELFLoader>> Process::loadedModules() {
+    return _prxs;
+}
+
+StolenFuncInfo Process::getStolenInfo(uintptr_t ncallIndex) {
+    auto it = boost::find_if(_stolenInfos, [=](auto& info) {
+        return info.ncallIndex == ncallIndex;
+    });
+    assert(it != end(_stolenInfos));
+    return *it;
 }
