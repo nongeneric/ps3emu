@@ -27,7 +27,7 @@ const char* tagToString(TagClassId tag) {
 }
 #undef X
 
-void SpuEvent::set(unsigned flags) {
+void SpuEvent::set_or(unsigned flags) {
     boost::unique_lock<boost::mutex> lock(_m);
     _pending |= flags;
     updateCount();
@@ -67,6 +67,39 @@ void SpuEvent::updateCount() {
     _count |= (_pending & _mask) != 0;
 }
 
+unsigned SpuSignal::value() {
+    boost::unique_lock<boost::mutex> lock(_m);
+    return _value;
+}
+
+unsigned SpuSignal::wait_clear() {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _cv.wait(lock, [&] { return _count; });
+    auto res = _value;
+    _count = 0;
+    _value = 0;
+    return res;
+}
+
+unsigned SpuSignal::count() {
+    boost::unique_lock<boost::mutex> lock(_m);
+    return _count;
+}
+
+void SpuSignal::set_or(unsigned value) {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _value |= value;
+    _count = 1;
+    _cv.notify_all();
+}
+
+void SpuSignal::set(unsigned value) {
+    boost::unique_lock<boost::mutex> lock(_m);
+    _value = value;
+    _count = 1;
+    _cv.notify_all();
+}
+
 SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread)
     : _mm(mm),
       _thread(thread),
@@ -103,7 +136,7 @@ void SPUChannels::command(uint32_t word) {
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
             _mm->loadReserve(eal, lsa, size, [&] {
-                _event.set(1u << 10);
+                _event.set_or(1u << 10);
             });
             // reservation always succeeds
             _channels[MFC_RdAtomicStat] |= 0b100; // G
@@ -163,8 +196,8 @@ unsigned SPUChannels::readCount(unsigned ch) {
             case SPU_RdEventStat: return _event.count();
             case SPU_WrEventMask: return 1u;
             case SPU_WrEventAck: return 1u;
-            //case SPU_RdSigNotify1: return 0;
-            //case SPU_RdSigNotify2: return 0;
+            case SPU_RdSigNotify1: return _snr1.count();
+            case SPU_RdSigNotify2: return _snr2.count();
             case SPU_WrDec: return 1u;
             case SPU_RdDec: return 1u;
             case SPU_RdEventMask: return 1u;
@@ -197,6 +230,7 @@ unsigned SPUChannels::readCount(unsigned ch) {
 }
 
 void SPUChannels::write(unsigned ch, uint32_t data) {
+    assert(ch <= SPU_WrOutIntrMbox);
     if (ch == SPU_WrEventMask) {
         _event.setMask(data);
     } else if (ch == SPU_WrEventAck) {
@@ -222,8 +256,13 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
 }
 
 uint32_t SPUChannels::read(unsigned ch) {
+    assert(ch <= SPU_WrOutIntrMbox);
     auto data = ([&ch, this] {
-        if (ch == SPU_RdEventMask) {
+        if (ch == SPU_RdSigNotify1) {
+            return _snr1.wait_clear();
+        } else if (ch == SPU_RdSigNotify2) {
+            return _snr2.wait_clear();
+        } else if (ch == SPU_RdEventMask) {
             return _event.mask();
         } else if (ch == SPU_RdEventStat) {
             return _event.wait();
@@ -286,8 +325,7 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
         _channels[MFC_Size] = data >> 16;
         _channels[MFC_TagID] = data & 0xff;
         return;
-    }    
-
+    }
     if (offset == TagClassId::MFC_Class_CMD) {
         command(data);
         return;
@@ -304,6 +342,14 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
     }
     if (offset == TagClassId::SPU_NPC) {
         _thread->setNip(data);
+        return;
+    }
+    if (offset == TagClassId::SPU_Sig_Notify_1) {
+        _snr1.set(data); // TODO: check SPU_Cfg
+        return;
+    }
+    if (offset == TagClassId::SPU_Sig_Notify_2) {
+        _snr2.set(data); // TODO: check SPU_Cfg
         return;
     }
     throw std::runtime_error("unknown mmio offset");
@@ -324,6 +370,8 @@ uint32_t SPUChannels::mmio_read(unsigned offset) {
                        mmio_readCount(SPU_Out_MBox);
             case TagClassId::Prxy_QueryType: return 0x01u;
             case TagClassId::Prxy_TagStatus: return -1u;
+            case TagClassId::SPU_Sig_Notify_1: return _snr1.value();
+            case TagClassId::SPU_Sig_Notify_2: return _snr2.value();
             default: throw std::runtime_error("unknown mmio offset");
         }
     }();
@@ -348,5 +396,5 @@ unsigned SPUChannels::mmio_readCount(unsigned offset) {
 }
 
 void SPUChannels::setEvent(unsigned flags) {
-    _event.set(flags);
+    _event.set_or(flags);
 }

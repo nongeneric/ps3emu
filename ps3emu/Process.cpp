@@ -402,6 +402,15 @@ std::shared_ptr<SPUThread> Process::getSpuThread(uint32_t id) {
     return _spuThreadIds.get(id);
 }
 
+std::shared_ptr<SPUThread> Process::getSpuThreadBySpuNum(uint32_t spuNum) {
+    boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
+    auto it = boost::find_if(_spuThreads, [&](auto& th) {
+        return th->getSpu() == spuNum;
+    });
+    assert(it != end(_spuThreads));
+    return *it;
+}
+
 void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
     _eventQueue.send(PPUThreadEventInfo{event, thread});
 }

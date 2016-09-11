@@ -64,6 +64,8 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
                                uint64_t value,
                                size_t type);
+int32_t sys_spu_thread_write_snr(sys_spu_thread_t id, int32_t number, uint32_t value);
+
 int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
                              uint32_t type,

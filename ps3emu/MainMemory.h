@@ -95,8 +95,9 @@ class MainMemory {
                                     uint len,
                                     uint32_t va,
                                     bool cond);
-    void writeSpuAddress(ps3_uintptr_t va, const void* val, uint32_t len);
-    uint32_t readSpuAddress(ps3_uintptr_t va);
+    void writeRawSpuVa(ps3_uintptr_t va, const void* val, uint32_t len);
+    void writeSpuThreadVa(ps3_uintptr_t va, const void* val, uint32_t len);
+    uint32_t readRawSpuVa(ps3_uintptr_t va);
 
 public:
     MainMemory();

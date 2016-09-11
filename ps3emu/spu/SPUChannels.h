@@ -149,8 +149,26 @@ public:
     unsigned mask();
     void acknowledge(unsigned mask);
     unsigned wait();
+    unsigned wait_clear();
     unsigned count();
+    unsigned pending();
+    void set_or(unsigned flags);
     void set(unsigned flags);
+};
+
+class SpuSignal {
+    boost::mutex _m;
+    boost::condition_variable _cv;
+    unsigned _value = 0;
+    unsigned _count = 0;
+    void updateCount();
+        
+public:
+    unsigned wait_clear();
+    unsigned count();
+    unsigned value();
+    void set_or(unsigned value);
+    void set(unsigned value);
 };
 
 class MainMemory;
@@ -164,6 +182,7 @@ class SPUChannels {
     std::atomic<uint32_t> _spuStatus;
     std::atomic<uint32_t> _interrupt2;
     SpuEvent _event;
+    SpuSignal _snr1, _snr2;
     void command(uint32_t word);
     
 public:

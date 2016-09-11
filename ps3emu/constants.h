@@ -22,6 +22,11 @@ static constexpr ps3_uintptr_t RawSpuBaseAddr = 0xe0000000;
 static constexpr ps3_uintptr_t RawSpuProblemOffset = 0x00040000;
 static constexpr ps3_uintptr_t RawSpuOffset = 0x00100000;
 
+static constexpr ps3_uintptr_t SpuThreadBaseAddr = 0xf0000000;
+static constexpr ps3_uintptr_t SpuThreadOffsetAddr = 0x100000;
+static constexpr ps3_uintptr_t SpuThreadSnr1 = 0x05400c;
+static constexpr ps3_uintptr_t SpuThreadSnr2 = 0x05c00c;
+
 static constexpr uint32_t GcmLocalMemorySize = 0xf900000;
 static constexpr uint32_t RsxMemoryFrequency = 650000000;
 static constexpr uint32_t RsxCoreFrequency = 500000000;

@@ -133,3 +133,39 @@ TEST_CASE("spuchannels_event_reservation") {
     REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
     REQUIRE(channels.read(SPU_RdEventStat) == 1u << 10);
 }
+
+TEST_CASE("spuchannels_signal_basic") {
+    MainMemory mm;
+    TestSPUChannelsThread thread;
+    SPUChannels channels(&mm, &thread);
+    
+    REQUIRE(channels.readCount(SPU_RdSigNotify1) == 0);
+    REQUIRE(channels.readCount(SPU_RdSigNotify2) == 0);
+    
+    // mmio doesn't reset the signal
+    channels.mmio_write(SPU_Sig_Notify_1, 0b1010);
+    REQUIRE(channels.mmio_read(SPU_Sig_Notify_1) == 0b1010);
+    REQUIRE(channels.mmio_read(SPU_Sig_Notify_1) == 0b1010);
+    channels.mmio_write(SPU_Sig_Notify_2, 0b1110);
+    REQUIRE(channels.mmio_read(SPU_Sig_Notify_2) == 0b1110);
+    REQUIRE(channels.mmio_read(SPU_Sig_Notify_2) == 0b1110);
+    
+    // spu resets the signal
+    REQUIRE(channels.read(SPU_RdSigNotify1) == 0b1010);
+    REQUIRE(channels.read(SPU_RdSigNotify2) == 0b1110);
+    REQUIRE(channels.mmio_read(SPU_Sig_Notify_1) == 0);
+    REQUIRE(channels.mmio_read(SPU_Sig_Notify_2) == 0);
+    
+    boost::thread spu([&] {
+        REQUIRE(channels.read(SPU_RdSigNotify1) == 0b110100);
+        REQUIRE(channels.read(SPU_RdSigNotify2) == 0b110111);
+    });
+    
+    boost::thread ppu([&] {
+        channels.mmio_write(SPU_Sig_Notify_2, 0b110111);
+        channels.mmio_write(SPU_Sig_Notify_1, 0b110100);
+    });
+    
+    spu.join();
+    ppu.join();
+}

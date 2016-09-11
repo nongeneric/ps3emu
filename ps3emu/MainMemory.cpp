@@ -89,8 +89,12 @@ void MainMemory::copy(ps3_uintptr_t va,
 }
 
 void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
+    if ((va & SpuThreadBaseAddr) == SpuThreadBaseAddr) {
+        writeSpuThreadVa(va, buf, len);
+        return;
+    }
     if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        writeSpuAddress(va, buf, len);
+        writeRawSpuVa(va, buf, len);
         return;
     }
     if (coversRsxRegsRange(va, len)) {
@@ -131,7 +135,7 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
     
     if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
         assert(len == 4);
-        *(big_uint32_t*)buf = readSpuAddress(va);
+        *(big_uint32_t*)buf = readRawSpuVa(va);
         return;
     }
     
@@ -268,15 +272,15 @@ MainMemory::MainMemory() {
     reset();
 }
 
-void splitSpuRegisterAddress(uint32_t va, uint32_t& id, uint32_t& offset) {
+void splitRawSpuAddress(uint32_t va, uint32_t& id, uint32_t& offset) {
     offset = va & 0x3ffff;
     id = ((va - offset - RawSpuBaseAddr) & ~RawSpuProblemOffset) / RawSpuOffset;
 }
 
-void MainMemory::writeSpuAddress(ps3_uintptr_t va, const void* src, uint32_t len) {
-    uint32_t id, offset;
-    splitSpuRegisterAddress(va, id, offset);
-    auto th = findRawSpuThread(id);
+void MainMemory::writeRawSpuVa(ps3_uintptr_t va, const void* src, uint32_t len) {
+    uint32_t spuNum, offset;
+    splitRawSpuAddress(va, spuNum, offset);
+    auto th = findRawSpuThread(spuNum);
     if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
         assert(len == 4);
         auto val = *(big_uint32_t*)src;
@@ -286,14 +290,33 @@ void MainMemory::writeSpuAddress(ps3_uintptr_t va, const void* src, uint32_t len
     memcpy(th->ptr(offset), src, len);
 }
 
-uint32_t MainMemory::readSpuAddress(ps3_uintptr_t va) {
-    uint32_t id, offset;
-    splitSpuRegisterAddress(va, id, offset);
-    auto th = findRawSpuThread(id);
+uint32_t MainMemory::readRawSpuVa(ps3_uintptr_t va) {
+    uint32_t spuNum, offset;
+    splitRawSpuAddress(va, spuNum, offset);
+    auto th = findRawSpuThread(spuNum);
     if ((va & RawSpuProblemOffset) == RawSpuProblemOffset) {
         return th->channels()->mmio_read(offset);
     }
     return *(big_uint32_t*)th->ptr(offset);
+}
+
+void splitSpuThreadAddress(uint32_t va, uint32_t& spuNum, uint32_t& offset) {
+    va &= ~SpuThreadBaseAddr;
+    spuNum = va / SpuThreadOffsetAddr;
+    offset = va & 0x5ffff;
+}
+
+void MainMemory::writeSpuThreadVa(ps3_uintptr_t va, const void* val, uint32_t len) {
+    uint32_t spu, offset;
+    splitSpuThreadAddress(va, spu, offset);
+    auto th = g_state.proc->getSpuThreadBySpuNum(spu);
+    if (offset == SpuThreadSnr1) {
+        th->channels()->mmio_write(SPU_Sig_Notify_1, *(big_uint32_t*)val);
+    } else if (offset == SpuThreadSnr1) {
+        th->channels()->mmio_write(SPU_Sig_Notify_2, *(big_uint32_t*)val);
+    } else {
+        memcpy(th->ptr(offset), val, len);
+    }
 }
 
 void readString(MainMemory* mm, uint32_t va, std::string& str) {

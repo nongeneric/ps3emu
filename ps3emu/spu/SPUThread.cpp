@@ -70,6 +70,7 @@ void SPUThread::loop() {
                        e.type() == SYS_SPU_THREAD_STOP_THREAD_EXIT) {
                 SPU_Status_SetStopCode(_channels.spuStatus(), e.type());
                 _channels.spuStatus() |= SPU_Status_P;
+                _exitCode = _channels.mmio_read(SPU_Out_MBox);
                 _cause = e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT
                              ? SPUThreadExitCause::GroupExit
                              : SPUThreadExitCause::Exit;
@@ -199,10 +200,20 @@ void SPUThread::handleReceiveEvent() {
 
 void SPUThread::connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
                                    uint32_t portNumber) {
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
     _eventQueues.push_back({portNumber, queue});
 }
 
-bool SPUThread::isAvailableQueuePort(uint8_t portNumber) {
+void SPUThread::disconnectOrUnbindQueue(uint32_t portNumber) {
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
+    auto it = boost::find_if(_eventQueues, [&](auto& eq) {
+        return eq.port == portNumber;
+    });
+    assert(it != end(_eventQueues));
+    _eventQueues.erase(it);
+}
+
+bool SPUThread::isAvailableQueuePort(uint32_t portNumber) {
     auto it = boost::find_if(_eventQueues, [=](auto& i) {
         return i.port == portNumber;
     });

@@ -147,24 +147,46 @@ int32_t sys_event_port_destroy(sys_event_port_t eport_id) {
 int32_t sys_spu_thread_connect_event(uint32_t thread_id,
                                      sys_event_queue_t eq,
                                      sys_event_type_t et,
-                                     uint8_t spup,
-                                     Process* proc) {
+                                     uint8_t spup) {
     INFO(libs) << ssnprintf(
-        "sys_spu_thread_connect_event(thread = %d, queue = %d, spup = %02x)", thread_id, eq, spup);
+        "sys_spu_thread_connect_event(thread = %d, queue = %d, spup = %02x)",
+        thread_id,
+        eq,
+        spup);
     assert(et == SYS_SPU_THREAD_EVENT_USER);
-    auto thread = proc->getSpuThread(thread_id);
+    auto thread = g_state.proc->getSpuThread(thread_id);
     auto queue = queues.get(eq);
     thread->connectOrBindQueue(queue, spup);
     return CELL_OK;
 }
 
+int32_t sys_spu_thread_disconnect_event(uint32_t thread_id,
+                                        sys_event_type_t et,
+                                        uint8_t spup) {
+    assert(et == SYS_SPU_THREAD_EVENT_USER);
+    INFO(libs) << ssnprintf("sys_spu_thread_disconnect_event(thread = %d, spup = %02x)",
+                            thread_id,
+                            spup);
+    auto thread = g_state.proc->getSpuThread(thread_id);
+    thread->disconnectOrUnbindQueue(spup);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_unbind_queue(uint32_t thread_id, uint32_t spuq_num) {
+    INFO(libs) << ssnprintf("sys_spu_thread_unbind_queue(thread = %d, spup = %02x)",
+                            thread_id,
+                            spuq_num);
+    auto thread = g_state.proc->getSpuThread(thread_id);
+    thread->disconnectOrUnbindQueue(spuq_num);
+    return CELL_OK;
+}
+
 int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
                                   sys_event_queue_t spuq,
-                                  uint32_t spuq_num,
-                                  Process* proc) {
+                                  uint32_t spuq_num) {
     INFO(libs) << ssnprintf(
         "sys_spu_thread_bind_queue(thread = %d, queue = %d, spuq = %02x)", thread_id, spuq, spuq_num);
-    auto thread = proc->getSpuThread(thread_id);
+    auto thread = g_state.proc->getSpuThread(thread_id);
     auto queue = queues.get(spuq);
     thread->connectOrBindQueue(queue, spuq_num);
     return CELL_OK;
@@ -173,15 +195,14 @@ int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
 int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        sys_event_queue_t eq,
                                                        uint64_t req,
-                                                       uint8_t* spup,
-                                                       Process* proc) {
+                                                       uint8_t* spup) {
     INFO(libs) << ssnprintf("sys_spu_thread_group_connect_event_all_threads"
                             "(group = %d, queue = %d, req = %016llx)", 
                             group_id, eq, req);
     auto group = findThreadGroup(group_id);
     std::vector<std::shared_ptr<SPUThread>> threads;
     std::transform(begin(group->threads), end(group->threads), std::back_inserter(threads), [=](auto id) {
-        return proc->getSpuThread(id);
+        return g_state.proc->getSpuThread(id);
     });
     auto queue = queues.get(eq);
     for (auto i = 0u; i < 64; ++i) {

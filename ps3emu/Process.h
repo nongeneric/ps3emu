@@ -174,6 +174,7 @@ public:
     PPUThread* getThread(uint64_t id);
     uint32_t createSpuThread(std::string name);
     std::shared_ptr<SPUThread> getSpuThread(uint32_t id);
+    std::shared_ptr<SPUThread> getSpuThreadBySpuNum(uint32_t spuNum);
     CallbackThread* getCallbackThread();
     void destroySpuThread(SPUThread* thread);
     std::vector<PPUThread*> dbgPPUThreads();

@@ -149,6 +149,13 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
     return CELL_OK;
 }
 
+int32_t sys_spu_thread_write_snr(sys_spu_thread_t id, int32_t number, uint32_t value) {
+    auto thread = g_state.proc->getSpuThread(id);
+    auto ch = number ? SPU_Sig_Notify_2 : SPU_Sig_Notify_1;
+    thread->channels()->mmio_write(ch, value);
+    return CELL_OK;
+}
+
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu) {
     LOG << __FUNCTION__;
     return CELL_OK;
@@ -254,6 +261,12 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
                                   const sys_spu_thread_attribute_t* attr,
                                   const sys_spu_thread_argument_t* arg,
                                   Process* proc) {
+    sys_spu_image_t image_copy = *img;
+    if (img->type == SYS_SPU_IMAGE_TYPE_KERNEL) {
+        img = &image_copy;
+        spuImageInit(g_state.mm, g_state.memalloc, img, img->entry_point, true);
+    }
+    
     LOG << ssnprintf("sys_spu_thread_initialize() source=%x", img->segs);
     auto group = groups.get(group_id);
     std::string name;
