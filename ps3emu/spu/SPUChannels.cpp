@@ -155,18 +155,10 @@ void SPUChannels::command(uint32_t word) {
             break;
         }
         case MFC_PUTLLC_CMD: // TODO: handle sizes correctly when calling writeCond
-        case MFC_PUTLLUC_CMD:
         case MFC_PUTQLLUC_CMD: {
             assert(opcode != MFC_PUTQLLUC_CMD);
             auto stored = _mm->writeCond(eal, lsa, size);
-            if (opcode == MFC_PUTLLUC_CMD) {
-                assert(size == 0x80); // cache line
-                if (!stored) {
-                    _mm->writeMemory(eal, lsa, size);
-                } else {
-                    _channels[MFC_RdAtomicStat] |= 0b010; // U
-                }
-            } else if (opcode == MFC_PUTLLC_CMD) {
+            if (opcode == MFC_PUTLLC_CMD) {
                 _channels[MFC_RdAtomicStat] |= !stored; // S
             }
             logAtomic(stored);
@@ -180,7 +172,12 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTFS_CMD:
         case MFC_PUTBS_CMD:
         case MFC_PUTRF_CMD:
+        case MFC_PUTLLUC_CMD:
         case MFC_PUTRB_CMD: {
+            if (opcode == MFC_PUTLLUC_CMD) {
+                assert(size == 0x80); // cache line
+                _channels[MFC_RdAtomicStat] |= 0b010; // U 
+            }
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
             log();

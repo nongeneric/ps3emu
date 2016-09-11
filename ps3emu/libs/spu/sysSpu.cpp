@@ -440,7 +440,7 @@ int32_t sys_raw_spu_get_int_stat(sys_raw_spu_t id,
                                  uint32_t class_id,
                                  big_uint64_t* stat) {
     if (class_id != 2) {
-        throw std::runtime_error("incorrect spu interrupt class");
+        WARNING(libs) << "sys_raw_spu_get_int_stat: unimplemented spu interrupt class";
     }
     auto rawSpu = rawSpus.get(id);
     // only privileged software
@@ -462,7 +462,7 @@ int32_t sys_spu_thread_write_spu_mb(uint32_t thread_id, uint32_t value) {
 
 int32_t sys_raw_spu_set_int_stat(sys_raw_spu_t id, uint32_t class_id, uint64_t stat) {
     if (class_id != 2) {
-        throw std::runtime_error("incorrect spu interrupt class");
+        WARNING(libs) << "sys_raw_spu_set_int_stat: unimplemented spu interrupt class";
     }
     auto rawSpu = rawSpus.get(id);
     // only privileged software

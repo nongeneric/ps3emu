@@ -141,7 +141,7 @@ class SpuEvent {
     boost::condition_variable _cv;
     unsigned _pending = 0;
     unsigned _mask = 0;
-    unsigned _count = 1;
+    unsigned _count = 0;
     void updateCount();
         
 public:

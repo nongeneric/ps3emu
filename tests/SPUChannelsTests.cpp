@@ -74,11 +74,7 @@ TEST_CASE("spuchannels_event_basic") {
     MainMemory mm;
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
-    
-    // initial count is 1
-    REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
-    channels.read(SPU_RdEventStat);
-    
+        
     boost::thread spu([&] {
         channels.write(SPU_WrEventMask, 0b1000);
         REQUIRE(channels.read(SPU_RdEventMask) == 0b1000);
@@ -107,10 +103,7 @@ TEST_CASE("spuchannels_event_reservation") {
     SPUChannels channels(&mm, &thread);
     
     mm.setMemory(0x10000, 0, 1000, true);
-    
-    // initial count is 1
-    channels.read(SPU_RdEventStat);
-    
+        
     channels.write(SPU_WrEventMask, 1u << 10);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
     channels.write(MFC_EAH, 0);

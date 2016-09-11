@@ -2055,3 +2055,180 @@ TEST_CASE("spu_thr_dma_sync") {
         "Exiting.\n"
     );
 }
+
+TEST_CASE("ppu_spu_round_trip_ppu_side_raw_spu") {
+#define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
+    std::string output;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+#undef ASSERT
+}
+
+TEST_CASE("ppu_spu_round_trip_ppu_side_spu_thread") {
+#define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
+    std::string output;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_SEND/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_THROW/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___EVENT_QUEUE_SEND/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___EVENT_QUEUE_THROW/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_SEND/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf"});
+    ASSERT;
+#undef ASSERT
+}
+
+TEST_CASE("ppu_spu_round_trip_spu_side_raw_spu") {
+#define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
+    std::string output;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf"});
+    ASSERT;
+#undef ASSERT
+}
+
+TEST_CASE("ppu_spu_round_trip_spu_side_spu_thread") {
+#define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
+    std::string output;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_SEND/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_THROW/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_SEND/a.elf"});
+    ASSERT;
+    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf"});
+    ASSERT;
+#undef ASSERT
+}

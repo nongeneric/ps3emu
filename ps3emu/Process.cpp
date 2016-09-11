@@ -118,7 +118,7 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
     uint32_t modresVa;
     g_state.memalloc->internalAlloc<4, uint32_t>(&modresVa);
     auto& segments = g_state.proc->getSegments();
-    // make the recursive ps3call using continuations instead of the for loop
+    // TODO: make the recursive ps3call using continuations instead of the for loop
     // when prx store contains modules other than lv2
     for (auto i = 1u; i < segments.size(); ++i) {
         auto& s = segments[i];

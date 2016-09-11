@@ -14,12 +14,19 @@ void SPUThread::run() {
     _thread = boost::thread([=] { loop(); });
 }
 
-#define SYS_SPU_THREAD_STOP_YIELD                 0x0100
-#define SYS_SPU_THREAD_STOP_GROUP_EXIT            0x0101
-#define SYS_SPU_THREAD_STOP_THREAD_EXIT           0x0102
-#define SYS_SPU_THREAD_STOP_RECEIVE_EVENT         0x0110
-#define SYS_SPU_THREAD_STOP_TRY_RECEIVE_EVENT     0x0111
-#define SYS_SPU_THREAD_STOP_SWITCH_SYSTEM_MODULE  0x0120
+#define SYS_SPU_THREAD_STOP_YIELD 0x0100
+#define SYS_SPU_THREAD_STOP_GROUP_EXIT 0x0101
+#define SYS_SPU_THREAD_STOP_THREAD_EXIT 0x0102
+#define SYS_SPU_THREAD_STOP_RECEIVE_EVENT 0x0110
+#define SYS_SPU_THREAD_STOP_TRY_RECEIVE_EVENT 0x0111
+#define SYS_SPU_THREAD_STOP_SWITCH_SYSTEM_MODULE 0x0120
+#define STOP_TYPE_MASK 0x3f00
+#define STOP_TYPE_TERMINATE 0x0000
+#define STOP_TYPE_MISC 0x0100
+#define STOP_TYPE_SHARED_MUTEX 0x0200
+#define STOP_TYPE_STOP_CALL 0x0400
+#define STOP_TYPE_SYSTEM 0x1000
+#define STOP_TYPE_RESERVE 0x2000
 
 void SPUThread::loop() {
     INFO(spu) << ssnprintf("spu thread loop started");
@@ -74,6 +81,8 @@ void SPUThread::loop() {
                 _cause = e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT
                              ? SPUThreadExitCause::GroupExit
                              : SPUThreadExitCause::Exit;
+                break;
+            } else if (e.type() == STOP_TYPE_RESERVE) { // raw spu
                 break;
             } else {
                 throw std::runtime_error("not implemented");
