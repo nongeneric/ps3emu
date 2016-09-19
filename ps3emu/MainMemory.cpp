@@ -19,18 +19,18 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
                                             uint size,
                                             uint32_t va,
                                             bool cond) {
-    boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
+    boost::unique_lock<boost::mutex> lock(_storeLock);
     bool success = false;
     auto thread = boost::this_thread::get_id();
     for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
         auto& r = _reservations[i];
         if (intersects(r.va, r.size, va, size)) {
             success |= (r.va <= va && r.va + r.size >= va + size) && r.thread == thread;
-            if (r.thread != thread) {
-                if (r.notify)
-                    r.notify();
-                _reservations.erase(begin(_reservations) + i);
+            if (r.notify) {
+                // we are under a lock, notifying before the memory is actually stored is fine
+                r.notify(thread);
             }
+            _reservations.erase(begin(_reservations) + i);
         }
     }
     if (!cond || success) {

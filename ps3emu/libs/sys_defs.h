@@ -23,6 +23,7 @@ typedef big_uint32_t sys_protocol_t;
 typedef big_uint32_t sys_recursive_t;
 typedef big_uint32_t sys_process_shared_t;
 typedef big_uint64_t usecond_t;
+typedef big_uint64_t second_t;
 typedef big_uint32_t sys_adaptive_t;
 typedef big_uint64_t sys_ipc_key_t;
 

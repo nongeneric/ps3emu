@@ -7,6 +7,8 @@ def build():
 	for ppu2spu in raw_spu_ppu_to_spu:
 		for spu2ppu in raw_spu_spu_to_ppu:
 			print('ppu2spu: ', ppu2spu, ' spu2ppu', spu2ppu)
+			line = 'make -C ' + dir + ' clean'
+			subprocess.check_output(line, shell=True)
 			line = 'make -C ' + dir + ' PPU_TO_SPU=' + ppu2spu + ' SPU_TO_PPU=' + spu2ppu
 			subprocess.check_output(line, shell=True)
 			ppu_outdir = 'output/' + name + '/' + ppu2spu + '___' + spu2ppu
@@ -35,7 +37,14 @@ build()
 
 spu_name = 'observer'
 raw_spu_ppu_to_spu = ['GETLLAR_POLLING', 'SPU_INBOUND_MAILBOX', 'SIGNAL_NOTIFICATION']
-raw_spu_spu_to_ppu = ['SPU_OUTBOUND_MAILBOX', 'SPU_OUTBOUND_INTERRUPT_MAILBOX', 'SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE', 'DMA_PUT', 'ATOMIC_PUTLLUC']
+raw_spu_spu_to_ppu = ['SPU_OUTBOUND_MAILBOX', 'SPU_OUTBOUND_INTERRUPT_MAILBOX', 'DMA_PUT', 'ATOMIC_PUTLLUC']
+dir = 'spu-side/raw_spu'
+name = 'spu_side_raw_spu'
+build()
+
+spu_name = 'observer'
+raw_spu_ppu_to_spu = ['GETLLAR_POLLING']
+raw_spu_spu_to_ppu = ['SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE']
 dir = 'spu-side/raw_spu'
 name = 'spu_side_raw_spu'
 build()

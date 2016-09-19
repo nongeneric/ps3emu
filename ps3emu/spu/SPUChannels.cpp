@@ -121,22 +121,26 @@ void SPUChannels::command(uint32_t word) {
     assert(cmd.rid.u() == 0);
     auto eal = _channels[MFC_EAL].load();
     assert(_channels[MFC_EAH] == 0);
-    auto lsa = &_thread->ls()[_channels[MFC_LSA]];
+    auto lsaVa = _channels[MFC_LSA].load();
+    auto lsa = &_thread->ls()[lsaVa];
     auto size = _channels[MFC_Size].load();
     auto opcode = cmd.opcode.u();
     auto name = mfcCommandToString(opcode);
     auto log = [&] {
         INFO(spu) << ssnprintf(
-            "%s(%x, %x, %x) %x", name, size, lsa, eal, _channels[MFC_TagID].load());
+            "%s(%x, %x, %x) %x", name, size, lsaVa, eal, _channels[MFC_TagID].load());
     };
     auto logAtomic = [&](bool stored) {
         INFO(spu) << ssnprintf(
-            "%s(%x, %x, %x) %s", name, size, lsa, eal, stored ? "OK" : "FAIL");
+            "%s(%x, %x, %x) %s", name, size, lsaVa, eal, stored ? "OK" : "FAIL");
     };
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
-            _mm->loadReserve(eal, lsa, size, [&] {
-                _event.set_or(1u << 10);
+            auto hostThreadId = boost::this_thread::get_id();
+            _mm->loadReserve(eal, lsa, size, [=](auto id) {
+                if (hostThreadId != id) {
+                    _event.set_or(1u << 10);
+                }
             });
             // reservation always succeeds
             _channels[MFC_RdAtomicStat] |= 0b100; // G
@@ -233,10 +237,9 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
     } else if (ch == SPU_WrEventAck) {
         _event.acknowledge(data);
     } else if (ch == SPU_WrOutIntrMbox) {
-        _outboundInterruptMailbox.enqueue(data);
         _interrupt2 |= INT_Mask_class2_M;
         INFO(spu) << ssnprintf("write %x to interrupt mailbox", data);
-        throw SPUThreadInterruptException();
+        throw SPUThreadInterruptException(data);
     } else if (ch == SPU_WrOutMbox) {
         _outboundMailbox.enqueue(data);
     } else {
@@ -270,7 +273,7 @@ uint32_t SPUChannels::read(unsigned ch) {
             _channels[ch] = 0;
             return res;
         } else if (ch == SPU_RdDec) {
-            return 0x1234u;
+            return 0u;
         } else {
             if (ch == MFC_RdTagStat) {
                 // as every MFC request completes immediately
@@ -394,4 +397,8 @@ unsigned SPUChannels::mmio_readCount(unsigned offset) {
 
 void SPUChannels::setEvent(unsigned flags) {
     _event.set_or(flags);
+}
+
+void SPUChannels::silently_write_interrupt_mbox(uint32_t value) {
+    _outboundInterruptMailbox.enqueue(value);
 }

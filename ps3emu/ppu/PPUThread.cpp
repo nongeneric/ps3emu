@@ -89,8 +89,11 @@ void PPUThread::loop() {
     log_set_thread_name(ssnprintf("ppu_%s_%d", _name, (unsigned)_id));
     LOG << ssnprintf("thread loop started");
     
-    _running = true;
-    _cvRunning.notify_all();
+    {
+        boost::unique_lock<boost::mutex> lock(_mutexRunning);
+        _running = true;
+        _cvRunning.notify_all();
+    }
     
     _eventHandler(this, PPUThreadEvent::Started);
     dbgpause(true);
@@ -120,8 +123,7 @@ void PPUThread::run() {
     if (!_init) {
         _thread = boost::thread([=] { loop(); });
         _init = true;
-        while (!_running)
-            _cvRunning.wait(lock);
+        _cvRunning.wait(lock, [&] { return _running; });
     }
 }
 

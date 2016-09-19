@@ -41,6 +41,7 @@ void PPUThread::scall() {
         case 348: wrap(sys_memory_allocate, this); break;
         case 349: wrap(sys_memory_free, this); break;
         case 141: wrap(sys_timer_usleep, this); break;
+        case 142: wrap(sys_timer_sleep, this); break;
         case 801: wrap(sys_fs_open_proxy, this); break;
         case 128: wrap(sys_event_queue_create, this); break;
         case 129: wrap(sys_event_queue_destroy, this); break;
@@ -94,7 +95,9 @@ void PPUThread::scall() {
         case 156: wrap(sys_spu_image_open, this); break;
         case 150: wrap(sys_raw_spu_create_interrupt_tag, this); break;
         case 151: wrap(sys_raw_spu_set_int_mask, this); break;
+        case 81: wrap(sys_interrupt_tag_destroy, this); break;
         case 84: wrap(sys_interrupt_thread_establish, this); break;
+        case 89: wrap(sys_interrupt_thread_disestablish, this); break;
         case 154: wrap(sys_raw_spu_get_int_stat, this); break;
         case 155: wrap(sys_spu_image_get_info, this); break;
         case 158: wrap(sys_spu_image_close, this); break;

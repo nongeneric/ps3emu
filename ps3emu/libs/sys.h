@@ -63,6 +63,7 @@ typedef big_uint32_t sys_addr_t;
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t * alloc_addr, PPUThread* thread);
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread);
 int sys_timer_usleep(usecond_t sleep_time);
+int sys_timer_sleep(second_t sleep_time);
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread);
 uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec);

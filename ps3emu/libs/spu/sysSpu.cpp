@@ -150,6 +150,7 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
 }
 
 int32_t sys_spu_thread_write_snr(sys_spu_thread_t id, int32_t number, uint32_t value) {
+    INFO(libs) << ssnprintf("sys_spu_thread_write_snr(id=%x, number=%d, value=%x)", id, number, value);
     auto thread = g_state.proc->getSpuThread(id);
     auto ch = number ? SPU_Sig_Notify_2 : SPU_Sig_Notify_1;
     thread->channels()->mmio_write(ch, value);
@@ -287,6 +288,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
 
 int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id, Process* proc) {
     auto group = groups.get(id);
+    INFO(libs) << ssnprintf("sys_spu_thread_group_start(%s)", group->name);
     for (auto id : group->threads) {
         auto th = proc->getSpuThread(id);
         th->run();
@@ -301,9 +303,9 @@ int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id, Process* proc) {
 int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
                                   big_int32_t* cause,
                                   big_int32_t* status,
-                                  Process* proc)
-{
+                                  Process* proc) {
     auto group = groups.get(gid);
+    INFO(libs) << ssnprintf("sys_spu_thread_group_join(%s)", group->name);
     bool groupExit = false;
     bool threadExit = true;
     bool groupTerminate = false;
@@ -414,14 +416,23 @@ int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
 int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
                                        sys_interrupt_tag_t intrtag,
                                        uint32_t intrthread,
-                                       uint64_t arg,
-                                       Process* proc) {
+                                       uint64_t arg) {
     LOG << __FUNCTION__;
-    auto th = dynamic_cast<InterruptPPUThread*>(proc->getThread(intrthread));
+    auto th = dynamic_cast<InterruptPPUThread*>(g_state.proc->getThread(intrthread));
     auto tag = interruptTags.get(intrtag);
     tag->interruptThread = th;
     th->setArg(arg);
     th->establish(tag->rawSpu->thread.get());
+    return CELL_OK;
+}
+
+int32_t sys_interrupt_thread_disestablish(sys_interrupt_thread_handle_t ih) {
+    WARNING(libs) << "sys_interrupt_thread_disestablish not implemented";
+    return CELL_OK;
+}
+
+int32_t sys_interrupt_tag_destroy(sys_interrupt_tag_t intrtag) {
+    WARNING(libs) << "sys_interrupt_tag_destroy not implemented";
     return CELL_OK;
 }
 

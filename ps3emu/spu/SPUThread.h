@@ -195,7 +195,7 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     boost::mutex _eventQueuesMutex;
     std::vector<EventQueueInfo> _eventQueues;
     void loop();
-    void handleSyscall();
+    void handleInterrupt(uint32_t interruptValue);
     void handleReceiveEvent();
 
 public:

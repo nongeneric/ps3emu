@@ -32,7 +32,7 @@ void SPUThread::loop() {
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     _dbgPaused = true;
-    log_set_thread_name(ssnprintf("spu %d", _id));
+    log_set_thread_name(ssnprintf("spu_%d", _id));
     
 #ifdef DEBUG
     auto f = fopen(ssnprintf("/tmp/spu_ls_dump_%x.bin", getNip()).c_str(), "w");
@@ -89,9 +89,10 @@ void SPUThread::loop() {
             }
         } catch (SPUThreadInterruptException& e) {
             if (_interruptHandler && (_interruptHandler->mask2 & _channels.interrupt())) {
+                _channels.silently_write_interrupt_mbox(e.imboxValue());
                 _interruptHandler->handler();
             } else {
-                handleSyscall();
+                handleInterrupt(e.imboxValue());
             }
         } catch (std::exception& e) {
             INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
@@ -170,27 +171,50 @@ void SPUThread::cancel() {
     pthread_cancel(_thread.native_handle());
 }
 
-void SPUThread::handleSyscall() {
-    INFO(spu) << "handling spu syscall";
-    auto data1 = _channels.mmio_read(SPU_Out_MBox);
-    auto spupData0 = _channels.mmio_read(SPU_Out_Intr_Mbox);
-    assert((spupData0 >> 16) != 0x8001 && (spupData0 >> 16) != 0x8000); // not a syscall, not implemented
-    auto port = (spupData0 >> 24) & 0xff;
+enum SpuInterruptOperation {
+    SpuInterruptOperation_SendEvent = 0,
+    SpuInterruptOperation_ThrowEvent = 1,
+    SpuInterruptOperation_WriteInterruptMbox = 2,
+    SpuInterruptOperation_SetFlag = 3
+};
+
+void SPUThread::handleInterrupt(uint32_t interruptValue) {
+    auto spupData0 = interruptValue;
+    auto op_port = (spupData0 >> 24) & 0xff;
     auto data0 = spupData0 & 0xffffff;
+    auto port = op_port & 0x3f;
+    auto op = op_port >> 6;
     
-    if (port == 0xc0) {
+    INFO(spu) << ssnprintf("%s",
+        op == SpuInterruptOperation_SendEvent ? "SpuInterruptOperation_SendEvent" :
+        op == SpuInterruptOperation_ThrowEvent ? "SpuInterruptOperation_ThrowEvent" :
+        op == SpuInterruptOperation_WriteInterruptMbox ? "SpuInterruptOperation_WriteInterruptMbox" : "?"
+    );
+    
+    if (op == SpuInterruptOperation_WriteInterruptMbox) {
+        _channels.silently_write_interrupt_mbox(interruptValue);
+        return;
+    }
+    
+    auto data1 = _channels.mmio_read(SPU_Out_MBox);
+    
+    if (op == SpuInterruptOperation_SetFlag) {
         auto flag_id = data1;
         auto bit = data0;
         sys_event_flag_set(flag_id, 1u << bit);
         return;
     }
     
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
     auto info = boost::find_if(_eventQueues, [=](auto& i) {
         return i.port == port;
     });
     assert(info != end(_eventQueues));
     info->queue->send({SYS_SPU_THREAD_EVENT_USER_KEY, _id, ((uint64_t)port << 32) | data0, data1});
-    _channels.mmio_write(SPU_In_MBox, 0);
+    
+    if (op == SpuInterruptOperation_SendEvent) {
+        _channels.mmio_write(SPU_In_MBox, 0);   
+    }
 }
 
 void SPUThread::handleReceiveEvent() {
@@ -223,6 +247,7 @@ void SPUThread::disconnectOrUnbindQueue(uint32_t portNumber) {
 }
 
 bool SPUThread::isAvailableQueuePort(uint32_t portNumber) {
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
     auto it = boost::find_if(_eventQueues, [=](auto& i) {
         return i.port == portNumber;
     });

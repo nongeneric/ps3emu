@@ -113,15 +113,31 @@ TEST_CASE("spuchannels_event_reservation") {
     channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
  
-    // the same threads doesn't destroy reservation
+    // the same thread destroys the reservation but doesn't raise the event
     mm.store<4>(0x10000, 0);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
     
-    // another thread destroys reservation and sets event
+    // there is no reservation, and therefore no event is raised
     boost::thread ppu([&] {
         mm.store<4>(0x10000, 0);
     });
     ppu.join();
+    
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    
+    // setup a reservation
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    
+    // another thread destroys the reservation and raises the event
+    boost::thread ppu1([&] {
+        mm.store<4>(0x10000, 0);
+    });
+    ppu1.join();
     
     REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
     REQUIRE(channels.read(SPU_RdEventStat) == 1u << 10);

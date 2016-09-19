@@ -229,6 +229,11 @@ int sys_timer_usleep(usecond_t sleep_time) {
     return CELL_OK;
 }
 
+int sys_timer_sleep(second_t sleep_time) {
+    ums_sleep(sleep_time * 1000000ull);
+    return CELL_OK;
+}
+
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
     LOG << __FUNCTION__;
     return g_state.proc->getFrequency();

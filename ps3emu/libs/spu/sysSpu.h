@@ -102,8 +102,9 @@ int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
 int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
                                        sys_interrupt_tag_t intrtag,
                                        uint32_t intrthread,
-                                       uint64_t arg,
-                                       Process* proc);
+                                       uint64_t arg);
+int32_t sys_interrupt_thread_disestablish(sys_interrupt_thread_handle_t ih);
+int32_t sys_interrupt_tag_destroy(sys_interrupt_tag_t intrtag);
 int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id, uint32_t class_id, uint64_t mask);
 int32_t sys_raw_spu_mmio_write(sys_raw_spu_t id,
                                unsigned classId,

@@ -2180,9 +2180,6 @@ TEST_CASE("ppu_spu_round_trip_spu_side_raw_spu") {
                                  "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
     ASSERT;
     output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf"});
-    ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
                                  "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf"});
     ASSERT;
     output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
@@ -2193,9 +2190,6 @@ TEST_CASE("ppu_spu_round_trip_spu_side_raw_spu") {
     ASSERT;
     output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
                                  "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
-    ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf"});
     ASSERT;
     output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
                                  "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf"});
@@ -2231,4 +2225,15 @@ TEST_CASE("ppu_spu_round_trip_spu_side_spu_thread") {
                                  "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf"});
     ASSERT;
 #undef ASSERT
+}
+
+TEST_CASE("spurs_iwl_communication1_event_flag") {
+    auto output = startWaitGetOutput({"./binaries/spurs_iwl_communication1_event_flag/a.elf"});
+    REQUIRE( output ==
+        "PPU: wait until all task becomes ready\n"
+        "PPU: wake up setter tasks\n"
+        "PPU: joining all tasks\n"
+        "PPU: destroying taskset\n"
+        "## libspurs : sample_spurs_iwl_event_flag SUCCEEDED ##\n"
+    );
 }

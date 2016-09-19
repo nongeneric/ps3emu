@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <array>
 #include <atomic>
+#include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include "stdint.h"
@@ -126,7 +127,16 @@ enum INT_Mask_class2_Flags {
     INT_Mask_class2_M = 1u << (63u - 63u)
 };
 
-class SPUThreadInterruptException : public virtual std::exception {};
+class SPUThreadInterruptException : public virtual std::exception {
+    uint32_t _imboxValue;
+
+public:
+    inline SPUThreadInterruptException(uint32_t imboxValue)
+        : _imboxValue(imboxValue) {}
+    inline uint32_t imboxValue() {
+        return _imboxValue;
+    }
+};
 
 class ISPUChannelsThread {
 public:
@@ -194,6 +204,7 @@ public:
     uint32_t mmio_read(unsigned offset);
     unsigned mmio_readCount(unsigned offset);
     void setEvent(unsigned flags);
+    void silently_write_interrupt_mbox(uint32_t value);
     inline std::atomic<uint32_t>& spuStatus() { return _spuStatus; }
     inline std::atomic<uint32_t>& interrupt() { return _interrupt2; }
 };

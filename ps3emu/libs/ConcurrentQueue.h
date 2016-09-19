@@ -33,13 +33,15 @@ class ConcurrentQueue : public IConcurrentQueue<T> {
     boost::mutex _mutex;
     boost::condition_variable _cv;
     Q<WaitingThread> _waiting;
+    uint32_t _size;
     ConcurrentQueue(ConcurrentQueue&) = delete;
     
 public:
-    ConcurrentQueue() = default;
+    ConcurrentQueue(uint32_t size = 1000) : _size(size) { }
     
     void send(T const& t) override {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        _cv.wait(lock, [&] { return _values.size() < _size; });
         _values.push(t);
         _cv.notify_all();
     }
@@ -48,8 +50,7 @@ public:
         auto id = boost::this_thread::get_id();
         boost::unique_lock<boost::mutex> lock(_mutex);
         _waiting.push({id, priority});
-        while (_values.empty() || _waiting.top().id != id)
-            _cv.wait(lock);
+        _cv.wait(lock, [&] { return !_values.empty() && _waiting.top().id == id; });
         _waiting.pop();
         auto val = _values.front();
         _values.pop();

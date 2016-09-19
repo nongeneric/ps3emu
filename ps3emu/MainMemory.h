@@ -72,7 +72,7 @@ struct Reservation {
     uint32_t va;
     uint32_t size;
     boost::thread::id thread;
-    std::function<void()> notify;
+    std::function<void(boost::thread::id)> notify;
 };
 
 class MainMemory {
@@ -81,7 +81,7 @@ class MainMemory {
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     Process* _proc;
     boost::mutex _pageMutex;
-    boost::detail::spinlock _storeLock = BOOST_DETAIL_SPINLOCK_INIT;
+    boost::mutex _storeLock;
     std::vector<Reservation> _reservations;
     
     template <bool Read>
@@ -165,8 +165,8 @@ public:
     void loadReserve(ps3_uintptr_t va,
                      void* buf,
                      uint len,
-                     std::function<void()> notify = {}) {
-        boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
+                     std::function<void(boost::thread::id)> notify = {}) {
+        boost::unique_lock<boost::mutex> lock(_storeLock);
         _reservations.push_back({va, len, boost::this_thread::get_id(), notify});
         readMemory(va, buf, len, false, false);
     }
