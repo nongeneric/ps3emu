@@ -13,9 +13,31 @@ typedef struct sys_memory_info {
     big_uint32_t available_user_memory;
 } sys_memory_info_t;
 
+
+typedef struct sys_page_attr {
+    big_uint64_t attribute;
+    big_uint64_t access_right;
+    big_uint32_t page_size;
+    big_uint32_t pad;
+} sys_page_attr_t;
+
+#define SYS_MEMORY_PROT_READ_ONLY        0x0000000000080000ULL
+#define SYS_MEMORY_PROT_READ_WRITE       0x0000000000040000ULL
+#define SYS_MEMORY_ACCESS_RIGHT_PPU_THR  0x0000000000000008ULL
+#define SYS_MEMORY_ACCESS_RIGHT_HANDLER  0x0000000000000004ULL
+#define SYS_MEMORY_ACCESS_RIGHT_SPU_THR  0x0000000000000002ULL
+#define SYS_MEMORY_ACCESS_RIGHT_RAW_SPU  0x0000000000000001ULL
+#define SYS_MEMORY_ACCESS_RIGHT_ANY      (SYS_MEMORY_ACCESS_RIGHT_PPU_THR | \
+                                          SYS_MEMORY_ACCESS_RIGHT_HANDLER | \
+                                          SYS_MEMORY_ACCESS_RIGHT_SPU_THR | \
+                                          SYS_MEMORY_ACCESS_RIGHT_RAW_SPU)
+#define SYS_MEMORY_ACCESS_RIGHT_NONE     0x00000000000000f0ULL
+#define SYS_MEMORY_ACCESS_RIGHT_MASK     0x00000000000000ffULL
+
 void init_sys_lib();
 
 int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
+int sys_memory_get_page_attribute(uint32_t addr, sys_page_attr_t* attr);
 
 extern cell_system_time_t sys_time_get_system_time(PPUThread* thread);
 extern int _sys_process_atexitspawn();

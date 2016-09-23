@@ -805,13 +805,13 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
                     log(ssnprintf("TASK_YIELD: %016llx", packet->data.guid));
                     break;
                 case CELL_SPURS_TRACE_TAG_LOAD:
-                    log(ssnprintf("USER_LOAD: ea=%08u, ls=%06x, size=%04x",
+                    log(ssnprintf("USER_LOAD: ea=%08u, ls=%06x, size=%x",
                                   packet->data.load.ea,
                                   packet->data.load.ls * 16,
                                   packet->data.load.size));
                     break;
                 case CELL_SPURS_TRACE_TAG_MAP:
-                    log(ssnprintf("USER_MAP: offset=%08u, ls=%06x, size=%04x",
+                    log(ssnprintf("USER_MAP: offset=%08u, ls=%06x, size=%x",
                                   packet->data.map.offset,
                                   packet->data.map.ls * 16,
                                   packet->data.map.size));
@@ -820,11 +820,11 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
                     auto level = packet->data.start.level == 0 ? "kernel"
                                : packet->data.start.level == 1 ? "policy" 
                                : "job/task";
-                    log(ssnprintf("USER_START: name=%s, level=%04x(%s), ls=%04x",
+                    log(ssnprintf("USER_START: name=%s, level=%04x(%s), ls=%x",
                                   std::string(packet->data.start.module, 4),
                                   packet->data.start.level,
                                   level,
-                                  packet->data.start.ls));
+                                  packet->data.start.ls * 16));
                     break;
                 }
                 case CELL_SPURS_TRACE_TAG_STOP:
@@ -834,13 +834,13 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
                     log(ssnprintf("KERNEL: %016llx", packet->data.guid));
                     break;
                 case CELL_TRACE_TAG_LOAD:
-                    log(ssnprintf("LOAD: ea=%08u, ls=%06x, size=%04x",
+                    log(ssnprintf("LOAD: ea=%08u, ls=%x, size=%04x",
                         packet->data.load.ea,
                         packet->data.load.ls * 16,
                         packet->data.load.size));
                     break;
                 case CELL_TRACE_TAG_MAP:
-                    log(ssnprintf("MAP: offset=%08u, ls=%06x, size=%04x",
+                    log(ssnprintf("MAP: offset=%08u, ls=%x, size=%04x",
                                   packet->data.map.offset,
                                   packet->data.map.ls * 16,
                                   packet->data.map.size));

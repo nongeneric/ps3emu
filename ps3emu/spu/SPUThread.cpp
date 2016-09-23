@@ -188,7 +188,8 @@ void SPUThread::handleInterrupt(uint32_t interruptValue) {
     INFO(spu) << ssnprintf("%s",
         op == SpuInterruptOperation_SendEvent ? "SpuInterruptOperation_SendEvent" :
         op == SpuInterruptOperation_ThrowEvent ? "SpuInterruptOperation_ThrowEvent" :
-        op == SpuInterruptOperation_WriteInterruptMbox ? "SpuInterruptOperation_WriteInterruptMbox" : "?"
+        op == SpuInterruptOperation_WriteInterruptMbox ? "SpuInterruptOperation_WriteInterruptMbox" :
+        "SpuInterruptOperation_SetFlag"
     );
     
     if (op == SpuInterruptOperation_WriteInterruptMbox) {
@@ -200,8 +201,8 @@ void SPUThread::handleInterrupt(uint32_t interruptValue) {
     
     if (op == SpuInterruptOperation_SetFlag) {
         auto flag_id = data1;
-        auto bit = data0;
-        sys_event_flag_set(flag_id, 1u << bit);
+        uint64_t bit = data0;
+        sys_event_flag_set(flag_id, 1ull << bit);
         return;
     }
     

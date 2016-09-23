@@ -254,7 +254,7 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         return;
     INFO(spu) << ssnprintf("write %x to channel %d (%s)", data, ch, classIdToString(ch));
 }
-
+unsigned dec = 0x11111111;
 uint32_t SPUChannels::read(unsigned ch) {
     assert(ch <= SPU_WrOutIntrMbox);
     auto data = ([&ch, this] {
@@ -273,7 +273,7 @@ uint32_t SPUChannels::read(unsigned ch) {
             _channels[ch] = 0;
             return res;
         } else if (ch == SPU_RdDec) {
-            return 0u;
+            return dec--;
         } else {
             if (ch == MFC_RdTagStat) {
                 // as every MFC request completes immediately

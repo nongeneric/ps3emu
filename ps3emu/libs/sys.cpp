@@ -585,3 +585,11 @@ int32_t sys_prx_get_module_list(uint32_t flags, sys_prx_get_module_list_t* info)
     }
     return CELL_OK;
 }
+
+int sys_memory_get_page_attribute(uint32_t addr, sys_page_attr_t* attr) {
+    WARNING(libs) << "sys_memory_get_page_attribute is only partially implemented";
+    attr->attribute = SYS_MEMORY_PROT_READ_WRITE;
+    attr->page_size = 1u << 20u;
+    attr->access_right = SYS_MEMORY_ACCESS_RIGHT_ANY;
+    return CELL_OK;
+}

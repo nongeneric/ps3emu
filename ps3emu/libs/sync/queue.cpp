@@ -137,7 +137,7 @@ int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uin
     port->name = name;
     port->type = port_type;
     *eport_id = ports.create(port);
-    INFO(libs) << ssnprintf("sys_event_port_create(id = %d, name = %016llx)", *eport_id, name);
+    INFO(libs) << ssnprintf("sys_event_port_create(id = %d, name = %llx)", *eport_id, name);
     return CELL_OK;
 }
 
@@ -155,7 +155,7 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
                             uint64_t data1,
                             uint64_t data2,
                             uint64_t data3) {
-    INFO(libs) << ssnprintf("sys_event_port_send(port = %d, data = %016llx, %016llx, %016llx)",
+    INFO(libs) << ssnprintf("sys_event_port_send(port = %d, data = %llx, %llx, %llx)",
                             eport_id, data1, data2, data3);
     auto port = ports.get(eport_id);
     port->queue->send({ port->name, data1, data2, data3 });

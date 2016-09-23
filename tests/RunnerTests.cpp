@@ -2237,3 +2237,13 @@ TEST_CASE("spurs_iwl_communication1_event_flag") {
         "## libspurs : sample_spurs_iwl_event_flag SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("spurs_task_hello2") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_hello2/a.elf"});
+    REQUIRE( output ==
+        "PPU: wait for completion of the task\n"
+        "Total sum = 7116240\n"
+        "PPU: taskset completed\n"
+        "## libspurs : sample_spurs_hello SUCCEEDED ##\n"
+    );
+}

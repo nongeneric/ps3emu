@@ -1736,7 +1736,7 @@ PRINT(CNTLZW, XForm_11) {
 
 EMU(CNTLZW, XForm_11) {
     static_assert(sizeof(unsigned int) == 4, "");
-    auto rs = TH->getGPR(i->RS);
+    uint32_t rs = TH->getGPR(i->RS);
     auto res = !rs ? 32 : __builtin_clz(rs);
     TH->setGPR(i->RA, res);
     if (i->Rc.u())

@@ -120,11 +120,11 @@ enum SPU_Status_Flags {
 #define SPU_Status_GetStopCode(status) ((status >> 16) & 0xffff)
 
 enum INT_Mask_class2_Flags {
-    INT_Mask_class2_B = 1u << (63u - 59u),
-    INT_Mask_class2_T = 1u << (63u - 60u),
-    INT_Mask_class2_H = 1u << (63u - 61u),
-    INT_Mask_class2_S = 1u << (63u - 62u),
-    INT_Mask_class2_M = 1u << (63u - 63u)
+    INT_Mask_class2_B = 1ull << (63u - 59u),
+    INT_Mask_class2_T = 1ull << (63u - 60u),
+    INT_Mask_class2_H = 1ull << (63u - 61u),
+    INT_Mask_class2_S = 1ull << (63u - 62u),
+    INT_Mask_class2_M = 1ull << (63u - 63u)
 };
 
 class SPUThreadInterruptException : public virtual std::exception {

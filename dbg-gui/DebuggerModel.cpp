@@ -498,7 +498,8 @@ void DebuggerModel::run() {
             emit message("process finished");
             cont = false;
         } else if (auto ev = boost::get<PPUThreadStartedEvent>(&untyped)) {
-            emit message("thread started");
+            emit message(QString::fromStdString(ssnprintf("ppu thread started %x",
+                                                          ev->thread->getNIP())));
             if (g_config.config().StopAtNewPpuThread) {
                 cont = false;
                 switchThread(ev->thread);
