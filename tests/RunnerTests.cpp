@@ -2247,3 +2247,11 @@ TEST_CASE("spurs_task_hello2") {
         "## libspurs : sample_spurs_hello SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("l10n_convert_str") {
+    auto output = startWaitGetOutput({"./binaries/l10n_convert_str/a.elf", "CODEPAGE_1251", "UTF8"});
+    REQUIRE( output ==
+        "cellSysmoduleLoadModule() : 0\n"
+        "l10n_convert_str: CODEPAGE_1251 0xe0 0xe1 0xe2 => UTF8 0xd0 0xb0 0xd0 0xb1 0xd0 0xb2\n"
+    );
+}

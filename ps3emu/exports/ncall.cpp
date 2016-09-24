@@ -18,7 +18,6 @@
 #include "ps3emu/libs/sync/queue.h"
 #include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/libs/libpngdec.h"
-#include "ps3emu/libs/libl10n.h"
 #include "ps3emu/libs/audio/configuration.h"
 #include "ps3emu/libs/audio/libaudio.h"
 #include "ps3emu/ppu/CallbackThread.h"
@@ -239,8 +238,6 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmSetFlipStatus),
     ENTRY(cellGcmGetReportDataAddressLocation),
     ENTRY(cellGcmGetLastFlipTime),
-    ENTRY(l10n_get_converter),
-    ENTRY(l10n_convert_str),
     ENTRY(cellAudioOutGetSoundAvailability),
     ENTRY(cellAudioOutConfigure),
     ENTRY(cellAudioOutGetState),

@@ -52,7 +52,10 @@ boost::optional<fdescr> findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid,
 uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name) {
     auto& segments = g_state.proc->getSegments();
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
-    assert(segment != end(segments));
+    if (segment == end(segments)) {
+        WARNING(libs) << ssnprintf("module %x not found", imageBase);
+        return 0;
+    }
     auto elfName = segment->elf->shortName();
     for (auto name : {"libaudio.sprx.elf",
                       "libgcm_sys.sprx.elf",
