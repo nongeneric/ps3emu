@@ -17,7 +17,6 @@
 #include "ps3emu/libs/sync/rwlock.h"
 #include "ps3emu/libs/sync/queue.h"
 #include "ps3emu/libs/sync/event_flag.h"
-#include "ps3emu/libs/libpngdec.h"
 #include "ps3emu/libs/audio/configuration.h"
 #include "ps3emu/libs/audio/libaudio.h"
 #include "ps3emu/ppu/CallbackThread.h"
@@ -225,13 +224,6 @@ NCallEntry ncallTable[] {
     ENTRY(cellKbEnd),
     ENTRY(cellMouseEnd),
     ENTRY(cellVideoOutGetResolutionAvailability),
-    ENTRY(cellPngDecCreate),
-    ENTRY(cellPngDecDecodeData),
-    ENTRY(cellPngDecClose),
-    ENTRY(cellPngDecDestroy),
-    ENTRY(cellPngDecReadHeader),
-    ENTRY(cellPngDecOpen),
-    ENTRY(cellPngDecSetParameter),
     ENTRY(cellGcmInitDefaultFifoMode),
     ENTRY(cellGcmGetTileInfo),
     ENTRY(cellGcmGetZcullInfo),

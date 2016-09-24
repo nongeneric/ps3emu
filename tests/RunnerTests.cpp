@@ -861,7 +861,7 @@ TEST_CASE("pngdec_ppu") {
         "* setDecodeParam: pngdecOutParam.outputBitDepth          = 8\n"
         "* setDecodeParam: pngdecOutParam.outputMode              = 0\n"
         "* setDecodeParam: pngdecOutParam.outputColorSpace        = 10\n"
-        "* setDecodeParam: pngdecOutParam.useMemorySpace          = 512\n"
+        "* setDecodeParam: pngdecOutParam.useMemorySpace          = 42049\n"
         "\n"
         "* decodeStream: cellPngDecDecodeData() returned CELL_OK\n"
         "* decodeStream: pngdecDataOutInfo.chunkInformation  = 8080\n"
@@ -872,8 +872,8 @@ TEST_CASE("pngdec_ppu") {
         "* closeStream: cellPngDecClose() returned CELL_OK\n"
         "* destoryModules: cellPngDecDestroy() returned CELL_OK\n"
         "disp_destroy> cellGcmFinish done ...\n"
-        "* main: Call Malloc Function = 0\n"
-        "* main: Call Free Function = 0\n"
+        "* main: Call Malloc Function = 10\n"
+        "* main: Call Free Function = 10\n"
         "* errorLog: Finished decoding \n"
     );
 }
