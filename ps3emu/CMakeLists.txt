@@ -92,4 +92,5 @@ target_link_libraries(ps3emu
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvmath/libnvmath.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvcore/libnvcore.a
     pthread
+    dl
 )

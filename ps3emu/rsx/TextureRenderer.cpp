@@ -2,24 +2,27 @@
 #include "GLTexture.h"
 
 TextureRenderer::TextureRenderer() {
-    auto fragmentCode =
-        "#version 450 core\n"
-        "out vec4 color;\n"
-        "layout (binding = 20) uniform sampler2D tex;\n"
-        "void main(void) {\n"
-        "    vec2 size = textureSize(tex, 0);\n"
-        "    color = texture(tex, gl_FragCoord.xy / size, 0);\n"
-        "}";
+    auto fragmentCode = R""(
+        #version 450 core
+        out vec4 color;
+        layout (binding = 20) uniform sampler2D tex;
+        void main(void) {
+            vec2 size = textureSize(tex, 0);
+            color = texture(tex, gl_FragCoord.xy / size, 0);
+            color.a = 1;
+        }
+    )"";
 
-    auto vertexCode =
-        "#version 450 core\n"
-        "layout (location = 0) in vec2 pos;\n"
-        "out gl_PerVertex {\n"
-        "    vec4 gl_Position;\n"
-        "};\n"
-        "void main(void) {\n"
-        "    gl_Position = vec4(pos, 0, 1);\n"
-        "}\n";
+    auto vertexCode = R""(
+        #version 450 core
+        layout (location = 0) in vec2 pos;
+        out gl_PerVertex {
+            vec4 gl_Position;
+        };
+        void main(void) {
+            gl_Position = vec4(pos, 0, 1);
+        }
+    )"";
 
     _fragmentShader = FragmentShader(fragmentCode);
     _vertexShader = VertexShader(vertexCode);

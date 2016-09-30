@@ -292,12 +292,12 @@ void Rsx::ViewportOffset(float offset0,
 void Rsx::ColorMask(uint32_t mask) {
     TRACE1(ColorMask, mask);
     _context->colorMask = mask;
-    glcall(glColorMask(
+    glColorMask(
         (mask & CELL_GCM_COLOR_MASK_R) ? GL_TRUE : GL_FALSE,
         (mask & CELL_GCM_COLOR_MASK_G) ? GL_TRUE : GL_FALSE,
         (mask & CELL_GCM_COLOR_MASK_B) ? GL_TRUE : GL_FALSE,
         (mask & CELL_GCM_COLOR_MASK_A) ? GL_TRUE : GL_FALSE
-    ));
+    );
 }
 
 void Rsx::DepthTestEnable(bool enable) {
@@ -363,8 +363,8 @@ void Rsx::ClearSurface(uint32_t mask) {
         glmask |= GL_STENCIL_BUFFER_BIT;
     _context->glClearSurfaceMask = glmask;
     auto& c = _context->colorClearValue;
-    glcall(glClearColor(c.r, c.g, c.b, c.a));
-    glcall(glClear(glmask));
+    glClearColor(c.r, c.g, c.b, c.a);
+    glClear(glmask);
 }
 
 void Rsx::VertexDataArrayFormat(uint8_t index,
@@ -406,19 +406,27 @@ void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offse
     assert((GLint)array.binding < (glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBindings), maxBindings));
 }
 
+GLenum gcmPrimitiveToOpengl(uint32_t primitive) {
+#define X(x) case CELL_GCM_PRIMITIVE_##x: return GL_##x;
+    switch (primitive) {
+        X(QUADS)
+        X(QUAD_STRIP)
+        X(POLYGON)
+        X(POINTS)
+        X(LINES)
+        X(LINE_LOOP)
+        X(LINE_STRIP)
+        X(TRIANGLES)
+        X(TRIANGLE_STRIP)
+        X(TRIANGLE_FAN)
+        default: assert(false); return 0;
+    }
+#undef X
+}
+
 void Rsx::BeginEnd(uint32_t mode) {
     TRACE1(BeginEnd, mode);
-    _context->glVertexArrayMode = 
-        mode == CELL_GCM_PRIMITIVE_QUADS ? GL_QUADS :
-        mode == CELL_GCM_PRIMITIVE_QUAD_STRIP ? GL_QUAD_STRIP :
-        mode == CELL_GCM_PRIMITIVE_POLYGON ? GL_POLYGON :
-        mode == CELL_GCM_PRIMITIVE_POINTS ? GL_POINTS :
-        mode == CELL_GCM_PRIMITIVE_LINES ? GL_LINES :
-        mode == CELL_GCM_PRIMITIVE_LINE_LOOP ? GL_LINE_LOOP :
-        mode == CELL_GCM_PRIMITIVE_LINE_STRIP ? GL_LINE_STRIP :
-        mode == CELL_GCM_PRIMITIVE_TRIANGLES ? GL_TRIANGLES :
-        mode == CELL_GCM_PRIMITIVE_TRIANGLE_STRIP ? GL_TRIANGLE_STRIP :
-        GL_TRIANGLE_FAN;
+    _context->glVertexArrayMode = !mode ? GL_TRIANGLE_FAN : gcmPrimitiveToOpengl(mode);
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
@@ -561,7 +569,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     TRACE3(EmuFlip, buffer, label, labelValue);
     auto& fb = _context->displayBuffers[buffer];
     auto va = fb.offset + RsxFbBaseAddr;
-    FramebufferTextureKey key{va, fb.width, fb.height, GL_RGB32F};
+    FramebufferTextureKey key{va, fb.width, fb.height, GL_RGBA8}; // GL_RGB32F
     auto tex = _context->framebuffer->findTexture(key);
     if (!tex && _mode == RsxOperationMode::Replay)
         return;
@@ -654,18 +662,18 @@ bool Rsx::linkShaderProgram() {
     _context->pipeline.useShader(*_context->fragmentShader);
     _context->pipeline.validate();
     
-    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                            VertexShaderConstantBinding,
-                            _context->vertexConstBuffer.handle()));
-    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                            VertexShaderSamplesInfoBinding,
-                            _context->vertexSamplersBuffer.handle()));
-    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                            VertexShaderViewportMatrixBinding,
-                            _context->vertexViewportBuffer.handle()));
-    glcall(glBindBufferBase(GL_UNIFORM_BUFFER,
-                            FragmentShaderSamplesInfoBinding,
-                            _context->fragmentSamplersBuffer.handle()));
+    glBindBufferBase(GL_UNIFORM_BUFFER,
+                     VertexShaderConstantBinding,
+                     _context->vertexConstBuffer.handle());
+    glBindBufferBase(GL_UNIFORM_BUFFER,
+                     VertexShaderSamplesInfoBinding,
+                     _context->vertexSamplersBuffer.handle());
+    glBindBufferBase(GL_UNIFORM_BUFFER,
+                     VertexShaderViewportMatrixBinding,
+                     _context->vertexViewportBuffer.handle());
+    glBindBufferBase(GL_UNIFORM_BUFFER,
+                     FragmentShaderSamplesInfoBinding,
+                     _context->fragmentSamplersBuffer.handle());
     return true;
 }
 
@@ -967,7 +975,7 @@ void Rsx::updateTextures() {
         if (sampler.enable && sampler.texture.width && sampler.texture.height) {
             auto textureUnit = i + FragmentTextureUnit;
             auto va = rsxOffsetToEa(sampler.texture.location, sampler.texture.offset);
-            FramebufferTextureKey key{va, sampler.texture.width, sampler.texture.height, GL_RGB32F};
+            FramebufferTextureKey key{va, sampler.texture.width, sampler.texture.height, GL_RGBA8}; // GL_RGB32F
             auto surfaceTex = _context->framebuffer->findTexture(key);
             if (surfaceTex) {
                 glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
@@ -1185,6 +1193,7 @@ void Rsx::SurfaceFormat(uint8_t colorFormat,
     }
     //assert(antialias == CELL_GCM_SURFACE_CENTER_1);
     assert(type == CELL_GCM_SURFACE_PITCH);
+    _context->surface.colorFormat = colorFormat;
     _context->surface.width = 1 << (width + 1);
     _context->surface.height = 1 << (height + 1);
     _context->surface.colorPitch[0] = pitchA;
@@ -1869,6 +1878,7 @@ void Rsx::Nv309eSetFormat(uint16_t format,
 
 void Rsx::BlendEnable(bool enable) {
     TRACE1(BlendEnable, enable);
+    _context->fragmentOps.blend = enable;
     glEnableb(GL_BLEND, enable);
 }
 
@@ -1900,6 +1910,10 @@ void Rsx::BlendFuncSFactor(uint16_t sfcolor,
                            uint16_t dfcolor,
                            uint16_t dfalpha) {
     TRACE4(BlendFuncSFactor, sfcolor, sfalpha, dfcolor, dfalpha);
+    _context->fragmentOps.sfcolor = sfcolor;
+    _context->fragmentOps.sfalpha = sfalpha;
+    _context->fragmentOps.dfcolor = dfcolor;
+    _context->fragmentOps.dfalpha = dfalpha;
     glBlendFuncSeparate(
         gcmBlendFuncToOpengl(sfcolor),
         gcmBlendFuncToOpengl(dfcolor),
@@ -1910,6 +1924,7 @@ void Rsx::BlendFuncSFactor(uint16_t sfcolor,
 
 void Rsx::LogicOpEnable(bool enable) {
     TRACE1(LogicOpEnable, enable);
+    _context->fragmentOps.logic = enable;
     glEnableb(GL_COLOR_LOGIC_OP, enable);
 }
 
@@ -1926,6 +1941,8 @@ GLenum gcmBlendEquationToOpengl(uint16_t eq) {
 
 void Rsx::BlendEquation(uint16_t color, uint16_t alpha) {
     TRACE2(BlendEquation, color, alpha);
+    _context->fragmentOps.blendColor = color;
+    _context->fragmentOps.blendAlpha = alpha;
     glBlendEquationSeparate(
         gcmBlendEquationToOpengl(color),
         gcmBlendEquationToOpengl(alpha));
@@ -1967,7 +1984,12 @@ GLenum gcmPolygonModeToOpengl(uint32_t mode) {
 
 void Rsx::FrontPolygonMode(uint32_t mode) {
     TRACE1(FrontPolygonMode, mode);
-    glPolygonMode(GL_FRONT_AND_BACK, gcmPolygonModeToOpengl(mode));
+    glPolygonMode(GL_FRONT, gcmPolygonModeToOpengl(mode));
+}
+
+void Rsx::BackPolygonMode(uint32_t mode) {
+    TRACE1(BackPolygonMode, mode);
+    glPolygonMode(GL_BACK, gcmPolygonModeToOpengl(mode));
 }
 
 void Rsx::StencilTestEnable(bool enable) {
@@ -2038,6 +2060,61 @@ void Rsx::GetReport(uint8_t type, uint32_t offset) {
     g_state.mm->store<8>(ea, g_state.proc->getTimeBaseNanoseconds().count());
     g_state.mm->store<8>(ea + 8 + 4, 0);
     __sync_synchronize();
+}
+
+void Rsx::ScissorHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
+    TRACE4(ScissorHorizontal, x, w, y, h);
+    _context->surface.scissor.x = x;
+    _context->surface.scissor.width = w;
+    _context->surface.scissor.y = y;
+    _context->surface.scissor.height = h;
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(x, _context->surfaceClipHeight - (y + h), w, h);
+}
+
+void Rsx::TransformProgramStart(uint32_t startSlot) {
+    TRACE1(TransformProgramStart, startSlot);
+    assert(startSlot == 0);
+}
+
+void Rsx::LineWidth(float width) {
+    TRACE1(LineWidth, width);
+    glLineWidth(width);
+}
+
+void Rsx::LineSmoothEnable(bool enable) {
+    TRACE1(LineSmoothEnable, enable);
+    glEnableb(GL_LINE_SMOOTH, enable);
+}
+
+GLenum gcmLogicOpToOpengl(uint32_t op) {
+#define X(x) case CELL_GCM_##x: return GL_##x;
+    switch (op) {
+        X(CLEAR)
+        X(AND)
+        X(AND_REVERSE)
+        X(COPY)
+        X(AND_INVERTED)
+        X(NOOP)
+        X(XOR)
+        X(OR)
+        X(NOR)
+        X(EQUIV)
+        X(INVERT)
+        X(OR_REVERSE)
+        X(COPY_INVERTED)
+        X(OR_INVERTED)
+        X(NAND)
+        X(SET)
+        default: throw std::runtime_error("bad logic op");
+    }
+#undef X
+}
+
+void Rsx::LogicOp(uint32_t op) {
+    TRACE1(LogicOp, op);
+    _context->fragmentOps.logicOp = op;
+    glLogicOp(gcmLogicOpToOpengl(op));
 }
 
 void Rsx::setOperationMode(RsxOperationMode mode) {

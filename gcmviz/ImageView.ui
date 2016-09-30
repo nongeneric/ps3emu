@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1400</width>
-    <height>800</height>
+    <height>815</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -28,14 +28,28 @@
         <x>0</x>
         <y>0</y>
         <width>1384</width>
-        <height>784</height>
+        <height>799</height>
        </rect>
       </property>
-      <layout class="QHBoxLayout" name="horizontalLayout">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <widget class="QLabel" name="labelImage">
          <property name="text">
           <string/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="cbAlpha1">
+         <property name="text">
+          <string>Set Alpha = 1</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="cbAlphaOnly">
+         <property name="text">
+          <string>Set RGB = Alpha</string>
          </property>
         </widget>
        </item>

@@ -63,6 +63,10 @@ float fixedUint16ToFloat(uint16_t val) {
     return (float)val / 16.f;
 }
 
+float fixedUint9ToFloat(uint32_t val) {
+    return (float)val / 8.f;
+}
+
 int64_t Rsx::interpret(uint32_t get) {
     MethodHeader header { g_state.mm->load<4>(rsxOffsetToEa(MemoryLocation::Main, get)) };
     auto count = header.count.u();
@@ -486,9 +490,11 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_SET_LOGIC_OP_ENABLE";
             LogicOpEnable(readarg(1));
             break;
-        case 0x00000378:
-            name = "CELL_GCM_NV4097_SET_LOGIC_OP";
+        case 0x00000378: {
+            //name = "CELL_GCM_NV4097_SET_LOGIC_OP";
+            LogicOp(readarg(1));
             break;
+        }
         case 0x0000037c:
             name = "CELL_GCM_NV4097_SET_BLEND_COLOR2";
             break;
@@ -515,15 +521,23 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_SET_CONTROL0";
             Control0(readarg(1));
             break;
-        case 0x000003b8:
-            name = "CELL_GCM_NV4097_SET_LINE_WIDTH";
+        case 0x000003b8: {
+            //name = "CELL_GCM_NV4097_SET_LINE_WIDTH";
+            LineWidth(fixedUint9ToFloat(readarg(1)));
             break;
-        case 0x000003bc:
-            name = "CELL_GCM_NV4097_SET_LINE_SMOOTH_ENABLE";
+        }
+        case 0x000003bc: {
+            //name = "CELL_GCM_NV4097_SET_LINE_SMOOTH_ENABLE";
+            LineSmoothEnable(readarg(1));
             break;
-        case 0x000008c0:
-            name = "CELL_GCM_NV4097_SET_SCISSOR_HORIZONTAL";
+        }
+        case 0x000008c0: {
+            //name = "CELL_GCM_NV4097_SET_SCISSOR_HORIZONTAL";
+            auto arg1 = readarg(1);
+            auto arg2 = readarg(2);
+            ScissorHorizontal(arg1 & 0xffff, arg1 >> 16, arg2 & 0xffff, arg2 >> 16);
             break;
+        }
         case 0x000008c4:
             name = "CELL_GCM_NV4097_SET_SCISSOR_VERTICAL";
             break;
@@ -729,7 +743,8 @@ int64_t Rsx::interpret(uint32_t get) {
             FrontPolygonMode(readarg(1));
             break;
         case 0x0000182c:
-            name = "CELL_GCM_NV4097_SET_BACK_POLYGON_MODE";
+            //name = "CELL_GCM_NV4097_SET_BACK_POLYGON_MODE";
+            BackPolygonMode(readarg(1));
             break;
         case 0x00001830:
             //name = "CELL_GCM_NV4097_SET_CULL_FACE";
@@ -865,9 +880,11 @@ int64_t Rsx::interpret(uint32_t get) {
                 TransformProgramLoad(readarg(1), readarg(2));
             }
             break;
-        case 0x00001ea0:
-            name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_START";
+        case 0x00001ea0: {
+            //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_START";
+            TransformProgramStart(readarg(1));
             break;
+        }
         case 0x00001ea4:
             name = "CELL_GCM_NV4097_SET_ZCULL_CONTROL0";
             break;
@@ -1556,7 +1573,7 @@ int64_t Rsx::interpret(uint32_t get) {
         }
     }
     if (name) {
-        LOG << ssnprintf("[0x%08x: %02d%s] %s",
+        WARNING(rsx) << ssnprintf("[0x%08x: %02d%s] %s",
             get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
     }
     len = (header.count.u() + 1) * 4;

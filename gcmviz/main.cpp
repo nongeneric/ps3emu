@@ -1,4 +1,5 @@
 #include "MainWindowModel.h"
+#include "ps3emu/log.h"
 #include <QApplication>
 #include <QMainWindow>
 #include <boost/program_options.hpp>
@@ -8,6 +9,7 @@
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
+    log_init(log_console, log_info, log_rsx | log_libs | log_debugger, false);    
     std::string tracePath;
     options_description consoleDescr("Allowed options");
     try {

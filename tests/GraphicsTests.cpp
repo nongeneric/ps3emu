@@ -137,7 +137,7 @@ TEST_CASE("opengl_createdevice") {
 
 TEST_CASE("gcm_duck") {
     runAndWait("./binaries/gcm_duck/a.elf");
-    compareLastFrame("./binaries/gcm_duck/ps3frame0.png");
+    compareLastFrame("./binaries/gcm_duck/ps3frame0.png", 0, 20);
 }
 
 TEST_CASE("gcm_video_texturing") {

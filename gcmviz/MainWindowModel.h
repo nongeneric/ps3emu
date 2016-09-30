@@ -8,6 +8,8 @@
 
 class Process;
 class Rsx;
+class QDialog;
+class OpenGLPreview;
 class MainWindowModel {
     Ui::MainWindow _window;
     QMainWindow _qwindow;
@@ -15,6 +17,7 @@ class MainWindowModel {
     unsigned _lastDrawCount;
     std::unique_ptr<Process> _proc;
     std::unique_ptr<Rsx> _rsx;
+    std::unique_ptr<OpenGLPreview> _openglPreview;
     unsigned _currentCommand;
     unsigned _currentFrame;
     void changeFrame();
@@ -29,4 +32,5 @@ public:
     void runTo(unsigned lastCommand, unsigned frame);
 public slots:
     void onRun();
+    void onTest();
 };

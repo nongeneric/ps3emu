@@ -174,6 +174,18 @@ struct SurfaceToFramebufferLink {
     }
 };
 
+struct FragmentOps {
+    bool blend;
+    uint16_t sfcolor;
+    uint16_t sfalpha;
+    uint16_t dfcolor;
+    uint16_t dfalpha;
+    uint16_t blendColor;
+    uint16_t blendAlpha;
+    bool logic;
+    uint32_t logicOp;
+};
+
 class FragmentShaderUpdateFunctor;
 class GLFramebuffer;
 class TextureRenderer;
@@ -225,6 +237,7 @@ struct RsxContext {
     uint32_t surfaceClipWidth = 0;
     uint32_t surfaceClipHeight = 0;
     uint16_t frequencyDividerOperation = 0;
+    FragmentOps fragmentOps;
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

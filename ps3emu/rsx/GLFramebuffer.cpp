@@ -44,14 +44,14 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
         GLuint texHandle = 0;
         if (info.colorTarget[i]) {
             auto offset = rsxOffsetToEa(info.colorLocation[i], info.colorOffset[i]);
-            auto tex = searchCache(GL_RGB32F, offset, width, height);
+            auto tex = searchCache(GL_RGBA8, offset, width, height); // GL_RGB32F
             texHandle = tex->handle();
         }
-        glcall(glNamedFramebufferTexture(
+        glNamedFramebufferTexture(
                    _id,
                    GL_COLOR_ATTACHMENT0 + i,
                    texHandle,
-                   0));
+                0);
     }
     glNamedFramebufferTexture(_id, GL_DEPTH_STENCIL_ATTACHMENT, 0, 0);
     glNamedFramebufferTexture(_id, GL_STENCIL_ATTACHMENT, 0, 0);

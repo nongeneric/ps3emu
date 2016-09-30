@@ -11,13 +11,20 @@
 #include <QPainter>
 #include <boost/endian/conversion.hpp>
 #include <boost/range/numeric.hpp>
-#include "../ps3emu/utils.h"
-#include "../ps3emu/rsx/Rsx.h"
-#include "../ps3emu/rsx/RsxContext.h"
-#include "../ps3emu/rsx/Tracer.h"
-#include "../ps3emu/Process.h"
-#include "../ps3emu/shaders/ShaderGenerator.h"
-#include "../ps3emu/rsx/FragmentShaderUpdateFunctor.h"
+#include <boost/algorithm/string/join.hpp>
+#include "ps3emu/utils.h"
+#include "ps3emu/rsx/Rsx.h"
+#include "ps3emu/rsx/RsxContext.h"
+#include "ps3emu/rsx/Tracer.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/shaders/ShaderGenerator.h"
+#include "ps3emu/rsx/FragmentShaderUpdateFunctor.h"
+#include "ps3emu/state.h"
+#include "OpenGLPreview.h"
+#include "OpenGLPreviewWidget.h"
+
+#define GCM_EMU
+#include <gcm_tool.h>
 
 using namespace boost::endian;
 
@@ -58,7 +65,8 @@ public:
         auto command = _db->getCommand(_frame, index.row());
         auto id = (CommandId)command.id;
         if (role == Qt::BackgroundColorRole) {
-           if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
+           if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray ||
+               id == CommandId::ClearSurface) {
                return QColor(Qt::green);
            }
            if (id == CommandId::UpdateBufferCache ||
@@ -99,12 +107,13 @@ public:
             case 1: return "Value";
             case 2: return "Hex";
             case 3: return "Type";
+            case 4: return "Comment";
         }
         return QVariant();
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 4;
+        return 5;
     }
     
     QModelIndex index(int row,
@@ -117,6 +126,27 @@ public:
         return _command.args.size();
     }
     
+    QString printComment(GcmCommandArg arg) const {
+        std::string res;
+        if ((CommandId)_command.id == CommandId::ClearSurface && arg.name == "mask") {
+            std::vector<std::string> flags;
+            if (arg.value & CELL_GCM_CLEAR_R)
+                flags.push_back("CELL_GCM_CLEAR_R");
+            if (arg.value & CELL_GCM_CLEAR_G)
+                flags.push_back("CELL_GCM_CLEAR_G");
+            if (arg.value & CELL_GCM_CLEAR_B)
+                flags.push_back("CELL_GCM_CLEAR_B");
+            if (arg.value & CELL_GCM_CLEAR_A)
+                flags.push_back("CELL_GCM_CLEAR_A");
+            if (arg.value & CELL_GCM_CLEAR_Z)
+                flags.push_back("CELL_GCM_CLEAR_Z");
+            if (arg.value & CELL_GCM_CLEAR_S)
+                flags.push_back("CELL_GCM_CLEAR_S");
+            res = boost::algorithm::join(flags, " | ");
+        }
+        return QString::fromStdString(res);;
+    }
+    
     QVariant data(const QModelIndex& index,
                   int role = Qt::DisplayRole) const override {
          if (role != Qt::DisplayRole)
@@ -127,6 +157,7 @@ public:
              case 1: return QString::fromStdString(printArgDecimal(arg));
              case 2: return QString::fromStdString(printArgHex(arg));
              case 3: return printArgType((GcmArgType)arg.type);
+             case 4: return printComment(arg);
          }
          return QVariant();
     }
@@ -182,6 +213,8 @@ public:
                         : entry.texture->format() == GL_DEPTH24_STENCIL8 ? "GL_DEPTH24_STENCIL8"
                         : entry.texture->format() == GL_RGBA32F ? "GL_RGBA32F"
                         : entry.texture->format() == GL_RGB32F ? "GL_RGB32F"
+                        : entry.texture->format() == GL_RGB8 ? "GL_RGB8"
+                        : entry.texture->format() == GL_RGBA8 ? "GL_RGBA8"
                         : "unknown";
             switch (index.column()) {
                 case 0: return QString::fromStdString(ssnprintf("#%08x", entry.key.offset));
@@ -250,19 +283,44 @@ public:
                               image.bits());
         });
         
-        QPainter p(&background);
-        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        p.drawImage(0, 0, image);
-        p.end();
         if (!isRegular) {
-            background = background.mirrored();
+            image = image.mirrored();
         }
         
         auto dialog = new QDialog();
         auto imageView = new Ui::ImageView();
         imageView->setupUi(dialog);
-        auto pixmap = QPixmap::fromImage(background);
-        imageView->labelImage->setPixmap(pixmap);
+        
+        auto setPixmap = [=](bool alpha1, bool alphaOnly) {
+            auto background_copy = background;
+            for (auto x = 0u; x < width; ++x) {
+                for (auto y = 0u; y < height; ++y) {
+                    auto pixel = image.pixel(x, y);
+                    if (alphaOnly) {
+                        auto alpha = pixel = 0xff000000;
+                        pixel = alpha << 24 | alpha << 16 | alpha << 8 | alpha;
+                    } else if (alpha1) {
+                        pixel |= 0xff000000;
+                    }
+                    background_copy.setPixel(x, y, pixel);
+                }
+            }
+            QPainter p(&background_copy);
+            p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            p.drawImage(0, 0, image);
+            p.end();
+            auto pixmap = QPixmap::fromImage(background_copy);
+            imageView->labelImage->setPixmap(pixmap);
+        };
+        setPixmap(false, false);
+        
+        QObject::connect(imageView->cbAlpha1, &QAbstractButton::clicked, [=] {
+            setPixmap(imageView->cbAlpha1->isChecked(), imageView->cbAlphaOnly->isChecked());
+        });
+        
+        QObject::connect(imageView->cbAlphaOnly, &QAbstractButton::clicked, [=] {
+            setPixmap(imageView->cbAlpha1->isChecked(), imageView->cbAlphaOnly->isChecked());
+        });
         
         dialog->show();
     }
@@ -383,6 +441,7 @@ public:
 
 class VDATableModel : public QAbstractItemModel {
     Rsx* _rsx;
+    
 public:
     VDATableModel(Rsx* rsx) : _rsx(rsx) { }
     
@@ -447,6 +506,7 @@ class VDABufferTableModel : public QAbstractItemModel {
     VertexDataArrayFormatInfo _info;
     uint8_t* _buffer;
     unsigned _size;
+    std::unique_ptr<OpenGLPreview> _openglPreview;
     
 public:
     VDABufferTableModel(Rsx* rsx, std::uint8_t* buffer, unsigned vdaIndex, unsigned size) 
@@ -509,6 +569,25 @@ public:
             return _info.frequency;
         return _size;
     }
+    
+    void showPreview() {
+        std::vector<PreviewVertex> vertices;
+        auto ptr = _buffer;
+        for (auto i = 0; i < rowCount(); ++i) {
+            auto component = (uint32_t*)ptr;
+            PreviewVertex v = {0};
+            for (auto j = 0; j < std::min<int>(3, _info.size); ++j) {
+                v.xyz[j] = union_cast<uint32_t, float>(endian_reverse(component[j]));
+            }
+            ptr += _info.stride;
+            vertices.push_back(v);
+        }
+        
+        _openglPreview.reset(new OpenGLPreview());
+        _openglPreview->widget()->setVertices(vertices);
+        _openglPreview->widget()->setMode(_rsx->context()->glVertexArrayMode);
+        _openglPreview->show();
+    }
 };
 
 MainWindowModel::~MainWindowModel() = default;
@@ -524,6 +603,11 @@ void MainWindowModel::loadTrace(std::string path) {
 
 void MainWindowModel::onRun() {
     runTo(_db.commands(_currentFrame) - 1, _currentFrame);
+}
+
+void MainWindowModel::onTest() {
+    _openglPreview.reset(new OpenGLPreview());
+    _openglPreview->show();
 }
 
 void MainWindowModel::update() {
@@ -614,6 +698,11 @@ void MainWindowModel::update() {
         auto mapped = (uint8_t*)buffer->mapped() + info.offset;
         auto vdaBufferModel = new VDABufferTableModel(_rsx.get(), mapped, index.row(), _lastDrawCount);
         _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
+        
+        QObject::disconnect(_window.pbVisualizeGeometry, &QPushButton::clicked, 0, 0);
+        QObject::connect(_window.pbVisualizeGeometry, &QPushButton::clicked, [=] { 
+            vdaBufferModel->showPreview();
+        });
     });
     _window.twVertexDataArrays->setModel(vdaModel);
     updateContextTable();
@@ -680,6 +769,7 @@ void MainWindowModel::changeFrame() {
 MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _currentFrame(0) {
     _window.setupUi(&_qwindow);
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
+    QObject::connect(_window.actionTest, &QAction::triggered, [=] { onTest(); });
     Rsx::setOperationMode(RsxOperationMode::Replay);
     QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
         this->runTo(index.row(), _currentFrame);
@@ -687,6 +777,7 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     _window.contextTree->setColumnCount(1);
     QList<QTreeWidgetItem*> items;
     items.append(new SurfaceContextTreeItem());
+    items.append(new FragmentOperationsTreeItem());
     
     auto vertexSamplers = new QTreeWidgetItem();
     vertexSamplers->setText(0, "Vertex Samplers");

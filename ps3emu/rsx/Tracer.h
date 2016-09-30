@@ -105,12 +105,18 @@
     X(VertexData4fM) \
     X(CullFace) \
     X(FrontPolygonMode) \
+    X(BackPolygonMode) \
     X(StencilTestEnable) \
     X(StencilMask) \
     X(StencilFunc) \
     X(StencilOpFail) \
     X(ContextDmaReport) \
     X(GetReport) \
+    X(ScissorHorizontal) \
+    X(TransformProgramStart) \
+    X(LineWidth) \
+    X(LineSmoothEnable) \
+    X(LogicOp) \
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \

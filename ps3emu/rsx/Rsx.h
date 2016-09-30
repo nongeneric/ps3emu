@@ -298,12 +298,18 @@ class Rsx {
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
     void CullFace(uint32_t cfm);
     void FrontPolygonMode(uint32_t mode);
+    void BackPolygonMode(uint32_t mode);
     void StencilTestEnable(bool enable);
     void StencilMask(uint32_t sm);
     void StencilFunc(uint32_t func, int32_t ref, uint32_t mask);
     void StencilOpFail(uint32_t fail, uint32_t depthFail, uint32_t depthPass);
     void ContextDmaReport(uint32_t handle);
     void GetReport(uint8_t type, uint32_t offset);
+    void ScissorHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h);
+    void TransformProgramStart(uint32_t startSlot);
+    void LineWidth(float width);
+    void LineSmoothEnable(bool enable);
+    void LogicOp(uint32_t op);
     
     void invokeHandler(uint32_t descrEa);
     

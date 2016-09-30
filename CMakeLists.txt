@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.4)
 project(root)
 include_directories(${root_SOURCE_DIR})
 
+set(CMAKE_CXX_STANDARD 14)
+
 add_definitions(-DBOOST_ALL_DYN_LINK)
 set(Boost_USE_STATIC_LIBS       OFF)
 set(Boost_USE_MULTITHREADED      ON)
@@ -32,10 +34,10 @@ set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
 
 add_definitions(-DDEBUG)
 add_definitions(-DTESTS)
-set(CMAKE_CXX_FLAGS "-ggdb3 -O0 -Wall -Werror -std=c++17 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-ggdb3 -O0 -Wall -Werror ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
-#set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror -std=c++17 ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})

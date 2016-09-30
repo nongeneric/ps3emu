@@ -32,3 +32,9 @@ public:
     SamplerTextureContextTreeItem(bool fragment, int index);
     virtual GenericTableModel<RsxContext>* getTable(RsxContext* context) override;
 };
+
+class FragmentOperationsTreeItem : public ContextTreeItem {
+public:
+    FragmentOperationsTreeItem();
+    virtual GenericTableModel<RsxContext>* getTable(RsxContext* context) override;
+};

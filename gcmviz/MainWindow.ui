@@ -82,7 +82,7 @@
       </widget>
       <widget class="QTabWidget" name="tabWidget">
        <property name="currentIndex">
-        <number>5</number>
+        <number>4</number>
        </property>
        <property name="documentMode">
         <bool>false</bool>
@@ -306,17 +306,35 @@
         <attribute name="title">
          <string>VDAs</string>
         </attribute>
-        <layout class="QHBoxLayout" name="horizontalLayout_11">
+        <layout class="QHBoxLayout" name="horizontalLayout_23">
          <item>
           <widget class="QSplitter" name="splitter_4">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
            <widget class="QTableView" name="twVertexDataArrays"/>
-           <widget class="QTableView" name="twVertexDataArraysBuffer"/>
+           <widget class="QWidget" name="">
+            <layout class="QVBoxLayout" name="verticalLayout_4">
+             <item>
+              <widget class="QTableView" name="twVertexDataArraysBuffer"/>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pbVisualizeGeometry">
+               <property name="text">
+                <string>Geometry</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
           </widget>
          </item>
         </layout>
+        <zorder>splitter_4</zorder>
+        <zorder>pbVisualizeGeometry</zorder>
+        <zorder>twVertexDataArraysBuffer</zorder>
+        <zorder>pbVisualizeGeometry</zorder>
+        <zorder>twVertexDataArraysBuffer</zorder>
        </widget>
        <widget class="QWidget" name="tab_8">
         <attribute name="title">
@@ -395,6 +413,7 @@
      <string>&amp;Trace</string>
     </property>
     <addaction name="actionRun"/>
+    <addaction name="actionTest"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTrace"/>
@@ -414,6 +433,14 @@
    </property>
    <property name="shortcut">
     <string>F5</string>
+   </property>
+  </action>
+  <action name="actionTest">
+   <property name="text">
+    <string>&amp;Test</string>
+   </property>
+   <property name="shortcut">
+    <string>F6</string>
    </property>
   </action>
  </widget>

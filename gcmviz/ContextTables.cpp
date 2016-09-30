@@ -24,6 +24,31 @@ std::string printBool(bool value) {
     return value ? "TRUE" : "FALSE";
 }
 
+#define DECHEX(x, p) {\
+    #p, [=](auto) { return printDec(x. p); },\
+        [=](auto) { return printHex(x. p); },\
+},
+
+#define HEX(x, p) {\
+    #p, [=](auto) { return printHex(x. p); },\
+        [=](auto) { return ""; },\
+},
+
+#define DEC(x, p) {\
+    #p, [=](auto) { return printDec(x. p); },\
+        [=](auto) { return ""; },\
+},
+
+#define BOOL(x, p) {\
+    #p, [=](auto) { return printBool(x. p); },\
+        [=](auto) { return ""; },\
+},
+
+#define FLOAT(x, p) {\
+    #p, [=](auto) { return ssnprintf("%g", x. p); },\
+        [=](auto) { return ""; },\
+},
+
 GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
     RsxContext* context) {
     return new GenericTableModel<RsxContext>(
@@ -123,6 +148,11 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
                 [=](auto c) { return ""; },
             },
             {
+                "Color format",
+                [=](auto c) { return printHex(c->surface.colorFormat); },
+                [=](auto c) { return ""; },
+            },
+            {
                 "Depth format",
                 [=](auto c) {
                     return c->surface.depthFormat == SurfaceDepthFormat::z24s8
@@ -142,33 +172,13 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
                 },
                 [=](auto c) { return ""; },
             },
+            {
+                "Color mask",
+                [=](auto c) { return printHex(c->colorMask); },
+                [=](auto c) { return ""; },
+            },
         });
 }
-
-#define DECHEX(x, p) {\
-    #p, [=](auto) { return printDec(x. p); },\
-        [=](auto) { return printHex(x. p); },\
-},
-
-#define HEX(x, p) {\
-    #p, [=](auto) { return printHex(x. p); },\
-        [=](auto) { return ""; },\
-},
-
-#define DEC(x, p) {\
-    #p, [=](auto) { return printDec(x. p); },\
-        [=](auto) { return ""; },\
-},
-
-#define BOOL(x, p) {\
-    #p, [=](auto) { return printBool(x. p); },\
-        [=](auto) { return ""; },\
-},
-
-#define FLOAT(x, p) {\
-    #p, [=](auto) { return ssnprintf("%g", x. p); },\
-        [=](auto) { return ""; },\
-},
 
 SamplerContextTreeItem::SamplerContextTreeItem(bool fragment, int index)
     : ContextTreeItem(ssnprintf("s[%d]", index)),
@@ -243,4 +253,22 @@ GenericTableModel<RsxContext>* SamplerTextureContextTreeItem::getTable(
             HEX(t(), fragmentGs)
         });
 }
-    
+
+FragmentOperationsTreeItem::FragmentOperationsTreeItem() : ContextTreeItem("Fragment Operations") {}
+
+GenericTableModel<RsxContext>* FragmentOperationsTreeItem::getTable(RsxContext* context) {
+    auto& ops = context->fragmentOps;
+    return new GenericTableModel<RsxContext>(
+        context,
+        {
+            BOOL(ops, blend)
+            HEX(ops, sfcolor)
+            HEX(ops, sfalpha)
+            HEX(ops, dfcolor)
+            HEX(ops, dfalpha)
+            HEX(ops, blendColor)
+            HEX(ops, blendAlpha)
+            BOOL(ops, logic)
+            HEX(ops, logicOp)
+        });
+}

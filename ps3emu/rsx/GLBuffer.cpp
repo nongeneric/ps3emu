@@ -4,7 +4,7 @@
 
 GLBuffer::GLBuffer() : HandleWrapper(0) { }
 
-GLBuffer::GLBuffer(GLBufferType type, uint32_t size, void* data) 
+GLBuffer::GLBuffer(GLBufferType type, uint32_t size, const void* data) 
     : _size(size), _type(type) {
     if (!data && type == GLBufferType::Static)
         throw std::runtime_error("static buffer should be initialized with data");

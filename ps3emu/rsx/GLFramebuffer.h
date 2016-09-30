@@ -14,9 +14,17 @@ enum class SurfaceDepthFormat {
     z16, z24s8
 };
 
+struct ScissorInfo {
+    uint16_t x;
+    uint16_t width;
+    uint16_t y;
+    uint16_t height;
+};
+
 struct SurfaceInfo {
     MemoryLocation colorLocation[4];
     MemoryLocation depthLocation;
+    unsigned colorFormat;
     unsigned width;
     unsigned height;
     unsigned colorPitch[4];
@@ -28,6 +36,7 @@ struct SurfaceInfo {
     SurfaceDepthType depthType;
     SurfaceDepthFormat depthFormat;
     std::array<bool, 4> colorTarget;
+    ScissorInfo scissor;
 };
 
 struct FramebufferTextureKey {

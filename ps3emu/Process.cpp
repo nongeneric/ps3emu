@@ -134,8 +134,6 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
 }
 
 void Process::init(std::string elfPath, std::vector<std::string> args) {
-    g_state.proc = this;
-    g_state.mm = _mainMemory.get();
     _threads.emplace_back(std::make_unique<PPUThread>(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
     _rsx.reset(new Rsx());
@@ -448,7 +446,9 @@ CallbackThread* Process::getCallbackThread() {
 Process::~Process() = default;
 
 Process::Process() {
+    g_state.proc = this;
     _mainMemory.reset(new MainMemory());
+    g_state.mm = _mainMemory.get();
     _systemStart = boost::chrono::high_resolution_clock::now();
 }
 

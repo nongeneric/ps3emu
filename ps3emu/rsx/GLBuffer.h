@@ -23,7 +23,7 @@ class GLBuffer : public HandleWrapper<GLuint, deleteBuffer> {
 public:
     GLBuffer();
     GLBuffer& operator=(GLBuffer&& other);
-    GLBuffer(GLBufferType type, uint32_t size, void* data = nullptr);
+    GLBuffer(GLBufferType type, uint32_t size, const void* data = nullptr);
     uint32_t size();
     void* map();
     void unmap(bool sync = true);
