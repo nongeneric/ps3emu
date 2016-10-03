@@ -308,8 +308,8 @@ int64_t Rsx::interpret(uint32_t get) {
                 BitField<27, 32> colorFormat;
             } arg = { readarg(1) };
             SurfaceFormat(
-                arg.colorFormat.u(),
-                arg.depthFormat.u(),
+                enum_cast<GcmSurfaceColor>(arg.colorFormat.u()),
+                enum_cast<SurfaceDepthFormat>(arg.depthFormat.u()),
                 arg.antialias.u(),
                 arg.type.u(),
                 arg.width.u(),
@@ -391,7 +391,7 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00000308:
             //name = "CELL_GCM_NV4097_SET_ALPHA_FUNC";
-            AlphaFunc(readarg(1), readarg(2));
+            AlphaFunc(enum_cast<GcmOperator>(readarg(1)), readarg(2));
             break;
         case 0x0000030c:
             name = "CELL_GCM_NV4097_SET_ALPHA_REF";
@@ -404,8 +404,10 @@ int64_t Rsx::interpret(uint32_t get) {
             //name = "CELL_GCM_NV4097_SET_BLEND_FUNC_SFACTOR";
             auto arg1 = readarg(1);
             auto arg2 = readarg(2);
-            BlendFuncSFactor(arg1 & 0xffff, arg1 >> 16,
-                             arg2 & 0xffff, arg2 >> 16);
+            BlendFuncSFactor(enum_cast<GcmBlendFunc>(arg1 & 0xffff),
+                             enum_cast<GcmBlendFunc>(arg1 >> 16),
+                             enum_cast<GcmBlendFunc>(arg2 & 0xffff),
+                             enum_cast<GcmBlendFunc>(arg2 >> 16));
             break;
         }
         case 0x00000318:
@@ -417,12 +419,13 @@ int64_t Rsx::interpret(uint32_t get) {
         case 0x00000320: {
             //name = "CELL_GCM_NV4097_SET_BLEND_EQUATION";
             auto arg = readarg(1);
-            BlendEquation(arg & 0xffff, arg >> 16);
+            BlendEquation(enum_cast<GcmBlendEquation>(arg & 0xffff),
+                          enum_cast<GcmBlendEquation>(arg >> 16));
             break;
         }
         case 0x00000324:
             //name = "CELL_GCM_NV4097_SET_COLOR_MASK";
-            ColorMask(readarg(1));
+            ColorMask(enum_cast<GcmColorMask>(readarg(1)));
             break;
         case 0x00000328:
             //name = "CELL_GCM_NV4097_SET_STENCIL_TEST_ENABLE";
@@ -434,7 +437,7 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00000330:
             //name = "CELL_GCM_NV4097_SET_STENCIL_FUNC";
-            StencilFunc(readarg(1), readarg(2), readarg(3));
+            StencilFunc(enum_cast<GcmOperator>(readarg(1)), readarg(2), readarg(3));
             break;
         case 0x00000334:
             name = "CELL_GCM_NV4097_SET_STENCIL_FUNC_REF";
@@ -492,7 +495,7 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00000378: {
             //name = "CELL_GCM_NV4097_SET_LOGIC_OP";
-            LogicOp(readarg(1));
+            LogicOp(enum_cast<GcmLogicOp>(readarg(1)));
             break;
         }
         case 0x0000037c:
@@ -594,14 +597,16 @@ int64_t Rsx::interpret(uint32_t get) {
             name = "CELL_GCM_NV4097_SET_POLY_OFFSET_POINT_ENABLE";
             break;
         case 0x00000a64:
-            name = "CELL_GCM_NV4097_SET_POLY_OFFSET_LINE_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_POLY_OFFSET_LINE_ENABLE";
+            PolyOffsetLineEnable(readarg(1));
             break;
         case 0x00000a68:
-            name = "CELL_GCM_NV4097_SET_POLY_OFFSET_FILL_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_POLY_OFFSET_FILL_ENABLE";
+            PolyOffsetFillEnable(readarg(1));
             break;
         case 0x00000a6c:
             //name = "CELL_GCM_NV4097_SET_DEPTH_FUNC";
-            DepthFunc(readarg(1));
+            DepthFunc(enum_cast<GcmOperator>(readarg(1)));
             break;
         case 0x00000a70:
             name = "CELL_GCM_NV4097_SET_DEPTH_MASK";
@@ -684,8 +689,8 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00001808: {
             //name = "CELL_GCM_NV4097_SET_BEGIN_END";
-            auto mode = readarg(1);
-            drawActive = mode;
+            auto mode = enum_cast<GcmPrimitive>(readarg(1));
+            drawActive = (unsigned)mode;
             if (!drawActive) {
                 if (drawArrayFirst != -1u) {
                     DrawArrays(drawArrayFirst, drawCount);
@@ -748,13 +753,14 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00001830:
             //name = "CELL_GCM_NV4097_SET_CULL_FACE";
-            CullFace(readarg(1));
+            CullFace(enum_cast<GcmCullFace>(readarg(1)));
             break;
         case 0x00001834:
             name = "CELL_GCM_NV4097_SET_FRONT_FACE";
             break;
         case 0x00001838:
-            name = "CELL_GCM_NV4097_SET_POLY_SMOOTH_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_POLY_SMOOTH_ENABLE";
+            PolySmoothEnable(readarg(1));
             break;
         case 0x0000183c:
             //name = "CELL_GCM_NV4097_SET_CULL_FACE_ENABLE";

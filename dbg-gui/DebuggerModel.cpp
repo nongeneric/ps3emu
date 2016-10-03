@@ -514,6 +514,14 @@ void DebuggerModel::run() {
         } else if (auto ev = boost::get<PPUSingleStepBreakpointEvent>(&untyped)) {
             cont = false;
             switchThread(ev->thread);
+        } else if (auto ev = boost::get<PPUModuleLoadedEvent>(&untyped)) {
+            auto segments = _proc->getSegments();
+            auto& last = segments[segments.size() - 2];
+            emit message(QString::fromStdString(ssnprintf("module loaded: %s", last.elf->shortName())));
+            if (g_config.config().StopAtNewModule) {
+                cont = false;
+                switchThread(ev->thread);
+            }
         } else if (auto ev = boost::get<SPUInvalidInstructionEvent>(&untyped)) {
             emit message(QString("invalid spu instruction at %1")
                              .arg(ev->thread->getNip(), 8, 16, QChar('0')));

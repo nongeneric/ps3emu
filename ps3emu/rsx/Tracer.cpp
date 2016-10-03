@@ -8,6 +8,11 @@ void Tracer::enable() {
     system("rm -rf /tmp/ps3emu.trace");
     _db.createOrOpen("/tmp/ps3emu.trace");
 }
+
+bool Tracer::isEnabled() {
+    return _enabled;
+}
+
 void Tracer::pushBlob(const void* ptr, uint32_t size) {
     if (!_enabled)
         return;
@@ -15,6 +20,7 @@ void Tracer::pushBlob(const void* ptr, uint32_t size) {
     _blob.resize(size);
     memcpy(&_blob[0], ptr, size);
 }
+
 void Tracer::trace(uint32_t frame,
                    uint32_t num,
                    CommandId command,

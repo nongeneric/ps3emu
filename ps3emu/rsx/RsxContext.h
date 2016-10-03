@@ -176,14 +176,18 @@ struct SurfaceToFramebufferLink {
 
 struct FragmentOps {
     bool blend;
-    uint16_t sfcolor;
-    uint16_t sfalpha;
-    uint16_t dfcolor;
-    uint16_t dfalpha;
-    uint16_t blendColor;
-    uint16_t blendAlpha;
+    GcmBlendFunc sfcolor;
+    GcmBlendFunc sfalpha;
+    GcmBlendFunc dfcolor;
+    GcmBlendFunc dfalpha;
+    GcmBlendEquation blendColor;
+    GcmBlendEquation blendAlpha;
     bool logic;
-    uint32_t logicOp;
+    GcmLogicOp logicOp;
+    GcmOperator alphaFunc;
+    bool depthTest;
+    GcmOperator depthFunc;
+    GcmOperator stencilFunc;
 };
 
 class FragmentShaderUpdateFunctor;
@@ -191,19 +195,20 @@ class GLFramebuffer;
 class TextureRenderer;
 struct RsxContext {
     Tracer tracer;
+    uint32_t feedbackCount = 0;
+    uint32_t feedbackMode;
     uint32_t frame = 0;
     uint32_t commandNum = 0;
     SurfaceInfo surface;
     ViewPortInfo viewPort;
-    uint32_t colorMask;
-    bool isDepthTestEnabled;
-    uint32_t depthFunc;
+    GcmColorMask colorMask;
     bool isCullFaceEnabled;
     bool isFlatShadeMode;
     glm::vec4 colorClearValue;
     GLuint glClearSurfaceMask;
     std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;
+    GcmPrimitive vertexArrayMode;
     VertexShader* vertexShader = nullptr;
     FragmentShader* fragmentShader = nullptr;
     GLPersistentCpuBuffer vertexConstBuffer;
@@ -228,6 +233,7 @@ struct RsxContext {
     GLProgramPipeline pipeline;
     GLPersistentCpuBuffer mainMemoryBuffer;
     GLPersistentCpuBuffer localMemoryBuffer;
+    GLPersistentCpuBuffer feedbackBuffer;
     Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
     Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
@@ -238,6 +244,7 @@ struct RsxContext {
     uint32_t surfaceClipHeight = 0;
     uint16_t frequencyDividerOperation = 0;
     FragmentOps fragmentOps;
+    GcmCullFace cullFace;
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

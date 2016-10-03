@@ -60,7 +60,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
     auto offset = rsxOffsetToEa(info.depthLocation, info.depthOffset);
     auto format = GL_DEPTH24_STENCIL8;
     auto attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-    if (info.depthFormat == SurfaceDepthFormat::z16) {
+    if (info.depthFormat == SurfaceDepthFormat::Z16) {
         format = GL_DEPTH_COMPONENT16;
         attachment = GL_DEPTH_ATTACHMENT;
     }

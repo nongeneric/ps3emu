@@ -132,7 +132,8 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
                                  std::array<int, 4> const& samplerSizes,
                                  unsigned loadOffset,
-                                 std::vector<unsigned>* usedConsts)
+                                 std::vector<unsigned>* usedConsts,
+                                 bool feedback)
 {   
     std::string res;
     auto line = [&](auto&& s) { res += s; res += "\n"; };
@@ -211,8 +212,14 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
                        i + VertexTextureUnit, samplerSizes[i], i));
     }
-    line("out gl_PerVertex {");
-    line("    vec4 gl_Position;");
+    
+    if (feedback) {
+        line(ssnprintf("layout(xfb_buffer = %d) out gl_PerVertex {", TransformFeedbackBufferBinding));
+        line("    layout(xfb_offset = 0) vec4 gl_Position;");
+    } else {
+        line("out gl_PerVertex {");
+        line("    vec4 gl_Position;");
+    }
     //line("    float gl_PointSize;");
     //line("    float gl_ClipDistance[];");
     line("};");

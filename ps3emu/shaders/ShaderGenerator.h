@@ -27,7 +27,8 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
                                  std::array<int, 4> const& samplerSizes,
                                  unsigned loadOffset,
-                                 std::vector<unsigned>* usedConsts = nullptr);
+                                 std::vector<unsigned>* usedConsts = nullptr,
+                                 bool feedback = false);
 
 std::string PrintFragmentProgram(const uint8_t* instr);
 std::string PrintVertexProgram(const uint8_t* instr, bool verbose = false);

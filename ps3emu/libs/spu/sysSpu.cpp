@@ -338,11 +338,6 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
 }
 
 int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc) {
-    auto group = groups.get(id);
-    for (auto id : group->threads) {
-        auto th = proc->getSpuThread(id);
-        proc->destroySpuThread(th.get());
-    }
     groups.destroy(id);
     return CELL_OK;
 }
@@ -378,7 +373,6 @@ int32_t sys_raw_spu_destroy(sys_raw_spu_t id, Process* proc) {
     if (rawSpu->thread->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
         // leave a hanging thread if couldn't join
         assert(hangingRawSpuThreads < 10);
-        proc->destroySpuThread(rawSpu->thread.get());
         rawSpus.destroy(id);
         hangingRawSpuThreads++;
     }
@@ -526,7 +520,7 @@ int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
     uint32_t index;
     auto entry =
         findNCallEntry(calcFnid("cellSpursInitializeWithAttribute2"), index);
-    assert(entry);
+    assert(entry); (void)entry;
     auto info = g_state.proc->getStolenInfo(index);
     auto ncall = g_state.mm->load<4>(info.va);
     g_state.mm->store<4>(info.va, info.bytes);

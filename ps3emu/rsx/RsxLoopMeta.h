@@ -31,7 +31,7 @@ using namespace boost::function_types;
 
 template <typename T> struct DbColumnType {
     static T convert(uint32_t value) {
-        return value;
+        return (T)value;
     }
 };
 

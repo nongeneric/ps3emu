@@ -16,11 +16,12 @@ enum class PPUThreadEvent {
     SingleStepBreakpoint,
     Started,
     Finished,
-    ProcessFinished,
     Joined,
+    ProcessFinished,
     InvalidInstruction,
     MemoryAccessError,
-    Failure
+    Failure,
+    ModuleLoaded
 };
 
 class ProcessFinishedException : public virtual std::exception {
@@ -413,6 +414,7 @@ public:
     virtual void setArg(uint64_t arg);
     ~PPUThread() = default;
     friend uint64_t ps3call_then(PPUThread* thread);
+    void raiseModuleLoaded();
 };
 
 uint64_t ps3call_then(PPUThread* thread);

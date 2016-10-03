@@ -7,25 +7,22 @@
 #include <QMouseEvent>
 
 #define POS_ATTRIB_INDEX 0
-#define BARYCENTRIC_ATTRIB_INDEX 1
+#define ISLINES_ATTRIB_LOCATION 1
 
 #define POS_BINDING_INDEX 0
 #define AXES_BINDING_INDEX 1
 #define MVP_BINDING_INDEX 2
-#define BARYCENTRIC_BINDING_INDEX 3
 
 const char* vsText =
 R""(
     #version 450 core
     
     layout (location = 0) in vec4 position;
-    layout (location = 1) in vec3 barycentric;
     layout (std140, binding = 2) uniform MVP {
         mat4 mvp;
     } u;
     
     out vec4 vs_position;
-    out vec3 vs_barycentric;
     out gl_PerVertex {
         vec4 gl_Position;
     };
@@ -33,7 +30,6 @@ R""(
     void main(void) {
         vs_position = u.mvp * position;
         gl_Position = vs_position;
-        vs_barycentric = barycentric;
     }
 )"";
 
@@ -41,20 +37,14 @@ const char* fsText =
 R""(
     #version 450 core
     
+    layout (location = 1) uniform float isLines;
+    
     in vec4 vs_position;
-    in vec3 vs_barycentric;
     out vec4 color;
     
-    float edgeFactor() {
-        vec3 d = fwidth(vs_barycentric);
-        vec3 a3 = smoothstep(vec3(0.0), d*1.5, vs_barycentric);
-        return min(min(a3.x, a3.y), a3.z);
-    }
-    
     void main(void) {
-        if (any(lessThan(vs_barycentric, vec3(0.01)))) {
-            color = vec4(0.0, 0.0, 0.0, 1.0);
-            color = vec4(mix(vec3(0.0), vec3(0.5), edgeFactor()), 1);
+        if (isLines == 1) {
+            color = vec4(0, 0, 0, 1);
         } else {
             float zcolor = (vs_position.z + 1) / 2;
             color = vec4(1, 1, 1 - 0.5 * zcolor, 1);
@@ -83,10 +73,18 @@ OpenGLPreviewWidget::OpenGLPreviewWidget(QWidget* parent)
 void OpenGLPreviewWidget::paintGL() {
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.3, 0.3, 0.3, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     glVertexAttribBinding(POS_ATTRIB_INDEX, POS_BINDING_INDEX);
-    glVertexAttribBinding(BARYCENTRIC_ATTRIB_INDEX, BARYCENTRIC_BINDING_INDEX);
+    
+    glProgramUniform1f(_fs->handle(), ISLINES_ATTRIB_LOCATION, 0);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glDrawArrays(_mode, 0, _vertices);
+    
+    glProgramUniform1f(_fs->handle(), ISLINES_ATTRIB_LOCATION, 1);
+    glEnable(GL_LINE_SMOOTH);
+    glLineWidth(2);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     glDrawArrays(_mode, 0, _vertices);
     
     glVertexAttribBinding(POS_ATTRIB_INDEX, AXES_BINDING_INDEX);
@@ -97,6 +95,7 @@ void OpenGLPreviewWidget::paintGL() {
 void OpenGLPreviewWidget::resizeGL(int w, int h) {
     glViewport(0, 0, w, h);
 }
+
 void glDebugCallbackFunction(GLenum source,
             GLenum type,
             GLuint id,
@@ -117,13 +116,13 @@ void OpenGLPreviewWidget::initializeGL() {
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(&glDebugCallbackFunction, nullptr);
     
-    VertexShader vs(vsText);
-    FragmentShader fs(fsText);
-    INFO(debugger) << vs.log();
-    INFO(debugger) << fs.log();
+    _vs.reset(new VertexShader(vsText));
+    _fs.reset(new FragmentShader(fsText));
+    INFO(debugger) << _vs->log();
+    INFO(debugger) << _fs->log();
     _pipeline.reset(new GLProgramPipeline());
-    _pipeline->useShader(vs);
-    _pipeline->useShader(fs);
+    _pipeline->useShader(*_vs);
+    _pipeline->useShader(*_fs);
     _pipeline->validate();
     _pipeline->bind();
     
@@ -136,8 +135,6 @@ void OpenGLPreviewWidget::initializeGL() {
     
     glEnableVertexAttribArray(POS_ATTRIB_INDEX);
     glVertexAttribFormat(POS_ATTRIB_INDEX, 3, GL_FLOAT, GL_FALSE, 0);
-    glEnableVertexAttribArray(BARYCENTRIC_ATTRIB_INDEX);
-    glVertexAttribFormat(BARYCENTRIC_ATTRIB_INDEX, 3, GL_FLOAT, GL_FALSE, 0);
     
     std::vector<PreviewVertex> axes = {
         { -1, 0, 0 },
@@ -175,20 +172,6 @@ void OpenGLPreviewWidget::setVertices(std::vector<PreviewVertex> const& vertices
         _vertices = vertices.size();
         glBindVertexBuffer(
             POS_BINDING_INDEX, _vertexBuffer->handle(), 0, sizeof(PreviewVertex));
-
-        std::vector<PreviewVertex> barycentrics;
-        for (auto i = 0u; i < vertices.size(); ++i) {
-            PreviewVertex v = {0};
-            v.xyz[i % 3] = 1;
-            barycentrics.push_back(v);
-        }
-        _vertexBarycentricBuffer.reset(
-            new GLBuffer(GLBufferType::Static, byteSize, &barycentrics[0]));
-        glBindVertexBuffer(BARYCENTRIC_BINDING_INDEX,
-                           _vertexBarycentricBuffer->handle(),
-                           0,
-                           sizeof(PreviewVertex));
-
         update();
     };
 

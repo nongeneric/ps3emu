@@ -470,6 +470,20 @@ public:
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
+        
+        if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size()) {
+            switch (index.column()) {
+                case 0: return "TRANSFORM";
+                case 1: return "FEEDBACK";
+                case 2: return "";
+                case 3: return 0;
+                case 4: return 12;
+                case 5: return _rsx->context()->feedbackCount;
+                case 6: return "float";
+                case 7: return "";
+            }
+        }
+        
         auto vda = _rsx->context()->vertexDataArrays[index.row()];
         auto input = _rsx->context()->vertexInputs[index.row()];
         auto op = _rsx->context()->frequencyDividerOperation & (1 << index.row());
@@ -497,22 +511,26 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        return _rsx->context()->vertexDataArrays.size();
+        return _rsx->context()->vertexDataArrays.size() + 1;
     }
 };
 
 class VDABufferTableModel : public QAbstractItemModel {
     Rsx* _rsx;
-    VertexDataArrayFormatInfo _info;
     uint8_t* _buffer;
     unsigned _size;
+    VertexDataArrayFormatInfo _info;
+    bool _be;
     std::unique_ptr<OpenGLPreview> _openglPreview;
     
 public:
-    VDABufferTableModel(Rsx* rsx, std::uint8_t* buffer, unsigned vdaIndex, unsigned size) 
-        : _rsx(rsx), _buffer(buffer), _size(size) {
-        _info = _rsx->context()->vertexDataArrays[vdaIndex];
-    }
+    VDABufferTableModel(Rsx* rsx,
+                        std::uint8_t* buffer,
+                        unsigned vdaIndex,
+                        unsigned size,
+                        VertexDataArrayFormatInfo info,
+                        bool be)
+        : _rsx(rsx), _buffer(buffer), _size(size), _info(info), _be(be) {}
     
     QVariant headerData(int section,
                         Qt::Orientation orientation,
@@ -550,6 +568,9 @@ public:
             return QString::fromStdString(ssnprintf("#%02x", u8Value));
         } else {
             float fValue = union_cast<uint32_t, float>(endian_reverse(*(uint32_t*)&_buffer[valueOffset]));
+            if (!_be) {
+                fValue = union_cast<uint32_t, float>(*(uint32_t*)&_buffer[valueOffset]);
+            }
             return QString::fromStdString(ssnprintf("%g", fValue));
         }
         
@@ -577,7 +598,11 @@ public:
             auto component = (uint32_t*)ptr;
             PreviewVertex v = {0};
             for (auto j = 0; j < std::min<int>(3, _info.size); ++j) {
-                v.xyz[j] = union_cast<uint32_t, float>(endian_reverse(component[j]));
+                if (_be) {
+                    v.xyz[j] = union_cast<uint32_t, float>(endian_reverse(component[j]));
+                } else {
+                    v.xyz[j] = union_cast<uint32_t, float>(component[j]);
+                }
             }
             ptr += _info.stride;
             vertices.push_back(v);
@@ -586,6 +611,8 @@ public:
         _openglPreview.reset(new OpenGLPreview());
         _openglPreview->widget()->setVertices(vertices);
         _openglPreview->widget()->setMode(_rsx->context()->glVertexArrayMode);
+        _openglPreview->setWindowTitle(QString::fromStdString(ssnprintf(
+            "%s, %d", to_string(_rsx->context()->vertexArrayMode), vertices.size())));
         _openglPreview->show();
     }
 };
@@ -605,9 +632,23 @@ void MainWindowModel::onRun() {
     runTo(_db.commands(_currentFrame) - 1, _currentFrame);
 }
 
-void MainWindowModel::onTest() {
-    _openglPreview.reset(new OpenGLPreview());
-    _openglPreview->show();
+void MainWindowModel::onVisualizeFeedback() {
+//     auto buf = (std::array<float, 4>*)_rsx->context()->feedbackBuffer.mapped();
+//     std::vector<PreviewVertex> vertices;
+//     for (auto i = 0u; i < _rsx->context()->feedbackCount; ++i) {
+//         PreviewVertex v;
+//         v.xyz[0] = buf[i][0];
+//         v.xyz[1] = buf[i][1];
+//         v.xyz[2] = buf[i][2];
+//         vertices.push_back(v);
+//     }
+//     _openglPreview.reset(new OpenGLPreview());
+//     _openglPreview->widget()->setVertices(vertices);
+//     _openglPreview->widget()->setMode(_rsx->context()->feedbackMode);
+//     _openglPreview->setWindowTitle(QString::fromStdString(ssnprintf("%s, %d",
+//                                    to_string(_rsx->context()->vertexArrayMode),
+//                                    vertices.size())));
+//     _openglPreview->show();
 }
 
 void MainWindowModel::update() {
@@ -693,10 +734,24 @@ void MainWindowModel::update() {
         auto input = _rsx->context()->vertexInputs[index.row()];
         if (input.rank == 0)
             return;
-        auto info = _rsx->context()->vertexDataArrays[index.row()];
-        auto buffer = _rsx->getBuffer(info.location);
-        auto mapped = (uint8_t*)buffer->mapped() + info.offset;
-        auto vdaBufferModel = new VDABufferTableModel(_rsx.get(), mapped, index.row(), _lastDrawCount);
+        uint8_t* mapped;
+        VertexDataArrayFormatInfo info;
+        bool be;
+        if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size()) {
+            info.frequency = 0;
+            info.stride = 16;
+            info.size = 4;
+            info.type = CELL_GCM_VERTEX_F;
+            mapped = _rsx->context()->feedbackBuffer.mapped();
+            be = false;
+        } else {
+            info = _rsx->context()->vertexDataArrays[index.row()];
+            auto buffer = _rsx->getBuffer(info.location);
+            mapped = (uint8_t*)buffer->mapped() + info.offset;
+            be = true;
+        }
+        auto vdaBufferModel = new VDABufferTableModel(
+            _rsx.get(), mapped, index.row(), _lastDrawCount, info, be);
         _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
         
         QObject::disconnect(_window.pbVisualizeGeometry, &QPushButton::clicked, 0, 0);
@@ -769,7 +824,9 @@ void MainWindowModel::changeFrame() {
 MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _currentFrame(0) {
     _window.setupUi(&_qwindow);
     QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
-    QObject::connect(_window.actionTest, &QAction::triggered, [=] { onTest(); });
+    QObject::connect(_window.actionVisualizeFeedback, &QAction::triggered, [=] {
+        onVisualizeFeedback();
+    });
     Rsx::setOperationMode(RsxOperationMode::Replay);
     QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
         this->runTo(index.row(), _currentFrame);

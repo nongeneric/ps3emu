@@ -6,6 +6,7 @@
 #include "ELFLoader.h"
 #include "IDMap.h"
 #include "libs/ConcurrentQueue.h"
+#include "OneTimeEvent.h"
 
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
@@ -70,6 +71,10 @@ struct PPUThreadFailureEvent {
     PPUThread* thread;
 };
 
+struct PPUModuleLoadedEvent {
+    PPUThread* thread;
+};
+
 struct SPUThreadFailureEvent {
     SPUThread* thread;
 };
@@ -87,7 +92,8 @@ using Event = boost::variant<ProcessFinishedEvent,
                              SPUSingleStepBreakpointEvent,
                              MemoryAccessErrorEvent,
                              PPUThreadFailureEvent,
-                             SPUThreadFailureEvent>;
+                             SPUThreadFailureEvent,
+                             PPUModuleLoadedEvent>;
 
 struct PPUThreadEventInfo {
     PPUThreadEvent event;
@@ -99,7 +105,10 @@ struct SPUThreadEventInfo {
     SPUThread* thread;
 };
 
-using ThreadEvent = boost::variant<PPUThreadEventInfo, SPUThreadEventInfo>;
+struct ThreadEvent {
+    boost::variant<PPUThreadEventInfo, SPUThreadEventInfo> info;
+    std::shared_ptr<OneTimeEvent> promise;
+};
 
 struct ThreadInitInfo;
 class Rsx;
@@ -176,7 +185,6 @@ public:
     std::shared_ptr<SPUThread> getSpuThread(uint32_t id);
     std::shared_ptr<SPUThread> getSpuThreadBySpuNum(uint32_t spuNum);
     CallbackThread* getCallbackThread();
-    void destroySpuThread(SPUThread* thread);
     std::vector<PPUThread*> dbgPPUThreads();
     std::vector<SPUThread*> dbgSPUThreads();
     uint64_t getFrequency();

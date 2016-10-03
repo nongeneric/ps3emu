@@ -23,11 +23,11 @@ std::future<void> CallbackThread::schedule(std::vector<uint64_t> args,
                                            uint32_t ea) {
     CallbackInfo info{false, args, toc, ea, std::make_shared<std::promise<void>>()};
     auto promise = info.promise->get_future();
-    _queue.send(std::move(info));
+    _queue.enqueue(std::move(info));
     return promise;
 }
 
-CallbackThread::CallbackThread(Process* proc) {
+CallbackThread::CallbackThread(Process* proc) : _queue(1) {
     _lastCallback.terminate = true;
     
     uint32_t index;
@@ -49,7 +49,7 @@ CallbackThread::CallbackThread(Process* proc) {
     body->descr.tocBase = 0;
     body->thread = (uint64_t)this;
     
-    proc->createThread(0x1000, bodyEa, 0, "callback", 0);
+    _id = proc->createThread(0x1000, bodyEa, 0, "callback", 0);
 }
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
@@ -59,7 +59,7 @@ uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
     if (!thread->_lastCallback.terminate)
         thread->_lastCallback.promise->set_value();
     
-    auto info = thread->_queue.receive(0);
+    auto info = thread->_queue.dequeue();
     
     if (info.terminate)
         throw ThreadFinishedException(0);
@@ -79,5 +79,9 @@ uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
 }
 
 void CallbackThread::terminate() {
-    _queue.send({true, {}, 0, 0, nullptr});
+    _queue.enqueue({true, {}, 0, 0, nullptr});
+}
+
+uint64_t CallbackThread::id() {
+    return _id;
 }

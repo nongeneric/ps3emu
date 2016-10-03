@@ -16,10 +16,6 @@ template <typename T> std::string printDec(T num) {
     return ssnprintf("%d", num);
 }
 
-std::string printLocation(MemoryLocation location) {
-    return location == MemoryLocation::Local ? "LOCAL" : "MAIN";
-}
-
 std::string printBool(bool value) {
     return value ? "TRUE" : "FALSE";
 }
@@ -49,25 +45,30 @@ std::string printBool(bool value) {
         [=](auto) { return ""; },\
 },
 
+#define PRINT_ENUM(x, p) {\
+    #p, [=](auto) { return to_string(x. p); },\
+        [=](auto) { return ""; },\
+},
+
 GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
     RsxContext* context) {
     return new GenericTableModel<RsxContext>(
         context,
         {
             {"Depth location",
-             [=](auto c) { return printLocation(c->surface.depthLocation); },
+             [=](auto c) { return to_string(c->surface.depthLocation); },
              [=](auto c) { return ""; }},
             {"Color location [0]",
-             [=](auto c) { return printLocation(c->surface.colorLocation[0]); },
+             [=](auto c) { return to_string(c->surface.colorLocation[0]); },
              [=](auto c) { return ""; }},
             {"Color location [1]",
-             [=](auto c) { return printLocation(c->surface.colorLocation[1]); },
+             [=](auto c) { return to_string(c->surface.colorLocation[1]); },
              [=](auto c) { return ""; }},
             {"Color location [2]",
-             [=](auto c) { return printLocation(c->surface.colorLocation[2]); },
+             [=](auto c) { return to_string(c->surface.colorLocation[2]); },
              [=](auto c) { return ""; }},
             {"Color location [3]",
-             [=](auto c) { return printLocation(c->surface.colorLocation[3]); },
+             [=](auto c) { return to_string(c->surface.colorLocation[3]); },
              [=](auto c) { return ""; }},
             {
                 "Width",
@@ -141,24 +142,17 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
             },
             {
                 "Depth type",
-                [=](auto c) {
-                    return c->surface.depthType == SurfaceDepthType::Fixed ? "Fixed"
-                                                                           : "Float";
-                },
+                [=](auto c) { return to_string(c->surface.depthType); },
                 [=](auto c) { return ""; },
             },
             {
                 "Color format",
-                [=](auto c) { return printHex(c->surface.colorFormat); },
+                [=](auto c) { return to_string(c->surface.colorFormat); },
                 [=](auto c) { return ""; },
             },
             {
                 "Depth format",
-                [=](auto c) {
-                    return c->surface.depthFormat == SurfaceDepthFormat::z24s8
-                               ? "z24s8"
-                               : "z16";
-                },
+                [=](auto c) { return to_string(c->surface.depthFormat); },
                 [=](auto c) { return ""; },
             },
             {
@@ -174,7 +168,12 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
             },
             {
                 "Color mask",
-                [=](auto c) { return printHex(c->colorMask); },
+                [=](auto c) { return to_string(c->colorMask); },
+                [=](auto c) { return ""; },
+            },
+            {
+                "cullFace",
+                [=](auto c) { return to_string(c->cullFace); },
                 [=](auto c) { return ""; },
             },
         });
@@ -235,11 +234,7 @@ GenericTableModel<RsxContext>* SamplerTextureContextTreeItem::getTable(
             DEC(t(), mipmap)
             DECHEX(t(), format)
             DEC(t(), dimension)
-            {
-                "location",
-                [=](auto) { return printLocation(t().location); },
-                [=](auto) { return ""; },
-            },
+            PRINT_ENUM(t(), location)
             BOOL(t(), fragmentBorder)
             BOOL(t(), fragmentCubemap)
             HEX(t(), fragmentDepth)
@@ -262,13 +257,17 @@ GenericTableModel<RsxContext>* FragmentOperationsTreeItem::getTable(RsxContext* 
         context,
         {
             BOOL(ops, blend)
-            HEX(ops, sfcolor)
-            HEX(ops, sfalpha)
-            HEX(ops, dfcolor)
-            HEX(ops, dfalpha)
-            HEX(ops, blendColor)
-            HEX(ops, blendAlpha)
+            PRINT_ENUM(ops, sfcolor)
+            PRINT_ENUM(ops, sfalpha)
+            PRINT_ENUM(ops, dfcolor)
+            PRINT_ENUM(ops, dfalpha)
+            PRINT_ENUM(ops, blendColor)
+            PRINT_ENUM(ops, blendAlpha)
             BOOL(ops, logic)
-            HEX(ops, logicOp)
+            PRINT_ENUM(ops, logicOp)
+            PRINT_ENUM(ops, alphaFunc)
+            BOOL(ops, depthTest)
+            PRINT_ENUM(ops, depthFunc)
+            PRINT_ENUM(ops, stencilFunc)
         });
 }

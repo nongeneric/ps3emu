@@ -69,7 +69,7 @@ void FragmentShaderUpdateFunctor::updateWithBlob(FragmentShader* shader, std::ve
     }
 
     _context->tracer.pushBlob(&_newbytecode[0], size);
-    TRACE3(UpdateFragmentCache, va, size, mrt);
+    TRACE(UpdateFragmentCache, va, size, mrt);
 
     if (_bytecode.empty()) { // first update
         updateBytecode(shader);

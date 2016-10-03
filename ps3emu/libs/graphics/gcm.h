@@ -9,6 +9,7 @@
 #include <gcm_tool.h>
 
 #include <vector>
+#include "ps3emu/enum.h"
 
 class Process;
 class MainMemory;
@@ -25,9 +26,10 @@ struct TargetCellGcmContextData {
     boost::endian::big_uint32_t callback;
 };
 
-enum class MemoryLocation {
-    Main, Local
-};
+ENUM(MemoryLocation,
+    (Main, 0),
+    (Local, 1)
+)
 
 namespace emu {
 namespace Gcm {

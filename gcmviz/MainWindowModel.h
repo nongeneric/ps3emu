@@ -32,5 +32,5 @@ public:
     void runTo(unsigned lastCommand, unsigned frame);
 public slots:
     void onRun();
-    void onTest();
+    void onVisualizeFeedback();
 };

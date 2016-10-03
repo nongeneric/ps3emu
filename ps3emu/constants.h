@@ -50,12 +50,16 @@ static constexpr unsigned FragmentShaderConstantCount = 512 / 2;
 static constexpr unsigned VertexTextureUnit = 1;
 static constexpr unsigned FragmentTextureUnit = 5;
 
-static constexpr unsigned VertexInputsBinding = 1;
-static constexpr unsigned VertexShaderConstantBinding = VertexInputsBinding + 16;
-static constexpr unsigned FragmentShaderConstantBinding = VertexShaderConstantBinding + 1;
-static constexpr unsigned VertexShaderSamplesInfoBinding = FragmentShaderConstantBinding + 1;
-static constexpr unsigned FragmentShaderSamplesInfoBinding = VertexShaderSamplesInfoBinding + 1;
-static constexpr unsigned VertexShaderViewportMatrixBinding =  FragmentShaderSamplesInfoBinding + 1;
+enum Bindings {
+    VertexInputsBinding = 1,
+    VertexShaderConstantBinding = 17,
+    FragmentShaderConstantBinding,
+    VertexShaderSamplesInfoBinding,
+    FragmentShaderSamplesInfoBinding,
+    VertexShaderViewportMatrixBinding,
+};
+
+static constexpr unsigned TransformFeedbackBufferBinding = 0;
 
 static constexpr unsigned MutexIdBase = 0x1000;
 static constexpr unsigned LwMutexIdBase = 0x2000;

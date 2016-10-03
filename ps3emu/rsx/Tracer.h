@@ -3,6 +3,10 @@
 #include "../utils.h"
 #include "../gcmviz/GcmDatabase.h"
 #include "../libs/graphics/gcm.h"
+#include <boost/preprocessor/variadic/to_list.hpp>
+#include <boost/preprocessor/variadic/elem.hpp>
+#include <boost/preprocessor/list/for_each.hpp>
+#include <boost/preprocessor/punctuation/comma.hpp>
 #include <vector>
 
 #define X(x) x,
@@ -128,6 +132,9 @@
     X(UpdateBufferCache) \
     X(UpdateTextureCache) \
     X(UpdateFragmentCache) \
+    X(PolySmoothEnable) \
+    X(PolyOffsetLineEnable) \
+    X(PolyOffsetFillEnable) \
     
 enum class CommandId { CommandIdX };
 #undef X
@@ -139,6 +146,7 @@ class Tracer {
     bool _blobSet = false;
 public:
     void enable();
+    bool isEnabled();
     void pushBlob(const void* ptr, uint32_t size);
     void trace(uint32_t frame,
                uint32_t num,
@@ -157,7 +165,7 @@ template<> struct GcmType<int16_t> { static constexpr uint32_t type = (uint32_t)
 
 template <typename T> struct ConvertType {
     static uint32_t convert(T value) {
-        return value;
+        return (uint32_t)value;
     }
 };
 
@@ -173,33 +181,15 @@ template <> struct ConvertType<float> {
     }
 };
 
-/*
-def a(i):
-     r = "#define TRACE" + str(i) + "(id"
-     for n in range(0, i): r += ", a" + str(n)
-     r += ") _context->trace(CommandId::id, { ARG(a0)"
-     for n in range(1, i): r += ", ARG(a" + str(n) + ")"
-     r += " });"
-     print(r)
-for z in range(1, 14): a(z) 
-*/
-
 #define ARG(a) GcmCommandArg { ConvertType<decltype(a)>::convert(a), \
                                #a, GcmType<decltype(a)>::type }
-#define TRACE0(id) _context->trace(CommandId::id, {});
-#define TRACE1(id, a0) _context->trace(CommandId::id, { ARG(a0) });
-#define TRACE2(id, a0, a1) _context->trace(CommandId::id, { ARG(a0), ARG(a1) });
-#define TRACE3(id, a0, a1, a2) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2) });
-#define TRACE4(id, a0, a1, a2, a3) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3) });
-#define TRACE5(id, a0, a1, a2, a3, a4) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4) });
-#define TRACE6(id, a0, a1, a2, a3, a4, a5) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5) });
-#define TRACE7(id, a0, a1, a2, a3, a4, a5, a6) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6) });
-#define TRACE8(id, a0, a1, a2, a3, a4, a5, a6, a7) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7) });
-#define TRACE9(id, a0, a1, a2, a3, a4, a5, a6, a7, a8) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8) });
-#define TRACE10(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9) });
-#define TRACE11(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10) });
-#define TRACE12(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11) });
-#define TRACE13(id, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) _context->trace(CommandId::id, { ARG(a0), ARG(a1), ARG(a2), ARG(a3), ARG(a4), ARG(a5), ARG(a6), ARG(a7), ARG(a8), ARG(a9), ARG(a10), ARG(a11), ARG(a12) });
+#define TRACE_ARG(z, n, text) ARG(text) BOOST_PP_COMMA()
+#define TRACE(...) \
+    _context->trace(CommandId:: BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__), \
+            { BOOST_PP_LIST_FOR_EACH(TRACE_ARG, _, \
+                  BOOST_PP_LIST_REST( \
+                      BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__))) } \
+    )
 
 const char* printCommandId(CommandId id);
 std::string printArgHex(GcmCommandArg const& arg);

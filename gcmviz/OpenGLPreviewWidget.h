@@ -27,11 +27,12 @@ class OpenGLPreviewWidget : public QOpenGLWidget {
     void updateCamera();
     
     std::unique_ptr<GLBuffer> _vertexBuffer;
-    std::unique_ptr<GLBuffer> _vertexBarycentricBuffer;
     std::unique_ptr<GLBuffer> _axesVertexBuffer;
     std::unique_ptr<GLPersistentCpuBuffer> _matrixUniformBuffer;
     glm::mat4* _viewMatrix;
     std::unique_ptr<GLProgramPipeline> _pipeline;
+    std::unique_ptr<VertexShader> _vs;
+    std::unique_ptr<FragmentShader> _fs;
     int _vertices;
     int _axes;
     float _x, _y, _z;

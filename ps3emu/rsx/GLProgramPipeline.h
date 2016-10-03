@@ -16,17 +16,17 @@ class GLProgramPipeline : public HandleWrapper<GLuint, deleteProgramPipeline> {
         return handle;
     }
 public:
-    GLProgramPipeline() : HandleWrapper(create()) { }
-    void bind() {
-        glcall(glBindProgramPipeline(handle()));
+    inline GLProgramPipeline() : HandleWrapper(create()) { }
+    inline void bind() {
+        glBindProgramPipeline(handle());
     }
-    void useShader(VertexShader& shader) {
-        glcall(glUseProgramStages(handle(), GL_VERTEX_SHADER_BIT, shader.handle()));
+    inline void useShader(VertexShader& shader) {
+        glUseProgramStages(handle(), GL_VERTEX_SHADER_BIT, shader.handle());
     }
-    void useShader(FragmentShader& shader) {
-        glcall(glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader.handle()));
+    inline void useShader(FragmentShader& shader) {
+        glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader.handle());
     }
-    void validate() {
-        glcall(glValidateProgramPipeline(handle()));
+    inline void validate() {
+        glValidateProgramPipeline(handle());
     }
 };

@@ -31,7 +31,6 @@ void SPUThread::run() {
 void SPUThread::loop() {
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
-    _dbgPaused = true;
     log_set_thread_name(ssnprintf("spu_%d", _id));
     
 #ifdef DEBUG
@@ -47,7 +46,6 @@ void SPUThread::loop() {
         if (_singleStep) {
             _eventHandler(this, SPUThreadEvent::SingleStepBreakpoint);
             _singleStep = false;
-            _dbgPaused = true;
         }
         while (_dbgPaused) {
             ums_sleep(100);
@@ -61,7 +59,6 @@ void SPUThread::loop() {
         } catch (BreakpointException& e) {
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Breakpoint);
-            _dbgPaused = true;
         } catch (IllegalInstructionException& e) {
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::InvalidInstruction);
@@ -121,7 +118,7 @@ SPUThread::SPUThread(Process* proc,
       _proc(proc),
       _channels(g_state.mm, this),
       _eventHandler(eventHandler),
-      _dbgPaused(true),
+      _dbgPaused(false),
       _singleStep(false),
       _exitCode(0),
       _cause(SPUThreadExitCause::StillRunning) {

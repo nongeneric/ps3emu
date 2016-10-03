@@ -41,7 +41,6 @@ void PPUThread::innerLoop() {
 #ifdef DEBUG
         if (_singleStep) {
             _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
-            dbgpause(true);
             _singleStep = false;
         }
         
@@ -60,7 +59,6 @@ void PPUThread::innerLoop() {
         } catch (BreakpointException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Breakpoint);
-            dbgpause(true);
         } catch (IllegalInstructionException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::InvalidInstruction);
@@ -71,18 +69,20 @@ void PPUThread::innerLoop() {
             break;
         } catch (ProcessFinishedException& e) {
             _eventHandler(this, PPUThreadEvent::ProcessFinished);
-            break;
+            return;
         } catch (ThreadFinishedException& e) {
             _exitCode = e.errorCode();
             _threadFinishedGracefully = true;
             break;
         } catch (std::exception& e) {
-            LOG << ssnprintf("thread exception: %s", e.what());
+            auto message = ssnprintf("thread exception: %s", e.what());
+            ERROR(libs) << message;
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Failure);
             break;
         }
     }
+    _eventHandler(this, PPUThreadEvent::Finished);
 }
 
 void PPUThread::loop() {
@@ -96,14 +96,12 @@ void PPUThread::loop() {
     }
     
     _eventHandler(this, PPUThreadEvent::Started);
-    dbgpause(true);
     
     innerLoop();
     
     LOG << ssnprintf("thread loop finished (%s)",
         _threadFinishedGracefully ? "gracefully" : "with a failure"
     );
-    _eventHandler(this, PPUThreadEvent::Finished);
 }
 
 PPUThread::PPUThread() {}
@@ -145,11 +143,11 @@ uint32_t PPUThread::getStackSize() {
 
 uint64_t PPUThread::join(bool unique) {
     _thread.join();
+    _eventHandler(this, PPUThreadEvent::Joined);
     if (_threadFinishedGracefully)
         return _exitCode;
     if (unique)
         throw std::runtime_error("joining failed thread");
-    _eventHandler(this, PPUThreadEvent::Joined);
     return 0;
 }
 
@@ -206,4 +204,8 @@ unsigned PPUThread::getId() {
 
 std::string PPUThread::getName() {
     return _name;
+}
+
+void PPUThread::raiseModuleLoaded() {
+    _eventHandler(this, PPUThreadEvent::ModuleLoaded);
 }

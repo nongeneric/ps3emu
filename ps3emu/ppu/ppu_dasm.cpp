@@ -1852,6 +1852,7 @@ PRINT(STFSU, DForm_9) {
 EMU(STFSU, DForm_9) {
     auto ea = TH->getGPR(i->RA) + i->D.s();
     auto frs = TH->getFPRd(i->FRS);
+    TH->setGPR(i->RA, ea);
     MM->storef(ea, frs);
 }
 
@@ -1862,6 +1863,7 @@ PRINT(STFSUX, XForm_29) {
 EMU(STFSUX, XForm_29) {
     auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
     auto frs = TH->getFPRd(i->FRS);
+    TH->setGPR(i->RA, ea);
     MM->storef(ea, frs);
 }
 
@@ -1894,6 +1896,7 @@ PRINT(STFDU, DForm_9) {
 EMU(STFDU, DForm_9) {
     auto ea = TH->getGPR(i->RA) + i->D.s();
     auto frs = TH->getFPRd(i->FRS);
+    TH->setGPR(i->RA, ea);
     MM->stored(ea, frs);
 }
 
@@ -1904,6 +1907,7 @@ PRINT(STFDUX, XForm_29) {
 EMU(STFDUX, XForm_29) {
     auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
     auto frs = TH->getFPRd(i->FRS);
+    TH->setGPR(i->RA, ea);
     MM->stored(ea, frs);
 }
 

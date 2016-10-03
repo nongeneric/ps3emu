@@ -5,6 +5,8 @@
 #include "../libs/graphics/gcm.h"
 #include "../libs/ConcurrentQueue.h"
 #include "../gcmviz/GcmDatabase.h"
+#include "GLFramebuffer.h"
+#include "ps3emu/enum.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <memory>
@@ -20,6 +22,92 @@ typedef struct {
 } CellGcmControl;
 
 }
+
+ENUM(GcmBlendEquation,
+    (FUNC_ADD, 0x8006),
+    (MIN, 0x8007),
+    (MAX, 0x8008),
+    (FUNC_SUBTRACT, 0x800A),
+    (FUNC_REVERSE_SUBTRACT, 0x800B),
+    (FUNC_REVERSE_SUBTRACT_SIGNED, 0x0000F005),
+    (FUNC_ADD_SIGNED, 0x0000F006),
+    (FUNC_REVERSE_ADD_SIGNED, 0x0000F007)
+)
+
+ENUM(GcmBlendFunc,
+    (ZERO, 0),
+    (ONE, 1),
+    (SRC_COLOR, 0x0300),
+    (ONE_MINUS_SRC_COLOR, 0x0301),
+    (SRC_ALPHA, 0x0302),
+    (ONE_MINUS_SRC_ALPHA, 0x0303),
+    (DST_ALPHA, 0x0304),
+    (ONE_MINUS_DST_ALPHA, 0x0305),
+    (DST_COLOR, 0x0306),
+    (ONE_MINUS_DST_COLOR, 0x0307),
+    (SRC_ALPHA_SATURATE, 0x0308),
+    (CONSTANT_COLOR, 0x8001),
+    (ONE_MINUS_CONSTANT_COLOR, 0x8002),
+    (CONSTANT_ALPHA, 0x8003),
+    (ONE_MINUS_CONSTANT_ALPHA, 0x8004)
+)
+
+ENUM(GcmLogicOp,
+    (CLEAR, 0x1500),
+    (AND, 0x1501),
+    (AND_REVERSE, 0x1502),
+    (COPY, 0x1503),
+    (AND_INVERTED, 0x1504),
+    (NOOP, 0x1505),
+    (XOR, 0x1506),
+    (OR, 0x1507),
+    (NOR, 0x1508),
+    (EQUIV, 0x1509),
+    (INVERT, 0x150A),
+    (OR_REVERSE, 0x150B),
+    (COPY_INVERTED, 0x150C),
+    (OR_INVERTED, 0x150D),
+    (NAND, 0x150E),
+    (SET, 0x150F)
+)
+
+ENUMF(GcmColorMask,
+    (B, 1 << 0),
+    (G, 1 << 8),
+    (R, 1 << 16),
+    (A, 1 << 24)
+)
+
+ENUM(GcmCullFace,
+    (FRONT, 0x0404),
+    (BACK, 0x0405),
+    (FRONT_AND_BACK, 0x0408)
+)
+
+ENUM(GcmOperator,
+    (NEVER, 0x0200),
+    (LESS, 0x0201),
+    (EQUAL, 0x0202),
+    (LEQUAL, 0x0203),
+    (GREATER, 0x0204),
+    (NOTEQUAL, 0x0205),
+    (GEQUAL, 0x0206),
+    (ALWAYS, 0x0207)
+)
+
+ENUM(GcmPrimitive,
+    (NONE, 0),
+    (POINTS, 1),
+    (LINES, 2),
+    (LINE_LOOP, 3),
+    (LINE_STRIP, 4),
+    (TRIANGLES, 5),
+    (TRIANGLE_STRIP, 6),
+    (TRIANGLE_FAN, 7),
+    (QUADS, 8),
+    (QUAD_STRIP, 9),
+    (POLYGON, 10)
+)
 
 constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 constexpr auto FragmentProgramSize = 512 * 16;
@@ -91,6 +179,7 @@ class Rsx {
     FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size, bool mrt);
     FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size, bool mrt);
     void resetContext();
+    void updateScissor();
     
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
@@ -119,7 +208,7 @@ class Rsx {
                      uint8_t hSpacingSelect,
                      uint8_t vSpacingSelect);
     void VertexDataBaseOffset(uint32_t baseOffset, uint32_t baseIndex);
-    void AlphaFunc(uint32_t af, uint32_t ref);
+    void AlphaFunc(GcmOperator af, uint32_t ref);
     void AlphaTestEnable(bool enable);
     void ShaderControl(uint32_t control, uint8_t registerCount);
     void TransformProgramLoad(uint32_t load, uint32_t start);
@@ -143,8 +232,8 @@ class Rsx {
     void ContextDmaColorC_1(uint32_t contextC);
     void ContextDmaColorD(uint32_t context);
     void ContextDmaZeta(uint32_t context);
-    void SurfaceFormat(uint8_t colorFormat,
-                       uint8_t depthFormat,
+    void SurfaceFormat(GcmSurfaceColor colorFormat,
+                       SurfaceDepthFormat depthFormat,
                        uint8_t antialias,
                        uint8_t type,
                        uint8_t width,
@@ -156,8 +245,8 @@ class Rsx {
                        uint32_t pitchB);
     void SurfacePitchZ(uint32_t pitch);
     void SurfaceColorTarget(uint32_t target);
-    void ColorMask(uint32_t mask);
-    void DepthFunc(uint32_t zf);
+    void ColorMask(GcmColorMask mask);
+    void DepthFunc(GcmOperator zf);
     void CullFaceEnable(bool enable);
     void DepthTestEnable(bool enable);
     void ShadeMode(uint32_t sm);
@@ -169,7 +258,7 @@ class Rsx {
                                uint8_t size,
                                uint8_t type);
     void VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset);
-    void BeginEnd(uint32_t mode);
+    void BeginEnd(GcmPrimitive mode);
     void DrawArrays(unsigned first, unsigned count);
     void InlineArray(uint32_t offset, unsigned count);
     void TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count);
@@ -288,20 +377,20 @@ class Rsx {
                      float inX,
                      float inY);
     void BlendEnable(bool enable);
-    void BlendFuncSFactor(uint16_t sfcolor, 
-                          uint16_t sfalpha,
-                          uint16_t dfcolor,
-                          uint16_t dfalpha);
+    void BlendFuncSFactor(GcmBlendFunc sfcolor, 
+                          GcmBlendFunc sfalpha,
+                          GcmBlendFunc dfcolor,
+                          GcmBlendFunc dfalpha);
     void LogicOpEnable(bool enable);
-    void BlendEquation(uint16_t color, uint16_t alpha);
+    void BlendEquation(GcmBlendEquation color, GcmBlendEquation alpha);
     void ZStencilClearValue(uint32_t value);
     void VertexData4fM(unsigned index, float x, float y, float z, float w);
-    void CullFace(uint32_t cfm);
+    void CullFace(GcmCullFace cfm);
     void FrontPolygonMode(uint32_t mode);
     void BackPolygonMode(uint32_t mode);
     void StencilTestEnable(bool enable);
     void StencilMask(uint32_t sm);
-    void StencilFunc(uint32_t func, int32_t ref, uint32_t mask);
+    void StencilFunc(GcmOperator func, int32_t ref, uint32_t mask);
     void StencilOpFail(uint32_t fail, uint32_t depthFail, uint32_t depthPass);
     void ContextDmaReport(uint32_t handle);
     void GetReport(uint8_t type, uint32_t offset);
@@ -309,7 +398,10 @@ class Rsx {
     void TransformProgramStart(uint32_t startSlot);
     void LineWidth(float width);
     void LineSmoothEnable(bool enable);
-    void LogicOp(uint32_t op);
+    void LogicOp(GcmLogicOp op);
+    void PolySmoothEnable(bool enable);
+    void PolyOffsetLineEnable(bool enable);
+    void PolyOffsetFillEnable(bool enable);
     
     void invokeHandler(uint32_t descrEa);
     

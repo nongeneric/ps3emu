@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../constants.h"
-#include "../libs/ConcurrentQueue.h"
+#include "../libs/ConcurrentBoundedQueue.h"
 #include <future>
 #include <vector>
 #include <memory>
@@ -19,13 +19,15 @@ struct CallbackInfo {
 
 class CallbackThread {
     CallbackInfo _lastCallback;
-    ConcurrentFifoQueue<CallbackInfo> _queue;
+    ConcurrentBoundedQueue<CallbackInfo> _queue;
+    uint64_t _id = 0;
     friend uint64_t callbackThreadQueueWait(PPUThread* ppuThread);
     
 public:
     CallbackThread(Process* proc);
     std::future<void> schedule(std::vector<uint64_t> args, uint32_t toc, uint32_t ea);
     void terminate();
+    uint64_t id();
 };
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread);

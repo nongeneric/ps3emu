@@ -184,6 +184,9 @@ uint32_t Process::loadPrx(std::string path) {
     for (auto p : _prxs) {
         p->link(_mainMemory.get(), _prxs);
     }
+    if (g_state.th) {
+        g_state.th->raiseModuleLoaded();
+    }
     return imageBase;
 }
 
@@ -204,70 +207,101 @@ Event Process::run() {
     if (_firstRun) {
         _threads.back()->run();
     }
-
-    ThreadEvent threadEvent;
-    size_t num;
-    _eventQueue.tryReceive(&threadEvent, 1, &num);
-    if (!num) {
-        dbgPause(false);
-        threadEvent = _eventQueue.receive(0);
-    }
-    dbgPause(true);
     
-    if (_firstRun) {
-        _callbackThread.reset(new CallbackThread(this));
-        _firstRun = false;
-    }
-
-    if (auto ev = boost::get<PPUThreadEventInfo>(&threadEvent)) {
-        switch (ev->event) {
-            case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
-            case PPUThreadEvent::ProcessFinished: {
-                dbgPause(false);
-                _rsx->shutdown();
-                _callbackThread->terminate();
-                for (auto& t : _threads) {
-                    t->join();
-                }
-                for (auto& t : _spuThreads) {
-                    if (t->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
-                        t->cancel();
-                    }
-                }
+    for (;;) {
+        {
+            boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+            boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);   
+            if (_threads.empty() && _spuThreads.empty())
                 return ProcessFinishedEvent();
-            }
-            case PPUThreadEvent::Finished:
-                return PPUThreadFinishedEvent{ev->thread};
-            case PPUThreadEvent::Breakpoint: return PPUBreakpointEvent{ev->thread};
-            case PPUThreadEvent::SingleStepBreakpoint: return PPUSingleStepBreakpointEvent{ev->thread};
-            case PPUThreadEvent::InvalidInstruction:
-                return PPUInvalidInstructionEvent{ev->thread};
-            case PPUThreadEvent::MemoryAccessError:
-                return MemoryAccessErrorEvent{ev->thread};
-            case PPUThreadEvent::Joined: {
-                boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
-                auto it =
-                    std::find_if(begin(_threads),
-                                 end(_threads),
-                                 [=](auto& th) { return th.get() == ev->thread; });
-                assert(it != end(_threads));
-                _threads.erase(it);
-            }
-            case PPUThreadEvent::Failure: return PPUThreadFailureEvent{ev->thread};
         }
-    } else if (auto ev = boost::get<SPUThreadEventInfo>(&threadEvent)) {
-        switch (ev->event) {
-            case SPUThreadEvent::Breakpoint: return SPUBreakpointEvent{ev->thread};
-            case SPUThreadEvent::SingleStepBreakpoint:
-                return SPUSingleStepBreakpointEvent{ev->thread};
-            case SPUThreadEvent::Started: return SPUThreadStartedEvent{ev->thread};
-            case SPUThreadEvent::Finished: return SPUThreadFinishedEvent{ev->thread};
-            case SPUThreadEvent::InvalidInstruction:
-                return SPUInvalidInstructionEvent{ev->thread};
-            case SPUThreadEvent::Failure: return SPUThreadFailureEvent{ev->thread};
+    
+        auto removeThread = [&](PPUThread* thread) {
+            boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+            auto it = std::find_if(begin(_threads), end(_threads), [=](auto& th) {
+                return th.get() == thread;
+            });
+            assert(it != end(_threads));
+            _threads.erase(it);
+        };
+        
+        dbgPause(false);
+        auto threadEvent = _eventQueue.receive(0);
+        dbgPause(true);
+        threadEvent.promise->signal();
+        
+        if (_firstRun) {
+            _callbackThread.reset(new CallbackThread(this));
+            _firstRun = false;
+        }
+
+        if (auto ev = boost::get<PPUThreadEventInfo>(&threadEvent.info)) {
+            switch (ev->event) {
+                case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
+                case PPUThreadEvent::ProcessFinished: {
+                    dbgPause(false);
+                    {
+                        boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+                        assert(ev->thread == _threads[0].get());
+                        removeThread(ev->thread);
+                    }
+                    _rsx->shutdown();
+                    _callbackThread->terminate();
+                    boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
+                    for (auto& t : _spuThreads) {
+                        if (t->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
+                            t->cancel();
+                        }
+                    }
+                    _spuThreads.clear();
+                    break;
+                }
+                case PPUThreadEvent::Breakpoint: return PPUBreakpointEvent{ev->thread};
+                case PPUThreadEvent::SingleStepBreakpoint:
+                    return PPUSingleStepBreakpointEvent{ev->thread};
+                case PPUThreadEvent::InvalidInstruction:
+                    return PPUInvalidInstructionEvent{ev->thread};
+                case PPUThreadEvent::MemoryAccessError:
+                    return MemoryAccessErrorEvent{ev->thread};
+                case PPUThreadEvent::Finished: {
+                    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+                    if (ev->thread->getId() == _callbackThread->id()) {
+                        removeThread(ev->thread);
+                    }
+                    return PPUThreadFinishedEvent{nullptr};
+                }
+                case PPUThreadEvent::Failure: return PPUThreadFailureEvent{ev->thread};
+                case PPUThreadEvent::ModuleLoaded:
+                    return PPUModuleLoadedEvent{ev->thread};
+                case PPUThreadEvent::Joined:
+                    removeThread(ev->thread);
+                    break;
+            }
+        } else if (auto ev = boost::get<SPUThreadEventInfo>(&threadEvent.info)) {
+            switch (ev->event) {
+                case SPUThreadEvent::Breakpoint: return SPUBreakpointEvent{ev->thread};
+                case SPUThreadEvent::SingleStepBreakpoint:
+                    return SPUSingleStepBreakpointEvent{ev->thread};
+                case SPUThreadEvent::Started: return SPUThreadStartedEvent{ev->thread};
+                case SPUThreadEvent::Finished: {
+                    ev->thread->join();
+                    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+                    auto it =
+                        std::find_if(begin(_spuThreads),
+                                     end(_spuThreads),
+                                     [=](auto& th) { return th.get() == ev->thread; });
+                    assert(it != end(_spuThreads));
+                    _spuThreads.erase(it);
+                    return SPUThreadFinishedEvent{nullptr};
+                }
+                case SPUThreadEvent::InvalidInstruction:
+                    return SPUInvalidInstructionEvent{ev->thread};
+                case SPUThreadEvent::Failure: return SPUThreadFailureEvent{ev->thread};
+            }
+        } else {
+            throw std::runtime_error("unknown event");
         }
     }
-    throw std::runtime_error("unknown event");
 }
 
 uint64_t Process::createThread(uint32_t stackSize,
@@ -386,11 +420,11 @@ PPUThread* Process::getThread(uint64_t id) {
 uint32_t Process::createSpuThread(std::string name) {
     boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
     _spuThreads.emplace_back(
-        std::make_shared<SPUThread>(this,
-                                    name,
-                                    [=](auto t, auto e) {
-                                        _eventQueue.send(SPUThreadEventInfo{e, t});
-                                    }));
+        std::make_shared<SPUThread>(this, name, [=](auto t, auto e) {
+            auto oneTime = std::make_shared<OneTimeEvent>();
+            _eventQueue.send(ThreadEvent{SPUThreadEventInfo{e, t}, oneTime});
+            oneTime->wait();
+        }));
     auto t = _spuThreads.back();
     auto id = _spuThreadIds.create(std::move(t));
     _spuThreadIds.get(id)->setId(id);
@@ -413,16 +447,9 @@ std::shared_ptr<SPUThread> Process::getSpuThreadBySpuNum(uint32_t spuNum) {
 }
 
 void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
-    _eventQueue.send(PPUThreadEventInfo{event, thread});
-}
-
-void Process::destroySpuThread(SPUThread* thread) {
-    boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
-    auto it = std::find_if(begin(_spuThreads),
-                           end(_spuThreads),
-                           [=](auto& th) { return th.get() == thread; });
-    assert(it != end(_spuThreads));
-    _spuThreads.erase(it);
+    auto oneTime = std::make_shared<OneTimeEvent>();
+    _eventQueue.send(ThreadEvent{PPUThreadEventInfo{event, thread}, oneTime});
+    oneTime->wait();
 }
 
 std::vector<PPUThread*> Process::dbgPPUThreads() {
