@@ -110,11 +110,22 @@ void GLFramebuffer::updateTexture() {
     // TODO: draw -> dump -> cpu updates texture -> (update) -> flip
 }
 
-GLSimpleTexture* GLFramebuffer::findTexture(FramebufferTextureKey key) {
+FramebufferTextureResult GLFramebuffer::findTexture(FramebufferTextureKey key) {
     auto it = _cache.find(key);
-    if (it == end(_cache))
-        return nullptr;
-    return it->second.get();
+    if (it != end(_cache))
+        return FramebufferTextureResult{it->second.get(), 0, 0, 1, 1};
+    for (auto& entry : _cache) {
+        auto& cachedKey = entry.first;
+        auto texture = entry.second.get();
+//         if (key.format != texture->format())
+//             continue;
+        if (key.offset == cachedKey.offset) {
+            auto xscale = (float)key.width / (float)texture->width();
+            auto yscale = (float)key.height / (float)texture->height();
+            return FramebufferTextureResult{texture, 0, 0, xscale, yscale};
+        }
+    }
+    return {nullptr};
 }
 
 std::vector<GLFramebufferCacheEntry> GLFramebuffer::cacheSnapshot() {

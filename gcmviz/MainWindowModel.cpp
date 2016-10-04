@@ -522,6 +522,7 @@ class VDABufferTableModel : public QAbstractItemModel {
     VertexDataArrayFormatInfo _info;
     bool _be;
     std::unique_ptr<OpenGLPreview> _openglPreview;
+    bool isFeedback;
     
 public:
     VDABufferTableModel(Rsx* rsx,
@@ -530,7 +531,9 @@ public:
                         unsigned size,
                         VertexDataArrayFormatInfo info,
                         bool be)
-        : _rsx(rsx), _buffer(buffer), _size(size), _info(info), _be(be) {}
+        : _rsx(rsx), _buffer(buffer), _size(size), _info(info), _be(be) {
+        isFeedback = vdaIndex == 16;
+    }
     
     QVariant headerData(int section,
                         Qt::Orientation orientation,
@@ -610,7 +613,8 @@ public:
         
         _openglPreview.reset(new OpenGLPreview());
         _openglPreview->widget()->setVertices(vertices);
-        _openglPreview->widget()->setMode(_rsx->context()->glVertexArrayMode);
+        _openglPreview->widget()->setMode(isFeedback ? _rsx->context()->feedbackMode
+                                                     : _rsx->context()->glVertexArrayMode);
         _openglPreview->setWindowTitle(QString::fromStdString(ssnprintf(
             "%s, %d", to_string(_rsx->context()->vertexArrayMode), vertices.size())));
         _openglPreview->show();

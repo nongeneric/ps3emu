@@ -8,13 +8,13 @@ set(SRC
     main.cpp
     PPUTests.cpp
     PPUDasmTests.cpp
-    PPUSysCallsTests.cpp
     ShDasmTests.cpp
     RunnerTests.cpp
     GraphicsTests.cpp
     ShaderRewriterTests.cpp
     SPUChannelsTests.cpp
     EnumTests.cpp
+    TextureCacheTests.cpp
 )
 
 add_executable(tests ${SRC})

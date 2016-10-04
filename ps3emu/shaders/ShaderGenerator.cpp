@@ -80,6 +80,10 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line(ssnprintf("layout (std140, binding = %d) uniform FragmentSamplersInfo {",
                    FragmentShaderSamplesInfoBinding));
     line("    ivec4 flip[4];");
+    line("    vec4 xOffset[4];");
+    line("    vec4 yOffset[4];");
+    line("    vec4 xScale[4];");
+    line("    vec4 yScale[4];");
     line("} fragmentSamplersInfo;");
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
         if (samplerSizes[i] == 0)
@@ -92,8 +96,10 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
             line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
                         i + FragmentTextureUnit, samplerSizes[i], i));
             line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
-            line(ssnprintf("    uvp = fragmentSamplersInfo.flip%s == 0 ? uvp : vec4(uvp.x, 1 - uvp.y, uvp.zw);",
-                        flipIndex(i)));
+            line(ssnprintf("    float xScale = fragmentSamplersInfo.xScale%s;", flipIndex(i)));
+            line(ssnprintf("    float yScale = fragmentSamplersInfo.yScale%s;", flipIndex(i)));
+            line(ssnprintf("    int isFlip = fragmentSamplersInfo.flip%s;", flipIndex(i)));            
+            line(ssnprintf("    uvp = isFlip == 0 ? uvp : vec4(xScale * uvp.x, 1 - yScale * uvp.y, uvp.zw);"));
             line(ssnprintf("    return texture(s%d, uvp.xy);", i));
             line("}");
             line(ssnprintf("vec4 tex%dProj(vec4 uvp) { return textureProj(s%d, uvp.xyzw); }", i, i));
@@ -326,6 +332,9 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    bool b[32];");
     line("    vec4 void_var;");
     line("    int nip;");
+    for (int i = 0; i < 32; ++i) {
+        line(ssnprintf("    r[%d] = vec4(0,0,0,1);", i));
+    }
     for (int i = 0; i < 16; ++i) {
         line(ssnprintf("    v_out[%d] = vec4(0,0,0,1);", i));
     }

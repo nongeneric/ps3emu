@@ -65,9 +65,8 @@ struct FramebufferTextureKey {
     uint32_t height;
     uint32_t format;
     inline bool operator<(FramebufferTextureKey const& other) const {
-        return std::tie(offset, width, width, height, format) <
+        return std::tie(offset, width, height, format) <
                std::tie(other.offset,
-                        other.width,
                         other.width,
                         other.height,
                         other.format);
@@ -77,6 +76,12 @@ struct FramebufferTextureKey {
 struct GLFramebufferCacheEntry {
     FramebufferTextureKey key;
     GLSimpleTexture* texture;
+};
+
+struct FramebufferTextureResult {
+    GLSimpleTexture* texture;
+    float xOffset, yOffset;
+    float xScale, yScale;
 };
 
 class GLFramebuffer {
@@ -98,6 +103,6 @@ public:
     void setSurface(SurfaceInfo const& info, unsigned width, unsigned height);
     void dumpTextures();
     void updateTexture();
-    GLSimpleTexture* findTexture(FramebufferTextureKey key);
+    FramebufferTextureResult findTexture(FramebufferTextureKey key);
     std::vector<GLFramebufferCacheEntry> cacheSnapshot();
 };

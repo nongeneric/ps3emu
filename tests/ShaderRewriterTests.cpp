@@ -425,3 +425,20 @@ TEST_CASE("shader_rewriter_slexc_norm_kilr") {
         "}"
     );
 }
+
+TEST_CASE("shader_rewriter_cond_y") {
+    // MOV R3.y(NE), R5.x;
+    unsigned char instr[] = {
+        0x00, 0x01, 0xb4, 0x6c, 0x00, 0x40, 0x00, 0x00, 0x0a, 0x86, 0xc0, 0x83, 0x60, 0x40, 0x9f, 0xfc,
+    };
+    
+    std::array<VertexInstr, 2> res;
+    auto count = vertex_dasm_instr(instr, res);
+    auto st = MakeStatement(res[0], 0);
+    auto str = printStatements(st);
+        REQUIRE( str ==
+        "if (((c[0]).y != 0)) {\n"
+        "    r[3].y = (r[5].xxxx).y;\n"
+        "}"
+    );
+}

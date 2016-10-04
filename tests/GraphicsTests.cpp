@@ -210,3 +210,9 @@ TEST_CASE("gcm_strip_branch") {
             i);
     }
 }
+
+TEST_CASE("cube_with_font") {
+    runAndWait("./binaries/cube_with_font/a.elf");
+    compareLastFrame("./binaries/cube_with_font/ps3frame0.png", 0);
+}
+

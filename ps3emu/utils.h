@@ -134,6 +134,11 @@ bool intersects(T a, T alen, T b, T blen) {
 }
 
 template <typename T>
+bool subset(T sub, T sublen, T a, T alen) {
+    return sub >= a && sub + sublen <= a + alen;
+}
+
+template <typename T>
 T align(T n, unsigned alignment) {
     assert(alignment > 0 && (alignment & (alignment - 1)) == 0);
     return (n + alignment - 1) & (~(alignment - 1));

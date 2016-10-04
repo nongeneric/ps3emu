@@ -5,8 +5,44 @@
 #include "GLBuffer.h"
 #include "../constants.h"
 #include "../libs/graphics/gcm.h"
+#include "ps3emu/enum.h"
 #include <stdint.h>
 #include <functional>
+
+ENUM(GcmTextureFormat,
+    (B8, 0x81),
+    (A1R5G5B5, 0x82),
+    (A4R4G4B4, 0x83),
+    (R5G6B5, 0x84),
+    (A8R8G8B8, 0x85),
+    (COMPRESSED_DXT1, 0x86),
+    (COMPRESSED_DXT23, 0x87),
+    (COMPRESSED_DXT45, 0x88),
+    (G8B8, 0x8B),
+    (R6G5B5, 0x8F),
+    (DEPTH24_D8, 0x90),
+    (DEPTH24_D8_FLOAT, 0x91),
+    (DEPTH16, 0x92),
+    (DEPTH16_FLOAT, 0x93),
+    (X16, 0x94),
+    (Y16_X16, 0x95),
+    (R5G5B5A1, 0x97),
+    (COMPRESSED_HILO8, 0x98),
+    (COMPRESSED_HILO_S8, 0x99),
+    (W16_Z16_Y16_X16_FLOAT, 0x9A),
+    (W32_Z32_Y32_X32_FLOAT, 0x9B),
+    (X32_FLOAT, 0x9C),
+    (D1R5G5B5, 0x9D),
+    (D8R8G8B8, 0x9E),
+    (Y16_X16_FLOAT, 0x9F),
+    (COMPRESSED_B8R8_G8R8, 0xAD),
+    (COMPRESSED_R8B8_R8G8, 0xAE)
+);
+
+ENUMF(GcmTextureLnUn,
+    (LN, 0x20),
+    (UN, 0x40)
+)    
 
 struct RsxTextureInfo {
     uint32_t pitch;
@@ -14,7 +50,8 @@ struct RsxTextureInfo {
     uint16_t height;
     uint32_t offset; 
     uint8_t mipmap;
-    uint8_t format;
+    GcmTextureFormat format;
+    GcmTextureLnUn lnUn;
     uint8_t dimension;
     MemoryLocation location;
     bool fragmentBorder;
@@ -50,10 +87,10 @@ public:
 
 class TextureReader {
     std::function<glm::vec4(uint8_t*)> _read;
-    std::function<glm::vec4(uint8_t*)> make_read(uint32_t texelFormat,
+    std::function<glm::vec4(uint8_t*)> make_read(GcmTextureFormat texelFormat,
                                                  RsxTextureInfo const& info);
 public:
-    TextureReader(uint32_t format, RsxTextureInfo const& info);
+    TextureReader(GcmTextureFormat format, RsxTextureInfo const& info);
     void read(uint8_t* ptr, glm::vec4& tex);
 };
 

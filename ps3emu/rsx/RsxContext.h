@@ -7,6 +7,7 @@
 #include "GLTexture.h"
 #include "GLFramebuffer.h"
 #include "Cache.h"
+#include "TextureCache.h"
 #include "Rsx.h"
 #include "../shaders/ShaderGenerator.h"
 
@@ -104,18 +105,6 @@ struct InlineSettings {
     uint32_t destSizeY = 0;
 };
 
-struct TextureCacheKey {
-    uint32_t offset;
-    uint32_t location;
-    uint32_t width;
-    uint32_t height;
-    uint8_t internalType;
-    inline bool operator<(TextureCacheKey const& other) const {
-        return std::tie(offset, location, width, height, internalType)
-             < std::tie(other.offset, other.location, other.width, other.height, other.internalType);
-    }
-};
-
 struct VertexShaderCacheKey {
     std::vector<uint8_t> bytecode;
     std::array<uint8_t, 16> arraySizes;
@@ -136,6 +125,24 @@ struct FragmentShaderCacheKey {
     inline bool operator<(FragmentShaderCacheKey const& other) const {
         return std::tie(va, size, mrt)
              < std::tie(other.va, other.size, other.mrt);
+    }
+};
+
+struct TextureCacheKey {
+    uint32_t offset;
+    uint32_t location;
+    uint32_t width;
+    uint32_t height;
+    GcmTextureFormat internalType;
+    GcmTextureLnUn lnUn;
+    inline bool operator<(TextureCacheKey const& other) const {
+        return std::tie(offset, location, width, height, internalType, lnUn) <
+               std::tie(other.offset,
+                        other.location,
+                        other.width,
+                        other.height,
+                        other.internalType,
+                        lnUn);
     }
 };
 
@@ -188,6 +195,8 @@ struct FragmentOps {
     bool depthTest;
     GcmOperator depthFunc;
     GcmOperator stencilFunc;
+    uint32_t clearColor;
+    GcmClearMask clearMask;
 };
 
 class FragmentShaderUpdateFunctor;
@@ -204,8 +213,6 @@ struct RsxContext {
     GcmColorMask colorMask;
     bool isCullFaceEnabled;
     bool isFlatShadeMode;
-    glm::vec4 colorClearValue;
-    GLuint glClearSurfaceMask;
     std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;
     GcmPrimitive vertexArrayMode;
@@ -234,9 +241,9 @@ struct RsxContext {
     GLPersistentCpuBuffer mainMemoryBuffer;
     GLPersistentCpuBuffer localMemoryBuffer;
     GLPersistentCpuBuffer feedbackBuffer;
-    Cache<TextureCacheKey, GLTexture, 256 * (2 >> 20)> textureCache;
-    Cache<VertexShaderCacheKey, VertexShader, 10 * (2 >> 20)> vertexShaderCache;
-    Cache<FragmentShaderCacheKey, FragmentShader, 10 * (2 >> 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
+    Cache<TextureCacheKey, GLTexture, (256u << 20)> textureCache;
+    Cache<VertexShaderCacheKey, VertexShader, (20u << 20)> vertexShaderCache;
+    Cache<FragmentShaderCacheKey, FragmentShader, (20u << 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
     uint32_t vBlankHandlerDescr = 0;
     uint32_t flipHandlerDescr = 0;
     MemoryLocation reportLocation;

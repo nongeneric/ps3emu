@@ -127,79 +127,79 @@ struct FormatInfo {
     std::function<void(const uint8_t*, u8vec4&)> u8read;
 };
 
-unsigned getTexelSize(uint32_t format) {
+unsigned getTexelSize(GcmTextureFormat format) {
     switch (format) {
-        case CELL_GCM_TEXTURE_A8R8G8B8:
-        case CELL_GCM_TEXTURE_D8R8G8B8:
-        case CELL_GCM_TEXTURE_DEPTH24_D8:
-        case CELL_GCM_TEXTURE_DEPTH24_D8_FLOAT:
-        case CELL_GCM_TEXTURE_Y16_X16:
-        case CELL_GCM_TEXTURE_X32_FLOAT:
-        case CELL_GCM_TEXTURE_Y16_X16_FLOAT:
+        case GcmTextureFormat::A8R8G8B8:
+        case GcmTextureFormat::D8R8G8B8:
+        case GcmTextureFormat::DEPTH24_D8:
+        case GcmTextureFormat::DEPTH24_D8_FLOAT:
+        case GcmTextureFormat::Y16_X16:
+        case GcmTextureFormat::X32_FLOAT:
+        case GcmTextureFormat::Y16_X16_FLOAT:
             return 4;
-        case CELL_GCM_TEXTURE_A1R5G5B5:
-        case CELL_GCM_TEXTURE_R5G5B5A1:
-        case CELL_GCM_TEXTURE_A4R4G4B4:
-        case CELL_GCM_TEXTURE_R5G6B5:
-        case CELL_GCM_TEXTURE_D1R5G5B5:
-        case CELL_GCM_TEXTURE_R6G5B5:
-        case CELL_GCM_TEXTURE_G8B8:        
-        case CELL_GCM_TEXTURE_DEPTH16:
-        case CELL_GCM_TEXTURE_DEPTH16_FLOAT:
-        case CELL_GCM_TEXTURE_X16:
-        case CELL_GCM_TEXTURE_COMPRESSED_HILO8:
-        case CELL_GCM_TEXTURE_COMPRESSED_HILO_S8:
+        case GcmTextureFormat::A1R5G5B5:
+        case GcmTextureFormat::R5G5B5A1:
+        case GcmTextureFormat::A4R4G4B4:
+        case GcmTextureFormat::R5G6B5:
+        case GcmTextureFormat::D1R5G5B5:
+        case GcmTextureFormat::R6G5B5:
+        case GcmTextureFormat::G8B8:        
+        case GcmTextureFormat::DEPTH16:
+        case GcmTextureFormat::DEPTH16_FLOAT:
+        case GcmTextureFormat::X16:
+        case GcmTextureFormat::COMPRESSED_HILO8:
+        case GcmTextureFormat::COMPRESSED_HILO_S8:
             return 2;
-        case CELL_GCM_TEXTURE_B8:
+        case GcmTextureFormat::B8:
             return 1;
-        case CELL_GCM_TEXTURE_W16_Z16_Y16_X16_FLOAT:
-        case CELL_GCM_TEXTURE_COMPRESSED_DXT1:
+        case GcmTextureFormat::W16_Z16_Y16_X16_FLOAT:
+        case GcmTextureFormat::COMPRESSED_DXT1:
             return 8;
-        case CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT:
-        case CELL_GCM_TEXTURE_COMPRESSED_DXT23:
-        case CELL_GCM_TEXTURE_COMPRESSED_DXT45:
+        case GcmTextureFormat::W32_Z32_Y32_X32_FLOAT:
+        case GcmTextureFormat::COMPRESSED_DXT23:
+        case GcmTextureFormat::COMPRESSED_DXT45:
             return 16;
         default: assert(false);
     }
     return {};
 }
 
-FormatInfo getFormat(uint32_t format) {
+FormatInfo getFormat(GcmTextureFormat format) {
     switch (format) {
-        case CELL_GCM_TEXTURE_A8R8G8B8:
+        case GcmTextureFormat::A8R8G8B8:
             return { FormatType::u8x4, read_A8R8G8B8 };
-        case CELL_GCM_TEXTURE_D8R8G8B8:
+        case GcmTextureFormat::D8R8G8B8:
             return { FormatType::u8x4, read_D8R8G8B8 };
-        case CELL_GCM_TEXTURE_A1R5G5B5:
+        case GcmTextureFormat::A1R5G5B5:
             return { FormatType::u8x4, read_A1R5G5B5 };
-        case CELL_GCM_TEXTURE_R5G5B5A1:
+        case GcmTextureFormat::R5G5B5A1:
             return { FormatType::u8x4, read_R5G5B5A1 };
-        case CELL_GCM_TEXTURE_A4R4G4B4:
+        case GcmTextureFormat::A4R4G4B4:
             return { FormatType::u8x4, read_A4R4G4B4 };
-        case CELL_GCM_TEXTURE_R5G6B5:
+        case GcmTextureFormat::R5G6B5:
             return { FormatType::u8x4, read_R5G6B5 };
-        case CELL_GCM_TEXTURE_D1R5G5B5:
+        case GcmTextureFormat::D1R5G5B5:
             return { FormatType::u8x4, read_D1R5G5B5 };
-        case CELL_GCM_TEXTURE_R6G5B5:
+        case GcmTextureFormat::R6G5B5:
             return { FormatType::u8x4, read_R6G5B5 };
-        case CELL_GCM_TEXTURE_B8:
+        case GcmTextureFormat::B8:
             return { FormatType::u8x4, read_B8 };
         
-        case CELL_GCM_TEXTURE_G8B8:        
-        case CELL_GCM_TEXTURE_DEPTH16:
-        case CELL_GCM_TEXTURE_DEPTH16_FLOAT:
-        case CELL_GCM_TEXTURE_X16:
-        case CELL_GCM_TEXTURE_COMPRESSED_HILO8:
-        case CELL_GCM_TEXTURE_COMPRESSED_HILO_S8:
-        case CELL_GCM_TEXTURE_DEPTH24_D8:
-        case CELL_GCM_TEXTURE_DEPTH24_D8_FLOAT:
-        case CELL_GCM_TEXTURE_Y16_X16:
-        case CELL_GCM_TEXTURE_X32_FLOAT:
-        case CELL_GCM_TEXTURE_Y16_X16_FLOAT:
-        case CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT:
-        case CELL_GCM_TEXTURE_COMPRESSED_DXT1:
-        case CELL_GCM_TEXTURE_COMPRESSED_DXT23:
-        case CELL_GCM_TEXTURE_COMPRESSED_DXT45:
+        case GcmTextureFormat::G8B8:        
+        case GcmTextureFormat::DEPTH16:
+        case GcmTextureFormat::DEPTH16_FLOAT:
+        case GcmTextureFormat::X16:
+        case GcmTextureFormat::COMPRESSED_HILO8:
+        case GcmTextureFormat::COMPRESSED_HILO_S8:
+        case GcmTextureFormat::DEPTH24_D8:
+        case GcmTextureFormat::DEPTH24_D8_FLOAT:
+        case GcmTextureFormat::Y16_X16:
+        case GcmTextureFormat::X32_FLOAT:
+        case GcmTextureFormat::Y16_X16_FLOAT:
+        case GcmTextureFormat::W32_Z32_Y32_X32_FLOAT:
+        case GcmTextureFormat::COMPRESSED_DXT1:
+        case GcmTextureFormat::COMPRESSED_DXT23:
+        case GcmTextureFormat::COMPRESSED_DXT45:
         default: LOG << ssnprintf("unsupported texture format %d", format); assert(false);
     }
     return {};
@@ -355,12 +355,11 @@ uint32_t GLTexture::read2d(
 {
     auto size = 0ul;
     std::vector<vec4> conv(_info.width * _info.height);
-    auto texelFormat = _info.format & ~(CELL_GCM_TEXTURE_LN | CELL_GCM_TEXTURE_UN);
     for (auto level = 0u; level < _info.mipmap; ++level) {
         LinearTextureIterator srcDecoded(nullptr, 0, _info.width, _info.height, 16, level);
-        auto isDX1 = texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT1;
-        auto isDX23 = texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT23;
-        auto isDX45 = texelFormat == CELL_GCM_TEXTURE_COMPRESSED_DXT45;
+        auto isDX1 = _info.format == GcmTextureFormat::COMPRESSED_DXT1;
+        auto isDX23 = _info.format == GcmTextureFormat::COMPRESSED_DXT23;
+        auto isDX45 = _info.format == GcmTextureFormat::COMPRESSED_DXT45;
         if (isDX1 || isDX23 || isDX45) {
             auto decode = isDX1 ? decodeDXT1 : isDX23 ? decodeDXT23 : decodeDXT45;
             auto blockSize = isDX1 ? 8 : 16;
@@ -382,9 +381,9 @@ uint32_t GLTexture::read2d(
             }
             size = src.size();
         } else {
-            TextureReader reader(texelFormat, _info);
-            auto texelSize = getTexelSize(texelFormat);
-            if (_info.format & CELL_GCM_TEXTURE_LN) {
+            TextureReader reader(_info.format, _info);
+            auto texelSize = getTexelSize(_info.format);
+            if (!!(_info.lnUn & GcmTextureLnUn::LN)) {
                 LinearTextureIterator it(
                     raw, _info.pitch, _info.width, _info.height, texelSize, level);
                 for (auto y = 0u; y < _info.height; ++y) {
@@ -454,28 +453,28 @@ void glcheck(int line, const char* call) {
 //     }
 }
 
-TextureReader::TextureReader(uint32_t format, const RsxTextureInfo& info)
+TextureReader::TextureReader(GcmTextureFormat format, const RsxTextureInfo& info)
     : _read(make_read(format, info)) { }
     
-std::function<glm::vec4(uint8_t*)> TextureReader::make_read(uint32_t texelFormat, 
+std::function<glm::vec4(uint8_t*)> TextureReader::make_read(GcmTextureFormat texelFormat, 
                                                             RsxTextureInfo const& info)
 {
-    if (texelFormat == CELL_GCM_TEXTURE_W32_Z32_Y32_X32_FLOAT) {
+    if (texelFormat == GcmTextureFormat::W32_Z32_Y32_X32_FLOAT) {
         return [](uint8_t* p) {
             auto fp = (float*)p;
             return vec4(fp[0], fp[1], fp[2], fp[3]);
         };
-    } else if (texelFormat == CELL_GCM_TEXTURE_W16_Z16_Y16_X16_FLOAT) {
+    } else if (texelFormat == GcmTextureFormat::W16_Z16_Y16_X16_FLOAT) {
         return [](uint8_t* p) {
             auto u = (uint32_t*)p;
             return vec4(glm::unpackHalf2x16(u[0]), glm::unpackHalf2x16(u[1]));
         };
-    } else if (texelFormat == CELL_GCM_TEXTURE_Y16_X16_FLOAT) {
+    } else if (texelFormat == GcmTextureFormat::Y16_X16_FLOAT) {
         return [](uint8_t* p) {
             auto u = (uint32_t*)p;
             return vec4(glm::unpackHalf2x16(u[0]), vec2(0, 0));
         };
-    } else if (texelFormat == CELL_GCM_TEXTURE_DEPTH16) {
+    } else if (texelFormat == GcmTextureFormat::DEPTH16) {
         return [](uint8_t* p) {
             auto u = (big_uint16_t*)p;
             return vec4(*u, 0, 0, 0);
@@ -537,8 +536,10 @@ void TextureReader::read(uint8_t* ptr, vec4& tex) {
     tex = _read(ptr);
 }
 
-GLSimpleTexture::GLSimpleTexture ( unsigned int width, unsigned int height, GLuint format )
-    : _width (width), _height (height), _format (format)
+GLSimpleTexture::GLSimpleTexture(unsigned int width,
+                                 unsigned int height,
+                                 GLuint format)
+    : _width(width), _height(height), _format(format)
 {
     glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
     glcall(glTextureStorage2D(_handle, 1, format, width, height));

@@ -573,23 +573,30 @@ namespace ShaderRewriter {
         return expr;
     }
     
-    Expression* makeCondition(condition_t cond) {
+    Expression* makeCondition(condition_t cond, dest_mask_t mask) {
         if (cond.relation == cond_t::TR)
             return nullptr;
         auto func = relationToFunction(cond.relation);
-//         auto sw = cond.swizzle;
-//         assert(sw.comp[0] == sw.comp[1] && 
-//                sw.comp[1] == sw.comp[2] &&
-//                sw.comp[2] == sw.comp[3]);
+        auto sw = cond.swizzle;
+        if (sw.comp[0] == sw.comp[1] && sw.comp[1] == sw.comp[2] &&
+            sw.comp[2] == sw.comp[3]) {
+            mask = { 1, 0, 0, 0 };
+        } else {
+            assert(sw.comp[0] == swizzle2bit_t::X && sw.comp[1] == swizzle2bit_t::Y &&
+                   sw.comp[2] == swizzle2bit_t::Z && sw.comp[3] == swizzle2bit_t::W);
+        }
         auto regnum = cond.is_C1 ? 1 : 0;
         auto reg = new Variable("c", new IntegerLiteral(regnum));
         auto swexpr = new Swizzle(reg, cond.swizzle);
-        auto maskExpr = new ComponentMask(swexpr, { 1, 0, 0, 0 });
+        assert(mask.val[0] + mask.val[1] + mask.val[2] + mask.val[3] == 1);
+        auto maskExpr = new ComponentMask(swexpr, mask);
         return new BinaryOperator(func, maskExpr, new FloatLiteral(0));
     }
     
-    void appendCondition(condition_t cond, std::vector<std::unique_ptr<Statement>>& res) {
-        auto expr = makeCondition(cond);
+    void appendCondition(condition_t cond,
+                         std::vector<std::unique_ptr<Statement>>& res,
+                         dest_mask_t mask) {
+        auto expr = makeCondition(cond, mask);
         if (!expr)
             return;
         std::vector<Statement*> sts;
@@ -821,7 +828,7 @@ namespace ShaderRewriter {
         }
         
         if (i.opcode.instr == fragment_op_t::IFE) {
-            auto cond = makeCondition(i.condition);
+            auto cond = makeCondition(i.condition, i.dest_mask);
             assert(cond);
             res.emplace_back(new IfStubFragmentStatement(cond, i.elseLabel, i.endifLabel));
         } else {
@@ -834,7 +841,7 @@ namespace ShaderRewriter {
                 res.emplace_back(assign);
             }
             appendCAssignment(i.control, i.is_reg_c, i.dest_mask, regname, regnum, res);
-            appendCondition(i.condition, res);
+            appendCondition(i.condition, res, i.dest_mask);
         }
         
         TypeFixerVisitor typeFixer;
@@ -1167,7 +1174,7 @@ namespace ShaderRewriter {
         }
 
         appendCAssignment(i.control, isRegC, maskVal, "abc", 1, vec); // TODO:
-        appendCondition(i.condition, vec);
+        appendCondition(i.condition, vec, maskVal);
         
         TypeFixerVisitor fixer;
         for (auto& assignment : vec) {

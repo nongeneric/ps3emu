@@ -109,6 +109,16 @@ ENUM(GcmPrimitive,
     (POLYGON, 10)
 )
 
+ENUMF(GcmClearMask,
+    (Z, 1<<0),
+    (S, 1<<1),
+    (R, 1<<4),
+    (G, 1<<5),
+    (B, 1<<6),
+    (A, 1<<7),
+    (M, 0xf3)
+)
+
 constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 constexpr auto FragmentProgramSize = 512 * 16;
 
@@ -251,7 +261,7 @@ class Rsx {
     void DepthTestEnable(bool enable);
     void ShadeMode(uint32_t sm);
     void ColorClearValue(uint32_t color);
-    void ClearSurface(uint32_t mask);
+    void ClearSurface(GcmClearMask mask);
     void VertexDataArrayFormat(uint8_t index,
                                uint16_t frequency,
                                uint8_t stride,
@@ -269,7 +279,8 @@ class Rsx {
     void VertexTextureOffset(unsigned index, 
                              uint32_t offset, 
                              uint8_t mipmap,
-                             uint8_t format,
+                             GcmTextureFormat format,
+                             GcmTextureLnUn lnUn,
                              uint8_t dimension,
                              uint8_t location);
     void VertexTextureControl3(unsigned index, uint32_t pitch);
@@ -281,7 +292,8 @@ class Rsx {
     void TextureOffset(unsigned index,
                        uint32_t offset,
                        uint16_t mipmap,
-                       uint8_t format,
+                       GcmTextureFormat format,
+                       GcmTextureLnUn lnUn,
                        uint8_t dimension,
                        bool border,
                        bool cubemap,
@@ -407,7 +419,12 @@ class Rsx {
     
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);
-    void UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format);
+    void UpdateTextureCache(uint32_t offset,
+                            uint32_t location,
+                            uint32_t width,
+                            uint32_t height,
+                            GcmTextureFormat format,
+                            GcmTextureLnUn lnUn);
     void UpdateFragmentCache(uint32_t va, uint32_t size, bool mrt);
     inline void StopReplay() { }
     void transferImage();

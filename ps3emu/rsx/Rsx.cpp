@@ -336,34 +336,31 @@ void Rsx::ShadeMode(uint32_t sm) {
 
 void Rsx::ColorClearValue(uint32_t color) {
     TRACE(ColorClearValue, color);
+    _context->fragmentOps.clearColor = color;
+}
+
+void Rsx::ClearSurface(GcmClearMask mask) {
+    TRACE(ClearSurface, mask);
+    auto glmask = 0;
+    auto colorMask =
+        GcmClearMask::R | GcmClearMask::G | GcmClearMask::B | GcmClearMask::A;
+    if (!!(mask & colorMask))
+        glmask |= GL_COLOR_BUFFER_BIT;
+    if (!!(mask & GcmClearMask::Z))
+        glmask |= GL_DEPTH_BUFFER_BIT;
+    if (!!(mask & GcmClearMask::S))
+        glmask |= GL_STENCIL_BUFFER_BIT;
+    
     union {
         uint32_t val;
         BitField<0, 8> a;
         BitField<8, 16> r;
         BitField<16, 24> g;
         BitField<24, 32> b;
-    } c = { color };
-    _context->colorClearValue = {
-        c.r.u() / 255.,
-        c.g.u() / 255.,
-        c.b.u() / 255.,
-        c.a.u() / 255.
-    };
-}
-
-void Rsx::ClearSurface(uint32_t mask) {
-    TRACE(ClearSurface, mask);
-    auto glmask = 0;
-    if (mask & CELL_GCM_CLEAR_R || mask & CELL_GCM_CLEAR_G ||
-        mask & CELL_GCM_CLEAR_B || mask & CELL_GCM_CLEAR_A)
-        glmask |= GL_COLOR_BUFFER_BIT;
-    if (mask & CELL_GCM_CLEAR_Z)
-        glmask |= GL_DEPTH_BUFFER_BIT;
-    if (mask & CELL_GCM_CLEAR_S)
-        glmask |= GL_STENCIL_BUFFER_BIT;
-    _context->glClearSurfaceMask = glmask;
-    auto& c = _context->colorClearValue;
-    glClearColor(c.r, c.g, c.b, c.a);
+    } c = { _context->fragmentOps.clearColor };
+    
+    _context->fragmentOps.clearMask = mask;
+    glClearColor(c.r.u() / 255., c.g.u() / 255., c.b.u() / 255., c.a.u() / 255.);
     glClear(glmask);
 }
 
@@ -453,6 +450,7 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     updateTextures();
     watchCaches();
     linkShaderProgram();
+    updateScissor();
     
     GLQuery query(0);
     if (_mode == RsxOperationMode::Replay) {
@@ -536,6 +534,10 @@ struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
 
 struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
     uint32_t flip[16];
+    float xOffset[16];
+    float yOffset[16];
+    float xScale[16];
+    float yScale[16];
 };
 
 struct VertexShaderViewportUniform {
@@ -607,7 +609,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     auto& fb = _context->displayBuffers[buffer];
     auto va = fb.offset + RsxFbBaseAddr;
     FramebufferTextureKey key{va, fb.width, fb.height, GL_RGBA8}; // GL_RGB32F
-    auto tex = _context->framebuffer->findTexture(key);
+    auto tex = _context->framebuffer->findTexture(key).texture;
     if (!tex && _mode == RsxOperationMode::Replay)
         return;
     
@@ -618,7 +620,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
         //assert(it != end(_context->surfaceLinks));
         if (it != end(_context->surfaceLinks)) {
             key.offset = it->surfaceEa;
-            tex = _context->framebuffer->findTexture(key);
+            tex = _context->framebuffer->findTexture(key).texture;
         }
     }
     _context->framebuffer->bindDefault();
@@ -775,6 +777,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     updateShaders();
     watchCaches();
     linkShaderProgram();
+    updateScissor();
     
     glcall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, destBuffer->handle()));
     
@@ -868,15 +871,17 @@ void Rsx::updateShaders() {
 void Rsx::VertexTextureOffset(unsigned index, 
                               uint32_t offset, 
                               uint8_t mipmap,
-                              uint8_t format,
+                              GcmTextureFormat format,
+                              GcmTextureLnUn lnUn,
                               uint8_t dimension,
                               uint8_t location)
 {
-    TRACE(VertexTextureOffset, index, offset, mipmap, format, dimension, location);
+    TRACE(VertexTextureOffset, index, offset, mipmap, format, lnUn, dimension, location);
     auto& t = _context->vertexTextureSamplers[index].texture;
     t.offset = offset;
     t.mipmap = mipmap;
     t.format = format;
+    t.lnUn = lnUn;
     t.dimension = dimension;
     t.location = gcmEnumToLocation(location);
 }
@@ -1026,10 +1031,19 @@ void Rsx::updateTextures() {
             auto textureUnit = i + FragmentTextureUnit;
             auto va = rsxOffsetToEa(sampler.texture.location, sampler.texture.offset);
             FramebufferTextureKey key{va, sampler.texture.width, sampler.texture.height, GL_RGBA8}; // GL_RGB32F
-            auto surfaceTex = _context->framebuffer->findTexture(key);
+            auto surfaceTexResult = _context->framebuffer->findTexture(key);
+            auto surfaceTex = surfaceTexResult.texture;
             if (surfaceTex) {
-                glcall(glBindTextureUnit(textureUnit, surfaceTex->handle()));
+                fragmentSamplerUniform->xOffset[i] = surfaceTexResult.xOffset;
+                fragmentSamplerUniform->yOffset[i] = surfaceTexResult.yOffset;
+                fragmentSamplerUniform->xScale[i] = surfaceTexResult.xScale;
+                fragmentSamplerUniform->yScale[i] = surfaceTexResult.yScale;
+                glBindTextureUnit(textureUnit, surfaceTex->handle());
             } else {
+                fragmentSamplerUniform->xOffset[i] = 0;
+                fragmentSamplerUniform->yOffset[i] = 0;
+                fragmentSamplerUniform->xScale[i] = 1;
+                fragmentSamplerUniform->yScale[i] = 1;
                 auto texture = getTextureFromCache(i, true);
                 texture->bind(textureUnit);
             }
@@ -1038,7 +1052,7 @@ void Rsx::updateTextures() {
             if (!handle) {
                 sampler.glSampler = GLSampler();
                 handle = sampler.glSampler.handle();
-                glcall(glBindSampler(textureUnit, handle));
+                glBindSampler(textureUnit, handle);
             }
             glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD, sampler.minlod);
             glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD, sampler.maxlod);
@@ -1137,18 +1151,20 @@ void Rsx::TextureFilter(unsigned index,
 void Rsx::TextureOffset(unsigned index, 
                         uint32_t offset, 
                         uint16_t mipmap, 
-                        uint8_t format, 
+                        GcmTextureFormat format,
+                        GcmTextureLnUn lnUn,
                         uint8_t dimension,
                         bool border, 
                         bool cubemap, 
                         uint8_t location)
 {
-    TRACE(TextureOffset, index, offset, mipmap, format, dimension, border, cubemap, location);
+    TRACE(TextureOffset, index, offset, mipmap, format, lnUn, dimension, border, cubemap, location);
     _context->fragmentTextureSamplers[index].enable = true;
     auto& t = _context->fragmentTextureSamplers[index].texture;
     t.offset = offset;
     t.mipmap = mipmap;
     t.format = format;
+    t.lnUn = lnUn;
     t.dimension = dimension;
     t.fragmentBorder = border;
     t.fragmentCubemap = cubemap;
@@ -1284,7 +1300,6 @@ void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) 
     assert(y == 0);
     _context->surfaceClipWidth = w;
     _context->surfaceClipHeight = h;
-    updateScissor();
 }
 
 // assuming cellGcmSetSurface is always used and not its subcommands
@@ -2188,8 +2203,13 @@ void Rsx::UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t s
     }
 }
 
-void Rsx::UpdateTextureCache(uint32_t offset, uint32_t location, uint32_t width, uint32_t height, uint8_t format) {
-    TextureCacheKey key { offset, location, width, height, format };
+void Rsx::UpdateTextureCache(uint32_t offset,
+                             uint32_t location,
+                             uint32_t width,
+                             uint32_t height,
+                             GcmTextureFormat format,
+                             GcmTextureLnUn lnUn) {
+    TextureCacheKey key { offset, location, width, height, format, lnUn };
     auto tuple = _context->textureCache.retrieveWithUpdater(key);
     auto texture = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);

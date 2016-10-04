@@ -232,7 +232,8 @@ GenericTableModel<RsxContext>* SamplerTextureContextTreeItem::getTable(
             DECHEX(t(), height)
             HEX(t(), offset)
             DEC(t(), mipmap)
-            DECHEX(t(), format)
+            PRINT_ENUM(t(), format)
+            PRINT_ENUM(t(), lnUn)
             DEC(t(), dimension)
             PRINT_ENUM(t(), location)
             BOOL(t(), fragmentBorder)
@@ -269,5 +270,7 @@ GenericTableModel<RsxContext>* FragmentOperationsTreeItem::getTable(RsxContext* 
             BOOL(ops, depthTest)
             PRINT_ENUM(ops, depthFunc)
             PRINT_ENUM(ops, stencilFunc)
+            HEX(ops, clearColor)
+            PRINT_ENUM(ops, clearMask)
         });
 }

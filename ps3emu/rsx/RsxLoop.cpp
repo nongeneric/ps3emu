@@ -838,7 +838,7 @@ int64_t Rsx::interpret(uint32_t get) {
             break;
         case 0x00001d94:
             //name = "CELL_GCM_NV4097_CLEAR_SURFACE";
-            ClearSurface(readarg(1));
+            ClearSurface(enum_cast<GcmClearMask>(readarg(1)));
             break;
         case 0x00001d98: {
             //name = "CELL_GCM_NV4097_SET_CLEAR_RECT_HORIZONTAL";
@@ -1428,10 +1428,15 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<29, 30> cubemap;
                     BitField<30, 32> location;
                 } f = { readarg(2) };
+                auto lnUnMask = (uint8_t)(GcmTextureLnUn::LN | GcmTextureLnUn::UN);
+                auto formatMask = ~lnUnMask;
+                auto format = enum_cast<GcmTextureFormat>(f.format.u() & formatMask);
+                auto lnUn = enum_cast<GcmTextureLnUn>(f.format.u() & lnUnMask);
                 TextureOffset(index,
                               readarg(1),
                               f.mipmap.u(),
-                              f.format.u(),
+                              format,
+                              lnUn,
                               f.dimension.u(),
                               f.border.u(),
                               f.cubemap.u(),
@@ -1473,10 +1478,15 @@ int64_t Rsx::interpret(uint32_t get) {
                     BitField<24, 28> dimension;
                     BitField<28, 32> location;
                 } f = { readarg(2) };
+                auto lnUnMask = (uint8_t)(GcmTextureLnUn::LN | GcmTextureLnUn::UN);
+                auto formatMask = ~lnUnMask;
+                auto format = enum_cast<GcmTextureFormat>(f.format.u() & formatMask);
+                auto lnUn = enum_cast<GcmTextureLnUn>(f.format.u() & lnUnMask);
                 VertexTextureOffset(index, 
                                     readarg(1), 
                                     f.mipmap.u(),
-                                    f.format.u(),
+                                    format,
+                                    lnUn,
                                     f.dimension.u(),
                                     f.location.u() - 1);
                 break;
