@@ -589,6 +589,8 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
+        if (_info.frequency == 1)
+            return _size;
         if (_info.frequency != 0)
             return _info.frequency;
         return _size;

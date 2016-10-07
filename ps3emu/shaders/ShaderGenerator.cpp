@@ -32,15 +32,16 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    std::array<int, 16> const& samplerSizes,
                                    bool isFlatColorShading,
                                    bool isMrt) {
-    std::vector<std::unique_ptr<Statement>> sts;
+    ASTContext context;
+    std::vector<Statement*> sts;
     auto pos = 0u;
     int lastReg = 0;
     unsigned constIndex = 0;
     while (pos < bytecode.size()) {
         FragmentInstr fi;
         auto len = fragment_dasm_instr(&bytecode[0] + pos, fi);
-        for (auto& st : MakeStatement(fi, constIndex)) {
-            lastReg = std::max(lastReg, GetLastRegisterNum(st.get())); 
+        for (auto& st : MakeStatement(context, fi, constIndex)) {
+            lastReg = std::max(lastReg, GetLastRegisterNum(st)); 
             st->address(pos);
             sts.emplace_back(std::move(st));
         }
@@ -51,7 +52,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
             break;
     }
     
-    sts = RewriteIfStubs(std::move(sts));
+    sts = RewriteIfStubs(context, sts);
     
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
@@ -117,7 +118,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         line(ssnprintf("    h[%d] = vec4(0, 0, 0, 0);", i));
     }
     for (auto& st : sts) {
-        auto str = PrintStatement(st.get());
+        auto str = PrintStatement(st);
         line(str);
     }
     
@@ -348,15 +349,17 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                 "} else { v_in[%d] = samplersInfo.disabledInputValues[%d]; }",
                 i, i, type, inputs[i].rank, i, i, i, i));
     }
-    std::vector<std::unique_ptr<Statement>> sts;
+    std::vector<Statement*> sts;
     std::array<VertexInstr, 2> instr;
     bool isLast = false;
     int num = 0;
     UsedConstsVisitor usedConstsVisitor;
+    
+    ASTContext context;
     while (!isLast) {
         int count = vertex_dasm_instr(bytecode, instr);
         for (int n = 0; n < count; ++n) {
-            for (auto& st : MakeStatement(instr[n], num)) {
+            for (auto& st : MakeStatement(context, instr[n], num)) {
                 if (usedConsts) {
                     st->accept(&usedConstsVisitor);
                 }
@@ -373,10 +376,10 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         std::copy(begin(consts), end(consts), std::back_inserter(*usedConsts));
     }
     
-    sts = RewriteBranches(std::move(sts));
+    sts = RewriteBranches(context, sts);
     
     for (auto& st : sts) {
-        line(PrintStatement(st.get()));
+        line(PrintStatement(st));
     }
 
     line("    gl_Position = viewportInfo.glInverseGcm * v_out[0];");

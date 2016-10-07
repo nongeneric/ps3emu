@@ -7,11 +7,11 @@
 
 namespace ShaderRewriter {
     enum class FunctionName {
-        vec4, vec3, vec2, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
+        vec4, vec3, vec2, ivec4, equal, greaterThan, greaterThanEqual, lessThanEqual, notEqual,
         mul, div, add, abs, neg, exp2, lg2, min, max, pow, inversesqrt,
-        fract, floor, ceil, dot2, dot3, dot4, lessThan, cos, sin,
+        fract, floor, ceil, dot, lessThan, cos, sin,
         cast_float, cast_int, clamp4i, clamp, sign, normalize,
-        gt, ge, eq, ne, lt, le,
+        gt, ge, eq, ne, lt, le, mix, any,
         reverse4f, reverse3f, reverse2f,
         call, ret,
         txl0, txl1, txl2, txl3,
@@ -26,16 +26,16 @@ namespace ShaderRewriter {
     public:
         virtual ~Expression();
         virtual void accept(IExpressionVisitor* visitor) = 0;
-        virtual void replace(Expression* what, Expression* with);
-        virtual void replace(Expression* what, std::vector<Expression*> with);
-        virtual Expression* release(Expression* expr);
     };
     
     class Variable : public Expression {
         std::string _name;
-        std::unique_ptr<Expression> _index;
-    public:
+        Expression* _index;
+        
         Variable(std::string name, Expression* index);
+        friend class ASTContext;
+        
+    public:
         std::string name();
         Expression* index();
         virtual void accept(IExpressionVisitor* visitor) override;
@@ -51,25 +51,31 @@ namespace ShaderRewriter {
     };
     
     class Assignment : public Statement {
-        std::unique_ptr<Expression> _expr;
-        std::unique_ptr<Expression> _dest;
-    public:
+        Expression* _expr;
+        Expression* _dest;
+        
         Assignment(Expression* dest, Expression* expr);
+        friend class ASTContext;
+        
+    public:
         Expression* expr();
         Expression* dest();
-        void releaseAndReplaceExpr(Expression* expr);
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class IfStatement : public Statement {
-        std::unique_ptr<Expression> _expr;
-        std::vector<std::unique_ptr<Statement>> _trueBlock;
-        std::vector<std::unique_ptr<Statement>> _falseBlock;
-    public:
+        Expression* _expr;
+        std::vector<Statement*> _trueBlock;
+        std::vector<Statement*> _falseBlock;
+    
+    protected:
         IfStatement(Expression* expr, 
                     std::vector<Statement*> trueBlock,
                     std::vector<Statement*> falseBlock,
                     unsigned address);
+        friend class ASTContext;
+        
+    public: 
         std::vector<Statement*> trueBlock();
         std::vector<Statement*> falseBlock();
         void setTrueBlock(std::vector<Statement*> block);
@@ -81,13 +87,14 @@ namespace ShaderRewriter {
     class IfStubFragmentStatement : public IfStatement {
         unsigned _elseLabel;
         unsigned _endifLabel;
-    public:
+        
         inline IfStubFragmentStatement(Expression* expr,
                                        unsigned elseLabel,
                                        unsigned endifLabel)
-            : IfStatement(expr, {}, {}, 0),
-              _elseLabel(elseLabel),
-              _endifLabel(endifLabel) {}
+            : IfStatement(expr, {}, {}, 0), _elseLabel(elseLabel), _endifLabel(endifLabel) {}
+        friend class ASTContext;
+        
+    public:
         inline unsigned elseLabel() { return _elseLabel; }
         inline unsigned endifLabel() { return _endifLabel; }
         virtual void accept(IExpressionVisitor* visitor) override;
@@ -97,105 +104,134 @@ namespace ShaderRewriter {
     public:
         struct Case {
             uint32_t address = -1;
-            std::vector<std::unique_ptr<Statement>> body;
+            std::vector<Statement*> body;
         };
         
-        SwitchStatement(Expression* switchOn);
         void addCase(uint32_t address, std::vector<Statement*> body);
         std::vector<Case>& cases();
         Expression* switchOn();
         virtual void accept(IExpressionVisitor* visitor) override;
     private:
+        SwitchStatement(Expression* switchOn);
         std::vector<Case> _cases;
-        std::unique_ptr<Expression> _switchOn;
+        Expression* _switchOn;
+        friend class ASTContext;
     };
     
     class WhileStatement : public Statement {
-        std::unique_ptr<Expression> _condition;
-        std::vector<std::unique_ptr<Statement>> _body;
-    public:
+        Expression* _condition;
+        std::vector<Statement*> _body;
         WhileStatement(Expression* condition, std::vector<Statement*> body);
+        friend class ASTContext;
+    public:
         Expression* condition();
         std::vector<Statement*> body();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class BreakStatement : public Statement {
+        BreakStatement() = default;
+        friend class ASTContext;
+        
     public:
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class DiscardStatement : public Statement {
+        DiscardStatement() = default;
+        friend class ASTContext;
+        
     public:
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class FloatLiteral : public Expression {
         float _val;
-    public:
         FloatLiteral(float val);
+        friend class ASTContext;
+        
+    public:
         float value();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class IntegerLiteral : public Expression {
         int _val;
-    public:
+        
         IntegerLiteral(int val);
+        friend class ASTContext;
+        
+    public:
         int value();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class Swizzle : public Expression {
         swizzle_t _swizzle;
-        std::unique_ptr<Expression> _expr;
-    public:
+        Expression* _expr;
+        
         Swizzle(Expression* expr, swizzle_t _swizzle);
+        friend class ASTContext;
+        
+    public:
         Expression* expr();
         swizzle_t swizzle();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class ComponentMask : public Expression {
-        std::unique_ptr<Expression> _expr;
+        Expression* _expr;
         dest_mask_t _mask;
-    public:
+        
         ComponentMask(Expression* expr, dest_mask_t mask);
+        friend class ASTContext;
+        
+    public:
         Expression* expr();
         dest_mask_t& mask();
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class Invocation : public Expression {
-        std::vector<std::unique_ptr<Expression>> _args;
+        std::vector<Expression*> _args;
         FunctionName _name;
+        
+    protected:
+        template<typename... P>
+        Invocation(FunctionName name, P&&... ps) : _args{ps...}, _name(name) {}
+        friend class ASTContext;
+        
     public:
-        Invocation(FunctionName name, std::vector<Expression*> args);
         FunctionName name();
         std::vector<Expression*> args();
-        void releaseAndReplaceArg(int n, Expression* expr);
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class UnaryOperator : public Invocation {
-    public:
+        friend class ASTContext;
         UnaryOperator(FunctionName name, Expression* arg);
+        
+    public:
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class BinaryOperator : public Invocation {
-    public:
+        friend class ASTContext;
         BinaryOperator(FunctionName name,
                        Expression* left,
                        Expression* right);
+        
+    public:
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
     class TernaryOperator : public Invocation {
-    public:
+        friend class ASTContext;
         TernaryOperator(Expression* cond,
                         Expression* trueExpr,
                         Expression* falseExpr);
+        
+    public:
         virtual void accept(IExpressionVisitor* visitor) override;
     };
     
@@ -218,31 +254,18 @@ namespace ShaderRewriter {
         virtual void visit(WhileStatement* we) = 0;
         virtual void visit(TernaryOperator* we) = 0;
     };
+        
+    using ExprV = std::vector<Expression*>;
+    using StV = std::vector<Statement*>;
     
-    template <typename T>
-    std::vector<std::unique_ptr<T>> pack_unique(std::vector<T*> const& ts) {
-        std::vector<std::unique_ptr<T>> res;
-        for (auto t : ts) {
-            res.emplace_back(std::unique_ptr<T>(t));
+    class ASTContext {
+        std::vector<Expression*> _exprs;
+    public:
+        template <typename E, typename... P>
+        E* make(P&&... args) {
+            auto expr = new E(std::forward<P>(args)...);
+            _exprs.emplace_back(expr);
+            return expr;
         }
-        return res;
-    }
-    
-    template <typename T>
-    std::vector<T*> unpack_unique(std::vector<std::unique_ptr<T>> const& ts) {
-        std::vector<T*> res;
-        for (auto& t : ts) {
-            res.push_back(t.get());
-        }
-        return res;
-    }
-    
-    template <typename T>
-    std::vector<T*> release_unique(std::vector<std::unique_ptr<T>>& ts) {
-        std::vector<T*> res;
-        for (auto& t : ts) {
-            res.push_back(t.release());
-        }
-        return res;
-    }
+    };
 }

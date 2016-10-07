@@ -439,6 +439,8 @@ GLuint primitiveTypeToFeedbackPrimitiveType(GLuint type) {
         case GL_LINE_LOOP:
         case GL_LINE_STRIP:
             return GL_LINES;
+        case GL_POINTS:
+            return GL_POINTS;
         default: assert(false);
     }
     return 0;

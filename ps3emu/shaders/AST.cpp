@@ -3,16 +3,8 @@
 namespace ShaderRewriter {
     FloatLiteral::FloatLiteral(float val) : _val(val) { }
 
-    Invocation::Invocation(FunctionName name, std::vector<Expression*> args)
-        : _name(name) 
-    {
-        for (auto arg : args) {
-            _args.emplace_back(arg);
-        }
-    }
-
     UnaryOperator::UnaryOperator(FunctionName name, Expression* arg)
-        : Invocation(name, { arg }) { }
+        : Invocation(name, arg) { }
 
     Swizzle::Swizzle(Expression* expr, swizzle_t swizzle) 
         : _swizzle(swizzle), _expr(expr) { }
@@ -25,7 +17,7 @@ namespace ShaderRewriter {
     BinaryOperator::BinaryOperator(FunctionName name,
                                 Expression* left,
                                 Expression* right) 
-    : Invocation(name, { left, right }) { }
+    : Invocation(name, left, right) { }
 
     void Variable::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
     void Assignment::accept(IExpressionVisitor* visitor) { visitor->visit(this); }
@@ -53,11 +45,11 @@ namespace ShaderRewriter {
     }
 
     std::vector<Expression*> Invocation::args() {
-        return unpack_unique(_args);
+        return _args;
     }
 
     Expression* Swizzle::expr() {
-        return _expr.get();
+        return _expr;
     }
 
     swizzle_t Swizzle::swizzle() {
@@ -65,18 +57,18 @@ namespace ShaderRewriter {
     }
 
     Expression* Assignment::expr() {
-        return _expr.get();
+        return _expr;
     }
 
     Expression* Assignment::dest() {
-        return _dest.get();
+        return _dest;
     }
     
     ComponentMask::ComponentMask(Expression* expr, dest_mask_t mask)
         : _expr(expr), _mask(mask) { }
     
     Expression* ComponentMask::expr() {
-        return _expr.get();
+        return _expr;
     }
     
     dest_mask_t& ComponentMask::mask() {
@@ -86,46 +78,36 @@ namespace ShaderRewriter {
     TernaryOperator::TernaryOperator(Expression* cond, 
                                      Expression* trueExpr,
                                      Expression* falseExpr)
-        : Invocation(FunctionName::none, { cond, trueExpr, falseExpr }) { }
+        : Invocation(FunctionName::none, cond, trueExpr, falseExpr) { }
     
     IfStatement::IfStatement(Expression* expr,
                              std::vector<Statement*> trueBlock,
                              std::vector<Statement*> falseBlock,
                              unsigned address)
         : _expr(expr),
-          _trueBlock(pack_unique(trueBlock)),
-          _falseBlock(pack_unique(falseBlock)) {
+          _trueBlock(trueBlock),
+          _falseBlock(falseBlock) {
         this->address(address);
     }
     
     std::vector<Statement*> IfStatement::trueBlock() {
-        return unpack_unique(_trueBlock);
+        return _trueBlock;
     }
     
     std::vector<Statement*> IfStatement::falseBlock() {
-        return unpack_unique(_falseBlock);
+        return _falseBlock;
     }
     
     void IfStatement::setTrueBlock(std::vector<Statement*> block) {
-        _trueBlock = pack_unique(block);
+        _trueBlock = block;
     }
     
     void IfStatement::setFalseBlock(std::vector<Statement*> block) {
-        _falseBlock = pack_unique(block);
+        _falseBlock = block;
     }
     
     Expression* IfStatement::condition() {
-        return _expr.get();
-    }
-    
-    void Assignment::releaseAndReplaceExpr(Expression* expr) {
-        _expr.release();
-        _expr.reset(expr);
-    }
-    
-    void Invocation::releaseAndReplaceArg(int n, Expression* expr) {
-        _args.at(n).release();
-        _args.at(n).reset(expr);
+        return _expr;
     }
     
     IntegerLiteral::IntegerLiteral(int val) : _val(val) { }
@@ -142,7 +124,7 @@ namespace ShaderRewriter {
     }
     
     Expression* Variable::index() {
-        return _index.get();
+        return _index;
     }
     
     Statement::Statement() : _address(-1) { }
@@ -160,7 +142,7 @@ namespace ShaderRewriter {
     SwitchStatement::SwitchStatement(Expression* switchOn) : _switchOn(switchOn) { }
     
     void SwitchStatement::addCase(uint32_t address, std::vector<Statement*> body) {
-        _cases.emplace_back(Case{ address, pack_unique(body) });
+        _cases.emplace_back(Case{ address, body });
     }
  
     std::vector<SwitchStatement::Case>& SwitchStatement::cases() {
@@ -168,30 +150,18 @@ namespace ShaderRewriter {
     }
     
     Expression* SwitchStatement::switchOn() {
-        return _switchOn.get();
-    }
-    
-    void Expression::replace(Expression* what, Expression* with) {
-        throw std::runtime_error("not implemented");
-    }
-    
-    void Expression::replace(Expression* what, std::vector<Expression*> with) {
-        throw std::runtime_error("not implemented");
-    }
-    
-    Expression* Expression::release(Expression* expr) {
-        throw std::runtime_error("not implemented");
+        return _switchOn;
     }
     
     WhileStatement::WhileStatement(Expression* condition,
                                    std::vector<Statement*> body)
-        : _condition(condition), _body(pack_unique(body)) {}
+        : _condition(condition), _body(body) {}
  
     Expression* WhileStatement::condition() {
-        return _condition.get();
+        return _condition;
     }
     
     std::vector<Statement*> WhileStatement::body() {
-        return unpack_unique(_body);
+        return _body;
     }
 }

@@ -193,10 +193,12 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     std::experimental::optional<InterruptThreadInfo> _interruptHandler;
     uint64_t _id;
     boost::mutex _eventQueuesMutex;
-    std::vector<EventQueueInfo> _eventQueues;
+    std::vector<EventQueueInfo> _eventQueuesToPPU;
+    std::vector<EventQueueInfo> _eventQueuesToSPU;
     void loop();
     void handleInterrupt(uint32_t interruptValue);
     void handleReceiveEvent();
+    bool _hasStarted;
 
 public:
     SPUThread(Process* proc,
@@ -261,10 +263,13 @@ public:
     // TODO: removeInterruptHandler
     void setId(uint64_t id);
     uint64_t getId();
-    void connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
-                            uint32_t portNumber);
-    void disconnectOrUnbindQueue(uint32_t portNumber);
-    bool isAvailableQueuePort(uint32_t portNumber);
+    void connectQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
+                      uint32_t portNumber);
+    void bindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
+                   uint32_t portNumber);
+    void disconnectQueue(uint32_t portNumber);
+    void unbindQueue(uint32_t portNumber);
+    bool isQueuePortAvailableToConnect(uint32_t portNumber);
     std::string getName();
     SPUChannels* channels();
     

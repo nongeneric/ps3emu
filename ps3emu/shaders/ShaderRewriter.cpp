@@ -9,74 +9,15 @@
 #include <boost/range/algorithm.hpp>
 
 namespace ShaderRewriter {
-    
-    enum class ExprType {
-        fp32, int32, boolean, ivec2, ivec3, ivec4,
-        vec2, vec3, vec4, bvec2, bvec3, bvec4, notype
-    };
-
-    struct FunctionInfo {
-        FunctionName name;
-        ExprType types[5];
-    };
-    
-    FunctionInfo functionInfos[] {
-        { FunctionName::equal, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::notEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::lessThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::greaterThan, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::greaterThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::lessThanEqual, { ExprType::bvec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::vec4, 
-            { ExprType::vec4, ExprType::fp32, ExprType::fp32, ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::cast_int, { ExprType::int32, ExprType::fp32 } },
-        { FunctionName::fract, { ExprType::notype, ExprType::notype } },
-        { FunctionName::floor, { ExprType::notype, ExprType::notype } },
-        { FunctionName::ceil, { ExprType::notype, ExprType::notype } },
-        { FunctionName::cast_float, { ExprType::fp32, ExprType::notype } },
-        { FunctionName::dot2, { ExprType::fp32, ExprType::vec2, ExprType::vec2 } },
-        { FunctionName::dot3, { ExprType::fp32, ExprType::vec3, ExprType::vec3 } },
-        { FunctionName::dot4, { ExprType::fp32, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::abs, { ExprType::notype, ExprType::notype } },
-        { FunctionName::cos, { ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::min, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::max, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::exp2, { ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::sin, { ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::lg2, { ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::pow, { ExprType::vec4, ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::normalize, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::inversesqrt, { ExprType::fp32, ExprType::fp32 } },
-        { FunctionName::reverse4f, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::reverse3f, { ExprType::vec4, ExprType::vec4 } },
-        { FunctionName::txl0, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
-        { FunctionName::txl1, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
-        { FunctionName::txl2, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
-        { FunctionName::txl3, { ExprType::vec4, ExprType::notype, ExprType::vec4 } },
-        { FunctionName::ftex, { ExprType::vec4, ExprType::int32, ExprType::vec4 } },
-        { FunctionName::ftxp, { ExprType::vec4, ExprType::int32, ExprType::vec4 } },
-        { FunctionName::unpackUnorm4x8, { ExprType::vec4, ExprType::int32 } },
-        { FunctionName::floatBitsToUint, { ExprType::int32, ExprType::fp32 } },
-        { FunctionName::clamp, { ExprType::notype, ExprType::notype, ExprType::fp32, ExprType::fp32 } },
-    };
-    
-    int getSingleComponent(swizzle_t s) {
-        if (s.comp[0] == s.comp[1] &&
-            s.comp[1] == s.comp[2] &&
-            s.comp[2] == s.comp[3])
-            return (int)s.comp[0];
-        return -1;
-    }
-    
     FunctionName relationToFunction(cond_t relation) {
         switch (relation) {
             case cond_t::EQ:
-            case cond_t::FL: return FunctionName::eq;
-            case cond_t::GE: return FunctionName::ge;
-            case cond_t::GT: return FunctionName::gt;
-            case cond_t::LE: return FunctionName::le;
-            case cond_t::LT: return FunctionName::lt;
-            case cond_t::NE: return FunctionName::ne;
+            case cond_t::FL: return FunctionName::equal;
+            case cond_t::GE: return FunctionName::greaterThanEqual;
+            case cond_t::GT: return FunctionName::greaterThan;
+            case cond_t::LE: return FunctionName::lessThanEqual;
+            case cond_t::LT: return FunctionName::lessThan;
+            case cond_t::NE: return FunctionName::notEqual;
             default: assert(false); return FunctionName::none;
         }
     }
@@ -185,13 +126,12 @@ namespace ShaderRewriter {
                 case FunctionName::vec4: name = "vec4"; break;
                 case FunctionName::vec3: name = "vec3"; break;
                 case FunctionName::vec2: name = "vec2"; break;
+                case FunctionName::ivec4: name = "ivec4"; break;
                 case FunctionName::cast_int: name = "int"; break;
                 case FunctionName::fract: name = "fract"; break;
                 case FunctionName::floor: name = "floor"; break;
                 case FunctionName::ceil: name = "ceil"; break;
-                case FunctionName::dot2:
-                case FunctionName::dot3:
-                case FunctionName::dot4: name = "dot"; break;
+                case FunctionName::dot: name = "dot"; break;
                 case FunctionName::max: name = "max"; break;
                 case FunctionName::min: name = "min"; break;
                 case FunctionName::equal: name = "equal"; break;
@@ -218,6 +158,8 @@ namespace ShaderRewriter {
                 case FunctionName::unpackUnorm4x8: name = "unpackUnorm4x8"; break;
                 case FunctionName::floatBitsToUint: name = "floatBitsToUint"; break;
                 case FunctionName::clamp: name = "clamp"; break;
+                case FunctionName::mix: name = "mix"; break;
+                case FunctionName::any: name = "any"; break;
                 default: assert(false);
             }
             _ret = ssnprintf("%s(%s)", name, str.c_str());
@@ -252,7 +194,7 @@ namespace ShaderRewriter {
             for (auto& c : sw->cases()) {
                 std::string body;
                 for (auto& st : c.body) {
-                    body += ssnprintf("    %s\n", accept(st.get()));
+                    body += ssnprintf("    %s\n", accept(st));
                 }
                 cases += ssnprintf("case %d: {\n%s}\n", c.address, body);
             }
@@ -293,228 +235,6 @@ namespace ShaderRewriter {
         }
     };
     
-    enum class TypeClass {
-        integer, fp, boolean
-    };
-    
-    struct TypeInfo {
-        TypeClass typeClass;
-        int rank;
-        ExprType type;
-    };
-    
-    TypeInfo types[] = {
-        { TypeClass::integer, 1, ExprType::int32 },
-        { TypeClass::integer, 2, ExprType::ivec2 },
-        { TypeClass::integer, 3, ExprType::ivec3 },
-        { TypeClass::integer, 4, ExprType::ivec4 },
-        { TypeClass::boolean, 1, ExprType::boolean },
-        { TypeClass::boolean, 2, ExprType::bvec2 },
-        { TypeClass::boolean, 3, ExprType::bvec3 },
-        { TypeClass::boolean, 4, ExprType::bvec4 },
-        { TypeClass::fp,      1, ExprType::fp32 },
-        { TypeClass::fp,      2, ExprType::vec2 },
-        { TypeClass::fp,      3, ExprType::vec3 },
-        { TypeClass::fp,      4, ExprType::vec4 },
-    };
-    
-    class TypeVisitor : public DefaultVisitor {
-        ExprType _ret;
-        
-        ExprType accept(Expression* expr) {
-            expr->accept(this);
-            return _ret;
-        }
-        
-        virtual void visit(FloatLiteral* literal) override {
-            _ret = ExprType::fp32;
-        }
-        
-        virtual void visit(IntegerLiteral* literal) override {
-            _ret = ExprType::int32;
-        }
-        
-        virtual void visit(BinaryOperator* op) override {
-            auto leftType = accept(op->args().at(0));
-            auto rightType = accept(op->args().at(1));
-            if (leftType != rightType || 
-                leftType == ExprType::notype ||
-                rightType == ExprType::notype)
-            {
-                _ret = ExprType::notype;
-                return;
-            }
-            _ret = leftType;
-        }
-        
-        virtual void visit(UnaryOperator* op) override {
-            _ret = accept(op->args().at(0));
-        }
-        
-        virtual void visit(Swizzle* swizzle) override {
-            _ret = accept(swizzle->expr());
-        }
-        
-        virtual void visit(Assignment* assignment) override {
-            _ret = ExprType::notype;
-        }
-        
-        virtual void visit(Variable* ref) override {
-            if (ref->name() == "nip") {
-                _ret = ExprType::int32;
-            } else if (ref->name() == "a") {
-                _ret = ExprType::ivec4;
-            } else {
-                _ret = ExprType::vec4;
-            }
-        }
-        
-        virtual void visit(TernaryOperator* ternary) override {
-            _ret = accept(ternary->args().at(2));   
-        }
-        
-        virtual void visit(Invocation* invocation) override {
-            auto name = invocation->name();
-            auto fi = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
-                return i.name == invocation->name();
-            });
-            assert(fi != std::end(functionInfos));
-            if (name == FunctionName::floor || 
-                name == FunctionName::fract ||
-                name == FunctionName::abs)
-            {
-                _ret = accept(invocation->args().at(0));
-                return;
-            }
-            _ret = fi->types[0];
-        }
-        
-        virtual void visit(ComponentMask* mask) override {
-            auto exprType = accept(mask->expr());
-            if (exprType == ExprType::notype) {
-                _ret = ExprType::notype;
-                return;
-            }
-            auto t = std::find_if(std::begin(types), std::end(types), [=](auto i) {
-                return i.type == exprType;
-            });
-            assert(t != std::end(types));
-            auto val = mask->mask().val;
-            int rank = val[0] + val[1] + val[2] + val[3];
-            auto newType = std::find_if(std::begin(types), std::end(types), [=](auto i) {
-                return i.typeClass == t->typeClass && i.rank == rank;
-            });
-            assert(newType != std::end(types));
-            _ret = newType->type;
-        }
-        
-        virtual void visit(IfStatement* mask) override {
-            _ret = ExprType::notype;
-        }
-        
-    public:
-        ExprType result() {
-            return _ret;
-        }
-    };
-    
-    class TypeFixerVisitor : public DefaultVisitor {
-        TypeVisitor typeVisitor;
-        
-        ExprType getType(Expression* st) {
-            st->accept(&typeVisitor);
-            return typeVisitor.result();
-        }
-        
-        Expression* adjustType(Expression* expr, ExprType expected) {
-            auto current = getType(expr);
-            if (current == expected || expected == ExprType::notype)
-                return expr;
-            if (expected == ExprType::fp32 && current == ExprType::boolean) {
-                return new Invocation(FunctionName::cast_float, { expr });
-            }
-            if (expected == ExprType::vec2 && current == ExprType::vec4) {
-                return new ComponentMask(expr, { 1, 1, 0, 0 });
-            }
-            if (expected == ExprType::vec4 && current == ExprType::fp32) {
-                return new Invocation(FunctionName::vec4, { expr });
-            }
-            if (expected == ExprType::vec3 && current == ExprType::fp32) {
-                return new Invocation(FunctionName::vec3, { expr });
-            }
-            if (expected == ExprType::vec2 && current == ExprType::fp32) {
-                return new Invocation(FunctionName::vec2, { expr });
-            }
-            if (expected == ExprType::fp32 && current == ExprType::vec4) {
-                return new ComponentMask(expr, { 1, 0, 0, 0 });
-            }
-            if (expected == ExprType::vec4 && current == ExprType::bvec4) {
-                return new Invocation(FunctionName::vec4, { expr });
-            }
-            if (expected == ExprType::vec3 && current == ExprType::bvec3) {
-                return new Invocation(FunctionName::vec3, { expr });
-            }
-            if (expected == ExprType::vec2 && current == ExprType::bvec2) {
-                return new Invocation(FunctionName::vec2, { expr });
-            }
-            if (expected == ExprType::vec3 && current == ExprType::vec4) {
-                return new ComponentMask(expr, { 1, 1, 1, 0 });
-            }
-            if (expected == ExprType::int32 && current == ExprType::fp32) {
-                return new Invocation(FunctionName::cast_int, { expr });
-            }
-            if (current == ExprType::notype)
-                return expr;
-            assert(false);
-            return expr;
-        }
-        
-        virtual void visit(ComponentMask* mask) override {
-            mask->expr()->accept(this);
-            if (getType(mask->expr()) == ExprType::fp32)
-                mask->mask() = { 1, 0, 0, 0 };
-        }
-        
-        virtual void visit(Assignment* assignment) override {
-            DefaultVisitor::visit(assignment);
-            auto destType = getType(assignment->dest());
-            auto rhsType = getType(assignment->expr());
-            if (destType == rhsType)
-                return;
-            auto adjustedExpr = adjustType(assignment->expr(), destType);
-            assignment->releaseAndReplaceExpr(adjustedExpr);
-        }
-        
-        virtual void visit(TernaryOperator* ternary) override {
-            auto args = ternary->args();
-            args.at(0)->accept(this);
-            args.at(1)->accept(this);
-            args.at(2)->accept(this);
-            auto trueExpr = args[1];
-            auto falseType = getType(args[2]);
-            auto adjustedTrueExpr = adjustType(trueExpr, falseType);
-            ternary->releaseAndReplaceArg(1, adjustedTrueExpr);
-        }
-        
-        virtual void visit(Invocation* invocation) override {
-            DefaultVisitor::visit(invocation);            
-            auto rti = std::find_if(std::begin(functionInfos), std::end(functionInfos), [=](auto i) {
-                return i.name == invocation->name();
-            });
-            assert(rti != std::end(functionInfos));
-            auto args = invocation->args();
-            for (auto i = 0u; i < args.size(); ++i) {
-                auto& arg = args.at(i);
-                auto expectedType = rti->types[i + 1];
-                auto adjustedExpr = adjustType(arg, expectedType);
-                invocation->releaseAndReplaceArg(i, adjustedExpr);
-            }
-        }
-        
-        virtual void visit(BreakStatement* br) override { }
-        virtual void visit(DiscardStatement* br) override { }
-    };
-    
     class InfoCollectorVisitor : public DefaultVisitor {
         int _lastRegisterUsed = -1;
         virtual void visit(Variable* ref) override {
@@ -529,176 +249,181 @@ namespace ShaderRewriter {
         }
     };
     
+    Expression* adaptToSingleScalar(ASTContext& context, Expression* expr) {
+        return context.make<Swizzle>(expr, swizzle_t{
+            swizzle2bit_t::X,
+            swizzle2bit_t::X,
+            swizzle2bit_t::X,
+            swizzle2bit_t::X
+        });
+    };
+    
     std::string PrintStatement(Statement* stat) {
         PrintVisitor visitor;
         stat->accept(&visitor);
         return visitor.result();
     }    
     
-    Expression* ConvertArgument(FragmentInstr const& i, int n, unsigned constIndex) {
+    Expression* ConvertArgument(ASTContext& context,
+                                FragmentInstr const& i,
+                                int n,
+                                unsigned constIndex) {
         assert(n < i.opcode.op_count);
         auto& arg = i.arguments[n];
         assert(arg.is_abs + arg.is_neg <= 1);
         Expression* expr = nullptr;
-        bool ignoreSwizzle = false;
         if (i.opcode.tex && n == i.opcode.op_count - 1) {
-            expr = new IntegerLiteral(i.tex_num);
+            expr = context.make<IntegerLiteral>(i.tex_num);
         } else if (arg.type == op_type_t::Const) {
-            expr = new Variable("fconst.c", new IntegerLiteral(constIndex));
+            expr = context.make<Variable>("fconst.c", context.make<IntegerLiteral>(constIndex));
         } else if (arg.type == op_type_t::Attr) {
             // the g[] correction has no effect
             auto name = ssnprintf("f_%s", print_attr(i.input_attr));
-            expr = new Variable(name, nullptr);
+            expr = context.make<Variable>(name, nullptr);
         } else if (arg.type == op_type_t::Temp) {
             auto name = arg.reg_type == reg_type_t::H ? "h" : "r";
-            auto index = new IntegerLiteral(arg.reg_num);
-            expr = new Variable(name, index);
+            auto index = context.make<IntegerLiteral>(arg.reg_num);
+            expr = context.make<Variable>(name, index);
         }
         if (arg.is_abs) {
-            expr = new Invocation(FunctionName::abs, { expr });
+            expr = context.make<Invocation>(FunctionName::abs, expr );
         }
         if (arg.is_neg) {
-            expr = new UnaryOperator(FunctionName::neg, expr);
+            expr = context.make<UnaryOperator>(FunctionName::neg, expr);
         }
-        if (!ignoreSwizzle) {
-            if (arg.swizzle.comp[0] != swizzle2bit_t::X ||
-                arg.swizzle.comp[1] != swizzle2bit_t::Y ||
-                arg.swizzle.comp[2] != swizzle2bit_t::Z ||
-                arg.swizzle.comp[3] != swizzle2bit_t::W)
-            {
-                expr = new Swizzle(expr, arg.swizzle);
-            }
+        if (arg.swizzle.comp[0] != swizzle2bit_t::X ||
+            arg.swizzle.comp[1] != swizzle2bit_t::Y ||
+            arg.swizzle.comp[2] != swizzle2bit_t::Z ||
+            arg.swizzle.comp[3] != swizzle2bit_t::W)
+        {
+            expr = context.make<Swizzle>(expr, arg.swizzle);
         }
-        
         return expr;
     }
     
-    Expression* makeCondition(condition_t cond, dest_mask_t mask) {
+    Expression* makeCondition(ASTContext& context, condition_t cond) {
         if (cond.relation == cond_t::TR)
             return nullptr;
+        auto c = context.make<Variable>("c", context.make<IntegerLiteral>(cond.is_C1 ? 1 : 0));
+        auto swizzled_c = context.make<Swizzle>(c, cond.swizzle);
+        auto vec = context.make<Invocation>(FunctionName::vec4, context.make<FloatLiteral>(0));
         auto func = relationToFunction(cond.relation);
-        auto sw = cond.swizzle;
-        if (sw.comp[0] == sw.comp[1] && sw.comp[1] == sw.comp[2] &&
-            sw.comp[2] == sw.comp[3]) {
-            mask = { 1, 0, 0, 0 };
-        } else {
-            assert(sw.comp[0] == swizzle2bit_t::X && sw.comp[1] == swizzle2bit_t::Y &&
-                   sw.comp[2] == swizzle2bit_t::Z && sw.comp[3] == swizzle2bit_t::W);
-        }
-        auto regnum = cond.is_C1 ? 1 : 0;
-        auto reg = new Variable("c", new IntegerLiteral(regnum));
-        auto swexpr = new Swizzle(reg, cond.swizzle);
-        assert(mask.val[0] + mask.val[1] + mask.val[2] + mask.val[3] == 1);
-        auto maskExpr = new ComponentMask(swexpr, mask);
-        return new BinaryOperator(func, maskExpr, new FloatLiteral(0));
+        return context.make<Invocation>(func, swizzled_c, vec);
     }
     
-    void appendCondition(condition_t cond,
-                         std::vector<std::unique_ptr<Statement>>& res,
-                         dest_mask_t mask) {
-        auto expr = makeCondition(cond, mask);
-        if (!expr)
-            return;
-        std::vector<Statement*> sts;
-        for (auto& st : res)
-            sts.push_back(st.release());
-        auto ifstat = new IfStatement(expr, sts, {}, sts.front()->address());
-        res.clear();
-        res.emplace_back(ifstat);
+    Expression* appendCondition(ASTContext& context,
+                                condition_t cond,
+                                Expression* expr,
+                                Expression* lhs) {
+        auto relation = makeCondition(context, cond);
+        if (!relation)
+            return expr;
+        return context.make<Invocation>(FunctionName::mix, lhs, expr, relation);
     }
     
-    void appendCAssignment(control_mod_t mod, bool isRegC, dest_mask_t mask,
-                           const char* regname, int regnum,
-                           std::vector<std::unique_ptr<Statement>>& res)
-    {
+    Assignment* makeCAssignment(ASTContext& context,
+                                control_mod_t mod,
+                                bool isRegC,
+                                Expression* lhs) {
         if (mod != control_mod_t::None && !isRegC) {
             auto cregnum = mod == control_mod_t::C0 ? 0 : 1;
-            auto cdest = new Variable("c", new IntegerLiteral(cregnum));
-            auto maskedCdest = new ComponentMask(cdest, mask);
-            auto rhs = new Variable(regname, new IntegerLiteral(regnum));
-            auto maskedRhs = new ComponentMask(rhs, mask);
-            auto cassign = new Assignment(maskedCdest, maskedRhs);
-            res.emplace_back(cassign);
+            Expression* clhs = context.make<Variable>("c", context.make<IntegerLiteral>(cregnum));
+            auto mask = dynamic_cast<ComponentMask*>(lhs);
+            if (mask) {
+                clhs = context.make<ComponentMask>(clhs, mask->mask());
+            }
+            return context.make<Assignment>(clhs, lhs);
         }
+        return nullptr;
     }
     
-    Expression* clamp(Expression* expr, float min, float max) {
-        return new Invocation(FunctionName::clamp,
-                              {expr, new FloatLiteral(min), new FloatLiteral(max)});
+    Expression* clamp(ASTContext& context, Expression* expr, float min, float max) {
+        return context.make<Invocation>(FunctionName::clamp,
+                              expr, context.make<FloatLiteral>(min), context.make<FloatLiteral>(max));
     }
     
-    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i,
-                                                          unsigned constIndex) {
+    std::vector<Statement*> MakeStatement(ASTContext& context,
+                                          FragmentInstr const& i,
+                                          unsigned constIndex) {
         Expression* rhs = nullptr;
         Expression* args[4];
         for (int n = 0; n < i.opcode.op_count; ++n) {
-            args[n] = ConvertArgument(i, n, constIndex);
+            args[n] = ConvertArgument(context, i, n, constIndex);
         }
-        std::vector<std::unique_ptr<Statement>> res;
+        
+        auto isScalarRhs = false;
+        std::vector<Statement*> res;
         switch (i.opcode.instr) {
             case fragment_op_t::NOP:
             case fragment_op_t::FENCB:
             case fragment_op_t::FENCT:
-                res.emplace_back(std::unique_ptr<Statement>(new WhileStatement(new Variable("false", nullptr), {})));
+                res.emplace_back(
+                    context.make<WhileStatement>(context.make<Variable>("false", nullptr), StV{}));
                 return res;
             case fragment_op_t::ADD: {
-                rhs = new BinaryOperator(FunctionName::add, args[0], args[1]);
+                rhs = context.make<BinaryOperator>(FunctionName::add, args[0], args[1]);
                 break;
             }
             case fragment_op_t::COS: {
-                rhs = new Invocation(FunctionName::cos, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::cos, adaptToSingleScalar(context, args[0]));
                 break;
             }
             case fragment_op_t::DP2: {
-                rhs = new Invocation(FunctionName::dot2, { args[0], args[1] });
+                isScalarRhs = true;
+                auto arg0 = context.make<ComponentMask>(args[0], dest_mask_t{1, 1, 0, 0});
+                auto arg1 = context.make<ComponentMask>(args[1], dest_mask_t{1, 1, 0, 0});
+                rhs = context.make<Invocation>(FunctionName::dot, arg0, arg1);
                 break;
             }
             case fragment_op_t::DP3: {
-                rhs = new Invocation(FunctionName::dot3, { args[0], args[1] });
+                isScalarRhs = true;
+                auto arg0 = context.make<ComponentMask>(args[0], dest_mask_t{1, 1, 1, 0});
+                auto arg1 = context.make<ComponentMask>(args[1], dest_mask_t{1, 1, 1, 0});
+                rhs = context.make<Invocation>(FunctionName::dot, arg0, arg1);
                 break;
             }
             case fragment_op_t::DP4: {
-                rhs = new Invocation(FunctionName::dot4, { args[0], args[1] });
+                isScalarRhs = true;
+                rhs = context.make<Invocation>(FunctionName::dot, args[0], args[1]);
                 break;
             }
             case fragment_op_t::DIV: {
-                rhs = new BinaryOperator(FunctionName::div, args[0], args[1]);
+                rhs = context.make<BinaryOperator>(FunctionName::div, args[0], adaptToSingleScalar(context, args[1]));
                 break;
             }
             case fragment_op_t::DIVSQ: {
-                auto mask = new ComponentMask(args[1], { 1, 0, 0, 0 });
-                auto inv = new Invocation(FunctionName::inversesqrt, { mask });
-                rhs = new BinaryOperator(FunctionName::mul, args[0], inv);
+                auto inv = context.make<Invocation>(FunctionName::inversesqrt, adaptToSingleScalar(context, args[1]));
+                rhs = context.make<BinaryOperator>(FunctionName::mul, args[0], inv);
                 break;
             }
             case fragment_op_t::EX2: {
-                rhs = new Invocation(FunctionName::exp2, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::exp2, adaptToSingleScalar(context, args[0]));
                 break;
             }
             case fragment_op_t::FLR: {
-                rhs = new Invocation(FunctionName::floor, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::floor, args[0]);
                 break;
             }
             case fragment_op_t::FRC: {
-                rhs = new Invocation(FunctionName::fract, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::fract, args[0]);
                 break;
             }
             case fragment_op_t::LG2: {
-                rhs = new Invocation(FunctionName::lg2, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::lg2, adaptToSingleScalar(context, args[0]));
                 break;
             }
             case fragment_op_t::MAD: {
-                auto mul = new BinaryOperator(FunctionName::mul, args[0], args[1]);
-                auto add = new BinaryOperator(FunctionName::add, mul, args[2]);
+                auto mul = context.make<BinaryOperator>(FunctionName::mul, args[0], args[1]);
+                auto add = context.make<BinaryOperator>(FunctionName::add, mul, args[2]);
                 rhs = add;
                 break;
             }
             case fragment_op_t::MAX: {
-                rhs = new Invocation(FunctionName::max, { args[0], args[1] });
+                rhs = context.make<Invocation>(FunctionName::max, args[0], args[1]);
                 break;
             }
             case fragment_op_t::MIN: {
-                rhs = new Invocation(FunctionName::min, { args[0], args[1] });
+                rhs = context.make<Invocation>(FunctionName::min, args[0], args[1]);
                 break;
             }
             case fragment_op_t::MOV: {
@@ -706,77 +431,84 @@ namespace ShaderRewriter {
                 break;
             }
             case fragment_op_t::MUL: {
-                rhs = new BinaryOperator(FunctionName::mul, args[0], args[1]);
+                rhs = context.make<BinaryOperator>(FunctionName::mul, args[0], args[1]);
                 break;
             }
             case fragment_op_t::RCP: {
-                auto mask = new ComponentMask(args[0], { 1, 0, 0, 0 });
-                rhs = new Invocation(FunctionName::pow, { mask, new FloatLiteral(-1) });
+                auto exp = context.make<Invocation>(FunctionName::vec4, context.make<FloatLiteral>(-1));
+                rhs = context.make<Invocation>(FunctionName::pow, adaptToSingleScalar(context, args[0]), exp);
+                break;
             }
             case fragment_op_t::RSQ: {
-                rhs = new Invocation(FunctionName::inversesqrt, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::inversesqrt, adaptToSingleScalar(context, args[0]));
                 break;
             }
             case fragment_op_t::SEQ: {
-                rhs = new Invocation(FunctionName::equal, { args[0], args[1] });
+                auto func = context.make<Invocation>(FunctionName::equal, args[0], args[1]);
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case fragment_op_t::SFL: {
-                rhs = new Invocation(FunctionName::vec4, { 
-                    new FloatLiteral(0), new FloatLiteral(0),
-                    new FloatLiteral(0), new FloatLiteral(0)
-                });
+                rhs = context.make<Invocation>(FunctionName::vec4,
+                    context.make<FloatLiteral>(0), context.make<FloatLiteral>(0),
+                    context.make<FloatLiteral>(0), context.make<FloatLiteral>(0)
+                );
                 break;
             }
             case fragment_op_t::SGE: {
-                rhs = new Invocation(FunctionName::greaterThanEqual, { args[0], args[1] });
+                auto func = context.make<Invocation>(FunctionName::greaterThanEqual, args[0], args[1]);
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case fragment_op_t::SGT: {
-                rhs = new Invocation(FunctionName::greaterThan, { args[0], args[1] });
+                auto func = context.make<Invocation>(FunctionName::greaterThan, args[0], args[1]);
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case fragment_op_t::SIN: {
-                rhs = new Invocation(FunctionName::sin, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::sin, adaptToSingleScalar(context, args[0]));
                 break;
             }
             case fragment_op_t::SLE: {
-                rhs = new Invocation(FunctionName::lessThanEqual, { args[0], args[1] });
+                auto func = context.make<Invocation>(FunctionName::lessThanEqual, args[0], args[1]);
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case fragment_op_t::SLT: {
-                rhs = new Invocation(FunctionName::lessThan, { args[0], args[1] });
+                auto func = context.make<Invocation>(FunctionName::lessThan, args[0], args[1]);
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case fragment_op_t::SNE: {
-                rhs = new Invocation(FunctionName::notEqual, { args[0], args[1] });
+                auto func = context.make<Invocation>(FunctionName::notEqual, args[0], args[1]);
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case fragment_op_t::STR: {
-                rhs = new Invocation(FunctionName::vec4, { 
-                    new FloatLiteral(1), new FloatLiteral(1),
-                    new FloatLiteral(1), new FloatLiteral(1)
-                });
+                rhs = context.make<Invocation>(FunctionName::vec4,
+                    context.make<FloatLiteral>(1), context.make<FloatLiteral>(1),
+                    context.make<FloatLiteral>(1), context.make<FloatLiteral>(1)
+                );
                 break;
             }
             case fragment_op_t::TEX: {
                 assert(dynamic_cast<IntegerLiteral*>(args[1]));
-                rhs = new Invocation(FunctionName::ftex, { args[1], args[0] });
+                rhs = context.make<Invocation>(FunctionName::ftex, args[1], args[0]);
                 break;
             }
             case fragment_op_t::TXP: {
                 assert(dynamic_cast<IntegerLiteral*>(args[1]));
-                rhs = new Invocation(FunctionName::ftxp, { args[1], args[0] });
+                rhs = context.make<Invocation>(FunctionName::ftxp, args[1], args[0]);
                 break;
             }
             case fragment_op_t::NRM: {
-                rhs = new Invocation(FunctionName::normalize, { args[0] });
+                rhs = context.make<Invocation>(FunctionName::normalize, args[0]);
                 break;
             }
             case fragment_op_t::UPB: {
-                rhs = new Invocation(
+                rhs = context.make<Invocation>(
                     FunctionName::unpackUnorm4x8,
-                    {new Invocation(FunctionName::floatBitsToUint, { args[0] })});
+                    context.make<Invocation>(FunctionName::floatBitsToUint, args[0]));
                 break;
             }
             case fragment_op_t::KIL: {
@@ -787,8 +519,6 @@ namespace ShaderRewriter {
             }
             default: assert(false);
         }
-        
-        rhs = new ComponentMask(rhs, i.dest_mask);
         
         if (i.scale != scale_t::None) {
             auto mul = [&] {
@@ -802,16 +532,16 @@ namespace ShaderRewriter {
                     default: throw std::runtime_error("illegal scale");
                 }
             }();
-            rhs = new BinaryOperator(FunctionName::mul, new FloatLiteral(mul), rhs);
+            rhs = context.make<BinaryOperator>(FunctionName::mul, context.make<FloatLiteral>(mul), rhs);
         }
         
         if (i.is_sat || i.is_bx2) {
-            rhs = clamp(rhs, 0.0f, 1.0f);
+            rhs = clamp(context, rhs, 0.0f, 1.0f);
         } else {
             if (i.clamp == clamp_t::X) {
-                rhs = clamp(rhs, -2.0f, 2.0f);
+                rhs = clamp(context, rhs, -2.0f, 2.0f);
             } else if (i.clamp == clamp_t::B) {
-                rhs = clamp(rhs, -1.0f, 1.0f);
+                rhs = clamp(context, rhs, -1.0f, 1.0f);
             }
         }
         
@@ -828,25 +558,34 @@ namespace ShaderRewriter {
         }
         
         if (i.opcode.instr == fragment_op_t::IFE) {
-            auto cond = makeCondition(i.condition, i.dest_mask);
-            assert(cond);
-            res.emplace_back(new IfStubFragmentStatement(cond, i.elseLabel, i.endifLabel));
+            auto relation = makeCondition(context, i.condition);
+            assert(relation);
+            auto cond = context.make<Invocation>(FunctionName::any, relation);
+            res.emplace_back(context.make<IfStubFragmentStatement>(cond, i.elseLabel, i.endifLabel));
         } else {
             if (i.opcode.instr == fragment_op_t::KIL) {
-                res.emplace_back(new DiscardStatement());
+                Statement* st = context.make<DiscardStatement>();
+                auto relation = makeCondition(context, i.condition);
+                if (relation) {
+                    auto cond = context.make<Invocation>(FunctionName::any, relation);
+                    st = context.make<IfStatement>(cond, StV{dynamic_cast<Statement*>(st)}, StV{}, 0u);
+                }
+                res.emplace_back(st);
             } else {
-                auto dest = new Variable(regname, new IntegerLiteral(regnum));
-                auto mask = new ComponentMask(dest, i.dest_mask);
-                auto assign = new Assignment(mask, rhs);
+                Expression* dest = context.make<Variable>(regname, context.make<IntegerLiteral>(regnum));
+                rhs = appendCondition(context, i.condition, rhs, dest);
+                dest = context.make<ComponentMask>(dest, i.dest_mask);
+                if (!isScalarRhs) {
+                    rhs = context.make<ComponentMask>(rhs, i.dest_mask);
+                }
+                auto assign = context.make<Assignment>(dest, rhs);
                 res.emplace_back(assign);
+                
+                auto cassign = makeCAssignment(context, i.control, i.is_reg_c, dest);
+                if (cassign) {
+                    res.emplace_back(cassign);
+                }
             }
-            appendCAssignment(i.control, i.is_reg_c, i.dest_mask, regname, regnum, res);
-            appendCondition(i.condition, res, i.dest_mask);
-        }
-        
-        TypeFixerVisitor typeFixer;
-        for (auto& st : res) {
-            st->accept(&typeFixer);
         }
         
         return res;
@@ -859,274 +598,282 @@ namespace ShaderRewriter {
     }
 
     class VertexRefVisitor : public boost::static_visitor<Expression*> {
+        ASTContext* _context;
+        
     public:
+        VertexRefVisitor(ASTContext* context) : _context(context) {}
+        
         Expression* operator()(vertex_arg_address_ref x) const {
-            Expression* var = new Variable("a", new IntegerLiteral(x.reg));
-            var = new ComponentMask(var,
-                                    {x.component == 0,
-                                     x.component == 1,
-                                     x.component == 2,
-                                     x.component == 3});
-            return new BinaryOperator(
-                FunctionName::add, var, new IntegerLiteral(x.displ));
+            Expression* var = _context->make<Variable>("a", _context->make<IntegerLiteral>(x.reg));
+            var = _context->make<ComponentMask>(var, dest_mask_t{
+                x.component == 0, 
+                x.component == 1, 
+                x.component == 2, 
+                x.component == 3
+            });
+            return _context->make<BinaryOperator>(FunctionName::add, 
+                                                  var, 
+                                                  _context->make<IntegerLiteral>(x.displ));
         }
         
         Expression* operator()(int x) const {
-            return new IntegerLiteral(x);
+            return _context->make<IntegerLiteral>(x);
         }
     };
     
     class VertexArgVisitor : public boost::static_visitor<Expression*> {
+        ASTContext* _context;
+        
     public:
-        Expression* convert(std::string name, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw, int mask) const {
-            auto refNum = apply_visitor(VertexRefVisitor(), ref);
-            Expression* expr = new Variable(name, refNum);
+        VertexArgVisitor(ASTContext* context) : _context(context) {}
+        Expression* convert(std::string name, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
+            auto refNum = apply_visitor(VertexRefVisitor(_context), ref);
+            Expression* expr = _context->make<Variable>(name, refNum);
             if (abs)
-                expr = new Invocation(FunctionName::abs, { expr });
+                expr = _context->make<Invocation>(FunctionName::abs, expr);
             if (neg)
-                expr = new UnaryOperator(FunctionName::neg, expr);
+                expr = _context->make<UnaryOperator>(FunctionName::neg, expr);
             if (!sw.is_xyzw())
-                expr = new Swizzle(expr, sw);
-            if (mask != 0xf) {
-                expr = new ComponentMask(expr, 
-                    { bool(mask & 8), bool(mask & 4), bool(mask & 2), bool(mask & 1) });
-            }
+                expr = _context->make<Swizzle>(expr, sw);
             return expr;
         }
         
         Expression* operator()(vertex_arg_output_ref_t x) const {
-            return convert("v_out", x.ref, false, false, swizzle_xyzw, x.mask);
+            return convert("v_out", x.ref, false, false, swizzle_xyzw);
         }
         
         Expression* operator()(vertex_arg_input_ref_t x) const {
-            return convert("v_in", x.ref, x.is_neg, x.is_abs, x.swizzle, 0xf);
+            return convert("v_in", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
         
         Expression* operator()(vertex_arg_const_ref_t x) const {
-            return convert("constants.c", x.ref, x.is_neg, x.is_abs, x.swizzle, 0xf);
+            return convert("constants.c", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
         
         Expression* operator()(vertex_arg_temp_reg_ref_t x) const {
-            return convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle, x.mask);
+            return convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
         
         Expression* operator()(vertex_arg_address_reg_ref_t x) const {
-            return convert("a", x.a, false, false, swizzle_xyzw, x.mask);
+            return convert("a", x.a, false, false, swizzle_xyzw);
         }
         
         Expression* operator()(vertex_arg_cond_reg_ref_t x) const {
-            return convert("c", x.c, false, false, swizzle_xyzw, x.mask);
+            return convert("c", x.c, false, false, swizzle_xyzw);
         }
         
         Expression* operator()(vertex_arg_label_ref_t x) const {
-            return new IntegerLiteral(x.l);
+            return _context->make<IntegerLiteral>(x.l);
         }
         
         Expression* operator()(vertex_arg_tex_ref_t x) const {
-            return new IntegerLiteral(x.tex);
+            return _context->make<IntegerLiteral>(x.tex);
         }
     };
     
-    Expression* wrapMask(Expression* lhs, Expression* expr) {
-        auto mask = dynamic_cast<ComponentMask*>(lhs);
-        if (mask) {
-            return new ComponentMask(expr, mask->mask());
-        }
-        return expr;
-    }
-    
-    std::vector<std::unique_ptr<Statement>> MakeStatement(const VertexInstr& i, unsigned address) {
-        VertexArgVisitor argVisitor;
+    std::vector<Statement*> MakeStatement(ASTContext& context, const VertexInstr& i, unsigned address) {
+        VertexArgVisitor argVisitor(&context);
         auto arg = [&](int j) {
             return apply_visitor(argVisitor, i.args[j]);
         };
         
         Expression* rhs = nullptr, *lhs = nullptr;
+        bool isScalarRhs = false;
         
         switch (i.operation) {
             case vertex_op_t::ADD: {
-                rhs = new BinaryOperator(FunctionName::add, arg(1), arg(2));
+                rhs = context.make<BinaryOperator>(FunctionName::add, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::MAD: {
-                auto mul = new BinaryOperator(FunctionName::mul, arg(1), arg(2));
-                auto add = new BinaryOperator(FunctionName::add, mul, arg(3));
+                auto mul = context.make<BinaryOperator>(FunctionName::mul, arg(1), arg(2));
+                auto add = context.make<BinaryOperator>(FunctionName::add, mul, arg(3));
                 rhs = add;
                 break;
             }
             case vertex_op_t::ARL: {
-                rhs = new Invocation(FunctionName::floor, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::ivec4,
+                                     context.make<Invocation>(FunctionName::floor, arg(1)));
                 break;
             }
             case vertex_op_t::ARR: {
-                rhs = new Invocation(FunctionName::ceil, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::ivec4,
+                                     context.make<Invocation>(FunctionName::ceil, arg(1)));
                 break;
             }
             case vertex_op_t::BRB:
             case vertex_op_t::BRI: {
-                lhs = new Variable("nip", nullptr);
+                lhs = context.make<Variable>("nip", nullptr);
                 rhs = arg(0);
                 break;
             }
             case vertex_op_t::CLI:
             case vertex_op_t::CLB: {
-                lhs = new Variable("void_var", nullptr);
-                rhs = new Invocation(FunctionName::call, { arg(0) });
+                lhs = context.make<Variable>("void_var", nullptr);
+                rhs = context.make<Invocation>(FunctionName::call, arg(0));
                 break;
             }
             case vertex_op_t::COS: {
-                rhs = new Invocation(FunctionName::cos, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::cos, adaptToSingleScalar(context, arg(1)));
                 break;
             }
             case vertex_op_t::DP3: {
-                rhs = new Invocation(FunctionName::dot3, { arg(1), arg(2) });
+                isScalarRhs = true;
+                auto arg0 = context.make<ComponentMask>(arg(1), dest_mask_t{1, 1, 1, 0});
+                auto arg1 = context.make<ComponentMask>(arg(2), dest_mask_t{1, 1, 1, 0});
+                rhs = context.make<Invocation>(FunctionName::dot, arg0, arg1);
                 break;
             }
             case vertex_op_t::DP4: {
-                rhs = new Invocation(FunctionName::dot4, { arg(1), arg(2) });
+                isScalarRhs = true;
+                rhs = context.make<Invocation>(FunctionName::dot, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::DPH: {
-                auto x = new ComponentMask(arg(1), { 1, 0, 0, 0 });
-                auto y = new ComponentMask(arg(1), { 0, 1, 0, 0 });
-                auto z = new ComponentMask(arg(1), { 0, 0, 1, 0 });
-                auto w = new FloatLiteral(1);
-                auto xyz1 = new Invocation(FunctionName::vec4, { x, y, z, w });
-                rhs = new Invocation(FunctionName::dot4, { xyz1, arg(2) });
+                isScalarRhs = true;
+                auto sw = context.make<ComponentMask>(arg(1), dest_mask_t{1, 1, 1, 0});
+                auto xyz1 = context.make<Invocation>(FunctionName::vec4, sw, context.make<FloatLiteral>(1));
+                rhs = context.make<Invocation>(FunctionName::dot, xyz1, arg(2));
                 break;
             }
             case vertex_op_t::DST: {
-                auto c0 = new FloatLiteral(1);
-                auto c1 = new BinaryOperator(
+                auto c0 = context.make<FloatLiteral>(1);
+                auto c1 = context.make<BinaryOperator>(
                     FunctionName::mul,
-                    new ComponentMask(arg(1), { 0, 1, 0, 0 }),
-                    new ComponentMask(arg(2), { 0, 1, 0, 0 })
+                    context.make<ComponentMask>(arg(1), dest_mask_t{ 0, 1, 0, 0 }),
+                    context.make<ComponentMask>(arg(2), dest_mask_t{ 0, 1, 0, 0 })
                 );
-                auto c2 = new ComponentMask(arg(1), { 0, 0, 1, 0 });
-                auto c3 = new ComponentMask(arg(2), { 0, 0, 0, 1 });
-                rhs = new Invocation(FunctionName::vec4, { c0, c1, c2, c3 });
+                auto c2 = context.make<ComponentMask>(arg(1), dest_mask_t{ 0, 0, 1, 0 });
+                auto c3 = context.make<ComponentMask>(arg(2), dest_mask_t{ 0, 0, 0, 1 });
+                rhs = context.make<Invocation>(FunctionName::vec4, c0, c1, c2, c3);
                 break;
             }
             case vertex_op_t::EXP:
             case vertex_op_t::EX2: {
-                rhs = new Invocation(FunctionName::exp2, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::exp2, adaptToSingleScalar(context, arg(1)));
                 break;
             }
             case vertex_op_t::FLR: {
-                rhs = new Invocation(FunctionName::floor, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::floor, arg(1));
                 break;
             }
             case vertex_op_t::FRC: {
-                rhs = new Invocation(FunctionName::fract, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::fract, arg(1));
                 break;
             }
             case vertex_op_t::LG2:
             case vertex_op_t::LOG: {
-                rhs = new Invocation(FunctionName::lg2, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::lg2, adaptToSingleScalar(context, arg(1)));
                 break;
             }
             case vertex_op_t::LIT: {
-                auto c0 = new FloatLiteral(1);
-                auto c1 = new ComponentMask(arg(1), { 1, 0, 0, 0 });
-                auto mul = new BinaryOperator(
+                auto c0 = context.make<FloatLiteral>(1);
+                auto c1 = context.make<ComponentMask>(arg(1), dest_mask_t{ 1, 0, 0, 0 });
+                auto mul = context.make<BinaryOperator>(
                     FunctionName::mul,
-                    new ComponentMask(arg(1), { 0, 0, 0, 1 }),
-                    new Invocation(
+                    context.make<ComponentMask>(arg(1), dest_mask_t{ 0, 0, 0, 1 }),
+                    context.make<Invocation>(
                         FunctionName::lg2,
-                        { new ComponentMask(arg(1), { 0, 1, 0, 0 }) }
+                        context.make<ComponentMask>(arg(1), dest_mask_t{ 0, 1, 0, 0 })
                     )
                 );
-                auto c2 = new TernaryOperator(
-                    new BinaryOperator(
+                auto c2 = context.make<TernaryOperator>(
+                    context.make<BinaryOperator>(
                         FunctionName::gt,
-                        new ComponentMask(arg(1), { 1, 0, 0, 0 }),
-                        new FloatLiteral(0)
+                        context.make<ComponentMask>(arg(1), dest_mask_t{ 1, 0, 0, 0 }),
+                        context.make<FloatLiteral>(0)
                     ),
-                    new Invocation(FunctionName::exp2, { mul }),
-                    new FloatLiteral(0)
+                    context.make<Invocation>(FunctionName::exp2, mul),
+                    context.make<FloatLiteral>(0)
                 );
-                auto c3 = new FloatLiteral(1);
-                rhs = new Invocation(FunctionName::vec4, { c0, c1, c2, c3 });
+                auto c3 = context.make<FloatLiteral>(1);
+                rhs = context.make<Invocation>(FunctionName::vec4, c0, c1, c2, c3);
                 break;
             }
             case vertex_op_t::MIN: {
-                rhs = new Invocation(FunctionName::min, { arg(1), arg(2) });
+                rhs = context.make<Invocation>(FunctionName::min, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::MAX: {
-                rhs = new Invocation(FunctionName::max, { arg(1), arg(2) });
+                rhs = context.make<Invocation>(FunctionName::max, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::MOV: {
                 break;
             }
             case vertex_op_t::MUL: {
-                rhs = new BinaryOperator(FunctionName::mul, arg(1), arg(2));
+                rhs = context.make<BinaryOperator>(FunctionName::mul, arg(1), arg(2));
                 break;
             }
             case vertex_op_t::MVA: {
-                auto x = new Swizzle(arg(1), { swizzle2bit_t::X, swizzle2bit_t::Y });
-                auto y = new Swizzle(arg(1), { swizzle2bit_t::Z, swizzle2bit_t::W });
-                auto sum = new BinaryOperator(FunctionName::add, x, y);
-                auto sw = new Swizzle(sum, {
+                auto x = context.make<Swizzle>(arg(1), swizzle_t{ swizzle2bit_t::X, swizzle2bit_t::Y });
+                auto y = context.make<Swizzle>(arg(1), swizzle_t{ swizzle2bit_t::Z, swizzle2bit_t::W });
+                auto sum = context.make<BinaryOperator>(FunctionName::add, x, y);
+                auto sw = context.make<Swizzle>(sum, swizzle_t{
                     swizzle2bit_t::X, swizzle2bit_t::Y, swizzle2bit_t::X, swizzle2bit_t::Y 
                 });
-                rhs = new Invocation(FunctionName::clamp4i, { sw });
+                rhs = context.make<Invocation>(FunctionName::clamp4i, sw);
                 break;
             }
             case vertex_op_t::RCP: {
-                auto mask = new ComponentMask(arg(1), { 1, 0, 0, 0 });
-                rhs = new Invocation(FunctionName::pow, { mask, new FloatLiteral(-1) });
+                auto exp = context.make<Invocation>(FunctionName::vec4, context.make<FloatLiteral>(-1));
+                rhs = context.make<Invocation>(FunctionName::pow, adaptToSingleScalar(context, arg(1)), exp);
                 break;
             }
             case vertex_op_t::RSQ: {
-                rhs = new Invocation(FunctionName::inversesqrt, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::inversesqrt, adaptToSingleScalar(context, arg(1)));
                 break;
             }
             case vertex_op_t::SEQ: {
-                rhs = new Invocation(FunctionName::equal, { arg(1), arg(2) });
+                auto func = context.make<Invocation>(FunctionName::equal, arg(1), arg(2));
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case vertex_op_t::SFL: {
-                rhs = new Invocation(FunctionName::vec4, { 
-                    new FloatLiteral(0), new FloatLiteral(0),
-                    new FloatLiteral(0), new FloatLiteral(0)
-                });
+                rhs = context.make<Invocation>(FunctionName::vec4,
+                    context.make<FloatLiteral>(0), context.make<FloatLiteral>(0),
+                    context.make<FloatLiteral>(0), context.make<FloatLiteral>(0)
+                );
                 break;
             }
             case vertex_op_t::SGE: {
-                rhs = new Invocation(FunctionName::greaterThanEqual, { arg(1), arg(2) });
+                auto func = context.make<Invocation>(FunctionName::greaterThanEqual, arg(1), arg(2));
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case vertex_op_t::SGT: {
-                rhs = new Invocation(FunctionName::greaterThan, { arg(1), arg(2) });
+                auto func = context.make<Invocation>(FunctionName::greaterThan, arg(1), arg(2));
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case vertex_op_t::SIN: {
-                rhs = new Invocation(FunctionName::sin, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::sin, adaptToSingleScalar(context, arg(1)));
                 break;
             }
             case vertex_op_t::SLE: {
-                rhs = new Invocation(FunctionName::lessThanEqual, { arg(1), arg(2) });
+                auto func = context.make<Invocation>(FunctionName::lessThanEqual, arg(1), arg(2));
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case vertex_op_t::SLT: {
-                rhs = new Invocation(FunctionName::lessThan, { arg(1), arg(2) });
+                auto func = context.make<Invocation>(FunctionName::lessThan, arg(1), arg(2));
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case vertex_op_t::SNE: {
-                rhs = new Invocation(FunctionName::notEqual, { arg(1), arg(2) });
+                auto func = context.make<Invocation>(FunctionName::notEqual, arg(1), arg(2));
+                rhs = context.make<Invocation>(FunctionName::vec4, func);
                 break;
             }
             case vertex_op_t::SSG: {
-                rhs = new Invocation(FunctionName::sign, { arg(1) });
+                rhs = context.make<Invocation>(FunctionName::sign, arg(1));
                 break;
             }
             case vertex_op_t::STR: {
-                rhs = new Invocation(FunctionName::vec4, { 
-                    new FloatLiteral(1), new FloatLiteral(1),
-                    new FloatLiteral(1), new FloatLiteral(1)
-                });
+                rhs = context.make<Invocation>(FunctionName::vec4, 
+                    context.make<FloatLiteral>(1), context.make<FloatLiteral>(1),
+                    context.make<FloatLiteral>(1), context.make<FloatLiteral>(1)
+                );
                 break;
             }
             case vertex_op_t::TXL: {
@@ -1136,50 +883,78 @@ namespace ShaderRewriter {
                           : txl->value() == 1 ? FunctionName::txl1
                           : txl->value() == 2 ? FunctionName::txl2
                           : FunctionName::txl3;
-                rhs = new Invocation(func, { arg(1) });
+                rhs = context.make<Invocation>(func, arg(1));
                 break;
             }
             case vertex_op_t::NOP: {
-                lhs = new WhileStatement(new Variable("false", nullptr), {});
+                lhs = context.make<WhileStatement>(context.make<Variable>("false", nullptr), StV{});
                 break;
             }
             default: assert(false);
         }
-        auto mask = dynamic_cast<ComponentMask*>(arg(0));
-        bool isRegC = i.op_count > 1 && boost::get<vertex_arg_cond_reg_ref_t>(&i.args[0]);
-        auto maskVal = mask ? mask->mask() : dest_mask_t { 1, 1, 1, 1 };
         
-        std::vector<std::unique_ptr<Statement>> vec;
-        if (rhs) {
-            auto dest = arg(0);
-            vec.emplace_back(new Assignment(lhs ? lhs : dest, wrapMask(dest, rhs)));
-            if (i.operation == vertex_op_t::BRI) {
-                vec.emplace_back(new BreakStatement());
-            }
-        } else {        
-            if (i.operation == vertex_op_t::MOV) {
-                if (i.op_count == 2) {
-                    auto dest = arg(0);
-                    vec.emplace_back(new Assignment(dest, wrapMask(dest, arg(1))));
-                } else {
-                    assert(i.op_count == 3);
-                    auto dest = arg(0);
-                    vec.emplace_back(new Assignment(dest, wrapMask(dest, arg(2))));
-                    dest = arg(1);
-                    vec.emplace_back(new Assignment(dest, wrapMask(dest, arg(2))));
+        bool isRegC = i.op_count > 1 && boost::get<vertex_arg_cond_reg_ref_t>(&i.args[0]);
+        
+        auto makeMaskedAssignment = [&] (auto lhs, auto rhs) {
+            if (isScalarRhs) {
+                if (i.mask.arity() != 1) {
+                    rhs = context.make<ComponentMask>(context.make<Invocation>(FunctionName::vec4, rhs), i.mask);
                 }
             } else {
-                vec.emplace_back(dynamic_cast<Statement*>(lhs));
+                if (i.mask.arity() != 4) {
+                    rhs = context.make<ComponentMask>(rhs, i.mask);
+                }
+            }
+            if (i.mask.arity() != 4) {
+                lhs = context.make<ComponentMask>(lhs, i.mask);
+            }
+            return context.make<Assignment>(lhs, rhs);
+        };
+        
+        std::vector<Statement*> vec;
+        
+        if (i.operation == vertex_op_t::MOV) {
+            if (i.op_count == 2) {
+                auto rhs = appendCondition(context, i.condition, arg(1), arg(0));
+                vec.emplace_back(makeMaskedAssignment(arg(0), rhs));
+            } else {
+                assert(i.op_count == 3);
+                auto rhs = appendCondition(context, i.condition, arg(2), arg(0));
+                vec.emplace_back(makeMaskedAssignment(arg(0), rhs));
+                vec.emplace_back(makeMaskedAssignment(arg(1), rhs));
+            }
+        } else if (i.operation == vertex_op_t::NOP) {
+            vec.emplace_back(dynamic_cast<Statement*>(lhs));
+        } else if (i.operation == vertex_op_t::BRI || i.operation == vertex_op_t::BRB) {
+            auto assign = context.make<Assignment>(lhs, rhs);
+            auto relation = makeCondition(context, i.condition);
+            if (relation) {
+                auto cond = context.make<Invocation>(FunctionName::any, relation);
+                auto ifSt = context.make<IfStatement>(cond, StV{assign, context.make<BreakStatement>()}, StV{}, 0);
+                vec.emplace_back(ifSt);
+            } else {
+                vec.emplace_back(assign);
+                vec.emplace_back(context.make<BreakStatement>());
+            }
+        } else {
+            assert(rhs);
+            if (!lhs) {
+                lhs = arg(0);
+            }
+            rhs = appendCondition(context, i.condition, rhs, lhs);
+            vec.emplace_back(makeMaskedAssignment(lhs, rhs));
+            if (i.operation == vertex_op_t::BRI) {
+                vec.emplace_back(context.make<BreakStatement>());
             }
         }
 
-        appendCAssignment(i.control, isRegC, maskVal, "abc", 1, vec); // TODO:
-        appendCondition(i.condition, vec, maskVal);
+        auto cassign = makeCAssignment(context, i.control, isRegC, lhs);
+        if (cassign) {
+            vec.emplace_back(cassign);
+        }
         
-        TypeFixerVisitor fixer;
         for (auto& assignment : vec) {
             assignment->address(address);
-            assignment->accept(&fixer);
         }
         return vec;
     }
@@ -1202,16 +977,17 @@ namespace ShaderRewriter {
         std::set<int> labels;
     };
     
-    std::vector<std::unique_ptr<Statement>> RewriteBranches(
-        std::vector<std::unique_ptr<Statement>> uniqueStatements) {
+    std::vector<Statement*> RewriteBranches(
+        ASTContext& context,
+        std::vector<Statement*> uniqueStatements) {
         DoesContainBranchVisitor visitor;
         for (auto& st : uniqueStatements) {
             st->accept(&visitor);
         }
         if (!visitor.result)
             return uniqueStatements;
-        auto sts = release_unique(uniqueStatements);
-        auto sw = new SwitchStatement(new Variable("nip", nullptr));
+        auto sts = uniqueStatements;
+        auto sw = context.make<SwitchStatement>(context.make<Variable>("nip", nullptr));
         
         std::vector<Statement*> curCase;
         for (auto i = 0u; i < sts.size(); ++i) {
@@ -1224,21 +1000,22 @@ namespace ShaderRewriter {
                     continue;
             }
             if (i == sts.size() - 1) {
-                curCase.push_back(new Assignment(new Variable("nip", nullptr),
-                                                 new IntegerLiteral(-1)));
+                curCase.push_back(context.make<Assignment>(context.make<Variable>("nip", nullptr),
+                                                 context.make<IntegerLiteral>(-1)));
             }
             sw->addCase(curCase.front()->address(), curCase);
             curCase.clear();
         }
         
         std::vector<Statement*> res = {
-            new Assignment(new Variable("nip", nullptr), new IntegerLiteral(0)),
-            new WhileStatement(new BinaryOperator(FunctionName::ne,
-                                                  new Variable("nip", nullptr),
-                                                  new IntegerLiteral(-1)),
-                               { sw })
-        };
-        return pack_unique(res);
+            context.make<Assignment>(context.make<Variable>("nip", nullptr),
+                                     context.make<IntegerLiteral>(0)),
+            context.make<WhileStatement>(
+                context.make<BinaryOperator>(FunctionName::ne,
+                                             context.make<Variable>("nip", nullptr),
+                                             context.make<IntegerLiteral>(-1)),
+                StV{sw})};
+        return res;
     }
     
     void UsedConstsVisitor::visit(Variable* variable) {
@@ -1253,7 +1030,7 @@ namespace ShaderRewriter {
         return _consts;
     }
     
-    bool fixFirstIfStub(std::vector<Statement*>& statements) {
+    bool fixFirstIfStub(ASTContext& context, std::vector<Statement*>& statements) {
         auto it = boost::find_if(statements, [](auto s) {
             auto stub = dynamic_cast<IfStubFragmentStatement*>(s);
             if (!stub)
@@ -1278,17 +1055,16 @@ namespace ShaderRewriter {
         std::vector<Statement*> falseBlock(trueEnd, falseEnd);
         
         statements.erase(trueStart, falseEnd);
-        while (fixFirstIfStub(trueBlock)) {}
-        while (fixFirstIfStub(falseBlock)) {}
+        while (fixFirstIfStub(context, trueBlock)) {}
+        while (fixFirstIfStub(context, falseBlock)) {}
         stub->setTrueBlock(trueBlock);
         stub->setFalseBlock(falseBlock);
         return true;
     }
     
-    std::vector<std::unique_ptr<Statement>> RewriteIfStubs(
-        std::vector<std::unique_ptr<Statement>> statements) {
-        auto unpacked = release_unique(statements);
-        while (fixFirstIfStub(unpacked)) { }
-        return pack_unique(unpacked);
+    std::vector<Statement*> RewriteIfStubs(ASTContext& context,
+                                           std::vector<Statement*> statements) {
+        while (fixFirstIfStub(context, statements)) { }
+        return statements;
     }
 }

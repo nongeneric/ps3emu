@@ -9,12 +9,16 @@
 #include <set>
 
 namespace ShaderRewriter {
-    std::vector<std::unique_ptr<Statement>> MakeStatement(FragmentInstr const& i, unsigned constIndex);
-    std::vector<std::unique_ptr<Statement>> MakeStatement(VertexInstr const& i, unsigned address);
-    std::vector<std::unique_ptr<Statement>> RewriteBranches(
-        std::vector<std::unique_ptr<Statement>> statements);
-    std::vector<std::unique_ptr<Statement>> RewriteIfStubs(
-        std::vector<std::unique_ptr<Statement>> statements);
+    std::vector<Statement*> MakeStatement(ASTContext& context,
+                                          FragmentInstr const& i,
+                                          unsigned constIndex);
+    std::vector<Statement*> MakeStatement(ASTContext& context,
+                                          VertexInstr const& i,
+                                          unsigned address);
+    std::vector<Statement*> RewriteBranches(ASTContext& context,
+                                            std::vector<Statement*> statements);
+    std::vector<Statement*> RewriteIfStubs(ASTContext& context,
+                                           std::vector<Statement*> statements);
     std::string PrintStatement(Statement* stat);
     int GetLastRegisterNum(Expression* expr);
     

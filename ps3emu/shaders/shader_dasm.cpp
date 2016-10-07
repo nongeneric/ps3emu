@@ -799,6 +799,21 @@ vertex_opcode_t vertex_opcodes_0[] = {
 
 const char* displ_components = "xyzw";
 
+std::string print_mask(dest_mask_t mask) {
+    if (mask.val[0] && mask.val[1] && mask.val[2] && mask.val[3])
+        return "";
+    std::string res = ".";
+    if (mask.val[0])
+        res += "x";
+    if (mask.val[1])
+        res += "y";
+    if (mask.val[2])
+        res += "z";
+    if (mask.val[3])
+        res += "w";
+    return res;
+}
+
 std::string print_mask(uint8_t mask) {
     if (mask == 0xf)
         return "";
@@ -853,8 +868,9 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
                 } else {
                     ref = regnum;
                 }
-                uint16_t mask = instr.mask_selector ? instr.mask1 : instr.mask2;
-                res.args[res_arg] = vertex_arg_output_ref_t { ref, mask };
+                auto mask = instr.mask_selector ? instr.mask1 : instr.mask2;
+                res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+                res.args[res_arg] = vertex_arg_output_ref_t { ref };
                 res_arg++;
             }
         } 
@@ -862,16 +878,17 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
             if (instr.addr_data_reg_num != 63 || instr.mask_selector || instr.output_reg_num == 31) {
                 auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask2;
                 if (instr.dest_reg_num == 63) {
-                    res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
+                    res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+                    res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0 };
                 } else if (opcode->addr_reg) {
                     res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.dest_reg_num, mask };
                 } else {
+                    res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
                     res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
                         instr.dest_reg_num,
                         false,
                         false,
-                        swizzle_xyzw,
-                        mask
+                        swizzle_xyzw
                     };
                 }
                 res_arg++;
@@ -881,18 +898,19 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
             if (opcode->addr_reg) {
                 res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.addr_data_reg_num, mask };
             } else {
+                res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
                 res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
                     instr.addr_data_reg_num,
                     false,
                     false,
-                    swizzle_xyzw,
-                    mask
+                    swizzle_xyzw
                 };
             }
             res_arg++;
         } else if ((!instr.mask_selector || instr.output_reg_num == 31) && !opcode->control) {
             auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
-            res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0, mask };
+            res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+            res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0 };
             res_arg++;
         }
     }
@@ -946,7 +964,7 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
                     };
                 } else {
                     res.args[res_arg] = vertex_arg_temp_reg_ref_t {
-                        arg->reg_num, arg->is_neg, arg->is_abs, arg->swizzle, 0xf
+                        arg->reg_num, arg->is_neg, arg->is_abs, arg->swizzle
                     };
                 }
             }
@@ -994,10 +1012,16 @@ public:
 };
 
 class arg_visitor : public boost::static_visitor<std::string> {
+    const VertexInstr* _instr;
+    bool _noMask;
+    
 public:
+    arg_visitor(const VertexInstr* instr, bool noMask)
+        : _instr(instr), _noMask(noMask) {}
+    
     std::string operator()(vertex_arg_output_ref_t x) const {
         auto ref = apply_visitor(ref_visitor(), x.ref);
-        return ssnprintf("o[%s]%s", ref, print_mask(x.mask));
+        return ssnprintf("o[%s]%s", ref, _noMask ? "" : print_mask(_instr->mask));
     }
     
     std::string print(char reg, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
@@ -1025,17 +1049,17 @@ public:
             res = ssnprintf("|%s|", res);
         if (x.is_neg)
             res = "-" + res;
-        auto mask = print_mask(x.mask);
+        auto mask = _noMask ? "" : print_mask(_instr->mask);
         auto swizzle = print_swizzle(x.swizzle, false);
         return res + mask + swizzle;
     }
     
     std::string operator()(vertex_arg_address_reg_ref_t x) const {
-        return ssnprintf("A%d%s", x.a, print_mask(x.mask));
+        return ssnprintf("A%d%s", x.a, _noMask ? "" : print_mask(_instr->mask));
     }
     
     std::string operator()(vertex_arg_cond_reg_ref_t x) const {
-        return ssnprintf("RC%s", print_mask(x.mask));
+        return ssnprintf("RC%s", _noMask ? "" : print_mask(_instr->mask));
     }
     
     std::string operator()(vertex_arg_label_ref_t x) const {
@@ -1053,7 +1077,7 @@ std::string vertex_dasm(const VertexInstr& instr) {
         res += ssnprintf("(%s%s) %s", 
                          print_cond(instr.condition.relation),
                          print_swizzle(instr.condition.swizzle, false),
-                         apply_visitor(arg_visitor(), instr.args[0]));
+                         apply_visitor(arg_visitor(&instr, false), instr.args[0]));
     } else {
         if (instr.control != control_mod_t::None) {
             res += "C";
@@ -1066,7 +1090,7 @@ std::string vertex_dasm(const VertexInstr& instr) {
             if (i > 0) {
                 res += ", ";
             }
-            res += apply_visitor(arg_visitor(), instr.args[i]);
+            res += apply_visitor(arg_visitor(&instr, i != 0), instr.args[i]);
             if (i == 0 && instr.condition.relation != cond_t::TR) {
                 auto cond = print_cond(instr.condition.relation);
                 auto sw = print_swizzle(instr.condition.swizzle, false);

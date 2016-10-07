@@ -143,3 +143,10 @@ T align(T n, unsigned alignment) {
     assert(alignment > 0 && (alignment & (alignment - 1)) == 0);
     return (n + alignment - 1) & (~(alignment - 1));
 }
+
+template <typename Container, typename Pred>
+void erase_if(Container& container, Pred pred) {
+    auto it = std::find_if(begin(container), end(container), pred);
+    assert(it != end(container));
+    container.erase(it);
+}

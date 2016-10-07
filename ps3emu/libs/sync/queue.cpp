@@ -183,13 +183,14 @@ int32_t sys_spu_thread_connect_event(uint32_t thread_id,
                                      uint8_t spup) {
     auto info = queues.get(eq);
     INFO(libs) << ssnprintf(
-        "sys_spu_thread_connect_event(thread=%x, queue=%s, spup=%02x)",
+        "sys_spu_thread_connect_event(thread=%x, queue=%s|%x, spup=%02x)",
         thread_id,
         info->name,
+        eq,
         spup);
     assert(et == SYS_SPU_THREAD_EVENT_USER);
     auto thread = g_state.proc->getSpuThread(thread_id);
-    thread->connectOrBindQueue(info->queue, spup);
+    thread->connectQueue(info->queue, spup);
     return CELL_OK;
 }
 
@@ -201,7 +202,7 @@ int32_t sys_spu_thread_disconnect_event(uint32_t thread_id,
                             thread_id,
                             spup);
     auto thread = g_state.proc->getSpuThread(thread_id);
-    thread->disconnectOrUnbindQueue(spup);
+    thread->disconnectQueue(spup);
     return CELL_OK;
 }
 
@@ -210,7 +211,7 @@ int32_t sys_spu_thread_unbind_queue(uint32_t thread_id, uint32_t spuq_num) {
                             thread_id,
                             spuq_num);
     auto thread = g_state.proc->getSpuThread(thread_id);
-    thread->disconnectOrUnbindQueue(spuq_num);
+    thread->unbindQueue(spuq_num);
     return CELL_OK;
 }
 
@@ -219,12 +220,13 @@ int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
                                   uint32_t spuq_num) {
     auto info = queues.get(spuq);
     INFO(libs) << ssnprintf(
-        "sys_spu_thread_bind_queue(thread=%d, queue=%s, spuq=%02x)",
+        "sys_spu_thread_bind_queue(thread=%d, queue=%s|%x, spuq=%02x)",
         thread_id,
         info->name,
+        spuq,
         spuq_num);
     auto thread = g_state.proc->getSpuThread(thread_id);
-    thread->connectOrBindQueue(info->queue, spuq_num);
+    thread->bindQueue(info->queue, spuq_num);
     return CELL_OK;
 }
 
@@ -245,11 +247,11 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
         if (((1ull << i) & req) == 0)
             continue;
         auto available = std::all_of(begin(threads), end(threads), [=](auto& th) {
-            return th->isAvailableQueuePort(i);
+            return th->isQueuePortAvailableToConnect(i);
         });
         if (available) {
             for (auto& th : threads) {
-                th->connectOrBindQueue(info->queue, i);
+                th->connectQueue(info->queue, i);
             }
             *spup = i;
             INFO(libs) << ssnprintf("connected to spup %d", i);

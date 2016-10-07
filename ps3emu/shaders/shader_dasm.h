@@ -115,7 +115,10 @@ enum class vertex_op_t {
 };
 
 struct dest_mask_t {
-    bool val[4];
+    std::array<bool, 4> val;
+    inline int arity() const {
+        return val[0] + val[1] + val[2] + val[3];
+    }
 };
 
 struct FragmentInstr {
@@ -160,7 +163,7 @@ struct vertex_arg_label_ref_t {
 
 struct vertex_arg_cond_reg_ref_t {
     int c;
-    int mask;
+    swizzle_t mask;
 };
 
 struct vertex_arg_address_reg_ref_t {
@@ -170,7 +173,6 @@ struct vertex_arg_address_reg_ref_t {
 
 struct vertex_arg_output_ref_t {
     vertex_arg_ref_t ref;
-    int mask;
 };
 
 struct vertex_arg_input_ref_t {
@@ -192,7 +194,6 @@ struct vertex_arg_temp_reg_ref_t {
     bool is_neg;
     bool is_abs;
     swizzle_t swizzle;
-    int mask;
 };
 
 typedef boost::variant<
@@ -210,6 +211,7 @@ struct VertexInstr {
     int op_count;
     bool is_sat;
     VertexVariantArg args[4];
+    dest_mask_t mask;
     vertex_op_t operation;
     const char* mnemonic;
     bool is_last;

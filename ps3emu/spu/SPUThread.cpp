@@ -11,6 +11,8 @@
 #include <boost/range/algorithm.hpp>
 
 void SPUThread::run() {
+    assert(!_hasStarted);
+    _hasStarted = true;
     _thread = boost::thread([=] { loop(); });
 }
 
@@ -121,7 +123,8 @@ SPUThread::SPUThread(Process* proc,
       _dbgPaused(false),
       _singleStep(false),
       _exitCode(0),
-      _cause(SPUThreadExitCause::StillRunning) {
+      _cause(SPUThreadExitCause::StillRunning),
+      _hasStarted(false) {
     for (auto& r : _rs) {
         r.dw<0>() = 0;
         r.dw<1>() = 0;
@@ -203,53 +206,61 @@ void SPUThread::handleInterrupt(uint32_t interruptValue) {
         return;
     }
     
+    // throw or send
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
-    auto info = boost::find_if(_eventQueues, [=](auto& i) {
+    auto info = boost::find_if(_eventQueuesToPPU, [=](auto& i) {
         return i.port == port;
     });
-    assert(info != end(_eventQueues));
+    assert(info != end(_eventQueuesToPPU));
     info->queue->send({SYS_SPU_THREAD_EVENT_USER_KEY, _id, ((uint64_t)port << 32) | data0, data1});
     
     if (op == SpuInterruptOperation_SendEvent) {
-        _channels.mmio_write(SPU_In_MBox, 0);   
+        _channels.mmio_write(SPU_In_MBox, CELL_OK);
     }
 }
 
 void SPUThread::handleReceiveEvent() {
     INFO(spu) << "receive event";
     uint32_t port = _channels.mmio_read(SPU_Out_MBox);
-    auto info = boost::find_if(_eventQueues, [=](auto& i) {
+    auto info = boost::find_if(_eventQueuesToSPU, [=](auto& i) {
         return i.port == port;
     });
-    assert(info != end(_eventQueues));
+    assert(info != end(_eventQueuesToSPU));
     auto event = info->queue->receive(0);
-    _channels.mmio_write(SPU_In_MBox, event.source);
+    _channels.mmio_write(SPU_In_MBox, CELL_OK);
     _channels.mmio_write(SPU_In_MBox, event.data1);
     _channels.mmio_write(SPU_In_MBox, event.data2);
     _channels.mmio_write(SPU_In_MBox, event.data3);
 }
 
-void SPUThread::connectOrBindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
+void SPUThread::connectQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
                                    uint32_t portNumber) {
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
-    _eventQueues.push_back({portNumber, queue});
+    _eventQueuesToPPU.push_back({portNumber, queue});
 }
 
-void SPUThread::disconnectOrUnbindQueue(uint32_t portNumber) {
+void SPUThread::bindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
+                                   uint32_t portNumber) {
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
-    auto it = boost::find_if(_eventQueues, [&](auto& eq) {
-        return eq.port == portNumber;
-    });
-    assert(it != end(_eventQueues));
-    _eventQueues.erase(it);
+    _eventQueuesToSPU.push_back({portNumber, queue});
 }
 
-bool SPUThread::isAvailableQueuePort(uint32_t portNumber) {
+void SPUThread::unbindQueue(uint32_t portNumber) {
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
-    auto it = boost::find_if(_eventQueues, [=](auto& i) {
+    erase_if(_eventQueuesToSPU, [&](auto& eq) { return eq.port == portNumber; });
+}
+
+void SPUThread::disconnectQueue(uint32_t portNumber) {
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
+    erase_if(_eventQueuesToPPU, [&](auto& eq) { return eq.port == portNumber; });
+}
+
+bool SPUThread::isQueuePortAvailableToConnect(uint32_t portNumber) {
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
+    auto it = boost::find_if(_eventQueuesToPPU, [=](auto& i) {
         return i.port == portNumber;
     });
-    return it == end(_eventQueues);
+    return it == end(_eventQueuesToPPU);
 }
 
 uint64_t SPUThread::getId() {
