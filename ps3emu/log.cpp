@@ -86,7 +86,7 @@ log_type_t log_parse_filter(std::string const& str) {
         PARSE(s, res, rsx)
         PARSE(s, res, libs)
         PARSE(s, res, debugger)
-        throw std::runtime_error("unknown logging sink");
+        throw std::runtime_error("unknown logging filter");
     }
     return static_cast<log_type_t>(res);
 }
@@ -96,7 +96,7 @@ log_severity_t log_parse_verbosity(std::string const& str) {
     PARSE(str, res, info)
     PARSE(str, res, warning)
     PARSE(str, res, error)
-    throw std::runtime_error("unknown logging sink");
+    throw std::runtime_error("unknown logging verbosity");
     return static_cast<log_severity_t>(res);
 }
 

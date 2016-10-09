@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{874aad6b-127f-4a12-91fa-18f34efd25eb}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;cc;s;asm</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{23d39349-9f14-47b1-9b68-9dbdf2229642}</UniqueIdentifier>
+      <Extensions>h;hpp;vsm</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\ppu_main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

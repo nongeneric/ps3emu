@@ -212,10 +212,22 @@ Event Process::run() {
         {
             boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
             boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);   
-            if (_threads.empty() && _spuThreads.empty())
-                return ProcessFinishedEvent();
+            if (_spuThreads.empty() && _processFinished && _callbackThreadFinished) {
+                // there might be a dangling spu_printf thread or similar
+                bool dangling = false;
+                for (auto& t : _threads) {
+                    INFO(libs) << ssnprintf("a dangling thread at ProcessFinished %s", t->getName());
+                    dangling = true;
+                }
+                if (dangling) {
+                    INFO(libs) << "terminating process with dangling threads";
+                    exit(0);
+                }
+                INFO(libs) << "process finishes cleanly, without dangling threads";
+                return ProcessFinishedEvent{};
+            }
         }
-    
+
         auto removeThread = [&](PPUThread* thread) {
             boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
             auto it = std::find_if(begin(_threads), end(_threads), [=](auto& th) {
@@ -247,13 +259,16 @@ Event Process::run() {
                     }
                     _rsx->shutdown();
                     _callbackThread->terminate();
-                    boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
-                    for (auto& t : _spuThreads) {
-                        if (t->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
-                            t->cancel();
+                    {
+                        boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
+                        for (auto& t : _spuThreads) {
+                            if (t->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
+                                t->cancel();
+                            }
                         }
                     }
                     _spuThreads.clear();
+                    _processFinished = true;
                     break;
                 }
                 case PPUThreadEvent::Breakpoint: return PPUBreakpointEvent{ev->thread};
@@ -267,6 +282,7 @@ Event Process::run() {
                     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
                     if (ev->thread->getId() == _callbackThread->id()) {
                         removeThread(ev->thread);
+                        _callbackThreadFinished = true;
                     }
                     return PPUThreadFinishedEvent{nullptr};
                 }

@@ -251,7 +251,7 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libaudio.sprx.elf" ||
         name == "libio.sprx.elf" || name == "libfs.sprx.elf" ||
-        name == "libsysutil_np_trophy.sprx.elf" || name == "libresc.sprx.elf") {
+        name == "libsysutil_np_trophy.sprx.elf") {
         return false;
     }
     return true;

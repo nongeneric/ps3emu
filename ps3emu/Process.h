@@ -148,6 +148,8 @@ class Process {
     std::vector<ModuleSegment> _segments;
     std::vector<std::shared_ptr<ELFLoader>> _prxs;
     std::vector<StolenFuncInfo> _stolenInfos;
+    bool _processFinished = false;
+    bool _callbackThreadFinished = false;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
     void initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     void initNewThread(PPUThread* thread,

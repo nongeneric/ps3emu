@@ -216,3 +216,17 @@ TEST_CASE("cube_with_font") {
     compareLastFrame("./binaries/cube_with_font/ps3frame0.png", 0);
 }
 
+TEST_CASE("resc_basic") {
+    runAndWait("./binaries/resc_basic/a.elf");
+    compareLastFrame("./binaries/resc_basic/ps3frame0.png", 0);
+}
+
+TEST_CASE("particle_simulator_02_spu_particles") {
+    runAndWait("./binaries/particle_simulator_02_spu_particles/a.elf");
+    compareLastFrame("./binaries/particle_simulator_02_spu_particles/ps3frame1.png", 1);
+}
+
+TEST_CASE("particle_simulator_01_ppu_particles") {
+    runAndWait("./binaries/particle_simulator_01_ppu_particles/a.elf");
+    compareLastFrame("./binaries/particle_simulator_01_ppu_particles/ps3frame1.png", 1);
+}

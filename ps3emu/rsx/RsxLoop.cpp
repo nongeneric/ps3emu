@@ -1682,14 +1682,15 @@ void Rsx::shutdown() {
         return;
     
     if (!_shutdown) {
-        LOG << "waiting for rsx to shutdown";
+        INFO(rsx) << "waiting for shutdown";
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             _shutdown = true;
             _cv.notify_all();
         }
+        _thread->join();
+        INFO(rsx) << "shutdown";
     }
-    _thread->join();
 }
 
 void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {

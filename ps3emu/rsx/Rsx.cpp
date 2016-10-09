@@ -1818,14 +1818,16 @@ void Rsx::transferImage() {
     auto src = g_state.mm->getMemoryPointer(sourceEa, 1);
     auto dest = g_state.mm->getMemoryPointer(destEa, 1);
     
-//     if (_context->framebuffer->findTexture(sourceEa)) {
-//         auto it =
-//             br::find_if(_context->displayBuffers,
-//                         [&](auto& buf) { return buf.offset == surface.destOffset; });
-//         if (it != end(_context->displayBuffers)) {
-//             _context->surfaceLinks.insert({sourceEa, destEa});
-//         }
-//     }
+    FramebufferTextureKey key{sourceEa};
+    auto res = _context->framebuffer->findTexture(key);
+    if (res.texture) {
+        auto it =
+            br::find_if(_context->displayBuffers,
+                        [&](auto& buf) { return buf.offset == surface.destOffset; });
+        if (it != end(_context->displayBuffers)) {
+            _context->surfaceLinks.insert({sourceEa, destEa});
+        }
+    }
     
     auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;

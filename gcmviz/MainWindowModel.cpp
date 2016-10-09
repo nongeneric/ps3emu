@@ -741,7 +741,7 @@ void MainWindowModel::update() {
         if (input.rank == 0)
             return;
         uint8_t* mapped;
-        VertexDataArrayFormatInfo info;
+        VertexDataArrayFormatInfo info = {};
         bool be;
         if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size()) {
             info.frequency = 0;
