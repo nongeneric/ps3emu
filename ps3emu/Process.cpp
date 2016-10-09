@@ -8,6 +8,7 @@
 #include "state.h"
 
 #include "ppu/InterruptPPUThread.h"
+#include <GLFW/glfw3.h>
 #include <boost/thread/locks.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
@@ -134,6 +135,10 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
 }
 
 void Process::init(std::string elfPath, std::vector<std::string> args) {
+    if (!glfwInit()) {
+        throw std::runtime_error("glfw initialization failed");
+    }
+    
     _threads.emplace_back(std::make_unique<PPUThread>(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
     _rsx.reset(new Rsx());

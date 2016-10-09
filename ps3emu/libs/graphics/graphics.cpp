@@ -6,9 +6,6 @@
 #include <stdexcept>
 
 void Window::init() {
-    if (!glfwInit()) {
-        throw std::runtime_error("glfw initialization failed");
-    }
     _window = glfwCreateWindow(width(), height(), "ps3emu", NULL, NULL);
     if (!_window) {
         throw std::runtime_error("window creation failed");

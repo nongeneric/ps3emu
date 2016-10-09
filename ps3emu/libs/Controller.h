@@ -57,7 +57,15 @@ typedef struct CellPadData{
   big_uint16_t button[CELL_PAD_MAX_CODES];
 } CellPadData;
 
+#define CELL_PAD_ACTUATOR_MAX   (2)
+typedef struct CellPadActParam
+{
+    uint8_t motor[CELL_PAD_ACTUATOR_MAX];
+    uint8_t reserved[6];
+} CellPadActParam;
+
 int32_t cellMouseInit(uint32_t max_connect);
 int32_t cellMouseEnd();
 int32_t cellMouseGetInfo(CellMouseInfo* info);
 int32_t cellPadGetData(uint32_t port_no, CellPadData *data);
+int32_t cellPadSetActDirect(uint32_t port_no, CellPadActParam* param);

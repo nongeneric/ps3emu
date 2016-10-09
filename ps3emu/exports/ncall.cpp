@@ -254,6 +254,7 @@ NCallEntry ncallTable[] {
     ENTRY(sys_lwcond_signal_all),
     ENTRY(cellSpursInitializeWithAttribute2),
     ENTRY(cellSpursFinalize),
+    ENTRY(cellPadSetActDirect),
 };
 
 void PPUThread::ncall(uint32_t index) {
