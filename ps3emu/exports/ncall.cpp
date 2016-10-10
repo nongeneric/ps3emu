@@ -19,6 +19,7 @@
 #include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/libs/audio/configuration.h"
 #include "ps3emu/libs/audio/libaudio.h"
+#include "ps3emu/libs/message.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <openssl/sha.h>
@@ -255,6 +256,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellSpursInitializeWithAttribute2),
     ENTRY(cellSpursFinalize),
     ENTRY(cellPadSetActDirect),
+    ENTRY(cellMsgDialogOpen2),
 };
 
 void PPUThread::ncall(uint32_t index) {

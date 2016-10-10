@@ -21,6 +21,7 @@ pkg_search_module(SQLITE3 REQUIRED sqlite3)
 pkg_search_module(CRYPTO REQUIRED libcrypto)
 pkg_search_module(PNG REQUIRED libpng)
 pkg_search_module(ZLIB REQUIRED zlib)
+pkg_search_module(FREETYPE2 REQUIRED freetype2)
 
 include_directories(SYSTEM ps3emu/libs/graphics/GL/include)
 #-fsanitize=undefined
@@ -43,6 +44,7 @@ include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_TARGET_COMMON_INCLUDE})
 include_directories(SYSTEM thirdparty/cereal/include)
+include_directories(SYSTEM ${FREETYPE2_INCLUDE_DIRS})
 
 add_subdirectory(ps3emu)
 add_subdirectory(dbg-gui)

@@ -17,7 +17,8 @@
 #include <fstream>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/range/algorithm.hpp>
-#include "../libs/graphics/graphics.h"
+#include "ps3emu/libs/graphics/graphics.h"
+#include "ps3emu/libs/message.h"
 
 #include "FragmentShaderUpdateFunctor.h"
 #include "RsxContext.h"
@@ -628,6 +629,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->framebuffer->bindDefault();
     if (tex) {
         _context->textureRenderer->render(tex);
+        emuMessageDraw(tex->width(), tex->height());
     }
     _context->pipeline.bind();
     

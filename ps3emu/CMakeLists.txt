@@ -76,6 +76,7 @@ set(SRC
     libs/graphics/sysutil_sysparam.cpp
     libs/graphics/graphics.cpp
     libs/graphics/GL/src/glad.c
+    libs/message.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})
@@ -86,6 +87,7 @@ target_link_libraries(ps3emu
     ${SQLITE3_LIBRARIES}
     ${PNG_LIBRARIES}
     ${ZLIB_LIBRARIES}
+    ${FREETYPE2_LIBRARIES}
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvimage/libnvimage.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc7/libbc7.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc6h/libbc6h.a

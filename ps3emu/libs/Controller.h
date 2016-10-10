@@ -12,6 +12,34 @@ using namespace boost::endian;
 
 #define CELL_PAD_MAX_PORT_NUM (7)
 
+enum GlfwDS4Buttons {
+    GLFW_DS4_BUTTON_SQUARE = 0,
+    GLFW_DS4_BUTTON_CROSS,
+    GLFW_DS4_BUTTON_CIRCLE,
+    GLFW_DS4_BUTTON_TRIANGLE,
+    GLFW_DS4_BUTTON_L1,
+    GLFW_DS4_BUTTON_R1,
+    GLFW_DS4_BUTTON_L2,
+    GLFW_DS4_BUTTON_R2,
+    GLFW_DS4_BUTTON_SELECT,
+    GLFW_DS4_BUTTON_START,
+    GLFW_DS4_BUTTON_L3,
+    GLFW_DS4_BUTTON_R3,
+    GLFW_DS4_BUTTON_PS,
+    GLFW_DS4_BUTTON_TOUCHPAD
+};
+
+enum GlfwDS4Axes {
+    GLFW_DS4_AXIS_LEFT_X = 0,
+    GLFW_DS4_AXIS_LEFT_Y,
+    GLFW_DS4_AXIS_RIGHT_X,
+    GLFW_DS4_AXIS_L2,
+    GLFW_DS4_AXIS_R2,
+    GLFW_DS4_AXIS_RIGHT_Y,
+    GLFW_DS4_AXIS_LEFT_RIGHT,
+    GLFW_DS4_AXIS_DOWN_UP
+};
+
 typedef struct CellPadInfo2 {
     big_uint32_t max_connect;
     big_uint32_t now_connect;

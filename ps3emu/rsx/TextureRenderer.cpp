@@ -38,14 +38,14 @@ TextureRenderer::TextureRenderer() {
 }
 
 void TextureRenderer::render(GLSimpleTexture* tex) {
-    glcall(glEnableVertexAttribArray(0));
-    glcall(glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0));
-    glcall(glVertexAttribBinding(0, 0));
-    glcall(glBindVertexBuffer(0, _buffer.handle(), 0, sizeof(glm::vec2)));
+    glEnableVertexAttribArray(0);
+    glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0);
+    glVertexAttribBinding(0, 0);
+    glBindVertexBuffer(0, _buffer.handle(), 0, sizeof(glm::vec2));
 
     auto samplerIndex = 20;
-    glcall(glBindTextureUnit(samplerIndex, tex->handle()));
-    glcall(glBindSampler(samplerIndex, _sampler.handle()));
+    glBindTextureUnit(samplerIndex, tex->handle());
+    glBindSampler(samplerIndex, _sampler.handle());
     glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     _pipeline.bind();
@@ -53,9 +53,9 @@ void TextureRenderer::render(GLSimpleTexture* tex) {
     glDisable(GL_CULL_FACE);
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_DEPTH_TEST);
-    glcall(glViewport(0, 0, tex->width(), tex->height()));
-    glcall(glDepthRange(0, 1));
-    glcall(glDrawArrays(GL_TRIANGLES, 0, 6));
+    glViewport(0, 0, tex->width(), tex->height());
+    glDepthRange(0, 1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     // TODO: restore vertex attrib if required
     // TODO: restore cullFace if required
