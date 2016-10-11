@@ -14,19 +14,10 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
-
 namespace {
     using u32_string = std::basic_string<uint32_t>;
     
     struct Context {
-        bool shown = false;
-        uint32_t type;
-        u32_string message;
-        std::string u8message;
-        uint32_t callback = 0;
-        uint32_t userData;
-        int controller;
-        uint32_t result;
         GLProgramPipeline pipeline;
         VertexShader vertexShader;
         FragmentShader fragmentShader;
@@ -39,6 +30,14 @@ namespace {
         FT_Face face;
     };
     Context* context = nullptr;
+    bool g_shown = false;
+    uint32_t g_type;
+    u32_string g_message;
+    std::string g_u8message;
+    uint32_t g_callback = 0;
+    uint32_t g_userData;
+    int g_controller;
+    uint32_t g_result;
 }
 
 #define CELL_MSGDIALOG_TYPE_BUTTON_TYPE_NONE (0 << 4)
@@ -135,18 +134,17 @@ int32_t cellMsgDialogOpen2(uint32_t type,
                            uint32_t extParam) {
     INFO(libs) << ssnprintf("cellMsgDialogOpen2(\"%s\")", msgString.str);
     assert(extParam == 0);
-    initContext();
-    context->shown = true;
-    context->type = type;
+    g_shown = true;
+    g_type = type;
 //     using iter_t = boost::u8_to_u32_iterator<typename std::string::iterator>;
 //     iter_t it(msgString.str.begin(), msgString.str.begin(), msgString.str.end());
 //     context->message = u32_string(it, iter_t());
-    context->u8message = msgString.str;
-    context->callback = func;
-    context->userData = userData;
+    g_u8message = msgString.str;
+    g_callback = func;
+    g_userData = userData;
     for (int i = 0; i < GLFW_JOYSTICK_LAST; ++i) {
         if (glfwJoystickPresent(i)) {
-            context->controller = i;
+            g_controller = i;
             break;
         }
     }
@@ -202,26 +200,31 @@ void drawText(float x, float y, float width, float height, std::string text) {
 
 void emuMessageDraw(uint32_t width, uint32_t height) {
     initContext();
-    if (!context->shown)
+    if (!g_shown)
         return;
     
     int buttonCount;
-    auto buttons = glfwGetJoystickButtons(context->controller, &buttonCount);
+    auto buttons = glfwGetJoystickButtons(g_controller, &buttonCount);
     assert(buttonCount > GLFW_DS4_BUTTON_TOUCHPAD);
     bool isCross = buttons[GLFW_DS4_BUTTON_CROSS];
     bool isCircle = buttons[GLFW_DS4_BUTTON_CIRCLE];
-    if ((context->type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) && (isCross || isCircle)) {
-        context->shown = false;
-        context->result = CELL_MSGDIALOG_BUTTON_OK;
-    }
-    
-    if (context->type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_YESNO) {
+    if (g_type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) {
+        if (isCross || isCircle) {
+            g_shown = false;
+            g_result = CELL_MSGDIALOG_BUTTON_OK;
+        }
+    } else if (g_type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_YESNO) {
         if (isCross) {
-            context->shown = false;
-            context->result = CELL_MSGDIALOG_BUTTON_YES;
+            g_shown = false;
+            g_result = CELL_MSGDIALOG_BUTTON_YES;
         } else if (isCircle) {
-            context->shown = false;
-            context->result = CELL_MSGDIALOG_BUTTON_NO;
+            g_shown = false;
+            g_result = CELL_MSGDIALOG_BUTTON_NO;
+        }
+    } else {
+        if (isCircle) {
+            g_shown = false;
+            g_result = CELL_MSGDIALOG_BUTTON_NONE;
         }
     }
     
@@ -262,18 +265,38 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
     glVertexAttribBinding(1, 1);
     glBindVertexBuffer(1, context->textVerticesBuffer, 0, sizeof(float) * 4);
     
-    drawText(-0.8f, 0.3f, width, height, context->u8message);
-    if (context->type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) {
+    drawText(-0.8f, 0.3f, width, height, g_u8message);
+    if (g_type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) {
         drawText(0.8, -0.3, width, height, "[OK]");
-    } else if (context->type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_YESNO) {
+    } else if (g_type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_YESNO) {
         drawText(0.8, -0.3, width, height, "[YES / NO]");
     }
 }
 
+int32_t cellMsgDialogProgressBarSetMsg(uint32_t progressbarIndex,
+                                       cstring_ptr_t msgString) {
+    return CELL_OK;
+}
+
+int32_t cellMsgDialogClose(float delayTime) {
+    g_shown = false;
+    return CELL_OK;
+}
+
+int32_t cellMsgDialogProgressBarInc(uint32_t progressbarIndex, uint32_t delta) {
+    return CELL_OK;
+}
+
+int32_t cellMsgDialogAbort() {
+    g_shown = false;
+    g_callback = 0;
+    return CELL_OK;
+}
+
 boost::optional<MessageCallbackInfo> emuMessageFireCallback() {
-    if (!context->shown && context->callback) {
-        MessageCallbackInfo info{context->callback, {context->result, context->userData}};
-        context->callback = 0;
+    if (!g_shown && g_callback) {
+        MessageCallbackInfo info{g_callback, {g_result, g_userData}};
+        g_callback = 0;
         return info;
     }
     return {};

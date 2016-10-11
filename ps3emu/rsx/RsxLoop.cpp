@@ -158,26 +158,26 @@ int64_t Rsx::interpret(uint32_t get) {
     };
     
     if (header.val == 0) {
-        LOG << "rsx nop";
+        INFO(rsx) << "rsx nop";
         return 4;
     }
     if (header.prefix.u() == 1) {
         auto offset = header.jumpoffset.u();
         if (offset != get) { // don't log on busy wait
-            LOG << ssnprintf("rsx jump to %x", offset);
+            INFO(rsx) << ssnprintf("rsx jump to %x", offset);
         }
         return offset - get;
     }
     if (header.callsuffix.u() == 2) {
         auto offset = header.calloffset.u() << 2;
         _ret = get + 4;
-        LOG << ssnprintf("rsx call to %x", offset);
+        INFO(rsx) << ssnprintf("rsx call to %x", offset);
         return offset - get;
     }
     if (header.val == 0x20000) {
-        LOG << ssnprintf("rsx ret to %x", _ret.load());
+        INFO(rsx) << ssnprintf("rsx ret to %x", _ret.load());
         if (!_get) {
-            LOG << "rsx ret to 0, command buffer corruption is likely";
+            INFO(rsx) << "rsx ret to 0, command buffer corruption is likely";
         }
         auto offset = _ret - get;
         _ret = 0;
@@ -1585,7 +1585,7 @@ int64_t Rsx::interpret(uint32_t get) {
                 );
                 break;
             }
-            LOG << ssnprintf("illegal method offset %x", offset);
+            ERROR(rsx) << ssnprintf("illegal method offset %x", offset);
         }
     }
     if (name) {
@@ -1623,7 +1623,7 @@ void Rsx::loop() {
     _ref = 0xffffffff;
     _isFlipInProgress = false;
     log_set_thread_name("rsx_loop");
-    LOG << "rsx loop started, waiting for updates";
+    INFO(rsx) << "rsx loop started, waiting for updates";
     if (_mode == RsxOperationMode::Replay) {
         replayLoop();
     } else {
@@ -1636,7 +1636,7 @@ void Rsx::runLoop() {
     boost::unique_lock<boost::mutex> lock(_mutex);
     for (;;) {
         _cv.wait(lock);
-        LOG << "rsx loop update received";
+        INFO(rsx) << "rsx loop update received";
         while (_get != _put || _ret) {
             _get += interpret(_get);
         }

@@ -20,6 +20,7 @@
 #include "ps3emu/libs/audio/configuration.h"
 #include "ps3emu/libs/audio/libaudio.h"
 #include "ps3emu/libs/message.h"
+#include "ps3emu/libs/trophy.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <openssl/sha.h>
@@ -257,6 +258,22 @@ NCallEntry ncallTable[] {
     ENTRY(cellSpursFinalize),
     ENTRY(cellPadSetActDirect),
     ENTRY(cellMsgDialogOpen2),
+    ENTRY(cellMsgDialogProgressBarSetMsg),
+    ENTRY(cellMsgDialogClose),
+    ENTRY(cellMsgDialogProgressBarInc),
+    ENTRY(cellMsgDialogAbort),
+    ENTRY(sceNpTrophyInit),
+    ENTRY(sceNpTrophyTerm),
+    ENTRY(sceNpTrophyCreateContext),
+    ENTRY(sceNpTrophyDestroyContext),
+    ENTRY(sceNpTrophyCreateHandle),
+    ENTRY(sceNpTrophyRegisterContext),
+    ENTRY(sceNpTrophyUnlockTrophy),
+    ENTRY(sceNpTrophyGetGameInfo),
+    ENTRY(sceNpTrophyGetTrophyInfo),
+    ENTRY(sceNpTrophyGetGameIcon),
+    ENTRY(sceNpTrophyGetTrophyIcon),
+    ENTRY(sceNpTrophyGetGameProgress),
 };
 
 void PPUThread::ncall(uint32_t index) {

@@ -1,29 +1,31 @@
 #include "libsysutil.h"
 #include "../MainMemory.h"
 #include "../ContentManager.h"
+#include "ps3emu/libs/message.h"
+#include "ps3emu/libs/trophy.h"
 #include "assert.h"
 #include "../log.h"
 #include "../state.h"
 
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_LANG                                                        (0x0111)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_ENTER_BUTTON_ASSIGN                         (0x0112)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_NICKNAME                                            (0x0113)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_DATE_FORMAT                                         (0x0114)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_TIME_FORMAT                                         (0x0115)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_TIMEZONE                                            (0x0116)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_SUMMERTIME                                          (0x0117)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_GAME_PARENTAL_LEVEL                         (0x0121)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_GAME_PARENTAL_LEVEL0_RESTRICT       (0x0123)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_INTERNET_BROWSER_START_RESTRICT     (0x0125)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_CURRENT_USERNAME                            (0x0131)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_CURRENT_USER_HAS_NP_ACCOUNT         (0x0141)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_CAMERA_PLFREQ                                       (0x0151)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_RUMBLE                                          (0x0152)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_KEYBOARD_TYPE                                       (0x0153)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_JAPANESE_KEYBOARD_ENTRY_METHOD      (0x0154)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_CHINESE_KEYBOARD_ENTRY_METHOD       (0x0155)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_AUTOOFF                                         (0x0156)
-#define CELL_SYSUTIL_SYSTEMPARAM_ID_MAGNETOMETER                                        (0x0157)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_LANG (0x0111)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_ENTER_BUTTON_ASSIGN (0x0112)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_NICKNAME (0x0113)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_DATE_FORMAT (0x0114)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_TIME_FORMAT (0x0115)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_TIMEZONE (0x0116)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_SUMMERTIME (0x0117)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_GAME_PARENTAL_LEVEL (0x0121)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_GAME_PARENTAL_LEVEL0_RESTRICT (0x0123)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_INTERNET_BROWSER_START_RESTRICT (0x0125)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_CURRENT_USERNAME (0x0131)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_CURRENT_USER_HAS_NP_ACCOUNT (0x0141)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_CAMERA_PLFREQ (0x0151)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_RUMBLE (0x0152)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_KEYBOARD_TYPE (0x0153)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_JAPANESE_KEYBOARD_ENTRY_METHOD (0x0154)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_CHINESE_KEYBOARD_ENTRY_METHOD (0x0155)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_AUTOOFF (0x0156)
+#define CELL_SYSUTIL_SYSTEMPARAM_ID_MAGNETOMETER (0x0157)
 
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata) {
     // TODO: implement for handling game termination
@@ -31,7 +33,27 @@ int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_ui
 }
 
 int32_t cellSysutilCheckCallback() {
-    // TODO: implement for handling game termination
+    auto r2 = g_state.th->getGPR(2);
+    auto messageCallback = emuMessageFireCallback();
+    if (messageCallback) {
+        g_state.th->setGPR(2, g_state.mm->load<4>(messageCallback->va + 4));
+        g_state.th->setGPR(4, messageCallback->args[1]);
+        g_state.th->ps3call(g_state.mm->load<4>(messageCallback->va),
+                            [&] { cellSysutilCheckCallback(); });
+        return messageCallback->args[0];
+    }
+    auto trophyCallback = emuTrophyGetCallback();
+    if (trophyCallback) {
+        g_state.th->setGPR(2, g_state.mm->load<4>(trophyCallback->va + 4));
+        g_state.th->setGPR(4, trophyCallback->args[1]);
+        g_state.th->setGPR(5, trophyCallback->args[2]);
+        g_state.th->setGPR(6, trophyCallback->args[3]);
+        g_state.th->setGPR(7, trophyCallback->args[4]);
+        g_state.th->ps3call(g_state.mm->load<4>(trophyCallback->va),
+                            [&] { cellSysutilCheckCallback(); });
+        return trophyCallback->args[0];
+    }
+    g_state.th->setGPR(2, r2);
     return CELL_OK;
 }
 

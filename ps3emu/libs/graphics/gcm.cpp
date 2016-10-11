@@ -250,7 +250,6 @@ void setFlipCommand(Process* proc, uint32_t contextEa, uint32_t label, uint32_t 
 }
 
 emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer, Process* proc) {
-    INFO(libs) << __FUNCTION__;
     setFlipCommand(proc, context, -1, 0, buffer);
     return emu_void;
 }

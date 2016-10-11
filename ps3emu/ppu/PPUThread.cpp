@@ -175,6 +175,7 @@ struct CallStub {
 };
 
 void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
+    INFO(libs) << ssnprintf("ps3call: %x", va);
     _ps3calls.push({getNIP(), getLR(), then});
     
     uint32_t stubVa;

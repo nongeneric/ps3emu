@@ -156,6 +156,16 @@ void MainWindow::setupMenu() {
         settings->addAction(action);
     }
     {
+        auto action = new QAction("Log RSX", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().LogRsx);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().LogRsx = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
         auto action = new QAction("Log Dates", this);
         action->setCheckable(true);
         action->setChecked(g_config.config().LogDates);

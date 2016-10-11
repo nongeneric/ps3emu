@@ -32,7 +32,7 @@ void Tracer::trace(uint32_t frame,
     for (auto& arg : args) {
         argStr += ssnprintf("%s:%s ", arg.name, printArgHex(arg));
     }
-    LOG << printCommandId(command) + argStr;
+    INFO(rsx) << printCommandId(command) + argStr;
     
     GcmCommand gcmCommand;
     gcmCommand.frame = frame;

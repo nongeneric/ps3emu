@@ -77,6 +77,7 @@ set(SRC
     libs/graphics/graphics.cpp
     libs/graphics/GL/src/glad.c
     libs/message.cpp
+    libs/trophy.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})
@@ -95,4 +96,5 @@ target_link_libraries(ps3emu
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvcore/libnvcore.a
     pthread
     dl
+    pugixml
 )

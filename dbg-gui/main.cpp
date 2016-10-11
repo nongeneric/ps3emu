@@ -13,8 +13,8 @@ int main(int argc, char *argv[]) {
     g_config.load();
     log_init(log_file | log_console,
              log_info,
-             (g_config.config().LogSpu ? log_spu : 0) | log_rsx | log_libs |
-                 log_debugger,
+             (g_config.config().LogSpu ? log_spu : 0) |
+                 (g_config.config().LogRsx ? log_rsx : 0) | log_libs | log_debugger,
              g_config.config().LogDates);
     log_set_thread_name("dbg_main");
     if (g_config.config().EnableSpursTrace) {
