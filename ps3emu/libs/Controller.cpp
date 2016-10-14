@@ -134,6 +134,8 @@ int32_t cellPadGetData(uint32_t port_no, CellPadData* data) {
     if (!buttons || !axes)
         return CELL_PAD_ERROR_NO_DEVICE;
     
+    memset(data->button, 0, sizeof(CellPadData));
+    
     data->len = 8;
     data->button[0] = 0;
     data->button[1] = (7 << 4) | (data->len / 2);
