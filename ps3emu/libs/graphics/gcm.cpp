@@ -9,6 +9,8 @@
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -50,6 +52,8 @@ struct {
 } emuGcmState;
 
 struct OffsetTable {
+    boost::mutex _m;
+    
     OffsetTable() {
         for (auto& i : ioAddress) {
             i = 0xffff;
@@ -69,6 +73,7 @@ struct OffsetTable {
     std::array<uint16_t, 511> mapPageCount;
     
     uint32_t eaToOffset(uint32_t ea) {
+        boost::lock_guard<boost::mutex> lock(_m);
         auto ioIdx = ioAddress[ea >> 20];
         if (ioIdx == 0xffff)
             throw std::exception();
@@ -76,11 +81,13 @@ struct OffsetTable {
     }
     
     uint32_t offsetToEa(uint32_t offset) {
+        boost::lock_guard<boost::mutex> lock(_m);
         assert(eaAddress[offset >> 20] != 0xffff);
         return ((uint32_t)eaAddress[offset >> 20] << 20) | ((offset << 12) >> 12);
     }
     
     void unmapEa(uint32_t ea) {
+        boost::lock_guard<boost::mutex> lock(_m);
         ea >>= 20;
         auto io = ioAddress[ea];
         assert(io != 0xffff);
@@ -99,6 +106,8 @@ struct OffsetTable {
     }
     
     void map(uint32_t ea, uint32_t io, uint32_t size) {
+        INFO(rsx) << ssnprintf("mapping ea %08x to io %08x of size %08x", ea, io, size);
+        boost::lock_guard<boost::mutex> lock(_m);
         auto pages = size / DefaultMainMemoryPageSize;
         auto ioIndex = io >> 20;
         auto eaIndex = ea >> 20;
@@ -237,10 +246,13 @@ emu_void_t cellGcmResetFlipStatus(Process* proc) {
     return emu_void;
 }
 
-void setFlipCommand(Process* proc, uint32_t contextEa, uint32_t label, uint32_t labelValue, uint32_t buffer) {
+void setFlipCommand(uint32_t contextEa, uint32_t label, uint32_t labelValue, uint32_t buffer) {
     auto context = (TargetCellGcmContextData*)g_state.mm->getMemoryPointer(
         contextEa, sizeof(TargetCellGcmContextData));
-    assert(context->end - context->current >= 4);
+    if (context->end - context->current <= 16) {
+        ERROR(rsx) << "not enough space for EmuFlip in the buffer";
+        exit(1);
+    }
     uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
     g_state.mm->store<4>(context->current, header);
     g_state.mm->store<4>(context->current + 4, buffer);
@@ -249,8 +261,8 @@ void setFlipCommand(Process* proc, uint32_t contextEa, uint32_t label, uint32_t 
     context->current += 4 * sizeof(uint32_t);
 }
 
-emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer, Process* proc) {
-    setFlipCommand(proc, context, -1, 0, buffer);
+emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer) {
+    setFlipCommand(context, -1, 0, buffer);
     return emu_void;
 }
 
@@ -277,10 +289,10 @@ int32_t cellGcmSetTileInfo(uint8_t index,
     return CELL_OK;
 }
 
-uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, Process* proc) {
+uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
     assert(false);
     INFO(libs) << __FUNCTION__;
-    setFlipCommand(proc, 0, labelindex, labelvalue, id);
+    setFlipCommand(0, labelindex, labelvalue, id);
     return CELL_OK;
 }
 
@@ -329,7 +341,7 @@ emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
 
 uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) {
     uint32_t k32 = 32 * 1024;
-    assert(emuGcmState.defaultCommandBufferSize % k32 == 0);
+    //assert(emuGcmState.defaultCommandBufferSize % k32 == 0);
     auto ioBase = emuGcmState.offsetTable->offsetToEa(0);
     uint32_t nextBuffer = data->end + 4;
     uint32_t nextSize;
@@ -342,23 +354,25 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     }
     
     g_state.rsx->setPut(data->current - ioBase);
-    while ((g_state.rsx->getGet() > nextBuffer - ioBase &&
-           g_state.rsx->getGet() < nextBuffer - ioBase + nextSize) ||
-           g_state.rsx->isCallActive()) {
+    while (data->current - ioBase != g_state.rsx->getGet()) {
         sys_timer_usleep(20);
     }
     
     g_state.rsx->encodeJump(data->current, nextBuffer - ioBase);
     
-    INFO(libs) <<
-        ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, jump = %x, dest = %x, defsize = %x)",
-            nextSize, nextBuffer - ioBase, data->current - ioBase, nextBuffer - ioBase, 
-            emuGcmState.defaultCommandBufferSize
-        );
+    INFO(libs) << ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, "
+                            "jump = %x, dest = %x, defsize = %x, count = %x)",
+                            nextSize,
+                            nextBuffer - ioBase,
+                            data->current - ioBase,
+                            nextBuffer - ioBase,
+                            emuGcmState.defaultCommandBufferSize,
+                            count);
     
     data->begin = nextBuffer;
     data->current = nextBuffer;
     data->end = nextBuffer + nextSize - 4;
+    assert(data->end - ioBase < emuGcmState.defaultCommandBufferSize);
     return CELL_OK;
 }
 

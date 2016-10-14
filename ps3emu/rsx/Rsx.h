@@ -146,8 +146,8 @@ class Rsx {
     static RsxOperationMode _mode;
     uint32_t _get = 0;
     uint32_t _put = 0;
-    std::atomic<uint32_t> _ref;
-    std::atomic<uint32_t> _ret;
+    uint32_t _ref = 0;
+    uint32_t _ret = 0;
     std::atomic<bool> _isFlipInProgress;
     std::atomic<uint32_t> _lastFlipTime;
     bool _shutdown = false;

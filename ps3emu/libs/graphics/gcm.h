@@ -55,7 +55,7 @@ ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index);
 uint32_t cellGcmGetFlipStatus(Process* proc);
 emu_void_t cellGcmSetFlipStatus(Process* proc);
 emu_void_t cellGcmResetFlipStatus(Process* proc);
-emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer, Process* proc);
+emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer);
 uint32_t cellGcmGetTiledPitchSize(uint32_t size);
 int32_t cellGcmSetTileInfo(uint8_t index,
                            uint8_t location,
@@ -65,7 +65,7 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint8_t comp,
                            uint16_t base,
                            uint8_t bank);
-uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue, Process* proc);
+uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue);
 int32_t cellGcmBindTile(uint8_t index);
 int32_t cellGcmUnbindTile(uint8_t index);
 int32_t cellGcmBindZcull(uint8_t index,

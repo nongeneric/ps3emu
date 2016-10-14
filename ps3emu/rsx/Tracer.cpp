@@ -1,7 +1,9 @@
 #include "Tracer.h"
 
 #include "string.h"
-#include "../log.h"
+#include "ps3emu/log.h"
+#include "ps3emu/state.h"
+#include "ps3emu/rsx/Rsx.h"
 
 void Tracer::enable() {
     _enabled = true;
@@ -32,8 +34,11 @@ void Tracer::trace(uint32_t frame,
     for (auto& arg : args) {
         argStr += ssnprintf("%s:%s ", arg.name, printArgHex(arg));
     }
-    INFO(rsx) << printCommandId(command) + argStr;
-    
+    INFO(rsx) << ssnprintf("%08x/%08x | %s%s",
+                           g_state.rsx->getGet(),
+                           g_state.rsx->getPut(),
+                           printCommandId(command),
+                           argStr);
     GcmCommand gcmCommand;
     gcmCommand.frame = frame;
     gcmCommand.num = num;

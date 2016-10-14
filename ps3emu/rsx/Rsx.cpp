@@ -70,10 +70,10 @@ void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
         this->waitForIdle();
     }
     auto offset = index * 0x10;
-    INFO(rsx) << ssnprintf("setting rsx label at offset %x", offset);
-    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
-    auto atomic = (std::atomic<uint32_t>*)ptr;
-    atomic->store(boost::endian::native_to_big(value));
+    INFO(rsx) << ssnprintf("setting rsx label at offset %x (%08x)",
+                           offset,
+                           GcmLabelBaseOffset + offset);
+    g_state.mm->store<4>(GcmLabelBaseOffset + offset, value);
 }
 
 void Rsx::ChannelSetContextDmaSemaphore(uint32_t handle) {
@@ -87,32 +87,26 @@ void Rsx::ChannelSemaphoreOffset(uint32_t offset) {
 void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     auto offset = _semaphores[_activeSemaphoreHandle];
     INFO(rsx) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
-        _activeSemaphoreHandle, offset, value
+        _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
-    auto atomic = (std::atomic<uint32_t>*)ptr;
-    while (boost::endian::big_to_native(atomic->load()) != value) ;
+    while (g_state.mm->load<4>(GcmLabelBaseOffset + offset) != value) ;
     INFO(rsx) << ssnprintf("acquired");
 }
 
 void Rsx::SemaphoreRelease(uint32_t value) {
     auto offset = _semaphores[_activeSemaphoreHandle];
     INFO(rsx) << ssnprintf("releasing semaphore %x at offset %x with value %x",
-        _activeSemaphoreHandle, offset, value
+        _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
-    auto atomic = (std::atomic<uint32_t>*)ptr;
-    atomic->store(boost::endian::native_to_big(value));
+    g_state.mm->store<4>(GcmLabelBaseOffset + offset, value);
 }
 
 void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
     auto offset = _context->semaphoreOffset;
     INFO(rsx) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
-        _activeSemaphoreHandle, offset, value
+        _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    auto ptr = g_state.mm->getMemoryPointer(GcmLabelBaseOffset + offset, sizeof(uint32_t));
-    auto atomic = (std::atomic<uint32_t>*)ptr;
-    atomic->store(boost::endian::native_to_big(value));
+    g_state.mm->store<4>(GcmLabelBaseOffset + offset, value);
 }
 
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -620,7 +614,6 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
         auto it = br::find_if(_context->surfaceLinks, [&](auto& link) {
             return link.framebufferEa == va;
         });
-        //assert(it != end(_context->surfaceLinks));
         if (it != end(_context->surfaceLinks)) {
             key.offset = it->surfaceEa;
             tex = _context->framebuffer->findTexture(key).texture;

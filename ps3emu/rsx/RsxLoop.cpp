@@ -175,7 +175,7 @@ int64_t Rsx::interpret(uint32_t get) {
         return offset - get;
     }
     if (header.val == 0x20000) {
-        INFO(rsx) << ssnprintf("rsx ret to %x", _ret.load());
+        INFO(rsx) << ssnprintf("rsx ret to %x", _ret);
         if (!_get) {
             INFO(rsx) << "rsx ret to 0, command buffer corruption is likely";
         }
@@ -1599,6 +1599,7 @@ int64_t Rsx::interpret(uint32_t get) {
 
 void Rsx::setPut(uint32_t put) {
     boost::unique_lock<boost::mutex> lock(_mutex);
+    INFO(rsx) << ssnprintf("setting put = %x", put);
     _put = put;
     _cv.notify_all();
 }
@@ -1610,11 +1611,14 @@ void Rsx::setGet(uint32_t get) {
 }
 
 uint32_t Rsx::getRef() {
+    boost::unique_lock<boost::mutex> lock(_mutex);
     return _ref;
 }
 
 void Rsx::setRef(uint32_t ref) {
+    boost::unique_lock<boost::mutex> lock(_mutex);
     _ref = ref;
+    _cv.notify_all();
 }
 
 void Rsx::loop() {

@@ -123,12 +123,16 @@ enum CellPadButtonDataOffset {
     CELL_PAD_BTN_OFFSET_SENSOR_G       = 23
 };
 
+#define CELL_PAD_ERROR_NO_DEVICE 0x80121107
 #define FLOAT2INT(x) (uint16_t)((x + 1.f) / 2.f * 255.f)
 
 int32_t cellPadGetData(uint32_t port_no, CellPadData* data) {
     int buttonCount, axesCount;
     auto buttons = glfwGetJoystickButtons(port_no, &buttonCount);
     auto axes = glfwGetJoystickAxes(port_no, &axesCount);
+    
+    if (!buttons || !axes)
+        return CELL_PAD_ERROR_NO_DEVICE;
     
     data->len = 8;
     data->button[0] = 0;
