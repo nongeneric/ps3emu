@@ -1,0 +1,35 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample_lfqueue", "sample_lfqueue.vcxproj", "{F8431C12-E82C-4204-A813-663E94BF231E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "task_lfqueue.spu", "task\task_lfqueue.spu.vcxproj", "{8300A68F-856E-4F8E-83F0-B22A9A6D4681}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F8431C12-E82C-4204-A813-663E94BF231E}.Debug|PS3.ActiveCfg = Debug|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.Debug|PS3.Build.0 = Debug|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.Release|PS3.ActiveCfg = Release|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.Release|PS3.Build.0 = Release|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{F8431C12-E82C-4204-A813-663E94BF231E}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.Debug|PS3.ActiveCfg = Debug|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.Debug|PS3.Build.0 = Debug|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.Release|PS3.ActiveCfg = Release|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.Release|PS3.Build.0 = Release|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.SNC Debug|PS3.ActiveCfg = Debug|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.SNC Debug|PS3.Build.0 = Debug|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.SNC Release|PS3.ActiveCfg = Release|PS3
+		{8300A68F-856E-4F8E-83F0-B22A9A6D4681}.SNC Release|PS3.Build.0 = Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

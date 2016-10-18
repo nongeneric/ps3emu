@@ -1,5 +1,6 @@
 #include "MainWindowModel.h"
 #include "ps3emu/log.h"
+#include <GLFW/glfw3.h>
 #include <QApplication>
 #include <QMainWindow>
 #include <boost/program_options.hpp>
@@ -29,6 +30,10 @@ int main(int argc, char *argv[]) {
         std::cout << e.what() << "\n\n";
         std::cout << consoleDescr;
         return 1;
+    }
+    
+    if (!glfwInit()) {
+        throw std::runtime_error("glfw initialization failed");
     }
     
     QApplication app(argc, argv);

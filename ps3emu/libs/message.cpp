@@ -7,6 +7,7 @@
 #include "ps3emu/rsx/GLSampler.h"
 #include "ps3emu/rsx/GLBuffer.h"
 #include "ps3emu/rsx/GLTexture.h"
+#include "libsysutil.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <assert.h>
@@ -228,6 +229,10 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
         }
     }
     
+    if (!g_shown) {
+        emuCallback(g_callback, { g_result, g_userData }, false);
+    }
+    
     glEnableVertexAttribArray(0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0);
@@ -280,6 +285,7 @@ int32_t cellMsgDialogProgressBarSetMsg(uint32_t progressbarIndex,
 
 int32_t cellMsgDialogClose(float delayTime) {
     g_shown = false;
+    emuCallback(g_callback, { g_result, g_userData }, false);
     return CELL_OK;
 }
 
@@ -289,15 +295,5 @@ int32_t cellMsgDialogProgressBarInc(uint32_t progressbarIndex, uint32_t delta) {
 
 int32_t cellMsgDialogAbort() {
     g_shown = false;
-    g_callback = 0;
     return CELL_OK;
-}
-
-boost::optional<MessageCallbackInfo> emuMessageFireCallback() {
-    if (!g_shown && g_callback) {
-        MessageCallbackInfo info{g_callback, {g_result, g_userData}};
-        g_callback = 0;
-        return info;
-    }
-    return {};
 }

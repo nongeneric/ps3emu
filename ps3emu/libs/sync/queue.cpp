@@ -100,14 +100,15 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
     // TODO: handle timeout
     //assert(timeout == 0);
     auto info = queues.get(equeue_id);
-    INFO(libs) << ssnprintf("sys_event_queue_receive(%s)", info->name);
+    INFO(libs) << ssnprintf("sys_event_queue_receive(%s[%x])", info->name, equeue_id);
     auto event = info->queue->receive(th->priority());
     th->setGPR(4, event.source);
     th->setGPR(5, event.data1);
     th->setGPR(6, event.data2);
     th->setGPR(7, event.data3);
-    INFO(libs) << ssnprintf("completed sys_event_queue_receive(%s): %x, %x, %x, %x",
+    INFO(libs) << ssnprintf("completed sys_event_queue_receive(%s[%x]): %x, %x, %x, %x",
                             info->name,
+                            equeue_id,
                             event.source,
                             event.data1,
                             event.data2,
@@ -122,13 +123,13 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
                                    PPUThread* th)
 {
     auto info = queues.get(equeue_id);
-    INFO(libs) << ssnprintf("sys_event_queue_tryreceive(%s)", info->name);
+    INFO(libs) << ssnprintf("sys_event_queue_tryreceive(%s[%x])", info->name, equeue_id);
     std::vector<sys_event_t> vec(size);
     size_t num;
     info->queue->tryReceive(&vec[0], vec.size(), &num);
     *number = num;
     g_state.mm->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
-    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%s)", info->name);
+    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%s[%x])", info->name, equeue_id);
     return CELL_OK;
 }
 
@@ -236,8 +237,8 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        uint8_t* spup) {
     auto info = queues.get(eq);
     INFO(libs) << ssnprintf("sys_spu_thread_group_connect_event_all_threads"
-                            "(group=%d, queue=%s, req=%016llx)", 
-                            group_id, info->name, req);
+                            "(group=%d, queue=%s[%x], req=%016llx)", 
+                            group_id, info->name, eq, req);
     auto group = findThreadGroup(group_id);
     std::vector<std::shared_ptr<SPUThread>> threads;
     std::transform(begin(group->threads), end(group->threads), std::back_inserter(threads), [=](auto id) {

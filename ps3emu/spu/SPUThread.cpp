@@ -31,9 +31,9 @@ void SPUThread::run() {
 #define STOP_TYPE_RESERVE 0x2000
 
 void SPUThread::loop() {
+    log_set_thread_name(ssnprintf("spu_%d", _id));
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
-    log_set_thread_name(ssnprintf("spu_%d", _id));
     
 #ifdef DEBUG
     auto f = fopen(ssnprintf("/tmp/spu_ls_dump_%x.bin", getNip()).c_str(), "w");

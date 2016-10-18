@@ -3,7 +3,10 @@
 #include "../ContentManager.h"
 #include "ps3emu/libs/message.h"
 #include "ps3emu/libs/trophy.h"
+#include "ConcurrentQueue.h"
+#include <future>
 #include "assert.h"
+#include <memory>
 #include "../log.h"
 #include "../state.h"
 
@@ -27,34 +30,48 @@
 #define CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_AUTOOFF (0x0156)
 #define CELL_SYSUTIL_SYSTEMPARAM_ID_MAGNETOMETER (0x0157)
 
+namespace {
+    struct CallbackInfo {
+        uint32_t va;
+        std::vector<uint64_t> args;
+        std::promise<uint64_t> promise;
+    };
+    
+    ConcurrentFifoQueue<std::shared_ptr<CallbackInfo>> callbackQueue(12);
+}
+
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata) {
     // TODO: implement for handling game termination
     return CELL_OK;
 }
 
-int32_t cellSysutilCheckCallback() {
-    auto r2 = g_state.th->getGPR(2);
-    auto messageCallback = emuMessageFireCallback();
-    if (messageCallback) {
-        g_state.th->setGPR(2, g_state.mm->load<4>(messageCallback->va + 4));
-        g_state.th->setGPR(4, messageCallback->args[1]);
-        g_state.th->ps3call(g_state.mm->load<4>(messageCallback->va),
-                            [&] { cellSysutilCheckCallback(); });
-        return messageCallback->args[0];
+int64_t cellSysutilCheckCallback() {
+    std::shared_ptr<CallbackInfo> info;
+    size_t count;
+    callbackQueue.tryReceive(&info, 1, &count);
+    if (!count) {
+        return CELL_OK;
     }
-    auto trophyCallback = emuTrophyGetCallback();
-    if (trophyCallback) {
-        g_state.th->setGPR(2, g_state.mm->load<4>(trophyCallback->va + 4));
-        g_state.th->setGPR(4, trophyCallback->args[1]);
-        g_state.th->setGPR(5, trophyCallback->args[2]);
-        g_state.th->setGPR(6, trophyCallback->args[3]);
-        g_state.th->setGPR(7, trophyCallback->args[4]);
-        g_state.th->ps3call(g_state.mm->load<4>(trophyCallback->va),
-                            [&] { cellSysutilCheckCallback(); });
-        return trophyCallback->args[0];
+    g_state.th->setGPR(2, g_state.mm->load<4>(info->va + 4));
+    for (auto i = 1u; i < info->args.size(); ++i) {
+        g_state.th->setGPR(3 + i, info->args.at(i));
     }
-    g_state.th->setGPR(2, r2);
-    return CELL_OK;
+    g_state.th->ps3call(g_state.mm->load<4>(info->va), [=] {
+        info->promise.set_value(g_state.th->getGPR(3));
+        cellSysutilCheckCallback();
+    });
+    return info->args.at(0);
+}
+
+uint64_t emuCallback(uint32_t va, std::vector<uint64_t> const& args, bool wait) {
+    auto info = std::make_shared<CallbackInfo>();
+    info->va = va;
+    info->args = args;
+    auto future = info->promise.get_future();
+    callbackQueue.send(info);
+    if (wait)
+        return future.get();
+    return 0;
 }
 
 emu_void_t cellGcmSetDebugOutputLevel(int32_t level) {

@@ -21,6 +21,7 @@
 #include "ps3emu/libs/audio/libaudio.h"
 #include "ps3emu/libs/message.h"
 #include "ps3emu/libs/trophy.h"
+#include "ps3emu/libs/savedata.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <openssl/sha.h>
@@ -274,11 +275,20 @@ NCallEntry ncallTable[] {
     ENTRY(sceNpTrophyGetGameIcon),
     ENTRY(sceNpTrophyGetTrophyIcon),
     ENTRY(sceNpTrophyGetGameProgress),
+    ENTRY(sceNpTrophyGetRequiredDiskSpace),
+    ENTRY(sceNpTrophyGetTrophyUnlockState),
+    ENTRY(cellGcmGetTimeStamp),
+    ENTRY(cellSaveDataAutoSave2),
+    ENTRY(cellSaveDataAutoLoad2),
 };
 
 void PPUThread::ncall(uint32_t index) {
-    if (index >= sizeof(ncallTable) / sizeof(NCallEntry))
-        throw std::runtime_error(ssnprintf("unknown ncall index %x", index));
+    //INFO(libs) << ssnprintf("ncall %x", index);
+    if (index >= sizeof(ncallTable) / sizeof(NCallEntry)) {
+        auto msg = ssnprintf("unknown ncall index %x", index);
+        ERROR(libs) << msg;
+        throw std::runtime_error(msg);
+    }
     setNIP(getLR());
     ncallTable[index].stub(this);
 }

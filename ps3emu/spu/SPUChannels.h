@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ps3emu/libs/ConcurrentBoundedQueue.h"
+#include "ps3emu/enum.h"
 #include <stdexcept>
 #include <array>
 #include <atomic>
@@ -8,6 +9,25 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include "stdint.h"
+
+ENUMF(MfcEvent,
+    (MFC_TAG_STATUS_UPDATE_EVENT, 0x00000001),
+    (MFC_LIST_STALL_NOTIFY_EVENT, 0x00000002),
+    (MFC_COMMAND_QUEUE_AVAILABLE_EVENT, 0x00000008),
+    (MFC_IN_MBOX_AVAILABLE_EVENT, 0x00000010),
+    (MFC_DECREMENTER_EVENT, 0x00000020),
+    (MFC_OUT_INTR_MBOX_AVAILABLE_EVENT, 0x00000040),
+    (MFC_OUT_MBOX_AVAILABLE_EVENT, 0x00000080),
+    (MFC_SIGNAL_NOTIFY_2_EVENT, 0x00000100),
+    (MFC_SIGNAL_NOTIFY_1_EVENT, 0x00000200),
+    (MFC_LLR_LOST_EVENT, 0x00000400),
+    (MFC_PRIV_ATTN_EVENT, 0x00000800),
+    (MFC_MULTI_SRC_SYNC_EVENT, 0x00001000))
+
+ENUM(MfcTag,
+    (MFC_TAG_UPDATE_IMMEDIATE, 0x0),
+    (MFC_TAG_UPDATE_ANY, 0x1),
+    (MFC_TAG_UPDATE_ALL, 0x2))
 
 #define X(k, v) k = v,
 #define SpuChannelsX \

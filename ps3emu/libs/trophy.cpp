@@ -4,6 +4,7 @@
 #include "ps3emu/ContentManager.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/log.h"
+#include "libsysutil.h"
 #include "pugixml.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/thread/mutex.hpp>
@@ -11,6 +12,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include <bitset>
 
 using namespace boost::filesystem;
 using namespace pugi;
@@ -45,7 +47,6 @@ struct {
     uint32_t callback = 0;
     uint32_t arg = 0;
     boost::mutex m;
-    uint32_t step = 0;
     path gameImagePath;
     SceNpTrophyGameDetails gameDetails;
     SceNpTrophyGameData gameData;
@@ -207,49 +208,29 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
             case SCE_NP_TROPHY_GRADE_BRONZE: context.gameDetails.numBronze++; break;
         }
     }
-        
-    boost::lock_guard<boost::mutex> lock(context.m);
-    context.step = SCE_NP_TROPHY_STATUS_INSTALLED;
     
-    // TODO: shouldn't return immediately
+    int64_t res = emuCallback(
+        context.callback, {1, SCE_NP_TROPHY_STATUS_INSTALLED, 0, 0, context.arg}, true);
+    assert(res >= 0);
     
+    emuCallback(context.callback,
+                {1, SCE_NP_TROPHY_STATUS_PROCESSING_SETUP, 0, 0, context.arg},
+                true);
+    emuCallback(context.callback,
+                {1,
+                 SCE_NP_TROPHY_STATUS_PROCESSING_PROGRESS,
+                 (uint32_t)context.trophies.size(),
+                 (uint32_t)context.trophies.size(),
+                 context.arg},
+                true);
+    emuCallback(context.callback,
+                {1, SCE_NP_TROPHY_STATUS_PROCESSING_FINALIZE, 0, 0, context.arg},
+                true);
+    emuCallback(context.callback,
+                {1, SCE_NP_TROPHY_STATUS_PROCESSING_COMPLETE, 0, 0, context.arg},
+                true);
+            
     return CELL_OK;
-}
-
-boost::optional<TrophyCallbackInfo> emuTrophyGetCallback() {
-    boost::lock_guard<boost::mutex> lock(context.m);
-    switch (context.step) {
-        case SCE_NP_TROPHY_STATUS_INSTALLED:
-            context.step = SCE_NP_TROPHY_STATUS_PROCESSING_SETUP;
-            return TrophyCallbackInfo{
-                context.callback,
-                {1, SCE_NP_TROPHY_STATUS_INSTALLED, 0, 0, context.arg}};
-        case SCE_NP_TROPHY_STATUS_PROCESSING_SETUP:
-            context.step = SCE_NP_TROPHY_STATUS_PROCESSING_PROGRESS;
-            return TrophyCallbackInfo{
-                context.callback,
-                {1, SCE_NP_TROPHY_STATUS_PROCESSING_SETUP, 0, 0, context.arg}};
-        case SCE_NP_TROPHY_STATUS_PROCESSING_PROGRESS:
-            context.step = SCE_NP_TROPHY_STATUS_PROCESSING_FINALIZE;
-            return TrophyCallbackInfo{context.callback,
-                                      {1,
-                                       SCE_NP_TROPHY_STATUS_PROCESSING_PROGRESS,
-                                       (uint32_t)context.trophies.size(),
-                                       (uint32_t)context.trophies.size(),
-                                       context.arg}};
-        case SCE_NP_TROPHY_STATUS_PROCESSING_FINALIZE:
-            context.step = SCE_NP_TROPHY_STATUS_PROCESSING_COMPLETE;
-            return TrophyCallbackInfo{
-                context.callback,
-                {1, SCE_NP_TROPHY_STATUS_PROCESSING_FINALIZE, 0, 0, context.arg}};
-        case SCE_NP_TROPHY_STATUS_PROCESSING_COMPLETE:
-            context.step = 0;
-            return TrophyCallbackInfo{
-                context.callback,
-                {1, SCE_NP_TROPHY_STATUS_PROCESSING_COMPLETE, 0, context.arg}};
-        default: return {};
-    }
-    return {};
 }
 
 #define SCE_NP_TROPHY_ERROR_CANNOT_UNLOCK_PLATINUM 0x80022914
@@ -259,6 +240,7 @@ int32_t sceNpTrophyUnlockTrophy(SceNpTrophyContext,
                                 SceNpTrophyHandle,
                                 SceNpTrophyId trophyId,
                                 SceNpTrophyId* platinumId) {
+    boost::lock_guard<boost::mutex> lock(context.m);
     auto& trophy = context.trophies.at(trophyId);
     assert(trophy.id == trophyId);
     auto& p = platinum();
@@ -283,6 +265,7 @@ int32_t sceNpTrophyGetGameInfo(SceNpTrophyContext,
                                SceNpTrophyHandle handle,
                                SceNpTrophyGameDetails* details,
                                SceNpTrophyGameData* data) {
+    boost::lock_guard<boost::mutex> lock(context.m);
     updateGameData();
     if (details) {
         *details = context.gameDetails;
@@ -298,6 +281,7 @@ int32_t sceNpTrophyGetTrophyInfo(SceNpTrophyContext,
                                  SceNpTrophyId trophyId,
                                  SceNpTrophyDetails* details,
                                  SceNpTrophyData* data) {
+    boost::lock_guard<boost::mutex> lock(context.m);
     auto& trophy = context.trophies.at(trophyId);
     assert(trophy.id == trophyId);
     if (details) {
@@ -333,6 +317,7 @@ int32_t sceNpTrophyGetGameIcon(SceNpTrophyContext,
     INFO(libs) << ssnprintf("sceNpTrophyGetGameIcon(%s, %x)",
                             context.gameImagePath.string(),
                             buffer);
+    boost::lock_guard<boost::mutex> lock(context.m);
     if (!buffer) {
         *size = file_size(context.gameImagePath);
         return CELL_OK;
@@ -349,6 +334,7 @@ int32_t sceNpTrophyGetTrophyIcon(SceNpTrophyContext,
                                  SceNpTrophyId trophyId,
                                  big_int32_t buffer,
                                  big_int32_t* size) {
+    boost::lock_guard<boost::mutex> lock(context.m);
     auto& trophy = context.trophies.at(trophyId);
     assert(trophy.id == trophyId);
     
@@ -370,7 +356,31 @@ int32_t sceNpTrophyGetTrophyIcon(SceNpTrophyContext,
 int32_t sceNpTrophyGetGameProgress(SceNpTrophyContext,
                                    SceNpTrophyHandle,
                                    big_int32_t* percentage) {
+    boost::lock_guard<boost::mutex> lock(context.m);
     updateGameData();
     *percentage = (float)context.gameData.unlockedTrophies / context.trophies.size();
+    return CELL_OK;
+}
+
+int32_t sceNpTrophyGetRequiredDiskSpace(SceNpTrophyContext,
+                                        SceNpTrophyHandle,
+                                        big_uint64_t* reqspace,
+                                        uint64_t) {
+    *reqspace = 1ull << 20ull;
+    return CELL_OK;
+}
+
+int32_t sceNpTrophyGetTrophyUnlockState(SceNpTrophyContext,
+                                        SceNpTrophyHandle,
+                                        std::array<uint8_t, 16>* flags,
+                                        big_int32_t* count) {
+    boost::lock_guard<boost::mutex> lock(context.m);
+    updateGameData();
+    *count = context.gameData.unlockedTrophies;
+    std::bitset<128> set;
+    for (auto i = 0u; i < 128; ++i) {
+        set[i] = context.trophies[i].unlocked;
+    }
+    memcpy(flags, &set, 16);
     return CELL_OK;
 }

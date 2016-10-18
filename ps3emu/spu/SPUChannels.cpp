@@ -42,13 +42,13 @@ unsigned SpuEvent::count() {
 unsigned SpuEvent::wait() {
     boost::unique_lock<boost::mutex> lock(_m);
     _cv.wait(lock, [&] { return _count; });
-    _count = 0;
     return _pending & _mask;
 }
 
 void SpuEvent::acknowledge(unsigned mask) {
     boost::unique_lock<boost::mutex> lock(_m);
     _pending &= ~mask;
+    _count = 0;
 }
 
 void SpuEvent::setMask(unsigned mask) {
@@ -131,8 +131,10 @@ void SPUChannels::command(uint32_t word) {
             "%s(%x, %x, %x) %x", name, size, lsaVa, eal, _channels[MFC_TagID].load());
     };
     auto logAtomic = [&](bool stored) {
-        INFO(spu) << ssnprintf(
-            "%s(%x, %x, %x) %s", name, size, lsaVa, eal, stored ? "OK" : "FAIL");
+        if (stored) {
+            INFO(spu) << ssnprintf(
+                "%s(%x, %x, %x) %s", name, size, lsaVa, eal, stored ? "OK" : "FAIL");
+        }
     };
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
@@ -252,7 +254,14 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
     if (ch == MFC_Cmd || ch == MFC_EAH || ch == MFC_EAL || ch == MFC_LSA ||
         ch == MFC_Size || ch == MFC_TagID)
         return;
-    INFO(spu) << ssnprintf("write %x to channel %d (%s)", data, ch, classIdToString(ch));
+    
+    std::string datastr;
+    if (ch == SPU_WrEventMask || ch == SPU_WrEventAck) {
+        datastr = to_string((MfcEvent)data);
+    } else if (ch == MFC_WrTagUpdate) {
+        datastr = to_string((MfcTag)data);
+    }
+    INFO(spu) << ssnprintf("write %s to channel %d (%s)", datastr, ch, classIdToString(ch));
 }
 unsigned dec = 0x11111111;
 uint32_t SPUChannels::read(unsigned ch) {
@@ -278,13 +287,15 @@ uint32_t SPUChannels::read(unsigned ch) {
             if (ch == MFC_RdTagStat) {
                 // as every MFC request completes immediately
                 // it is possible to just always return the mask set last
-                ch = MFC_WrTagMask;
+                return _channels[MFC_WrTagMask].load();
             }
             return _channels[ch].load();
         }
     })();
     if (ch == SPU_RdEventStat) {
-        INFO(spu) << ssnprintf("SPU_RdEventStat(mask: %x, ret: %x)", _event.mask(), data);
+        auto maskstr = to_string((MfcEvent)_event.mask());
+        auto datastr = to_string((MfcEvent)data);
+        INFO(spu) << ssnprintf("SPU_RdEventStat(mask: %s, ret: %s)", maskstr, datastr);
     } else if (ch != MFC_RdAtomicStat) {
         INFO(spu) << ssnprintf("spu reads %x from channel %d (%s)",
                                data,

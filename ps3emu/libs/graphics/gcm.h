@@ -113,6 +113,7 @@ int32_t cellGcmInitDefaultFifoMode(int32_t mode);
 uint32_t cellGcmGetTileInfo();
 uint32_t cellGcmGetZcullInfo();
 uint32_t cellGcmGetLastFlipTime(Process* proc);
+uint64_t cellGcmGetTimeStamp(uint32_t index);
 
 emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
 

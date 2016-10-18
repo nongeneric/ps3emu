@@ -78,6 +78,7 @@ set(SRC
     libs/graphics/GL/src/glad.c
     libs/message.cpp
     libs/trophy.cpp
+    libs/savedata.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})

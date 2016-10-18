@@ -33,7 +33,7 @@ uint32_t sys_fs_open_proxy(uint32_t path,
 
 void PPUThread::scall() {
     auto index = getGPR(11);
-    // INFO(libs) << ssnprintf("  -- scall %d at %08x", index, getNIP());
+    //INFO(libs) << ssnprintf("  -- scall %d at %08x", index, getNIP());
     switch (index) {
         case 352: wrap(sys_memory_get_user_memory_size, this); break;
         case 403: wrap(sys_tty_write, this); break;

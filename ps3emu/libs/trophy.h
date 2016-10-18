@@ -2,6 +2,7 @@
 
 #include "sys.h"
 #include <boost/optional.hpp>
+#include <array>
 
 typedef big_int32_t SceNpTrophyId;
 typedef big_uint32_t SceNpTrophyContext;
@@ -57,11 +58,6 @@ typedef big_uint32_t SceNpTrophyFlagMask;
 #define SCE_NP_TROPHY_FLAG_SETSIZE (128)
 #define SCE_NP_TROPHY_FLAG_BITS_SHIFT (5)
 
-struct SceNpTrophyFlagArray {
-    SceNpTrophyFlagMask
-        flag_bits[SCE_NP_TROPHY_FLAG_SETSIZE >> SCE_NP_TROPHY_FLAG_BITS_SHIFT];
-};
-
 int32_t sceNpTrophyInit(uint32_t pool,
                         uint32_t poolSize,
                         uint32_t containerId,
@@ -97,7 +93,7 @@ int32_t sceNpTrophyGetGameInfo(SceNpTrophyContext context,
 
 int32_t sceNpTrophyGetTrophyUnlockState(SceNpTrophyContext context,
                                         SceNpTrophyHandle handle,
-                                        SceNpTrophyFlagArray* flags,
+                                        std::array<uint8_t, 16>* flags,
                                         big_int32_t* count);
 
 int32_t sceNpTrophyGetTrophyInfo(SceNpTrophyContext context,
@@ -118,14 +114,11 @@ int32_t sceNpTrophyGetTrophyIcon(SceNpTrophyContext context,
                                  big_int32_t* size);
 
 int32_t sceNpTrophyGetGameProgress(SceNpTrophyContext context,
-
                                    SceNpTrophyHandle handle,
-
                                    big_int32_t* percentage);
 
-struct TrophyCallbackInfo {
-    uint32_t va;
-    uint32_t args[5];
-};
 
-boost::optional<TrophyCallbackInfo> emuTrophyGetCallback();
+int32_t sceNpTrophyGetRequiredDiskSpace(SceNpTrophyContext context,
+                                        SceNpTrophyHandle handle,
+                                        big_uint64_t* reqspace,
+                                        uint64_t options);

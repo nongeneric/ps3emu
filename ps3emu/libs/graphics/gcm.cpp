@@ -497,6 +497,13 @@ uint32_t cellGcmGetLastFlipTime(Process* proc) {
     return proc->rsx()->getLastFlipTime();
 }
 
+uint64_t cellGcmGetTimeStamp(uint32_t index) {
+    WARNING(libs) << "not implemented cellGcmGetTimeStamp";
+    const auto valueOffset = 0;
+    auto ea = getReportDataAddressLocation(index, MemoryLocation::Local);
+    return g_state.mm->load<8>(ea + valueOffset);
+}
+
 }}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset) {

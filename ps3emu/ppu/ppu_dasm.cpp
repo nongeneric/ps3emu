@@ -2577,8 +2577,24 @@ PRINT(LVLX, SIMDForm) {
 EMU(LVLX, SIMDForm) {
     auto b = getB(i->rA, TH);
     auto ea = b + TH->getGPR(i->rB);
-    uint8_t be[16];
-    MM->readMemory(ea, be, 16);
+    auto eb = ea & 0b1111ull;
+    uint8_t be[16] = {0};
+    MM->readMemory(ea, be, 16 - eb);
+    TH->setV(i->vD, be);
+}
+
+PRINT(LVRX, SIMDForm) {
+    *result = format_nnn("lvrx", i->vD, i->rA, i->rB);
+}
+
+EMU(LVRX, SIMDForm) {
+    auto b = getB(i->rA, TH);
+    auto ea = b + TH->getGPR(i->rB);
+    auto eb = ea & 0b1111ull;
+    uint8_t be[16] = {0};
+    if (eb) {
+        MM->readMemory(ea - eb, be + 16 - eb, eb);
+    }
     TH->setV(i->vD, be);
 }
 
@@ -3195,6 +3211,12 @@ EMU(DCBZ, XForm_1) {
     MM->setMemory(line, 0, 128);
 }
 
+PRINT(DCBTST, XForm_1) {
+    *result = format_nn("dcbtst", i->RA, i->RB);
+}
+
+EMU(DCBTST, XForm_1) { }
+
 struct PPUDasmInstruction {
     const char* mnemonic;
     std::string operands;
@@ -3399,6 +3421,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 103: invoke(LVX);
                 case 359: invoke(LVXL);
                 case 519: invoke(LVLX);
+                case 551: invoke(LVRX);
                 case 371: invoke(MFTB);
                 case 9: invoke(MULHDU);
                 case 71: invoke(LVEWX);
@@ -3417,6 +3440,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                 case 199: invoke(STVEWX);
                 case 854: invoke(EIEIO);
                 case 1014: invoke(DCBZ);
+                case 246: invoke(DCBTST);
                 case 792: invoke(SRAW);
                 default: throw IllegalInstructionException();
             }

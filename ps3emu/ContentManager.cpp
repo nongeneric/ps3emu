@@ -75,6 +75,7 @@ std::string ContentManager::toHost(std::experimental::string_view path) {
     switch (type) {
         case MountPoint::HostHome: return absolute(elfdir / "app_home" / relative).string();
         case MountPoint::HostAbsolute: return absolute(elfdir / "host_root" / relative).string();
+        case MountPoint::Bluray: return absolute(approot / ".." / relative).string();
         case MountPoint::GameData: return absolute(approot / relative).string();
         case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
         case MountPoint::DevFlash: return absolute(prxStore() / relative).string();

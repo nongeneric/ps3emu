@@ -2255,3 +2255,91 @@ TEST_CASE("l10n_convert_str") {
         "l10n_convert_str: CODEPAGE_1251 0xe0 0xe1 0xe2 => UTF8 0xd0 0xb0 0xd0 0xb1 0xd0 0xb2\n"
     );
 }
+
+TEST_CASE("spu_dma_polling") {
+    auto output = startWaitGetOutput({"./binaries/spu_dma_polling/a.elf"});
+    REQUIRE( output ==
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "## libdma : sample_dma_polling SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_queue") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_queue/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#1 exited with code 0\n"
+        "Task#2 exited with code 0\n"
+        "Task#3 exited with code 0\n"
+        "Task#4 exited with code 0\n"
+        "Task#5 exited with code 0\n"
+        "## libspurs : sample_spurs_queue SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_poll") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_poll/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#0 exited with code 0\n"
+        "PPU: destroy taskset\n"
+        "PPU: destroy taskset\n"
+        "## libspurs : sample_spurs_poll SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_lfqueue") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_lfqueue/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of sender/receiver PPU threads\n"
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#1 exited with code 0\n"
+        "PPU: taskset completed\n"
+        "PPU: sample_spurs_lfqueue finished.\n"
+        "## libspurs : sample_spurs_lfqueue SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_barrier") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_barrier/a.elf"});
+    REQUIRE( output ==
+        "PPU: waiting for completion of tasks\n"
+        "Task#0 exited with code 0\n"
+        "Task#1 exited with code 0\n"
+        "Task#2 exited with code 0\n"
+        "Task#3 exited with code 0\n"
+        "Task#4 exited with code 0\n"
+        "Task#5 exited with code 0\n"
+        "Task#6 exited with code 0\n"
+        "Task#7 exited with code 0\n"
+        "Task#8 exited with code 0\n"
+        "Task#9 exited with code 0\n"
+        "Task#10 exited with code 0\n"
+        "Task#11 exited with code 0\n"
+        "Task#12 exited with code 0\n"
+        "Task#13 exited with code 0\n"
+        "Task#14 exited with code 0\n"
+        "Task#15 exited with code 0\n"
+        "PPU: destroy taskset\n"
+        "## libspurs : sample_spurs_barrier SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_create_on_task") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_create_on_task/a.elf"});
+    REQUIRE( output ==
+        "PPU: wait for completion of the task\n"
+        "SPU: Task create task start!\n"
+        "Task#0 exited with code 0\n"
+        "PPU: taskset completed\n"
+        "## libspurs : sample_create_on_task SUCCEEDED ##\n"
+    );
+}

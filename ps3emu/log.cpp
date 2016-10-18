@@ -3,6 +3,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
+#include <sys/prctl.h>
 
 namespace {
     thread_local std::string thread_name;
@@ -37,6 +38,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, bool date) {
 
 void log_set_thread_name(std::string name) {
     thread_name = "[" + name + "] ";
+    prctl(PR_SET_NAME, (unsigned long)name.c_str(), 0, 0, 0);
 }
 
 void log_unconditional(log_severity_t severity, log_type_t type, const char* message) {
