@@ -50,7 +50,6 @@ set(SRC
     rsx/GLBuffer.cpp
     rsx/Tracer.cpp
     rsx/TextureRenderer.cpp
-    rsx/FragmentShaderUpdateFunctor.cpp
     rsx/DXT.cpp
     gcmviz/GcmDatabase.cpp
     

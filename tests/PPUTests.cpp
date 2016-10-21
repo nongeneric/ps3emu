@@ -107,6 +107,21 @@ TEST_CASE("internal alloc") {
     REQUIRE( mm.load<sizeof(int)>(ea + sizeof(int)) == 0xbbbbbbbb );
 }
 
+TEST_CASE("internal_alloc_unique_ptr") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    InternalMemoryManager internal(EmuInternalArea, EmuInternalAreaSize);
+    uint32_t ea;
+    auto pair = internal.internalAllocU<128, std::pair<uint32_t, uint32_t>>(&ea, 10, 20);
+    REQUIRE( pair->first == 10 );
+    REQUIRE( pair->second == 20 );
+    
+    pair->first = 0xaaaaaaaa;
+    pair->second = 0xbbbbbbbb;
+    REQUIRE( mm.load<sizeof(int)>(ea) == 0xaaaaaaaa );
+    REQUIRE( mm.load<sizeof(int)>(ea + sizeof(int)) == 0xbbbbbbbb );
+}
+
 TEST_CASE("fixed loads") {
 /*
 10474:       88 60 00 20     lbz     r3,32(0)

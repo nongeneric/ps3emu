@@ -136,6 +136,7 @@ class InternalMemoryManager;
 void spuImageMap(MainMemory* mm, sys_spu_image_t* image, void* ls);
 
 int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va);
+int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va, uint32_t attr_va);
 int32_t cellSpursFinalize(uint32_t spurs_va);
 void dumpSpursTrace(std::function<void(std::string)> log,
                     char* buffer = nullptr,

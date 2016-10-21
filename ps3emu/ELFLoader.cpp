@@ -182,6 +182,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
     
     std::vector<Replacement> replacements = {
         { "cellSpurs", "cellSpursInitializeWithAttribute2" },
+        { "cellSpurs", "cellSpursInitializeWithAttribute" },
         //{ "cellSpurs", "cellSpursFinalize" },
         { "sysPrxForUser", "sys_lwmutex_create" },
         { "sysPrxForUser", "sys_lwmutex_lock" },

@@ -3,6 +3,8 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/BitField.h"
 #include "ps3emu/MainMemory.h"
+#include "ps3emu/state.h"
+#include "ps3emu/Process.h"
 #include <stdexcept>
 #include <algorithm>
 
@@ -263,7 +265,7 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
     }
     INFO(spu) << ssnprintf("write %s to channel %d (%s)", datastr, ch, classIdToString(ch));
 }
-unsigned dec = 0x11111111;
+
 uint32_t SPUChannels::read(unsigned ch) {
     assert(ch <= SPU_WrOutIntrMbox);
     auto data = ([&ch, this] {
@@ -282,7 +284,7 @@ uint32_t SPUChannels::read(unsigned ch) {
             _channels[ch] = 0;
             return res;
         } else if (ch == SPU_RdDec) {
-            return dec--;
+            return ~(uint32_t)g_state.proc->getTimeBase();
         } else {
             if (ch == MFC_RdTagStat) {
                 // as every MFC request completes immediately

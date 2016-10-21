@@ -4,15 +4,14 @@
 #include <glad/glad.h>
 #include <string>
 
-template <GLuint Type>
 class Shader {
     GLProgram _program;
-    GLuint create(const char* text) {
-        return glCreateShaderProgramv(Type, 1, &text);
+    GLuint create(GLuint type, const char* text) {
+        return glCreateShaderProgramv(type, 1, &text);
     }
 public:
     Shader() : _program(0) { }
-    Shader(const char* text) : _program(create(text)) { }
+    Shader(GLuint type, const char* text) : _program(create(type, text)) {}
     GLuint handle() {
         return _program.handle();
     }
@@ -26,14 +25,14 @@ public:
     }
 };
 
-class VertexShader : public Shader<GL_VERTEX_SHADER> {
+class VertexShader : public Shader {
 public:
-    VertexShader() { }
-    VertexShader(const char* text) : Shader(text) { }
+    VertexShader() {}
+    VertexShader(const char* text) : Shader(GL_VERTEX_SHADER, text) {}
 };
 
-class FragmentShader : public Shader<GL_FRAGMENT_SHADER> {
+class FragmentShader : public Shader {
 public:
-    FragmentShader() { }
-    FragmentShader(const char* text) : Shader(text) { }
+    FragmentShader() {}
+    FragmentShader(const char* text) : Shader(GL_FRAGMENT_SHADER, text) {}
 };

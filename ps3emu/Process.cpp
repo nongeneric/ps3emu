@@ -517,7 +517,7 @@ boost::chrono::microseconds Process::getTimeBaseMicroseconds() {
 boost::chrono::nanoseconds Process::getTimeBaseNanoseconds() {
     auto now = boost::chrono::high_resolution_clock::now();
     auto diff = now - _systemStart;
-    return boost::chrono::duration_cast<boost::chrono::microseconds>(diff);
+    return boost::chrono::duration_cast<boost::chrono::nanoseconds>(diff);
 }
 
 std::vector<ModuleSegment>& Process::getSegments() {

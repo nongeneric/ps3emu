@@ -255,6 +255,7 @@ NCallEntry ncallTable[] {
     ENTRY(sys_lwcond_wait),
     ENTRY(sys_lwcond_signal),
     ENTRY(sys_lwcond_signal_all),
+    ENTRY(cellSpursInitializeWithAttribute),
     ENTRY(cellSpursInitializeWithAttribute2),
     ENTRY(cellSpursFinalize),
     ENTRY(cellPadSetActDirect),

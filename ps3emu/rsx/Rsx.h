@@ -186,8 +186,6 @@ class Rsx {
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
     GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
-    FragmentShader* getFragmentShaderFromCache(uint32_t va, uint32_t size, bool mrt);
-    FragmentShader* addFragmentShaderToCache(uint32_t va, uint32_t size, bool mrt);
     void resetContext();
     void updateScissor();
     
@@ -425,7 +423,6 @@ class Rsx {
                             uint32_t height,
                             GcmTextureFormat format,
                             GcmTextureLnUn lnUn);
-    void UpdateFragmentCache(uint32_t va, uint32_t size, bool mrt);
     inline void StopReplay() { }
     void transferImage();
     void startCopy2d();
@@ -466,3 +463,5 @@ public:
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
 uint32_t getReportDataAddressLocation(uint32_t index, MemoryLocation location);
+bool isMrt(SurfaceInfo const& surface);
+std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context);

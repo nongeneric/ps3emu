@@ -516,10 +516,9 @@ int32_t sys_spu_thread_group_disconnect_event_all_threads(sys_spu_thread_group_t
 #define CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP 0x2
 #define CELL_SPURS_TRACE_MODE_FLAG_MASK 0x3
 
-int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
+int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va, uint32_t fnid) {
     uint32_t index;
-    auto entry =
-        findNCallEntry(calcFnid("cellSpursInitializeWithAttribute2"), index);
+    auto entry = findNCallEntry(fnid, index);
     assert(entry); (void)entry;
     auto info = g_state.proc->getStolenInfo(index);
     auto ncall = g_state.mm->load<4>(info.va);
@@ -528,7 +527,7 @@ int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
     auto modules = g_state.proc->loadedModules();
     auto initSpursStubVa =
         findExportedSymbol(modules,
-                           calcFnid("cellSpursInitializeWithAttribute2"),
+                           fnid,
                            "cellSpurs",
                            prx_symbol_type_t::function);
     auto initTraceStubVa = findExportedSymbol(modules,
@@ -563,6 +562,16 @@ int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
         return g_state.th->getGPR(3);
     });
     return g_state.th->getGPR(3);
+}
+
+int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va, uint32_t attr_va) {
+    return cellSpursInitializeWithAttribute1or2(
+        spurs_va, attr_va, calcFnid("cellSpursInitializeWithAttribute"));
+}
+
+int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
+    return cellSpursInitializeWithAttribute1or2(
+        spurs_va, attr_va, calcFnid("cellSpursInitializeWithAttribute2"));
 }
 
 int32_t cellSpursFinalize(uint32_t spurs_va) {

@@ -17,10 +17,10 @@
 #include <fstream>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/range/numeric.hpp>
 #include "ps3emu/libs/graphics/graphics.h"
 #include "ps3emu/libs/message.h"
 
-#include "FragmentShaderUpdateFunctor.h"
 #include "RsxContext.h"
 #include "TextureRenderer.h"
 #include "GLShader.h"
@@ -245,10 +245,35 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
 }
 
 void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
+    const uint8_t* ptr;
+    if (_mode == RsxOperationMode::Replay) {
+        ptr = _currentReplayBlob.data();
+    } else {
+        auto ea = rsxOffsetToEa(gcmEnumToLocation(location), offset);
+        _context->fragmentBytecode.resize(FragmentProgramSize);
+        g_state.mm->readMemory(ea, &_context->fragmentBytecode[0], FragmentProgramSize);
+        ptr = &_context->fragmentBytecode[0];
+    }
+    
+    _context->tracer.pushBlob(ptr, FragmentProgramSize);
     TRACE(ShaderProgram, offset, location);
-    auto ea = rsxOffsetToEa(gcmEnumToLocation(location), offset);
-    _context->fragmentVa = ea;
+    
+    auto info = get_fragment_bytecode_info(ptr);
+    auto fconst = (std::array<float, 4>*)_context->fragmentConstBuffer.mapped();
+    _context->fragmentBytecode.resize(info.length * 16);
+    _context->fragmentConstCount = 0;
+    for (auto i = 0u; i < info.length; i += 16) {
+        auto it = begin(_context->fragmentBytecode) + i;
+        if (info.constMap[i / 16]) {
+            *fconst = read_fragment_imm_val(ptr + i);
+            fconst++;
+            _context->fragmentConstCount++;
+            std::fill(it, it + 16, 0);
+        }
+    }
     _context->fragmentShaderDirty = true;
+    
+    INFO(rsx) << ssnprintf("%d fragment constants updated", _context->fragmentConstCount);
 }
 
 void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -787,39 +812,47 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     TRACE(DrawIndexArray, first, count);
 }
 
-FragmentShader* Rsx::addFragmentShaderToCache(uint32_t va, uint32_t size, bool mrt) {
-    TRACE(addFragmentShaderToCache, va, size, mrt);
-    FragmentShaderCacheKey key { va, size, mrt };
-    auto shader = new FragmentShader();
-    auto updater = new FragmentShaderUpdateFunctor(
-        _context->fragmentVa,
-        size,
-        mrt,
-        _context.get(),
-        g_state.mm
-    );
-    _context->fragmentShaderCache.insert(key, shader, updater);
-    return shader;
+std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context) {
+    std::array<int, 16> sizes = { 0 };
+    for (int i = 0; i < 16; ++i) {
+        auto& s = context->fragmentTextureSamplers[i];
+        if (!s.enable)
+            continue;
+        sizes[i] = s.texture.fragmentCubemap ? 6 : s.texture.dimension;
+    }
+    return sizes;
 }
 
-FragmentShader* Rsx::getFragmentShaderFromCache(uint32_t va, uint32_t size, bool mrt) {
-    FragmentShaderCacheKey key { va, size, mrt };
-    FragmentShaderUpdateFunctor* updater;
-    FragmentShader* shader;
-    std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
-    if (!shader) {
-        shader = addFragmentShaderToCache(va, size, mrt);
-        std::tie(shader, updater) = _context->fragmentShaderCache.retrieveWithUpdater(key);
-    }
-    updater->bindConstBuffer();
-    return shader;
+bool isMrt(SurfaceInfo const& surface) {
+    return boost::accumulate(surface.colorTarget, 0) > 1;
 }
 
 void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
-        _context->fragmentShader = getFragmentShaderFromCache(
-            _context->fragmentVa, FragmentProgramSize, isMrt(_context->surface));
+        
+        FragmentShaderCacheKey key{_context->fragmentBytecode, isMrt(_context->surface)};
+        auto shader = _context->fragmentShaderCache.retrieve(key);
+        if (!shader) {
+            auto sizes = getFragmentSamplerSizes(_context.get());
+            INFO(libs) << ssnprintf("Updated fragment shader:\n%s\n%s",
+                            PrintFragmentBytecode(&_context->fragmentBytecode[0]),
+                            PrintFragmentProgram(&_context->fragmentBytecode[0]));
+            auto text = GenerateFragmentShader(_context->fragmentBytecode,
+                                               sizes,
+                                               _context->isFlatShadeMode,
+                                               isMrt(_context->surface));
+            shader = new FragmentShader(text.c_str());
+            INFO(libs) << ssnprintf("Updated fragment shader (2):\n%s\n%s", text, shader->log());
+            auto updater = new SimpleCacheItemUpdater<FragmentShader> {
+                uint32_t(), (uint32_t)key.bytecode.size(), [](auto){}
+            };
+            _context->fragmentShaderCache.insert(key, shader, updater);
+            glBindBufferBase(GL_UNIFORM_BUFFER,
+                             FragmentShaderConstantBinding,
+                             _context->fragmentConstBuffer.handle());
+        }
+        _context->fragmentShader = shader;
     }
     
     if (_context->vertexShaderDirty) {
@@ -1411,6 +1444,7 @@ void Rsx::initGcm() {
     _context->localMemoryBuffer = GLPersistentCpuBuffer(256u << 20);
     _context->mainMemoryBuffer = GLPersistentCpuBuffer(256u << 20);
     _context->feedbackBuffer = GLPersistentCpuBuffer(48u << 20);
+    _context->fragmentConstBuffer = GLPersistentCpuBuffer(FragmentProgramSize / 2);
     
     g_state.mm->provideMemory(
         RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemoryBuffer.mapped());
@@ -2213,13 +2247,6 @@ void Rsx::UpdateTextureCache(uint32_t offset,
     auto texture = std::get<0>(tuple);
     auto updater = std::get<1>(tuple);
     updater->updateWithBlob(texture, _currentReplayBlob);
-}
-
-void Rsx::UpdateFragmentCache(uint32_t va, uint32_t size, bool mrt) {
-    auto tuple = _context->fragmentShaderCache.retrieveWithUpdater({va, size, mrt});
-    auto program = std::get<0>(tuple);
-    auto updater = std::get<1>(tuple);
-    updater->updateWithBlob(program, _currentReplayBlob);
 }
 
 RsxContext* Rsx::context() {

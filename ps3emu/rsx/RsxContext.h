@@ -117,14 +117,11 @@ struct VertexShaderCacheKey {
 };
 
 struct FragmentShaderCacheKey {
-    uint32_t va;
-    uint32_t size;
+    std::vector<uint8_t> bytecode;
     bool mrt;
-    inline FragmentShaderCacheKey(uint32_t va, uint32_t size, bool mrt)
-        : va(va), size(size), mrt(mrt) {}
     inline bool operator<(FragmentShaderCacheKey const& other) const {
-        return std::tie(va, size, mrt)
-             < std::tie(other.va, other.size, other.mrt);
+        return std::tie(bytecode, mrt)
+             < std::tie(other.bytecode, other.mrt);
     }
 };
 
@@ -199,7 +196,6 @@ struct FragmentOps {
     GcmClearMask clearMask;
 };
 
-class FragmentShaderUpdateFunctor;
 class GLFramebuffer;
 class TextureRenderer;
 struct RsxContext {
@@ -225,7 +221,9 @@ struct RsxContext {
     GLPersistentCpuBuffer elementArrayIndexBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
-    uint32_t fragmentVa = 0;
+    std::vector<uint8_t> fragmentBytecode;
+    uint32_t fragmentConstCount = 0;
+    GLPersistentCpuBuffer fragmentConstBuffer;
     std::vector<uint8_t> lastFrame;
     std::array<VertexShaderInputFormat, 16> vertexInputs;
     std::array<uint8_t, 512 * 16> vertexInstructions;
@@ -243,7 +241,7 @@ struct RsxContext {
     GLPersistentCpuBuffer feedbackBuffer;
     Cache<TextureCacheKey, GLTexture, (256u << 20)> textureCache;
     Cache<VertexShaderCacheKey, VertexShader, (20u << 20)> vertexShaderCache;
-    Cache<FragmentShaderCacheKey, FragmentShader, (20u << 20), FragmentShaderUpdateFunctor> fragmentShaderCache;
+    Cache<FragmentShaderCacheKey, FragmentShader, (20u << 20)> fragmentShaderCache;
     uint32_t vBlankHandlerDescr = 0;
     uint32_t flipHandlerDescr = 0;
     MemoryLocation reportLocation;

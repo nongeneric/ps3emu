@@ -18,8 +18,8 @@
 #include "ps3emu/rsx/Tracer.h"
 #include "ps3emu/Process.h"
 #include "ps3emu/shaders/ShaderGenerator.h"
-#include "ps3emu/rsx/FragmentShaderUpdateFunctor.h"
 #include "ps3emu/state.h"
+#include "ps3emu/shaders/shader_dasm.h"
 #include "OpenGLPreview.h"
 #include "OpenGLPreviewWidget.h"
 
@@ -70,8 +70,6 @@ public:
                return QColor(Qt::green);
            }
            if (id == CommandId::UpdateBufferCache ||
-               id == CommandId::addFragmentShaderToCache ||
-               id == CommandId::UpdateFragmentCache ||
                id == CommandId::addTextureToCache ||
                id == CommandId::UpdateTextureCache ||
                id == CommandId::updateOffsetTableForReplay)
@@ -691,33 +689,23 @@ void MainWindowModel::update() {
     }
     
     if (context->fragmentShader) {
-        FragmentShaderCacheKey key{
-            context->fragmentVa, FragmentProgramSize, isMrt(context->surface)};
-        FragmentShaderUpdateFunctor* updater;
-        FragmentShader* shader;
-        std::tie(shader, updater) = context->fragmentShaderCache.retrieveWithUpdater(key);
-        if (updater) {
-            auto const& bytecode = updater->bytecode();
+        FragmentShaderCacheKey key{context->fragmentBytecode, isMrt(context->surface)};
+        auto shader = context->fragmentShaderCache.retrieve(key);
+        if (shader) {
             auto sizes = getFragmentSamplerSizes(context);
-            auto asmText = PrintFragmentProgram(&bytecode[0]);
+            auto asmText = PrintFragmentProgram(&context->fragmentBytecode[0]);
             bool mrt = boost::accumulate(context->surface.colorTarget, 0) > 1;
-            auto glslText = GenerateFragmentShader(bytecode, sizes, context->isFlatShadeMode, mrt);
+            auto glslText = GenerateFragmentShader(context->fragmentBytecode, sizes, context->isFlatShadeMode, mrt);
             _window.teFragmentAsm->setText(QString::fromStdString(asmText));
             _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
             
-            auto info = get_fragment_bytecode_info(&bytecode[0]);
-            auto bytecodeText = PrintFragmentBytecode(&bytecode[0]);
+            auto bytecodeText = PrintFragmentBytecode(&context->fragmentBytecode[0]);
             _window.teFragmentBytecode->setText(QString::fromStdString(bytecodeText));
             
             std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
-            auto buffer = updater->constBuffer();
-            auto ptr = (std::array<uint32_t, 4>*)buffer->mapped();
-            auto index = 0u;
-            for (auto i = 0u; i < info.constMap.size(); ++i) {
-                if (info.constMap[i]) {
-                    values.push_back(std::make_tuple(index, ptr[index]));
-                    index++;
-                }
+            auto ptr = (std::array<uint32_t, 4>*)context->fragmentConstBuffer.mapped();
+            for (auto i = 0u; i < context->fragmentConstCount; ++i) {
+                values.push_back(std::make_tuple(i, ptr[i]));
             }
             auto vertexConstModel = new ConstTableModel(values);
             _window.twFragmentConsts->setModel(vertexConstModel);

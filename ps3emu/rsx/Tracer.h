@@ -125,13 +125,11 @@
     X(setDisplayBuffer) \
     X(waitForIdle) \
     X(addTextureToCache) \
-    X(addFragmentShaderToCache) \
     X(updateOffsetTableForReplay) \
     X(EmuFlip) \
     X(StopReplay) \
     X(UpdateBufferCache) \
     X(UpdateTextureCache) \
-    X(UpdateFragmentCache) \
     X(PolySmoothEnable) \
     X(PolyOffsetLineEnable) \
     X(PolyOffsetFillEnable) \

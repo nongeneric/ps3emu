@@ -120,11 +120,11 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
         setBuf->bufSize);
         
     uint32_t resultVa, getVa, setVa, setParamVa, setIndicatorVa;
-    auto result = g_state.memalloc->internalAllocU<4, CellSaveDataCBResult>(&resultVa);
-    auto get = g_state.memalloc->internalAllocU<4, CellSaveDataStatGet>(&getVa);
-    auto set = g_state.memalloc->internalAllocU<4, CellSaveDataStatSet>(&setVa);
-    auto setParam = g_state.memalloc->internalAllocU<4, CellSaveDataSystemFileParam>(&setParamVa);
-    auto setIndicator = g_state.memalloc->internalAllocU<4, CellSaveDataAutoIndicator>(&setIndicatorVa);
+    auto result = g_state.memalloc->internalAlloc<4, CellSaveDataCBResult>(&resultVa);
+    auto get = g_state.memalloc->internalAlloc<4, CellSaveDataStatGet>(&getVa);
+    auto set = g_state.memalloc->internalAlloc<4, CellSaveDataStatSet>(&setVa);
+    g_state.memalloc->internalAlloc<4, CellSaveDataSystemFileParam>(&setParamVa);
+    g_state.memalloc->internalAlloc<4, CellSaveDataAutoIndicator>(&setIndicatorVa);
     
     path rootPath =
         g_state.content->toHost(g_state.content->contentDir() + "/SAVEDATA/AUTO");
