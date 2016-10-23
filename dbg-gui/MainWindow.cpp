@@ -39,12 +39,25 @@ void MainWindow::setupDocks() {
     gprDock->setTitleBarWidget(new QWidget(this));
     addDockWidget(Qt::RightDockWidgetArea, gprDock);
     
-    auto bottomDock = new QDockWidget(this);
+    auto bottomLogDock = new QDockWidget("Debug", this);
     _log = new QTextEdit();
     _log->setReadOnly(true);
     _log->setFont(QFont("monospace", 10));
-    bottomDock->setWidget(_log);
-    addDockWidget(Qt::BottomDockWidgetArea, bottomDock);
+    bottomLogDock->setWidget(_log);
+    
+    auto bottomOutputDock = new QDockWidget("Output", this);
+    auto output = new QTextEdit();
+    output->setReadOnly(true);
+    output->setFont(QFont("monospace", 10));
+    bottomOutputDock->setWidget(output);
+    
+    connect(&_model, &DebuggerModel::output, this, [=](QString text){
+        output->insertPlainText(text);
+        output->moveCursor(QTextCursor::End);
+    });
+    
+    addDockWidget(Qt::BottomDockWidgetArea, bottomLogDock);
+    tabifyDockWidget(bottomLogDock, bottomOutputDock);
     
     auto memoryGrid = new MonospaceGrid();
     memoryGrid->setModel(_model.getMemoryDumpModel());
@@ -72,36 +85,48 @@ void MainWindow::setupDocks() {
 }
 
 void MainWindow::setupMenu() {
-    auto file = menuBar()->addMenu("&File");
-    auto open = new QAction("&Open", this);
-    open->setShortcut(QKeySequence::Open);
-    connect(open, &QAction::triggered, this, &MainWindow::openFile);
-    file->addAction(open);
-    
-    auto exit = new QAction("&Exit", this);
-    connect(exit, &QAction::triggered, this, []() { QApplication::quit(); });
-    file->addAction(exit);
-    
+    auto file = menuBar() -> addMenu("&File");
+    {
+        auto open = new QAction("&Open", this);
+        open->setShortcut(QKeySequence::Open);
+        connect(open, &QAction::triggered, this, &MainWindow::openFile);
+        file->addAction(open);
+    }
+    {
+        auto exit = new QAction("&Exit", this);
+        connect(exit, &QAction::triggered, this, []() { QApplication::quit(); });
+        file->addAction(exit);
+    }
     auto trace = menuBar()->addMenu("&Trace");
-    auto stepIn = new QAction("Step In", this);
-    stepIn->setShortcut(QKeySequence(Qt::Key_F7));
-    connect(stepIn, &QAction::triggered, this, [=]() { _model.stepIn(); });
-    trace->addAction(stepIn);
-    
-    auto stepOver = new QAction("Step Over", this);
-    stepOver->setShortcut(QKeySequence(Qt::Key_F8));
-    connect(stepOver, &QAction::triggered, this, [=]() { _model.stepOver(); });
-    trace->addAction(stepOver);
-    
-    auto runToLR = new QAction("Run to LR", this);
-    runToLR->setShortcut(QKeySequence(Qt::Key_F4));
-    connect(runToLR, &QAction::triggered, this, [=]() { _model.runToLR(); });
-    trace->addAction(runToLR);
-    
-    auto run = new QAction("Run", this);
-    run->setShortcut(QKeySequence(Qt::Key_F5));
-    connect(run, &QAction::triggered, this, [=]() { _model.run(); });
-    trace->addAction(run);
+    {
+        auto stepIn = new QAction("Step In", this);
+        stepIn->setShortcut(QKeySequence(Qt::Key_F7));
+        connect(stepIn, &QAction::triggered, this, [=]() { _model.stepIn(); });
+        trace->addAction(stepIn);
+    }
+    {
+        auto stepOver = new QAction("Step Over", this);
+        stepOver->setShortcut(QKeySequence(Qt::Key_F8));
+        connect(stepOver, &QAction::triggered, this, [=]() { _model.stepOver(); });
+        trace->addAction(stepOver);
+    }
+    {
+        auto runToLR = new QAction("Run to LR", this);
+        runToLR->setShortcut(QKeySequence(Qt::Key_F4));
+        connect(runToLR, &QAction::triggered, this, [=]() { _model.runToLR(); });
+        trace->addAction(runToLR);
+    }
+    {
+        auto run = new QAction("Run", this);
+        run->setShortcut(QKeySequence(Qt::Key_F5));
+        connect(run, &QAction::triggered, this, [=]() { _model.run(); });
+        trace->addAction(run);
+    }
+    {
+        auto action = new QAction("Pause", this);
+        connect(action, &QAction::triggered, this, [=]() { _model.pause(); });
+        trace->addAction(action);
+    }
     
 //     auto restart = new QAction("Restart", this);
 //     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));
@@ -161,6 +186,16 @@ void MainWindow::setupMenu() {
         action->setChecked(g_config.config().LogRsx);
         connect(action, &QAction::triggered, this, [=]() {
             g_config.config().LogRsx = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
+        auto action = new QAction("Capture RSX", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().CaptureRsx);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().CaptureRsx = action->isChecked();
             g_config.save();
         });
         settings->addAction(action);

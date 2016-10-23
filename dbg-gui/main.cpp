@@ -5,6 +5,7 @@
 #include "Config.h"
 #include <boost/program_options.hpp>
 #include <string>
+#include <stdint.h>
 #include <QApplication>
 
 using namespace boost::program_options;
@@ -42,6 +43,8 @@ int main(int argc, char *argv[]) {
         std::cout << consoleDescr;
         return 1;
     }
+    
+    qRegisterMetaType<uint64_t>("uint64_t");
     
     QApplication app(argc, argv);
     MainWindow w;

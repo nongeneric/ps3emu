@@ -15,8 +15,10 @@ class MainWindow : public QMainWindow {
      void setupDocks();
      void setupMenu();
      void setupStatusBar();
+     
 public slots:
     void openFile();
+    
 public:
     MainWindow(QWidget *parent = 0);
     ~MainWindow();

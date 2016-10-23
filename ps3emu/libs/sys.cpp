@@ -9,6 +9,7 @@
 #include "../InternalMemoryManager.h"
 #include "../ELFLoader.h"
 #include "../IDMap.h"
+#include "ps3emu/EmuCallbacks.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
@@ -91,16 +92,28 @@ int sys_tty_write(uint32_t ch,
     
     auto buf = g_state.mm->getMemoryPointer(buf_va, buf_len);
     if (ch == SYS_TTYP_PPU_STDOUT) {
+        if (g_state.callbacks->stdout) {
+            g_state.callbacks->stdout((char*)buf, buf_len);
+            return CELL_OK;
+        }
         fwrite(buf, 1, buf_len, stdout);
         fflush(stdout);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_PPU_STDERR) {
+        if (g_state.callbacks->stderr) {
+            g_state.callbacks->stderr((char*)buf, buf_len);
+            return CELL_OK;
+        }
         fwrite(buf, 1, buf_len, stderr);
         fflush(stderr);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_SPU_STDOUT) {
+        if (g_state.callbacks->spustdout) {
+            g_state.callbacks->spustdout((char*)buf, buf_len);
+            return CELL_OK;
+        }
         fwrite(buf, 1, buf_len, stdout);
         fflush(stdout);
         return CELL_OK;

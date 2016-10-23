@@ -1,7 +1,10 @@
 #pragma once
 
-#include "../ps3emu/Process.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/libs/ConcurrentBoundedQueue.h"
 #include "MonospaceGrid.h"
+#include <boost/thread.hpp>
+#include <boost/variant.hpp>
 #include <QString>
 #include <string>
 #include <memory>
@@ -19,6 +22,17 @@ struct SPUBreakInfo {
     ps3_uintptr_t va;
 };
 
+struct LoadElfCommand {
+    QString path;
+    QStringList args;
+};
+
+struct RunCommand {
+    
+};
+
+using DebugCommand = boost::variant<LoadElfCommand, RunCommand>;
+
 class GPRModel;
 class DasmModel;
 class MemoryDumpModel;
@@ -34,7 +48,10 @@ class DebuggerModel : public QWidget {
     std::unique_ptr<Process> _proc;
     std::vector<SoftBreakInfo> _softBreaks;
     std::vector<SPUBreakInfo> _spuBreaks;
+    boost::thread _debugThread;
+    ConcurrentBoundedQueue<DebugCommand> _debugThreadQueue;
     bool _elfLoaded = false;
+    bool _paused = false;
     void log(std::string str);
     void traceTo(ps3_uintptr_t va);
     void spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts);
@@ -56,6 +73,15 @@ class DebuggerModel : public QWidget {
     void changeThread(uint32_t index);
     void printSegment(uint32_t ea);
     void execSingleCommand(QString command);
+    void dbgLoop();
+    void loadElfHandler(LoadElfCommand command);
+    void runHandler(RunCommand command);
+    void printBacktrace();
+    
+    template<typename... Ts>
+    void messagef(const char* format, Ts... args) {
+        emit message(QString::fromStdString(ssnprintf(format, args...)));
+    }
 
 public:
     DebuggerModel();
@@ -73,6 +99,9 @@ public:
     void run();
     void runto(ps3_uintptr_t va);
     void runToLR();
+    void pause();
+    
 signals:
     void message(QString text);
+    void output(QString text);
 };

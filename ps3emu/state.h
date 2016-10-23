@@ -7,6 +7,7 @@ class ContentManager;
 class Rsx;
 class ELFLoader;
 class PPUThread;
+class EmuCallbacks;
 
 struct g_state_t {
     g_state_t();
@@ -17,6 +18,7 @@ struct g_state_t {
     ContentManager* content;
     Rsx* rsx;
     ELFLoader* elf;
+    EmuCallbacks* callbacks;
     thread_local static PPUThread* th;
 };
 

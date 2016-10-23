@@ -7,6 +7,7 @@
 #include "ps3emu/spu/SPUDasm.h"
 #include "ps3emu/state.h"
 #include "ps3emu/libs/spu/sysSpu.h"
+#include "ps3emu/EmuCallbacks.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
@@ -417,8 +418,52 @@ public:
     }
 };
 
-DebuggerModel::DebuggerModel() {
-    Rsx::setOperationMode(RsxOperationMode::RunCapture);
+void DebuggerModel::loadElfHandler(LoadElfCommand command) {
+    _proc.reset(new Process());
+    auto str = command.path.toStdString();
+    std::vector<std::string> argsVec;
+    for (auto arg : command.args) {
+        argsVec.push_back(arg.toStdString());
+    }
+    _proc->init(str, argsVec);
+    auto ev = _proc->run();
+    _activeThread = boost::get<PPUThreadStartedEvent>(ev).thread;
+    updateUI();
+    _elfLoaded = true;
+    emit message(QString("Loaded %1").arg(command.path));
+}
+
+void DebuggerModel::run() {
+    if (_paused) {
+        _proc->dbgPause(false);
+        _paused = false;
+        return;
+    }
+    _debugThreadQueue.enqueue(RunCommand{});
+}
+
+void DebuggerModel::dbgLoop() {
+    for (;;) {
+        auto untyped = _debugThreadQueue.dequeue();
+        if (auto c = boost::get<LoadElfCommand>(&untyped)) {
+            loadElfHandler(*c);
+        } else if (auto c = boost::get<RunCommand>(&untyped)) {
+            runHandler(*c);
+        }
+    }
+}
+
+DebuggerModel::DebuggerModel() : _debugThreadQueue(10) {
+    _debugThread = boost::thread([&] { dbgLoop(); });
+    if (g_config.config().CaptureRsx) {
+        Rsx::setOperationMode(RsxOperationMode::RunCapture);
+    }
+    auto callback = [&](auto str, auto len) {
+        emit this->output(QString::fromLatin1(str, len));
+    };
+    g_state.callbacks->stdout = callback;
+    g_state.callbacks->stderr = callback;
+    g_state.callbacks->spustdout = callback;
     _gprModel.reset(new GPRModel());
     _dasmModel.reset(new DasmModel());
     _memoryDumpModel.reset(new MemoryDumpModel());
@@ -439,18 +484,7 @@ MonospaceGridModel* DebuggerModel::getMemoryDumpModel() {
 }
 
 void DebuggerModel::loadFile(QString path, QStringList args) {
-    _proc.reset(new Process());
-    auto str = path.toStdString();
-    std::vector<std::string> argsVec;
-    for (auto arg : args) {
-        argsVec.push_back(arg.toStdString());
-    }
-    _proc->init(str, argsVec);
-    auto ev = _proc->run();
-    _activeThread = boost::get<PPUThreadStartedEvent>(ev).thread;
-    updateUI();
-    _elfLoaded = true;
-    emit message(QString("Loaded %1").arg(path));
+    _debugThreadQueue.enqueue(LoadElfCommand{path, args});
 }
 
 void DebuggerModel::stepIn() {
@@ -476,7 +510,7 @@ void DebuggerModel::switchThread(SPUThread* spu) {
     _activeSPUThread = spu;
 }
 
-void DebuggerModel::run() {
+void DebuggerModel::runHandler(RunCommand command) {
     bool cont = true;
     while (cont) {
         auto untyped = _proc->run();
@@ -579,6 +613,16 @@ void DebuggerModel::execSingleCommand(QString command) {
         return;
     } else if (name == "spurs") {
         dumpSpursTrace([&](auto line) { this->message(QString::fromStdString(line)); });
+        return;
+    } else if (name == "backtrace") {
+        printBacktrace();
+        return;
+    } else if (name == "backtraceall") {
+        for (auto th : _proc->dbgPPUThreads()) {
+            messagef("thread %s", th->getName());
+            _activeThread = th;
+            printBacktrace();
+        }
         return;
     }
     
@@ -1002,4 +1046,34 @@ void DebuggerModel::clearSPUSoftBreak(ps3_uintptr_t va) {
         *ptr = it->bytes;
     }
     _spuBreaks.erase(it);
+}
+
+void DebuggerModel::pause() {
+    _paused = true;
+    _proc->dbgPause(true);
+}
+
+struct StackFrame {
+    uint64_t lr;
+};
+
+std::vector<StackFrame> walkStack(uint64_t backChain) {
+    std::vector<StackFrame> frames;   
+    for (;;) {
+        backChain = g_state.mm->load<8>(backChain);
+        if (!backChain)
+            break;
+        auto lr = g_state.mm->load<8>(backChain + 16);
+        frames.push_back({lr});
+    }
+    return frames;
+}
+
+void DebuggerModel::printBacktrace() {
+    if (_activeThread) {
+        messagef("backtrace nip = %x", _activeThread->getNIP());
+        for (auto frame : walkStack(_activeThread->getGPR(1))) {
+            messagef("  %x", frame.lr);
+        }
+    }
 }

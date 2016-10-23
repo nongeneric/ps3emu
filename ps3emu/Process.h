@@ -157,7 +157,6 @@ class Process {
                        uint32_t stackSize,
                        uint32_t tls);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
-    void dbgPause(bool pause);
     void loadPrxStore();
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
@@ -196,6 +195,7 @@ public:
     std::vector<ModuleSegment>& getSegments();
     std::vector<std::shared_ptr<ELFLoader>> loadedModules();
     StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
+    void dbgPause(bool pause);
 };
 
 int32_t executeExportedFunction(uint32_t imageBase,
