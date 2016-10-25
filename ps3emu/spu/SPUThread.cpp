@@ -101,7 +101,7 @@ void SPUThread::loop() {
         }
     }
     
-    INFO(spu) << ssnprintf("spu thread loop finished");
+    INFO(spu) << ssnprintf("spu thread loop finished, cause %s", to_string(_cause));
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 

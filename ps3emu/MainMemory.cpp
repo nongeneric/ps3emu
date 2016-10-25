@@ -14,29 +14,61 @@ bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
 
 static constexpr auto PagePtrMask = ~uintptr_t() - 1;
 
+bool MainMemory::isReservedByCurrentThread(uint32_t va, uint32_t size) {
+    auto thread = boost::this_thread::get_id();
+    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
+        auto& r = _reservations[i];
+        if (intersects(r.va, r.size, va, size)) {
+            if ((r.va <= va && r.va + r.size >= va + size) && r.thread == thread)
+                return true;
+        }
+    }
+    return false;
+}
+
+void MainMemory::destroyReservationWithoutLocking(uint32_t va,
+                                                  uint32_t size) {
+    auto thread = boost::this_thread::get_id();
+    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
+        auto& r = _reservations[i];
+        if (intersects(r.va, r.size, va, size)) {
+            if (r.notify) {
+                // we are under a lock, notifying before the memory is actually
+                // stored is fine
+                r.notify(thread);
+            }
+            _reservations.erase(begin(_reservations) + i);
+        }
+    }
+}
+
+void MainMemory::destroyReservationOfCurrentThread() {
+    auto thread = boost::this_thread::get_id();
+    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
+        auto& r = _reservations[i];
+        if (thread == r.thread) {
+            if (r.notify) {
+                // we are under a lock, notifying before the memory is actually
+                // stored is fine
+                r.notify(thread);
+            }
+            _reservations.erase(begin(_reservations) + i);
+        }
+    }
+}
+
 bool MainMemory::storeMemoryWithReservation(void* dest, 
                                             const void* source, 
                                             uint size,
                                             uint32_t va,
                                             bool cond) {
     boost::unique_lock<boost::mutex> lock(_storeLock);
-    bool success = false;
-    auto thread = boost::this_thread::get_id();
-    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
-        auto& r = _reservations[i];
-        if (intersects(r.va, r.size, va, size)) {
-            success |= (r.va <= va && r.va + r.size >= va + size) && r.thread == thread;
-            if (r.notify) {
-                // we are under a lock, notifying before the memory is actually stored is fine
-                r.notify(thread);
-            }
-            _reservations.erase(begin(_reservations) + i);
-        }
-    }
-    if (!cond || success) {
+    if (!cond || isReservedByCurrentThread(va, size)) {
+        destroyReservationWithoutLocking(va, size);
         memcpy(dest, source, size);
+        return true;
     }
-    return success;
+    return false;
 }
 
 template <bool Read>

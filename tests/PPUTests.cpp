@@ -5,6 +5,7 @@
 #include "ps3emu/rsx/GLTexture.h"
 #include "ps3emu/state.h"
 #include <vector>
+#include <atomic>
 #include <catch.hpp>
 
 TEST_CASE("swizzle_coord_convert") {
@@ -1857,4 +1858,46 @@ TEST_CASE("addc r5,r4,r3") {
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
     REQUIRE( th.getGPR(5) == 3 );
     REQUIRE( th.getCA() == 0 );
+}
+
+TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
+    MainMemory mm;
+    mm.setMemory(0x10000, 0x11, 1000, true);
+    
+    boost::thread ppu([&] {
+        uint32_t buf = 0;
+        mm.loadReserve(0x10000, &buf, 4);
+        REQUIRE(buf == 0x11111111);
+        buf = 0xaabbccdd;
+        REQUIRE(mm.writeCond(0x10000, &buf, 4) == true);
+        REQUIRE(mm.load<4>(0x10000) == 0xddccbbaa);
+    });
+    ppu.join();
+    
+    std::atomic<bool> step1, step2;
+    
+    // th1 gets reservation
+    boost::thread th1([&] {
+        uint32_t buf = 0;
+        mm.loadReserve(0x10000, &buf, 4);
+        step1 = true;
+        while (!step2) ;
+        // reservation still active, th2 didn't destroy it with writeCond
+        buf = 0xffffffff;
+        REQUIRE(mm.writeCond(0x10000, &buf, 4) == true);
+        REQUIRE(mm.load<4>(0x10000) == 0xffffffff);
+    });
+    
+    while (!step1) ;
+    
+    // th2 doesn't have reservation, makes a conditional store
+    boost::thread th2([&] {
+        auto buf = 0x12345678;
+        REQUIRE(mm.writeCond(0x10000, &buf, 4) == false);
+        REQUIRE(mm.load<4>(0x10000) == 0xddccbbaa);
+    });
+    th2.join();
+    
+    step2 = true;
+    th1.join();
 }

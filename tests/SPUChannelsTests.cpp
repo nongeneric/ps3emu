@@ -145,14 +145,122 @@ TEST_CASE("spuchannels_event_reservation") {
     REQUIRE(channels.read(SPU_RdEventStat) == 1u << 10);
 }
 
+TEST_CASE("spuchannels_event_reservation_thread_can_only_have_one_reservation_at_a_time") {
+    MainMemory mm;
+    TestSPUChannelsThread thread;
+    SPUChannels channels(&mm, &thread);
+    
+    mm.setMemory(0x10000, 0, 1000, true);
+    mm.setMemory(0x20000, 0, 1000, true);
+        
+    channels.write(SPU_WrEventMask, 1u << 10);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
+    
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x20000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
+ 
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_PUTLLC_CMD);
+    REQUIRE((channels.read(MFC_RdAtomicStat) & 1) == 1); // failure
+    
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x20000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_PUTLLC_CMD);
+    REQUIRE((channels.read(MFC_RdAtomicStat) & 1) == 0); // success
+    
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x20000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_PUTLLC_CMD);
+    REQUIRE((channels.read(MFC_RdAtomicStat) & 1) == 1); // failure
+}
+
 TEST_CASE("spuchannels_event_reservation_2threads") {
+    MainMemory mm;
+    TestSPUChannelsThread thread;
+    SPUChannels channels(&mm, &thread);
+    channels.write(SPU_WrEventMask, (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
+    
+    mm.setMemory(0x10000, 0, 1000, true);
+
+    std::atomic<bool> th1flag, th2flag;
+    
+    bool f1 = false, s1 = false, f2 = false, s2 = false;
+    
+    // th1 creates a reservation
+    boost::thread th1([&] {
+        channels.write(MFC_EAH, 0);
+        channels.write(MFC_EAL, 0x10000);
+        channels.write(MFC_LSA, 0x300);
+        channels.write(MFC_Size, 0x80);
+        channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
+        f1 = channels.readCount(SPU_RdEventStat) == 0;
+        
+        th1flag = true;
+        
+        s1 = channels.read(SPU_RdEventStat) == (unsigned)MfcEvent::MFC_LLR_LOST_EVENT;
+    });
+    
+    while (!th1flag) ;
+    
+    TestSPUChannelsThread thread2;
+    SPUChannels channels2(&mm, &thread2);
+    channels2.write(SPU_WrEventMask, (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
+    
+    // th2 creates its own reservation and this doesn't destroy the reservation of th1
+    boost::thread th2([&] {
+        channels2.write(MFC_EAH, 0);
+        channels2.write(MFC_EAL, 0x10000);
+        channels2.write(MFC_LSA, 0x300);
+        channels2.write(MFC_Size, 0x80);
+        channels2.write(MFC_Cmd, MFC_GETLLAR_CMD);
+        f2 = channels2.readCount(SPU_RdEventStat) == 0;
+        
+        th2flag = true;
+        
+        s2 = channels2.read(SPU_RdEventStat) == (unsigned)MfcEvent::MFC_LLR_LOST_EVENT;
+    });
+    
+    while (!th2flag) ;
+    
+    // a third thread removes reservation, th1 and th2 lose their reservations
+    boost::thread ppu([&] {
+        mm.store<4>(0x10000, 0);
+    });
+    
+    ppu.join();
+    th1.join();
+    th2.join();
+    
+    REQUIRE(f1);
+    REQUIRE(f2);
+    REQUIRE(s1);
+    REQUIRE(s2);
+}
+
+TEST_CASE("spuchannels_event_reservation_putllc_should_not_raise_event") {
     MainMemory mm;
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
     
     mm.setMemory(0x10000, 0, 1000, true);
         
-    channels.write(SPU_WrEventMask, (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
+    channels.write(SPU_WrEventMask, 1u << 10);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
     channels.write(MFC_EAH, 0);
     channels.write(MFC_EAL, 0x10000);
@@ -162,48 +270,46 @@ TEST_CASE("spuchannels_event_reservation_2threads") {
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
  
     // the same thread destroys the reservation but doesn't raise the event
-    mm.store<4>(0x10000, 0);
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_PUTLLC_CMD);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    REQUIRE((channels.read(MFC_RdAtomicStat) & 1) == 0); // success
     
-    std::atomic<bool> th1flag, th2flag;
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_PUTLLC_CMD);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    REQUIRE((channels.read(MFC_RdAtomicStat) & 1) == 1); // failure
     
-    // two different threads setup a reservation
-    boost::thread th1([&] {
-        channels.write(MFC_EAH, 0);
-        channels.write(MFC_EAL, 0x10000);
-        channels.write(MFC_LSA, 0x300);
-        channels.write(MFC_Size, 0x80);
-        channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
-        REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
-        
-        th1flag = true;
-        
-        REQUIRE(channels.read(SPU_RdEventStat) == (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
-    });
-    
-    boost::thread th2([&] {
-        channels.write(MFC_EAH, 0);
-        channels.write(MFC_EAL, 0x10000);
-        channels.write(MFC_LSA, 0x300);
-        channels.write(MFC_Size, 0x80);
-        channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
-        REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
-        
-        th2flag = true;
-        
-        REQUIRE(channels.read(SPU_RdEventStat) == (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
-    });
-    
-    while (!th1flag || !th2flag) ;
-    
-    // a third thread removes reservation, both th1 and th2 should receive an event
+    // there is no reservation, and therefore no event is raised
     boost::thread ppu([&] {
         mm.store<4>(0x10000, 0);
     });
-    
     ppu.join();
-    th1.join();
-    th2.join();
+    
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    
+    // setup a reservation
+    channels.write(MFC_EAH, 0);
+    channels.write(MFC_EAL, 0x10000);
+    channels.write(MFC_LSA, 0x300);
+    channels.write(MFC_Size, 0x80);
+    channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
+    
+    // another thread destroys the reservation and raises the event
+    boost::thread ppu1([&] {
+        mm.store<4>(0x10000, 0);
+    });
+    ppu1.join();
+    
+    REQUIRE(channels.readCount(SPU_RdEventStat) == 1);
+    REQUIRE(channels.read(SPU_RdEventStat) == 1u << 10);
 }
 
 TEST_CASE("spuchannels_signal_basic") {
@@ -252,25 +358,26 @@ TEST_CASE("spuchannels_dma_updates") {
     auto mask1 = 0x10u;
     auto mask2 = 0x01u;
     
-    // issue two dma commands
+    channels.write(MFC_WrTagMask, 0x13);
+    REQUIRE(channels.read(MFC_RdTagMask) == 0x13);
+    
+    // update all
     channels.write(MFC_EAH, 0);
     channels.write(MFC_EAL, 0x10000);
     channels.write(MFC_LSA, 0x300);
     channels.write(MFC_Size, 0x80);
-    channels.write(MFC_TagID, mask1);
+    channels.write(MFC_TagID, 4);
     channels.write(MFC_Cmd, MFC_GET_CMD);
     
     channels.write(MFC_EAH, 0);
     channels.write(MFC_EAL, 0x10000);
     channels.write(MFC_LSA, 0x300);
     channels.write(MFC_Size, 0x80);
-    channels.write(MFC_TagID, mask2);
+    channels.write(MFC_TagID, 0);
     channels.write(MFC_Cmd, MFC_GET_CMD);
     
-    channels.write(MFC_WrTagUpdate, 0);
-    REQUIRE( channels.readCount(MFC_WrTagUpdate) != 0 );
-    channels.read(MFC_RdTagStat);
     channels.write(MFC_WrTagMask, mask1 | mask2);
     channels.write(MFC_WrTagUpdate, (unsigned)MfcTag::MFC_TAG_UPDATE_ALL);
+    REQUIRE( channels.readCount(MFC_WrTagUpdate) != 0 );
     REQUIRE( channels.read(MFC_RdTagStat) == (mask1 | mask2) );
 }

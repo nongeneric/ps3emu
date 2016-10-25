@@ -14,6 +14,7 @@
 #include <string.h>
 #include <functional>
 #include <experimental/optional>
+#include "ps3emu/enum.h"
 
 static constexpr uint32_t LSLR = 0x3ffff;
 static constexpr uint32_t LocalStorageSize = 256 * 1024;
@@ -27,12 +28,11 @@ public:
     }
 };
 
-enum class SPUThreadExitCause {
-    Exit,
-    GroupExit,
-    GroupTerminate,
-    StillRunning
-};
+ENUM(SPUThreadExitCause,
+     (Exit, 0),
+     (GroupExit, 1),
+     (GroupTerminate, 2),
+     (StillRunning, 3))
 
 class SPUThreadFinishedException : public virtual std::exception {
     int32_t _errorCode;

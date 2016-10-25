@@ -98,6 +98,9 @@ class MainMemory {
     void writeRawSpuVa(ps3_uintptr_t va, const void* val, uint32_t len);
     void writeSpuThreadVa(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readRawSpuVa(ps3_uintptr_t va);
+    void destroyReservationWithoutLocking(uint32_t va, uint32_t size);
+    void destroyReservationOfCurrentThread();
+    bool isReservedByCurrentThread(uint32_t va, uint32_t size);
 
 public:
     MainMemory();
@@ -167,6 +170,7 @@ public:
                      uint len,
                      std::function<void(boost::thread::id)> notify = {}) {
         boost::unique_lock<boost::mutex> lock(_storeLock);
+        destroyReservationOfCurrentThread();
         _reservations.push_back({va, len, boost::this_thread::get_id(), notify});
         readMemory(va, buf, len, false, false);
     }

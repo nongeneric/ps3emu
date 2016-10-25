@@ -128,9 +128,9 @@ void SPUChannels::command(uint32_t word) {
     auto size = _channels[MFC_Size].load();
     auto opcode = cmd.opcode.u();
     auto name = mfcCommandToString(opcode);
+    auto tag = _channels[MFC_TagID].load();
     auto log = [&] {
-        INFO(spu) << ssnprintf(
-            "%s(%x, %x, %x) %x", name, size, lsaVa, eal, _channels[MFC_TagID].load());
+        INFO(spu) << ssnprintf("%s(%x, %x, %x) %x", name, size, lsaVa, eal, tag);
     };
     auto logAtomic = [&](bool stored) {
         if (stored) {
@@ -143,7 +143,7 @@ void SPUChannels::command(uint32_t word) {
             auto hostThreadId = boost::this_thread::get_id();
             _mm->loadReserve(eal, lsa, size, [=](auto id) {
                 if (hostThreadId != id) {
-                    _event.set_or(1u << 10);
+                    _event.set_or((unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
                 }
             });
             // reservation always succeeds
@@ -162,7 +162,7 @@ void SPUChannels::command(uint32_t word) {
             log();
             break;
         }
-        case MFC_PUTLLC_CMD: // TODO: handle sizes correctly when calling writeCond
+        case MFC_PUTLLC_CMD:
         case MFC_PUTQLLUC_CMD: {
             assert(opcode != MFC_PUTQLLUC_CMD);
             auto stored = _mm->writeCond(eal, lsa, size);
@@ -246,6 +246,11 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         throw SPUThreadInterruptException(data);
     } else if (ch == SPU_WrOutMbox) {
         _outboundMailbox.enqueue(data);
+    } else if (ch == MFC_WrTagUpdate) {
+        _channels[MFC_WrTagUpdate] = data;
+        _channels[MFC_RdTagStat] = _channels[MFC_RdTagMask].load();
+    } else if (ch == MFC_WrTagMask) {
+        _channels[MFC_RdTagMask] = data;
     } else {
         if (ch == MFC_Cmd) {
             command(data);
@@ -254,7 +259,8 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         }
     }
     if (ch == MFC_Cmd || ch == MFC_EAH || ch == MFC_EAL || ch == MFC_LSA ||
-        ch == MFC_Size || ch == MFC_TagID)
+        ch == MFC_Size || ch == MFC_TagID || ch == MFC_WrTagMask ||
+        ch == MFC_WrTagUpdate || ch == SPU_WrEventMask)
         return;
     
     std::string datastr;
@@ -262,13 +268,15 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         datastr = to_string((MfcEvent)data);
     } else if (ch == MFC_WrTagUpdate) {
         datastr = to_string((MfcTag)data);
+    } else {
+        datastr = ssnprintf("%x", data);
     }
     INFO(spu) << ssnprintf("write %s to channel %d (%s)", datastr, ch, classIdToString(ch));
 }
 
 uint32_t SPUChannels::read(unsigned ch) {
     assert(ch <= SPU_WrOutIntrMbox);
-    auto data = ([&ch, this] {
+    auto data = ([&] {
         if (ch == SPU_RdSigNotify1) {
             return _snr1.wait_clear();
         } else if (ch == SPU_RdSigNotify2) {
@@ -286,11 +294,6 @@ uint32_t SPUChannels::read(unsigned ch) {
         } else if (ch == SPU_RdDec) {
             return ~(uint32_t)g_state.proc->getTimeBase();
         } else {
-            if (ch == MFC_RdTagStat) {
-                // as every MFC request completes immediately
-                // it is possible to just always return the mask set last
-                return _channels[MFC_WrTagMask].load();
-            }
             return _channels[ch].load();
         }
     })();
@@ -298,12 +301,17 @@ uint32_t SPUChannels::read(unsigned ch) {
         auto maskstr = to_string((MfcEvent)_event.mask());
         auto datastr = to_string((MfcEvent)data);
         INFO(spu) << ssnprintf("SPU_RdEventStat(mask: %s, ret: %s)", maskstr, datastr);
+    } else if (ch == MFC_RdTagStat) {
+        INFO(spu) << ssnprintf("MFC_RdTagStat(%x, %s) %x",
+                               _channels[MFC_RdTagMask].load(),
+                               to_string((MfcTag)_channels[MFC_WrTagUpdate].load()),
+                               data);
     } else if (ch != MFC_RdAtomicStat) {
         INFO(spu) << ssnprintf("spu reads %x from channel %d (%s)",
                                data,
                                ch,
                                classIdToString(ch));
-    }
+    } 
     return data;
 }
 
@@ -344,7 +352,7 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
         return;
     }
     if (offset == TagClassId::Prxy_QueryMask) {
-        _channels[MFC_WrTagMask] = data;
+        _channels[MFC_RdTagMask] = data;
         return;
     }
     if (offset == TagClassId::Prxy_QueryType) {
