@@ -22,6 +22,7 @@
 #include "ps3emu/libs/message.h"
 #include "ps3emu/libs/trophy.h"
 #include "ps3emu/libs/savedata.h"
+#include "ps3emu/libs/spurs.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <openssl/sha.h>
@@ -281,6 +282,18 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmGetTimeStamp),
     ENTRY(cellSaveDataAutoSave2),
     ENTRY(cellSaveDataAutoLoad2),
+    ENTRY(emuProxyEnter),
+    ENTRY(emuProxyExit),
+    ENTRY(emuBranch),
+    ENTRY(_cellSpursTaskAttribute2Initialize_proxy),
+    ENTRY(cellSpursCreateTaskset2_proxy),
+    ENTRY(cellSpursCreateTask2_proxy),
+    ENTRY(cellSpursCreateTaskWithAttribute_proxy),
+    ENTRY(cellSpursEventFlagAttachLv2EventQueue_proxy),
+    ENTRY(_cellSpursEventFlagInitialize_proxy),
+    ENTRY(cellSyncQueueInitialize_proxy),
+    ENTRY(_cellSpursQueueInitialize_proxy),
+    ENTRY(cellSpursEventFlagWait_proxy),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -290,11 +303,12 @@ void PPUThread::ncall(uint32_t index) {
         ERROR(libs) << msg;
         throw std::runtime_error(msg);
     }
+    setEMUREG(0, getNIP());
     setNIP(getLR());
     ncallTable[index].stub(this);
 }
 
-const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index) {
+const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound) {
     auto count = sizeof(ncallTable) / sizeof(NCallEntry);
     for (uint32_t i = 0; i < count; ++i) {
         if (ncallTable[i].fnid == fnid) {
@@ -302,5 +316,6 @@ const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index) {
             return &ncallTable[i];
         }
     }
+    assert(!assertFound);
     return nullptr;
 }

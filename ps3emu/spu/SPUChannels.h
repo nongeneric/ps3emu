@@ -162,7 +162,7 @@ class ISPUChannelsThread {
 public:
     virtual void run() = 0;
     virtual void setNip(uint32_t) = 0;
-    virtual uint8_t* ls() = 0;
+    virtual uint8_t* ls(uint32_t i) = 0;
     virtual ~ISPUChannelsThread() = default;
 };
 

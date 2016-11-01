@@ -12,7 +12,7 @@ public:
     std::array<uint8_t, LocalStorageSize> _ls;
     void run() override { _run = true; }
     void setNip(uint32_t nip) override { _nip = nip; }
-    uint8_t* ls() override { return &_ls[0]; }
+    uint8_t* ls(uint32_t i) override { return &_ls[i]; }
 };
 
 TEST_CASE("spuchannels_mailbox_basic") {

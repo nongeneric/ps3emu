@@ -590,6 +590,16 @@ void DebuggerModel::exec(QString command) {
     }
 }
 
+uint64_t DebuggerModel::evalExpr(std::string expr) {
+    try {
+        return _activeThread ? ::evalExpr(expr, _activeThread)
+                             : _activeSPUThread ? ::evalExpr(expr, _activeSPUThread) : 0;
+    } catch (std::exception& e) {
+        emit message(QString("expr eval failed: ") + e.what());
+        return -1;
+    }
+}
+
 void DebuggerModel::execSingleCommand(QString command) {
     auto name = command.section(':', 0, 0).trimmed();
     
@@ -632,15 +642,7 @@ void DebuggerModel::execSingleCommand(QString command) {
         return;
     }
     
-    uint64_t exprVal;
-    try {
-        exprVal = _activeThread ? evalExpr(expr.toStdString(), _activeThread)
-                : _activeSPUThread ? evalExpr(expr.toStdString(), _activeSPUThread)
-                : 0;
-    } catch (std::exception& e) {
-        emit message(QString("expr eval failed: ") + e.what());
-        return;
-    }
+    auto exprVal = evalExpr(expr.toStdString());
     
     try {
         if (name == "go") {
@@ -668,6 +670,16 @@ void DebuggerModel::execSingleCommand(QString command) {
             }
             setSPUSoftBreak(elfSource, exprVal);
             return;
+        } else if (name == "dump") {
+            auto start = exprVal;
+            auto end = evalExpr(command.section(':', 2, 2).toStdString());
+            auto path = "/tmp/dump.bin";
+            auto f = fopen(path, "w");
+            std::vector<uint8_t> vec(end - start);
+            g_state.mm->readMemory(start, &vec[0], vec.size());
+            fwrite(&vec[0], 1, vec.size(), f);
+            fclose(f);
+            messagef("memory dump %x-%x saved to %s", start, end, path);
         } else if (name == "p") {
             emit message(QString(" : 0x%1").arg(exprVal, 0, 16));
             return;

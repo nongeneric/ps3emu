@@ -77,8 +77,10 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
     auto name = printName(attr->name, SYS_SYNC_NAME_SIZE);
     info->name = name;
     *equeue_id = queues.create(std::move(info));
-    INFO(libs) << ssnprintf("sys_event_queue_create(id = %x, size = %d, name = %s, %s)",
+    INFO(libs) << ssnprintf("sys_event_queue_create(id = %x, event_queue_key = %llx, "
+                            "size = %d, name = %s, %s)",
                             *equeue_id,
+                            event_queue_key,
                             size,
                             name,
                             attr->attr_protocol == SYS_SYNC_PRIORITY ? "priority"

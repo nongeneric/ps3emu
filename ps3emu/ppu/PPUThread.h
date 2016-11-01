@@ -154,6 +154,7 @@ class PPUThread {
     std::array<uint64_t, 32> _GPR;
     std::array<double, 32> _FPR;
     std::array<uint128_t, 32> _V;
+    std::array<uint64_t, 2> _EMUREG;
     FPSCR_t _FPSCR;
     CR_t _CR;
     XER_t _XER;
@@ -203,6 +204,16 @@ public:
     template <typename V>
     inline uint64_t getGPR(V i) {
         return _GPR[getUValue(i)];
+    }
+    
+    template <typename V>
+    inline void setEMUREG(V i, uint64_t value) {
+        _EMUREG[getUValue(i)] = value;
+    }
+    
+    template <typename V>
+    inline uint64_t getEMUREG(V i) {
+        return _EMUREG[getUValue(i)];
     }
     
     template <typename V>

@@ -77,6 +77,7 @@ class DebuggerModel : public QWidget {
     void loadElfHandler(LoadElfCommand command);
     void runHandler(RunCommand command);
     void printBacktrace();
+    uint64_t evalExpr(std::string expr);
     
     template<typename... Ts>
     void messagef(const char* format, Ts... args) {

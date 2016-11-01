@@ -274,5 +274,5 @@ public:
     SPUChannels* channels();
     
     // ISPUChannelsThread
-    inline uint8_t* ls() override { return ptr(0); }
+    inline uint8_t* ls(uint32_t i) override { return ptr(i); }
 };

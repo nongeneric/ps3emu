@@ -50,7 +50,7 @@ unsigned SpuEvent::wait() {
 void SpuEvent::acknowledge(unsigned mask) {
     boost::unique_lock<boost::mutex> lock(_m);
     _pending &= ~mask;
-    _count = 0;
+    updateCount();
 }
 
 void SpuEvent::setMask(unsigned mask) {
@@ -66,7 +66,7 @@ unsigned SpuEvent::mask() {
 }
 
 void SpuEvent::updateCount() {
-    _count |= (_pending & _mask) != 0;
+    _count = (_pending & _mask) != 0;
 }
 
 unsigned SpuSignal::value() {
@@ -112,6 +112,10 @@ SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread)
     _channels[MFC_WrTagMask] = -1;
 }
 
+#define STALL_AND_NOTIFY(x) (x >> 63ul)
+#define LTS(x) ((x >> 32ul) & 0x7fffful)
+#define LEAL(x) (x & 0xfffffffful)
+
 void SPUChannels::command(uint32_t word) {
     union {
         uint32_t val;
@@ -124,7 +128,7 @@ void SPUChannels::command(uint32_t word) {
     auto eal = _channels[MFC_EAL].load();
     assert(_channels[MFC_EAH] == 0);
     auto lsaVa = _channels[MFC_LSA].load();
-    auto lsa = &_thread->ls()[lsaVa];
+    auto lsa = _thread->ls(lsaVa);
     auto size = _channels[MFC_Size].load();
     auto opcode = cmd.opcode.u();
     auto name = mfcCommandToString(opcode);
@@ -191,6 +195,20 @@ void SPUChannels::command(uint32_t word) {
             log();
             break;
         }
+        case MFC_GETL_CMD:
+        case MFC_GETLF_CMD:
+        case MFC_GETLB_CMD: {
+            assert(size % sizeof(big_uint64_t) == 0);
+            auto list = (const big_uint64_t*)_thread->ls(eal);
+            for (auto i = 0u; i < size / sizeof(big_uint64_t); ++i) {
+                assert(!STALL_AND_NOTIFY(list[i]));
+                auto cursize = LTS(list[i]);
+                _mm->readMemory(LEAL(list[i]), lsa, cursize);
+                lsa += std::max(8ul, cursize);
+                INFO(spu) << ssnprintf("LEAL: %x", LEAL(list[i]));
+            }
+            break;
+        }   
         default: throw std::runtime_error("not implemented");
     }
 }
@@ -377,6 +395,7 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
 }
 
 uint32_t SPUChannels::mmio_read(unsigned offset) {
+    INFO(spu) << "reading mmio";
     auto res = [&] {
         switch (offset) {
             case TagClassId::SPU_Status: return _spuStatus.load();

@@ -32,6 +32,7 @@ void SPUThread::run() {
 
 void SPUThread::loop() {
     log_set_thread_name(ssnprintf("spu_%d", _id));
+    g_state.sth = this;
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     
@@ -43,6 +44,8 @@ void SPUThread::loop() {
 #endif
 
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
+    
+    //f = fopen(ssnprintf("/tmp/spu_%d_trace", _id).c_str(), "w");
     
     for (;;) {
         if (_singleStep) {
@@ -56,6 +59,25 @@ void SPUThread::loop() {
         uint32_t cia;
         try {
             cia = getNip();
+
+//             std::string str;
+//             auto instr = ptr(cia);
+//             SPUDasm<DasmMode::Print>(instr, cia, &str);
+//             std::string name;
+//             SPUDasm<DasmMode::Name>(instr, cia, &name);
+//             
+//             fprintf(f, "pc:%08x;", cia);
+//             for (auto i = 0u; i < 128; ++i) {
+//                 auto v = r(i);
+//                 fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
+//                         v.w<0>(),
+//                         v.w<1>(),
+//                         v.w<2>(),
+//                         v.w<3>());
+//             }
+//             fprintf(f, " #%s\n", str.c_str());
+//             fflush(f);
+            
             setNip(cia + 4);
             SPUDasm<DasmMode::Emulate>(ptr(cia), cia, this);
         } catch (BreakpointException& e) {

@@ -6,8 +6,10 @@
 #include <stdexcept>
 #include "log.h"
 #include "state.h"
+#include "InternalMemoryManager.h"
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
+#include <map>
 
 using namespace boost::endian;
 
@@ -106,7 +108,42 @@ struct vdescr {
 struct Replacement {
     std::string lib;
     std::string name;
+    std::string proxy;
 };
+
+std::map<uint32_t, uint32_t> branchMap;
+
+struct ProxyStub {
+    uint32_t lr;
+    uint32_t ncall_proxy_enter;
+    uint32_t ncall;
+    uint32_t ncall_proxy_exit;
+    uint32_t stolen1;
+    uint32_t ncall_abs_branch;
+};
+
+uint64_t emuProxyEnter() {
+    auto nip = g_state.th->getEMUREG(0);
+    auto stub = (ProxyStub*)g_state.mm->getMemoryPointer(nip - 8, sizeof(ProxyStub));
+    stub->lr = g_state.th->getLR();
+    g_state.th->setLR(nip + 4);
+    g_state.th->setNIP(nip);
+    return g_state.th->getGPR(3);
+}
+
+uint64_t emuProxyExit() {
+    auto nip = g_state.th->getEMUREG(0);
+    auto stub = (ProxyStub*)g_state.mm->getMemoryPointer(nip - 16, sizeof(ProxyStub));
+    g_state.th->setLR(stub->lr);
+    g_state.th->setNIP(nip);
+    return g_state.th->getGPR(3);
+}
+
+uint64_t emuBranch() {
+    auto nip = g_state.th->getEMUREG(0) - 4;
+    g_state.th->setNIP(branchMap[nip]);
+    return g_state.th->getGPR(3);
+}
 
 std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
                                            make_segment_t makeSegment,
@@ -204,11 +241,51 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
             continue;
         auto codeVa = mm->load<4>(stub);
         uint32_t index;
-        auto entry = findNCallEntry(fnid, index);
-        assert(entry); (void)entry;
+        findNCallEntry(fnid, index, true);
         stolenInfos.push_back({codeVa, stub, mm->load<4>(codeVa), index});
         encodeNCall(mm, codeVa, index);
     }
+    
+    std::vector<Replacement> proxies = {
+         { "cellSpurs", "_cellSpursTaskAttribute2Initialize", "_cellSpursTaskAttribute2Initialize_proxy" },
+         { "cellSpurs", "cellSpursCreateTaskset2", "cellSpursCreateTaskset2_proxy" },
+         { "cellSpurs", "cellSpursCreateTaskset", "cellSpursCreateTaskset2_proxy" },
+         { "cellSpurs", "cellSpursCreateTask2", "cellSpursCreateTask2_proxy" },
+         { "cellSpurs", "cellSpursCreateTask", "cellSpursCreateTask2_proxy" },
+         { "cellSpurs", "cellSpursCreateTaskWithAttribute", "cellSpursCreateTaskWithAttribute_proxy" },
+         { "cellSpurs", "cellSpursEventFlagAttachLv2EventQueue", "cellSpursEventFlagAttachLv2EventQueue_proxy" },
+         { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
+         { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
+         { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
+         { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
+    };
+    
+    for (auto&& repl : proxies) {
+        auto fnid = calcFnid(repl.name.c_str());
+        auto exportStub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
+        if (exportStub == 0)
+            continue;
+        auto codeVa = mm->load<4>(exportStub);
+        
+        uint32_t enterIndex, exitIndex, branchIndex, index;
+        findNCallEntry(calcFnid("emuProxyEnter"), enterIndex, true);
+        findNCallEntry(calcFnid("emuProxyExit"), exitIndex, true);
+        findNCallEntry(calcFnid("emuBranch"), branchIndex, true);
+        findNCallEntry(calcFnid(repl.proxy.c_str()), index, true);
+        
+        uint32_t stubVa;
+        g_state.memalloc->internalAlloc<4, ProxyStub>(&stubVa);
+        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
+        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall), index);
+        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
+        g_state.mm->store<4>(stubVa + offsetof(ProxyStub, stolen1), mm->load<4>(codeVa));
+        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
+        branchMap[stubVa + offsetof(ProxyStub, ncall_abs_branch)] = codeVa + 4;
+        
+        encodeNCall(mm, codeVa, branchIndex);
+        branchMap[codeVa] = stubVa + offsetof(ProxyStub, ncall_proxy_enter);
+    }
+    
     return stolenInfos;
 }
 

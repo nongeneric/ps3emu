@@ -4,6 +4,9 @@
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
 #include <sys/prctl.h>
+#include "ps3emu/ppu/PPUThread.h"
+#include "ps3emu/spu/SPUThread.h"
+#include "ps3emu/state.h"
 
 namespace {
     thread_local std::string thread_name;
@@ -42,13 +45,20 @@ void log_set_thread_name(std::string name) {
 }
 
 void log_unconditional(log_severity_t severity, log_type_t type, const char* message) {
-    auto const& formatted = ssnprintf("%s %s%s: %s",
+    std::string nip;
+    if (g_state.th) {
+        nip = ssnprintf("%08x ", g_state.th->getNIP());
+    } else if (g_state.sth) {
+        nip = ssnprintf("%08x ", g_state.sth->getNip());
+    }
+    auto const& formatted = ssnprintf("%s %s%s%s: %s",
                                       type == log_spu ? "SPU" :
                                       type == log_libs ? "LIB" :
                                       type == log_debugger ? "DBG" :
                                       type == log_rsx ? "RSX"
                                       : "?",
                                       thread_name,
+                                      nip,
                                       severity == log_info ? "INFO" :
                                       severity == log_warning ? "WARNING" :
                                       severity == log_error ? "ERROR"

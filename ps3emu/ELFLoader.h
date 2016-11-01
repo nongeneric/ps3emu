@@ -202,3 +202,7 @@ uint32_t findExportedSymbol(std::vector<std::shared_ptr<ELFLoader>> const& prxs,
                             uint32_t id,
                             std::string library,
                             prx_symbol_type_t type);
+
+uint64_t emuProxyEnter();
+uint64_t emuProxyExit();
+uint64_t emuBranch();

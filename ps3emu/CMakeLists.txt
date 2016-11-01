@@ -78,6 +78,7 @@ set(SRC
     libs/message.cpp
     libs/trophy.cpp
     libs/savedata.cpp
+    libs/spurs.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})
