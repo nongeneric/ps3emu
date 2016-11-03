@@ -2637,6 +2637,70 @@ EMU(VSPLTW, SIMDForm) {
     TH->setV(i->vD, (uint8_t*)be);
 }
 
+PRINT(VSPLTISH, SIMDForm) { // TODO: test
+    *result = format_nn("vspltish", i->vD, i->SIMM);
+}
+
+EMU(VSPLTISH, SIMDForm) {
+    int16_t v = i->SIMM.s();
+    int16_t be[8] = {
+        v, v, v, v,
+        v, v, v, v
+    };
+    TH->setV(i->vD, (uint8_t*)be);
+}
+
+PRINT(VMRGHH, SIMDForm) { // TODO: test
+    *result = format_nnn("vmrghh", i->vD, i->vA, i->vB);
+}
+
+EMU(VMRGHH, SIMDForm) {
+    int16_t abe[8], bbe[8];
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
+    int16_t dbe[8] = {
+        abe[0], bbe[0],
+        abe[1], bbe[1],
+        abe[2], bbe[2],
+        abe[3], bbe[3],
+    };
+    TH->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VMULOSH, SIMDForm) { // TODO: test
+    *result = format_nnn("vmulosh", i->vD, i->vA, i->vB);
+}
+
+EMU(VMULOSH, SIMDForm) {
+    int16_t abe[8], bbe[8];
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
+    int32_t dbe[4] = {
+        (int32_t)abe[1] * (int32_t)bbe[1],
+        (int32_t)abe[3] * (int32_t)bbe[3],
+        (int32_t)abe[5] * (int32_t)bbe[5],
+        (int32_t)abe[7] * (int32_t)bbe[7],
+    };
+    TH->setV(i->vD, (uint8_t*)dbe);
+}
+
+PRINT(VMRGLH, SIMDForm) { // TODO: test
+    *result = format_nnn("vmrglh", i->vD, i->vA, i->vB);
+}
+
+EMU(VMRGLH, SIMDForm) {
+    int16_t abe[8], bbe[8];
+    TH->getV(i->vA, (uint8_t*)abe);
+    TH->getV(i->vB, (uint8_t*)bbe);
+    int16_t dbe[8] = {
+        abe[4], bbe[4],
+        abe[5], bbe[5],
+        abe[6], bbe[6],
+        abe[7], bbe[7],
+    };
+    TH->setV(i->vD, (uint8_t*)dbe);
+}
+
 PRINT(VSPLTISW, SIMDForm) { // TODO: test
     *result = format_nn("vspltisw", i->vD, i->SIMM);
 }
@@ -3249,6 +3313,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                                 case 1220: invoke(VXOR);
                                 case 652: invoke(VSPLTW);
                                 case 908: invoke(VSPLTISW);
+                                case 844: invoke(VSPLTISH);
                                 case 10: invoke(VADDFP);
                                 case 74: invoke(VSUBFP);
                                 case 970: invoke(VCTSXS);
@@ -3273,6 +3338,9 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
                                 case 1098: invoke(VMINFP);
                                 case 586: invoke(VRFIZ);
                                 case 906: invoke(VCTUXS);
+                                case 332: invoke(VMRGLH);
+                                case 76: invoke(VMRGHH);
+                                case 328: invoke(VMULOSH);
                                 default: throw IllegalInstructionException();
                             }
                     }

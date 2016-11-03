@@ -513,3 +513,21 @@ TEST_CASE("") {
     ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
     REQUIRE(res == "td 31,r0,r0");
 }
+
+TEST_CASE("ppu_dasm_1") {
+    uint8_t instr[] = { 
+        0x11, 0x41, 0x03, 0x4c,
+        0x10, 0x0b, 0x08, 0x4c,
+        0x10, 0x2b, 0x09, 0x4c,
+        0x10, 0x00, 0x51, 0x48,
+    };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "vspltish v10,1");
+    ppu_dasm<DasmMode::Print>(instr + 4, 0x205c8, &res);
+    REQUIRE(res == "vmrghh v0,v11,v1");
+    ppu_dasm<DasmMode::Print>(instr + 8, 0x205c8, &res);
+    REQUIRE(res == "vmrglh v1,v11,v1");
+    ppu_dasm<DasmMode::Print>(instr + 12, 0x205c8, &res);
+    REQUIRE(res == "vmulosh v0,v0,v10");
+}

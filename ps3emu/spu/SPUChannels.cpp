@@ -204,11 +204,26 @@ void SPUChannels::command(uint32_t word) {
                 auto cursize = LTS(list[i]);
                 _mm->readMemory(LEAL(list[i]), lsa, cursize);
                 lsa += std::max(8ul, cursize);
-                INFO(spu) << ssnprintf("LEAL: %x", LEAL(list[i]));
+            }
+            break;
+        }
+        case MFC_PUTL_CMD:
+        case MFC_PUTRL_CMD:
+        case MFC_PUTLF_CMD:
+        case MFC_PUTLB_CMD:
+        case MFC_PUTRLF_CMD:
+        case MFC_PUTRLB_CMD: {
+            assert(size % sizeof(big_uint64_t) == 0);
+            auto list = (const big_uint64_t*)_thread->ls(eal);
+            for (auto i = 0u; i < size / sizeof(big_uint64_t); ++i) {
+                assert(!STALL_AND_NOTIFY(list[i]));
+                auto cursize = LTS(list[i]);
+                _mm->writeMemory(LEAL(list[i]), lsa, cursize);
+                lsa += std::max(8ul, cursize);
             }
             break;
         }   
-        default: throw std::runtime_error("not implemented");
+        default: assert(false); throw std::runtime_error("not implemented");
     }
 }
 
