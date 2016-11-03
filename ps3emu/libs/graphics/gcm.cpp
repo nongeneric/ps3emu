@@ -140,7 +140,7 @@ emu_void_t cellGcmGetConfiguration(CellGcmConfig* config) {
 }
 
 void setCurrentCommandBuffer(MainMemory* mm, ps3_uintptr_t va) {
-    INFO(libs) << __FUNCTION__;
+    INFO(rsx) << __FUNCTION__;
     mm->store<4>(emuGcmState.gCellGcmCurrentContext, va);
 }
 
@@ -334,7 +334,7 @@ emu_void_t cellGcmSetFlipHandler(ps3_uintptr_t handler) {
 }
 
 emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
-    INFO(libs) << __FUNCTION__;
+    INFO(rsx) << __FUNCTION__;
     setCurrentCommandBuffer(g_state.mm, emuGcmState.defaultContextDataEa);
     return emu_void;
 }
@@ -360,14 +360,14 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     
     g_state.rsx->encodeJump(data->current, nextBuffer - ioBase);
     
-    INFO(libs) << ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, "
-                            "jump = %x, dest = %x, defsize = %x, count = %x)",
-                            nextSize,
-                            nextBuffer - ioBase,
-                            data->current - ioBase,
-                            nextBuffer - ioBase,
-                            emuGcmState.defaultCommandBufferSize,
-                            count);
+    INFO(rsx) << ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, "
+                           "jump = %x, dest = %x, defsize = %x, count = %x)",
+                           nextSize,
+                           nextBuffer - ioBase,
+                           data->current - ioBase,
+                           nextBuffer - ioBase,
+                           emuGcmState.defaultCommandBufferSize,
+                           count);
     
     data->begin = nextBuffer;
     data->current = nextBuffer;
@@ -498,7 +498,7 @@ uint32_t cellGcmGetLastFlipTime(Process* proc) {
 }
 
 uint64_t cellGcmGetTimeStamp(uint32_t index) {
-    WARNING(libs) << "not implemented cellGcmGetTimeStamp";
+    WARNING(rsx) << "not implemented cellGcmGetTimeStamp";
     const auto valueOffset = 0;
     auto ea = getReportDataAddressLocation(index, MemoryLocation::Local);
     return g_state.mm->load<8>(ea + valueOffset);

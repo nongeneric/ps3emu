@@ -1836,6 +1836,9 @@ PRINT(br) {
 
 EMU(br) {
     int32_t offset = signed_lshift32(i->I16.s(), 2);
+    if (offset == 0) {
+        throw InfiniteLoopException();
+    }
     th->setNip((cia + offset) & LSLR);
 }
 

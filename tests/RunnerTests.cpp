@@ -2478,3 +2478,31 @@ TEST_CASE("spurs_job_inout_dma") {
         "## libspurs : sample_spurs_job_inout_dma SUCCEEDED ##\n"
     );
 }
+
+TEST_CASE("libswcache_linked_list_sort") {
+    auto output = startWaitGetOutput({"./binaries/libswcache_linked_list_sort/a.elf"});
+    REQUIRE( output ==
+        "(1) ### Sort linked list by PPU ###\n"
+        "Linked list by PatchedObject\n"
+        "verify linked list sort by PatchObject\n"
+        "Linked list by Pointer\n"
+        "verify linked list sort by Pointer\n"
+        "(2) ### Sort linked list by SPU ###\n"
+        "Linked list by PatchObject\n"
+        "Linked list by Pointer\n"
+        "verify linked list sort by PatchObject\n"
+        "verify linked list sort by Pointer\n"
+        "## libswcache : sample_swcache_linked_list_sort SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_task_hello3_exit_if_no_work") {
+    auto output = startWaitGetOutput({"./binaries/spurs_task_hello3_exit_if_no_work/a.elf"});
+    REQUIRE( output ==
+        "PPU: wait for completion of the task\n"
+        "res = 80\n"
+        "PPU: taskset completed\n"
+        "## libspurs : sample_spurs_hello SUCCEEDED ##\n"
+    );
+}
+

@@ -18,14 +18,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define SYS_SPU_THREAD_GROUP_TYPE_NORMAL                 0x00
-#define SYS_SPU_THREAD_GROUP_TYPE_SEQUENTIAL             0x01
-#define SYS_SPU_THREAD_GROUP_TYPE_SYSTEM                 0x02
-#define SYS_SPU_THREAD_GROUP_TYPE_MEMORY_FROM_CONTAINER  0x04
-#define SYS_SPU_THREAD_GROUP_TYPE_NON_CONTEXT            0x08
-#define SYS_SPU_THREAD_GROUP_TYPE_EXCLUSIVE_NON_CONTEXT  0x18
-#define SYS_SPU_THREAD_GROUP_TYPE_COOPERATE_WITH_SYSTEM  0x20
-
 struct InterruptTag;
 
 struct RawSpu {
@@ -124,7 +116,7 @@ std::vector<sys_spu_segment_t> spuImageInit(MainMemory* mm,
     return segs;
 }
 
-void spuImageMap(MainMemory* mm, sys_spu_image_t* image, void* ls) {
+void spuImageMap(MainMemory* mm, const sys_spu_image_t* image, void* ls) {
     auto segs = (sys_spu_segment_t*)mm -> getMemoryPointer(
                     image->segs, sizeof(sys_spu_segment_t) * image->nsegs);
     for (auto i = 0; i < image->nsegs; ++i) {
@@ -249,7 +241,7 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
     return CELL_OK;
 }
 
-void initThread(MainMemory* mm, SPUThread* thread, sys_spu_image_t* image) {
+void initThread(MainMemory* mm, SPUThread* thread, const sys_spu_image_t* image) {
     spuImageMap(mm, image, thread->ptr(0));
     thread->setNip(image->entry_point);
     thread->setElfSource(image->segs);
@@ -273,16 +265,21 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     std::string name;
     name.resize(attr->nsize);
     g_state.mm->readMemory(attr->name, &name[0], attr->nsize);
-    
-    *thread_id = proc->createSpuThread(name);
-    auto thread = proc->getSpuThread(*thread_id);
-    thread->setSpu(spu_num);
-    initThread(g_state.mm, thread.get(), img);
-    thread->r(3).dw<0>() = arg->arg1;
-    thread->r(4).dw<0>() = arg->arg2;
-    thread->r(5).dw<0>() = arg->arg3;
-    thread->r(6).dw<0>() = arg->arg4;
-    group->threads.push_back(*thread_id);
+    auto id = proc->createSpuThread(name);
+    group->threads.push_back(id);
+    *thread_id = id;
+    auto argcopy = *arg;
+    auto imgcopy = *img;
+    group->initializers[*thread_id] = [=] {
+        auto thread = proc->getSpuThread(id);
+        thread->setSpu(spu_num);
+        initThread(g_state.mm, thread.get(), &imgcopy);
+        thread->r(3).dw<0>() = argcopy.arg1;
+        thread->r(4).dw<0>() = argcopy.arg2;
+        thread->r(5).dw<0>() = argcopy.arg3;
+        thread->r(6).dw<0>() = argcopy.arg4;
+        thread->setGroup([=] { return group->threads; });
+    };
     return CELL_OK;
 }
 
@@ -291,6 +288,7 @@ int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id, Process* proc) {
     INFO(libs) << ssnprintf("sys_spu_thread_group_start(%s)", group->name);
     for (auto id : group->threads) {
         auto th = proc->getSpuThread(id);
+        group->initializers[id]();
         th->run();
     }
     return CELL_OK;

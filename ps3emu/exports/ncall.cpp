@@ -294,10 +294,12 @@ NCallEntry ncallTable[] {
     ENTRY(cellSyncQueueInitialize_proxy),
     ENTRY(_cellSpursQueueInitialize_proxy),
     ENTRY(cellSpursEventFlagWait_proxy),
+    ENTRY(_cellSpursAttributeInitialize_proxy),
+    ENTRY(cellSpursAttributeSetSpuThreadGroupType_proxy),
 };
 
 void PPUThread::ncall(uint32_t index) {
-    //INFO(libs) << ssnprintf("ncall %x", index);
+    //INFO(libs) << ssnprintf("ncall %s", ncallTable[index].name);
     if (index >= sizeof(ncallTable) / sizeof(NCallEntry)) {
         auto msg = ssnprintf("unknown ncall index %x", index);
         ERROR(libs) << msg;

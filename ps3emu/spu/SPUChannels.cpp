@@ -50,7 +50,7 @@ unsigned SpuEvent::wait() {
 void SpuEvent::acknowledge(unsigned mask) {
     boost::unique_lock<boost::mutex> lock(_m);
     _pending &= ~mask;
-    updateCount();
+    _count = 0;
 }
 
 void SpuEvent::setMask(unsigned mask) {
@@ -169,10 +169,9 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTLLC_CMD:
         case MFC_PUTQLLUC_CMD: {
             assert(opcode != MFC_PUTQLLUC_CMD);
+            assert(size == 0x80);
             auto stored = _mm->writeCond(eal, lsa, size);
-            if (opcode == MFC_PUTLLC_CMD) {
-                _channels[MFC_RdAtomicStat] |= !stored; // S
-            }
+            _channels[MFC_RdAtomicStat] |= !stored; // S
             logAtomic(stored);
             break;
         }
@@ -188,7 +187,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTRB_CMD: {
             if (opcode == MFC_PUTLLUC_CMD) {
                 assert(size == 0x80); // cache line
-                _channels[MFC_RdAtomicStat] |= 0b010; // U 
+                _channels[MFC_RdAtomicStat] |= 0b010; // U
             }
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
@@ -299,7 +298,7 @@ uint32_t SPUChannels::read(unsigned ch) {
             return _snr1.wait_clear();
         } else if (ch == SPU_RdSigNotify2) {
             return _snr2.wait_clear();
-        } else if (ch == SPU_RdEventMask) {
+        } else if (ch == SPU_RdEventMask) {  
             return _event.mask();
         } else if (ch == SPU_RdEventStat) {
             return _event.wait();

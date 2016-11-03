@@ -305,15 +305,16 @@ Event Process::run() {
                     return SPUSingleStepBreakpointEvent{ev->thread};
                 case SPUThreadEvent::Started: return SPUThreadStartedEvent{ev->thread};
                 case SPUThreadEvent::Finished: {
-                    ev->thread->join();
-                    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
-                    auto it =
-                        std::find_if(begin(_spuThreads),
-                                     end(_spuThreads),
-                                     [=](auto& th) { return th.get() == ev->thread; });
-                    assert(it != end(_spuThreads));
-                    _spuThreads.erase(it);
-                    return SPUThreadFinishedEvent{nullptr};
+//                    ev->thread->join();
+//                     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+//                     auto it =
+//                         std::find_if(begin(_spuThreads),
+//                                      end(_spuThreads),
+//                                      [=](auto& th) { return th.get() == ev->thread; });
+//                     assert(it != end(_spuThreads));
+//                     _spuThreads.erase(it);
+//                     return SPUThreadFinishedEvent{nullptr};
+                    break;
                 }
                 case SPUThreadEvent::InvalidInstruction:
                     return SPUInvalidInstructionEvent{ev->thread};

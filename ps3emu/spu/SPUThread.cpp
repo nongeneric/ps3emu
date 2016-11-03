@@ -77,7 +77,7 @@ void SPUThread::loop() {
 //             }
 //             fprintf(f, " #%s\n", str.c_str());
 //             fflush(f);
-            
+
             setNip(cia + 4);
             SPUDasm<DasmMode::Emulate>(ptr(cia), cia, this);
         } catch (BreakpointException& e) {
@@ -102,6 +102,14 @@ void SPUThread::loop() {
                 _cause = e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT
                              ? SPUThreadExitCause::GroupExit
                              : SPUThreadExitCause::Exit;
+                if (_cause == SPUThreadExitCause::GroupExit) {
+                    boost::unique_lock<boost::mutex> lock(_groupExitMutex);
+                    for (auto th : _getGroupThreads()) {
+                        if (th == _id)
+                            continue;
+                        g_state.proc->getSpuThread(th)->groupExit();
+                    }
+                }
                 break;
             } else if (e.type() == STOP_TYPE_RESERVE) { // raw spu
                 break;
@@ -115,6 +123,14 @@ void SPUThread::loop() {
             } else {
                 handleInterrupt(e.imboxValue());
             }
+        } catch (InfiniteLoopException& e) {
+            boost::unique_lock<boost::mutex> lock(_groupExitMutex);
+            _groupExitCv.wait(lock, [&] { return _groupExitPending; });
+            _groupExitPending = false;
+            SPU_Status_SetStopCode(_channels.spuStatus(), SYS_SPU_THREAD_STOP_GROUP_EXIT);
+            //_exitCode = _channels.mmio_read(SPU_Out_MBox);
+            _cause = SPUThreadExitCause::GroupExit;
+            break;
         } catch (std::exception& e) {
             INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
             setNip(cia);
@@ -125,6 +141,7 @@ void SPUThread::loop() {
     
     INFO(spu) << ssnprintf("spu thread loop finished, cause %s", to_string(_cause));
     _eventHandler(this, SPUThreadEvent::Finished);
+    _hasStarted = false;
 }
 
 void SPUThread::singleStepBreakpoint() {
@@ -133,6 +150,10 @@ void SPUThread::singleStepBreakpoint() {
 
 void SPUThread::dbgPause(bool val) {
     _dbgPaused = val;
+}
+
+bool SPUThread::dbgIsPaused() {
+    return _dbgPaused;
 }
 
 SPUThread::SPUThread(Process* proc,
@@ -295,4 +316,15 @@ std::string SPUThread::getName() {
 
 SPUChannels* SPUThread::channels() {
     return &_channels;
+}
+
+void SPUThread::groupExit() {
+    boost::unique_lock<boost::mutex> lock(_groupExitMutex);
+    _groupExitPending = true;
+    _groupExitCv.notify_all();
+}
+
+void SPUThread::setGroup(std::function<std::vector<uint32_t>()> getThreads) {
+    boost::unique_lock<boost::mutex> lock(_groupExitMutex);
+    _getGroupThreads = getThreads;
 }

@@ -136,3 +136,29 @@ emu_void_t cellSpursEventFlagWait_proxy(uint32_t flag,
                             to_string(mode));
     return g_state.th->getGPR(3);
 }
+
+emu_void_t _cellSpursAttributeInitialize_proxy(uint32_t attr,
+                                               uint32_t revision,
+                                               uint32_t sdkVersion,
+                                               uint32_t nSpus,
+                                               int32_t spuPriority,
+                                               int32_t ppuPriority,
+                                               bool exitIfNoWork) {
+    INFO(libs) << ssnprintf(
+        "_cellSpursAttributeInitialize_proxy(%x, %x, %x, %d, %d, %d, %d)",
+        attr,
+        revision,
+        sdkVersion,
+        nSpus,
+        spuPriority,
+        ppuPriority,
+        exitIfNoWork);
+    return g_state.th->getGPR(3);
+}
+
+emu_void_t cellSpursAttributeSetSpuThreadGroupType_proxy(uint32_t attr,
+                                                         SpuThreadGroup type) {
+    INFO(libs) << ssnprintf("cellSpursAttributeSetSpuThreadGroupType_proxy(%s)",
+                            to_string(type));
+    return g_state.th->getGPR(3);
+}

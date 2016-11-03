@@ -191,6 +191,7 @@ public:
 #ifdef DEBUG
     void singleStepBreakpoint();
     void dbgPause(bool val);
+    bool dbgIsPaused();
 #endif
     
     void run();

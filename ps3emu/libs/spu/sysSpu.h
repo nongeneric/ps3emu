@@ -57,6 +57,7 @@ struct ThreadGroup {
     std::vector<uint32_t> threads;
     std::string name;
     std::map<uint32_t, int32_t> errorCodes;
+    std::map<uint32_t, std::function<void()>> initializers;
 };
 
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu);

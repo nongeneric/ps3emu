@@ -257,6 +257,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
          { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
          { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
          { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
+         { "cellSpurs", "_cellSpursAttributeInitialize", "_cellSpursAttributeInitialize_proxy" },
+         { "cellSpurs", "cellSpursAttributeSetSpuThreadGroupType", "cellSpursAttributeSetSpuThreadGroupType_proxy" },
          { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
     };
     

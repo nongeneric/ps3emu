@@ -55,6 +55,15 @@ ENUM(CellSpursQueueDirection,
      (CELL_SPURS_QUEUE_SPU2SPU, 0),
      (CELL_SPURS_QUEUE_SPU2PPU, 1),
      (CELL_SPURS_QUEUE_PPU2SPU, 2))
+    
+ENUM(SpuThreadGroup,
+     (SYS_SPU_THREAD_GROUP_TYPE_NORMAL, 0x00),
+     (SYS_SPU_THREAD_GROUP_TYPE_SEQUENTIAL, 0x01),
+     (SYS_SPU_THREAD_GROUP_TYPE_SYSTEM, 0x02),
+     (SYS_SPU_THREAD_GROUP_TYPE_MEMORY_FROM_CONTAINER, 0x04),
+     (SYS_SPU_THREAD_GROUP_TYPE_NON_CONTEXT, 0x08),
+     (SYS_SPU_THREAD_GROUP_TYPE_EXCLUSIVE_NON_CONTEXT, 0x18),
+     (SYS_SPU_THREAD_GROUP_TYPE_COOPERATE_WITH_SYSTEM, 0x20))
 
 emu_void_t _cellSpursTaskAttribute2Initialize_proxy(const CellSpursTaskAttribute2 *pAttr);
 emu_void_t cellSpursCreateTaskset2_proxy(uint32_t spurs,
@@ -88,3 +97,12 @@ emu_void_t _cellSpursQueueInitialize_proxy(uint32_t taskset,
 emu_void_t cellSpursEventFlagWait_proxy(uint32_t flag,
                                         const uint16_t* bits,
                                         CellSpursEventFlagWaitMode mode);
+emu_void_t _cellSpursAttributeInitialize_proxy(uint32_t attr,
+                                               uint32_t revision,
+                                               uint32_t sdkVersion,
+                                               uint32_t nSpus,
+                                               int32_t spuPriority,
+                                               int32_t ppuPriority,
+                                               bool exitIfNoWork);
+emu_void_t cellSpursAttributeSetSpuThreadGroupType_proxy(uint32_t attr,
+                                                         SpuThreadGroup type);

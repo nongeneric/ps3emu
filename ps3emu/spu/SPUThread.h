@@ -6,6 +6,8 @@
 #include "../BitField.h"
 #include "SPUChannels.h"
 #include <boost/thread.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/noncopyable.hpp>
 #include <atomic>
 #include <assert.h>
@@ -13,6 +15,7 @@
 #include <stdexcept>
 #include <string.h>
 #include <functional>
+#include <vector>
 #include <experimental/optional>
 #include "ps3emu/enum.h"
 
@@ -199,6 +202,11 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     void handleInterrupt(uint32_t interruptValue);
     void handleReceiveEvent();
     bool _hasStarted;
+    
+    boost::mutex _groupExitMutex;
+    boost::condition_variable _groupExitCv;
+    bool _groupExitPending = false;
+    std::function<std::vector<uint32_t>()> _getGroupThreads;
 
 public:
     SPUThread(Process* proc,
@@ -253,6 +261,7 @@ public:
     
     void singleStepBreakpoint();
     void dbgPause(bool val);
+    bool dbgIsPaused();
     void run();
     void cancel();
     SPUThreadExitInfo tryJoin(unsigned ms);
@@ -272,6 +281,8 @@ public:
     bool isQueuePortAvailableToConnect(uint32_t portNumber);
     std::string getName();
     SPUChannels* channels();
+    void groupExit();
+    void setGroup(std::function<std::vector<uint32_t>()> getThreads);
     
     // ISPUChannelsThread
     inline uint8_t* ls(uint32_t i) override { return ptr(i); }

@@ -15,6 +15,11 @@ public:
     BreakpointException() : std::runtime_error("breakpoint") { }
 };
 
+class InfiniteLoopException : public virtual std::runtime_error {
+public:
+    InfiniteLoopException() : std::runtime_error("infinite loop") { }
+};
+
 enum class DasmMode {
     Print, Emulate, Name
 };

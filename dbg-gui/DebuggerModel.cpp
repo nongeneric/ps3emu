@@ -744,27 +744,29 @@ void DebuggerModel::changeThread(uint32_t index) {
 
 void DebuggerModel::dumpThreads() {
     unsigned i = 0;
-    emit message("PPU Threads (id, nip)");
+    emit message("PPU Threads (id, nip, state)");
     for (auto th : _proc->dbgPPUThreads()) {
         auto current = th == _activeThread;
-        emit message(QString::asprintf("[%d]%s %08x  %08x  %s",
+        emit message(QString::asprintf("[%d]%s %08x  %08x  %s  %s",
                                        i,
                                        current ? "*" : " ",
                                        (uint32_t)th->getId(),
                                        (uint32_t)th->getNIP(),
-                                       th->getName().c_str()));
+                                       th->getName().c_str(),
+                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING"));
         i++;
     }
     emit message("SPU Threads (id, nip, source, name)");
     for (auto th : _proc->dbgSPUThreads()) {
         auto current = th == _activeSPUThread;
-        emit message(QString::asprintf("[%d]%s %08x  %08x  %08x  %s",
+        emit message(QString::asprintf("[%d]%s %08x  %08x  %08x  %s  %s",
                                        i,
                                        current ? "*" : " ",
                                        (uint32_t)th->getId(),
                                        th->getNip(),
                                        th->getElfSource(),
-                                       th->getName().c_str()));
+                                       th->getName().c_str(),
+                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING"));
         i++;
     }
 }

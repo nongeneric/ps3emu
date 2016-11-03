@@ -114,6 +114,10 @@ void PPUThread::singleStepBreakpoint() {
 void PPUThread::dbgPause(bool val) {
     _dbgPaused = val;
 }
+
+bool PPUThread::dbgIsPaused() {
+    return _dbgPaused;
+}
 #endif
 
 void PPUThread::run() {
