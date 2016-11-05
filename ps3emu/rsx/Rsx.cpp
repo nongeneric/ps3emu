@@ -245,15 +245,15 @@ void Rsx::TransformTimeout(uint16_t count, uint16_t registerCount) {
 }
 
 void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
-    const uint8_t* ptr;
     if (_mode == RsxOperationMode::Replay) {
-        ptr = _currentReplayBlob.data();
+        _context->fragmentBytecode = _currentReplayBlob;
     } else {
         auto ea = rsxOffsetToEa(gcmEnumToLocation(location), offset);
         _context->fragmentBytecode.resize(FragmentProgramSize);
         g_state.mm->readMemory(ea, &_context->fragmentBytecode[0], FragmentProgramSize);
-        ptr = &_context->fragmentBytecode[0];
     }
+    
+    auto ptr = &_context->fragmentBytecode[0];
     
     _context->tracer.pushBlob(ptr, FragmentProgramSize);
     TRACE(ShaderProgram, offset, location);
@@ -686,6 +686,20 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
     
     _isFlipInProgress = false;
+    
+    if (_frameCapturePending) {
+        _frameCapturePending = false;
+        _context->frame = 0;
+        _context->commandNum = 0;
+        _mode = RsxOperationMode::RunCapture;
+        _context->tracer.enable(true);
+    }
+    
+    if (_context->frame > 4 && _shortTrace) {
+        _shortTrace = false;
+        _mode = RsxOperationMode::Run;
+        _context->tracer.enable(false);
+    }
     
     resetContext();
 }
@@ -1423,7 +1437,7 @@ void Rsx::initGcm() {
     _context.reset(new RsxContext());
     
     if (_mode == RsxOperationMode::RunCapture) {
-        _context->tracer.enable();
+        _context->tracer.enable(true);
     }
     
     g_state.mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
@@ -2276,4 +2290,9 @@ uint32_t getReportDataAddressLocation(uint32_t index, MemoryLocation location) {
     }
     auto offset = 0x0e000000 + 16 * index;
     return rsxOffsetToEa(location, offset);
+}
+
+void Rsx::captureFrames() {
+    _frameCapturePending = true;
+    _shortTrace = true;
 }

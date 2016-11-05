@@ -5,10 +5,12 @@
 #include "ps3emu/state.h"
 #include "ps3emu/rsx/Rsx.h"
 
-void Tracer::enable() {
-    _enabled = true;
-    system("rm -rf /tmp/ps3emu.trace");
-    _db.createOrOpen("/tmp/ps3emu.trace");
+void Tracer::enable(bool enabled) {
+    _enabled = enabled;
+    if (_enabled) {
+        system("rm -rf /tmp/ps3emu.trace");
+        _db.createOrOpen("/tmp/ps3emu.trace");
+    }
 }
 
 bool Tracer::isEnabled() {

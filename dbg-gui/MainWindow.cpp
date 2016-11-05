@@ -127,6 +127,11 @@ void MainWindow::setupMenu() {
         connect(action, &QAction::triggered, this, [=]() { _model.pause(); });
         trace->addAction(action);
     }
+    {
+        auto action = new QAction("Capture Frames", this);
+        connect(action, &QAction::triggered, this, [=]() { _model.captureFrames(); });
+        trace->addAction(action);
+    }
     
 //     auto restart = new QAction("Restart", this);
 //     restart->setShortcut(QKeySequence(Qt::ControlModifier | Qt::Key_F9));

@@ -107,3 +107,7 @@ const char* printArgType(GcmArgType type) {
     }
     assert(false); return "";
 }
+
+void GcmDatabase::close() {
+    _db.reset(nullptr);
+}

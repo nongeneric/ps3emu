@@ -1091,3 +1091,10 @@ void DebuggerModel::printBacktrace() {
         }
     }
 }
+
+void DebuggerModel::captureFrames() {
+    if (g_state.rsx) {
+        messagef("capturing frames");
+        g_state.rsx->captureFrames();
+    }
+}

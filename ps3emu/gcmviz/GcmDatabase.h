@@ -33,7 +33,7 @@ public:
     int frames();
     int commands(int frame);
     GcmCommand getCommand(unsigned frame, unsigned num);
-    void clear();
+    void close();
 };
 
 const char* printArgType(GcmArgType type);

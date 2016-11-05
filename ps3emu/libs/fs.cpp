@@ -17,7 +17,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
-struct contentManager;
 using namespace boost::filesystem;
 class contentManager;
 

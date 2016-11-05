@@ -101,6 +101,7 @@ public:
     void runto(ps3_uintptr_t va);
     void runToLR();
     void pause();
+    void captureFrames();
     
 signals:
     void message(QString text);

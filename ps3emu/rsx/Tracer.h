@@ -143,7 +143,7 @@ class Tracer {
     std::vector<uint8_t> _blob;
     bool _blobSet = false;
 public:
-    void enable();
+    void enable(bool enabled);
     bool isEnabled();
     void pushBlob(const void* ptr, uint32_t size);
     void trace(uint32_t frame,

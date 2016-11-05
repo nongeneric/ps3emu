@@ -167,6 +167,8 @@ class Rsx {
     ConcurrentFifoQueue<GcmCommandReplayInfo> _replayQueue;
     ConcurrentFifoQueue<bool> _completionQueue;
     std::vector<uint8_t> _currentReplayBlob;
+    bool _frameCapturePending = false;
+    bool _shortTrace = false;
     
     void watchCaches();
     void memoryBreakHandler(uint32_t va, uint32_t size);
@@ -459,6 +461,7 @@ public:
     RsxContext* context();
     GLPersistentCpuBuffer* getBuffer(MemoryLocation location);
     uint32_t getLastFlipTime();
+    void captureFrames();
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
