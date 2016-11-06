@@ -5,6 +5,17 @@
 #include <boost/type_traits.hpp>
 #include <string>
 
+inline std::string rewrite_u(const char* mnemonic, uint64_t u) {
+    return ssnprintf("%s(%" PRIx64 ")", mnemonic, u);
+}
+
+template <typename OP1>
+inline std::string rewrite_nu(const char* mnemonic, OP1 op1, uint64_t u) {
+    return ssnprintf("%s(%s%d,0x%" PRIx64 ")", mnemonic, 
+                     op1.prefix(), op1.native(), 
+                     u);
+}
+
 inline std::string format_u(const char* mnemonic, uint64_t u) {
     return ssnprintf("%s %" PRIx64, mnemonic, u);
 }
@@ -85,15 +96,18 @@ inline std::string format_nnnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3,
     );
 }
 
-template <DasmMode M, typename P, typename E, typename S>
-void invoke_impl(const char* name, P* phandler, E* ehandler, void* instr, uint64_t cia, S* s) {
+template <DasmMode M, typename P, typename E, typename S, typename R>
+void invoke_impl(const char* name, P* phandler, E* ehandler, R* rhandler, void* instr, uint64_t cia, S* s) {
     typedef typename boost::function_traits<P>::arg1_type F;
     typedef typename boost::function_traits<P>::arg3_type PS;
     typedef typename boost::function_traits<E>::arg3_type ES;
+    typedef typename boost::function_traits<R>::arg3_type RS;
     if (M == DasmMode::Print)
         phandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<PS>(s));
     if (M == DasmMode::Emulate)
         ehandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<ES>(s));
     if (M == DasmMode::Name)
         *reinterpret_cast<std::string*>(s) = name;
+    if (M == DasmMode::Rewrite)
+        phandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<RS>(s));
 }

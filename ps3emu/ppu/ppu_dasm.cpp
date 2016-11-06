@@ -18,13 +18,73 @@
 #include <cinttypes>
 #include <limits>
 #include <tuple>
+#include <type_traits>
+
+#include <boost/preprocessor/variadic/to_list.hpp>
+#include <boost/preprocessor/variadic/elem.hpp>
+#include <boost/preprocessor/list/for_each.hpp>
+#include <boost/preprocessor/punctuation.hpp>
+#include <boost/preprocessor/logical.hpp>
+#include <boost/preprocessor/control.hpp>
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/control/if.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/list/enum.hpp>
+#include <boost/preprocessor/list/rest_n.hpp>
 
 using namespace boost::endian;
 
 #define MM g_state.mm
 #define TH thread
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
+#define REWRITE(name, form) inline void rewrite##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPUThread* thread)
+#define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, rewriteX, &x, cia, state); break
+
+template <typename T>
+std::string printSorU(T v) {
+    if (std::is_signed<T>::value) {
+        return ssnprintf("-%x", -v);
+    }
+    return ssnprintf("%x", v);
+}
+
+std::string print_args(std::vector<std::string> vec) {
+    std::string res;
+    for (auto i = 0u; i < vec.size(); ++i) {
+        if (i) {
+            res += ",";
+        }
+        res += vec[i];
+    }
+    return res;
+}
+
+template <typename... Ts>
+std::string rewrite_print(const char* mnemonic, Ts... ts) {
+    return ssnprintf("_%s(%s)", mnemonic, print_args(std::vector<std::string>{ printSorU(ts)... }));
+}
+
+inline void rewriteX(void* i, uint64_t cia, std::string* result) { }
+
+#define EMU_REWRITE(...) \
+    inline void BOOST_PP_CAT(rewrite, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)) \
+        (BOOST_PP_VARIADIC_ELEM(1, __VA_ARGS__)* i, uint64_t cia, std::string* result) { \
+            *result = rewrite_print( \
+                BOOST_PP_STRINGIZE(BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)), \
+                BOOST_PP_LIST_ENUM( \
+                    BOOST_PP_LIST_REST_N(2, BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__))) \
+            ); \
+        } \
+    inline void BOOST_PP_CAT(emulate, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)) \
+        (BOOST_PP_VARIADIC_ELEM(1, __VA_ARGS__)* i, uint64_t cia, PPUThread* thread) { \
+            BOOST_PP_EXPAND(BOOST_PP_CAT(_, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)) BOOST_PP_LPAREN() \
+                BOOST_PP_LIST_ENUM( \
+                    BOOST_PP_LIST_REST_N(2, BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__)))) \
+            ); \
+        }
 
 // Branch I-form, p24
 
@@ -33,18 +93,20 @@ inline uint64_t getNIA(IForm* i, uint64_t cia) {
     return i->AA.u() ? ext : (cia + ext);
 }
 
+#define _B(nia, lk) { \
+    if (lk) \
+        TH->setLR(cia + 4); \
+    TH->setNIP(nia); \
+}
+
+EMU_REWRITE(B, IForm, getNIA(i, cia), i->LK.u())
+
 PRINT(B, IForm) {
     const char* mnemonics[][2] = {
         { "b", "ba" }, { "bl", "bla" }  
     };
     auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
     *result = format_u(mnemonic, getNIA(i, cia));
-}
-
-EMU(B, IForm) {
-    TH->setNIP(getNIA(i, cia));
-    if (i->LK.u())
-        TH->setLR(cia + 4);
 }
 
 // Branch Conditional B-form, p24
@@ -86,27 +148,28 @@ PRINT(BC, BForm) {
     }
 }
 
-template <int P1, int P2, int P3, int P4>
-inline bool isTaken(BitField<P1, P1 + 1> bo0, 
-                    BitField<P2, P2 + 1> bo1,
-                    BitField<P3, P3 + 1> bo2,
-                    BitField<P4, P4 + 1> bo3,
+inline bool isTaken(unsigned bo0, 
+                    unsigned bo1,
+                    unsigned bo2,
+                    unsigned bo3,
                     PPUThread* thread,
-                    BI_t bi)
+                    unsigned bi)
 {
-    auto ctr_ok = bo2.u() | ((TH->getCTR() != 0) ^ bo3.u());
-    auto cond_ok = bo0.u() | (bit_test(TH->getCR(), 32, bi) == bo1.u());
+    auto ctr_ok = bo2 | ((TH->getCTR() != 0) ^ bo3);
+    auto cond_ok = bo0 | (bit_test(TH->getCR(), 32, bi) == bo1);
     return ctr_ok && cond_ok;
 }
 
-EMU(BC, BForm) {
-    if (!i->BO2.u())
-        TH->setCTR(TH->getCTR() - 1);
-    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, TH, i->BI))
-        TH->setNIP(getNIA(i, cia));
-    if (i->LK.u())
-        TH->setLR(cia + 4);
+#define _BC(bo0, bo1, bo2, bo3, bi, lk) { \
+    if (!bo2) \
+        TH->setCTR(TH->getCTR() - 1); \
+    if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) \
+        TH->setNIP(getNIA(i, cia)); \
+    if (lk) \
+        TH->setLR(cia + 4); \
 }
+
+EMU_REWRITE(BC, BForm, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u())
 
 // Branch Conditional to Link Register XL-form, p25
 
@@ -128,14 +191,17 @@ PRINT(BCLR, XLForm_2) {
     }
 }
 
-EMU(BCLR, XLForm_2) {
-    if (!i->BO2.u())
-        TH->setCTR(TH->getCTR() - 1);
-    if (isTaken(i->BO0, i->BO1, i->BO2, i->BO3, TH, i->BI))
-        TH->setNIP(TH->getLR() & ~3ul);
-    if (i->LK.u())
-        TH->setLR(cia + 4);
+
+#define _BCLR(bo0, bo1, bo2, bo3, bi, lk) { \
+    if (!bo2) \
+        TH->setCTR(TH->getCTR() - 1); \
+    if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) \
+        TH->setNIP(TH->getLR() & ~3ul); \
+    if (lk) \
+        TH->setLR(cia + 4); \
 }
+
+EMU_REWRITE(BCLR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u())
 
 // Branch Conditional to Count Register, p25
 
@@ -153,13 +219,15 @@ PRINT(BCCTR, XLForm_2) {
     }
 }
 
-EMU(BCCTR, XLForm_2) {
-    auto cond_ok = i->BO0.u() || bit_test(TH->getCR(), 32, i->BI) == i->BO1.u();
-    if (cond_ok)
-        TH->setNIP(TH->getCTR() & ~3);
-    if (i->LK.u())
-        TH->setLR(cia + 4);
+#define _BCCTR(bo0, bo1, bi, lk) { \
+    auto cond_ok = bo0 || bit_test(TH->getCR(), 32, bi) == bo1; \
+    if (cond_ok) \
+        TH->setNIP(TH->getCTR() & ~3); \
+    if (lk) \
+        TH->setLR(cia + 4); \
 }
+
+EMU_REWRITE(BCCTR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BI.u(), i->LK.u())
 
 // Condition Register AND, p28
 
@@ -167,11 +235,13 @@ PRINT(CRAND, XLForm_1) {
     *result = format_nnn("crand", i->BT, i->BA, i->BB);
 }
 
-EMU(CRAND, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), bit_test(cr, i->BA) & bit_test(cr, i->BB));
-    TH->setCR(cr);
+#define _CRAND(bt, ba, bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, bt, bit_test(cr, 32, ba) & bit_test(cr, 32, bb)); \
+    TH->setCR(cr); \
 }
+
+EMU_REWRITE(CRAND, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
 
 // Condition Register OR, p28
 
@@ -3286,8 +3356,6 @@ struct PPUDasmInstruction {
     std::string operands;
 };
 
-#define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, &x, cia, state); break
-
 template <DasmMode M, typename S>
 void ppu_dasm(void* instr, uint64_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
@@ -3730,7 +3798,7 @@ bool isTaken(void* branchInstr, uint64_t cia, PPUThread* thread) {
         return true;
     } else if (iform->OPCD.u() == 16) {
         auto b = reinterpret_cast<BForm*>(&x);
-        return isTaken(b->BO0, b->BO1, b->BO2, b->BO3, thread, b->BI);
+        return isTaken(b->BO0.u(), b->BO1.u(), b->BO2.u(), b->BO3.u(), thread, b->BI.u());
     }
     throw std::runtime_error("not absolute branch");
 }
@@ -3753,4 +3821,7 @@ template void ppu_dasm<DasmMode::Emulate, PPUThread>(
     void* instr, uint64_t cia, PPUThread* th);
 
 template void ppu_dasm<DasmMode::Name, std::string>(
+    void* instr, uint64_t cia, std::string* name);
+
+template void ppu_dasm<DasmMode::Rewrite, std::string>(
     void* instr, uint64_t cia, std::string* name);

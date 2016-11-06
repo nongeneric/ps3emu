@@ -35,7 +35,9 @@ union SPUForm {
 
 #define PRINT(name) inline void print##name(SPUForm* i, uint32_t cia, std::string* result)
 #define EMU(name) inline void emulate##name(SPUForm* i, uint32_t cia, SPUThread* th)
-#define INVOKE(name) invoke_impl<M>(#name, print##name, emulate##name, &x, cia, state); return
+#define INVOKE(name) invoke_impl<M>(#name, print##name, emulate##name, rewriteX, &x, cia, state); return
+
+inline void rewriteX(SPUForm* i, uint32_t cia, std::string* result) { }
 
 PRINT(lqd) {
     *result = format_br_nnn("lqd", i->RT, i->I10, i->RA);

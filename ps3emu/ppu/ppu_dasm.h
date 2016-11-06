@@ -21,7 +21,7 @@ public:
 };
 
 enum class DasmMode {
-    Print, Emulate, Name
+    Print, Emulate, Name, Rewrite
 };
 
 bool isAbsoluteBranch(void* instr);
