@@ -103,7 +103,7 @@ EMU_REWRITE(B, IForm, getNIA(i, cia), i->LK.u())
 
 PRINT(B, IForm) {
     const char* mnemonics[][2] = {
-        { "b", "ba" }, { "bl", "bla" }  
+        { "b", "ba" }, { "bl", "bla" }
     };
     auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
     *result = format_u(mnemonic, getNIA(i, cia));
@@ -130,10 +130,10 @@ PRINT(BC, BForm) {
         i->LK.u(), i->AA.u(), false, false, i->BO, i->BI, extMnemonic);
     if (mtype == BranchMnemonicType::Generic) {
         const char* mnemonics[][2] = {
-            { "bc", "bca" }, { "bcl", "bcla" }  
+            { "bc", "bca" }, { "bcl", "bcla" }
         };
         auto mnemonic = mnemonics[i->LK.u()][i->AA.u()];
-        *result = ssnprintf("%s %d,%s,%x", 
+        *result = ssnprintf("%s %d,%s,%x",
                             mnemonic, i->BO.u(), formatCRbit(i->BI).c_str(), getNIA(i, cia));
     } else if (i->BI.u() > 3) {
         if (mtype == BranchMnemonicType::ExtCondition) {
@@ -148,7 +148,7 @@ PRINT(BC, BForm) {
     }
 }
 
-inline bool isTaken(unsigned bo0, 
+inline bool isTaken(unsigned bo0,
                     unsigned bo1,
                     unsigned bo2,
                     unsigned bo3,
@@ -249,11 +249,13 @@ PRINT(CROR, XLForm_1) {
     *result = format_nnn("cror", i->BT, i->BA, i->BB);
 }
 
-EMU(CROR, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), bit_test(cr, 32, i->BA.u()) | bit_test(cr, 32, i->BB.u()));
-    TH->setCR(cr);
+#define _CROR(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, bit_test(cr, 32, _ba) | bit_test(cr, 32, _bb)); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CROR, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register XOR, p28
 
@@ -261,11 +263,13 @@ PRINT(CRXOR, XLForm_1) {
     *result = format_nnn("crxor", i->BT, i->BA, i->BB);
 }
 
-EMU(CRXOR, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), bit_test(cr, 32, i->BA.u()) ^ bit_test(cr, 32, i->BB.u()));
-    TH->setCR(cr);
+#define _CRXOR(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, bit_test(cr, 32, _ba) ^ bit_test(cr, 32, _bb)); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CRXOR, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register NAND, p28
 
@@ -273,11 +277,13 @@ PRINT(CRNAND, XLForm_1) {
     *result = format_nnn("crnand", i->BT, i->BA, i->BB);
 }
 
-EMU(CRNAND, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), !(bit_test(cr, 32, i->BA.u()) & bit_test(cr, 32, i->BB.u())));
-    TH->setCR(cr);
+#define _CRNAND(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, !(bit_test(cr, 32, _ba) & bit_test(cr, 32, _bb))); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CRNAND, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register NOR, p29
 
@@ -285,11 +291,13 @@ PRINT(CRNOR, XLForm_1) {
     *result = format_nnn("crnor", i->BT, i->BA, i->BB);
 }
 
-EMU(CRNOR, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), (!bit_test(cr, 32, i->BA.u())) | bit_test(cr, 32, i->BB.u()));
-    TH->setCR(cr);
+#define _CRNOR(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, (!bit_test(cr, 32, _ba)) | bit_test(cr, 32, _bb)); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CRNOR, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register Equivalent, p29
 
@@ -297,11 +305,13 @@ PRINT(CREQV, XLForm_1) {
     *result = format_nnn("creqv", i->BT, i->BA, i->BB);
 }
 
-EMU(CREQV, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), bit_test(cr, 32, i->BA.u()) == bit_test(cr, 32, i->BB.u()));
-    TH->setCR(cr);
+#define _CREQV(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, bit_test(cr, 32, _ba) == bit_test(cr, 32, _bb)); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CREQV, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register AND with Complement, p29
 
@@ -309,11 +319,13 @@ PRINT(CRANDC, XLForm_1) {
     *result = format_nnn("crandc", i->BT, i->BA, i->BB);
 }
 
-EMU(CRANDC, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), bit_test(cr, 32, i->BA.u()) & (!bit_test(cr, 32, i->BB.u())));
-    TH->setCR(cr);
+#define _CRANDC(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, bit_test(cr, 32, _ba) & (!bit_test(cr, 32, _bb))); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CRANDC, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register OR with Complement, p29
 
@@ -321,11 +333,13 @@ PRINT(CRORC, XLForm_1) {
     *result = format_nnn("crorc", i->BT, i->BA, i->BB);
 }
 
-EMU(CRORC, XLForm_1) {
-    auto cr = TH->getCR();
-    cr = bit_set(cr, i->BT.u(), bit_test(cr, 32, i->BA.u()) | (!bit_test(cr, 32, i->BB.u())));
-    TH->setCR(cr);
+#define _CRORC(_bt, _ba, _bb) { \
+    auto cr = TH->getCR(); \
+    cr = bit_set(cr, _bt, bit_test(cr, 32, _ba) | (!bit_test(cr, 32, _bb))); \
+    TH->setCR(cr); \
 }
+EMU_REWRITE(CRORC, XLForm_1, i->BT.u(), i->BA.u(), i->BB.u())
+
 
 // Condition Register Field Instruction, p30
 
@@ -333,9 +347,11 @@ PRINT(MCRF, XLForm_3) {
     *result = format_nn("mcrf", i->BF, i->BFA);
 }
 
-EMU(MCRF, XLForm_3) {
-    TH->setCRF(i->BF.u(), TH->getCRF(i->BFA.u()));
+#define _MCRF(_bf, _bfa) { \
+    TH->setCRF(_bf, TH->getCRF(_bfa)); \
 }
+EMU_REWRITE(MCRF, XLForm_3, i->BF.u(), i->BFA.u())
+
 
 // Load Byte and Zero, p34
 
@@ -343,11 +359,13 @@ PRINT(LBZ, DForm_1) {
     *result = format_br_nnn("lbz", i->RT, i->D, i->RA);
 }
 
-EMU(LBZ, DForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    TH->setGPR(i->RT, MM->load<1>(ea));
+#define _LBZ(_ra, _ds, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    TH->setGPR(_rt, MM->load<1>(ea)); \
 }
+EMU_REWRITE(LBZ, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
+
 
 // Load Byte and Zero, p34
 
@@ -355,11 +373,13 @@ PRINT(LBZX, XForm_1) {
     *result = format_nnn("lbzx", i->RT, i->RA, i->RB);
 }
 
-EMU(LBZX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<1>(ea));
+#define _LBZX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<1>(ea)); \
 }
+EMU_REWRITE(LBZX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Byte and Zero with Update, p34
 
@@ -367,11 +387,13 @@ PRINT(LBZU, DForm_1) {
     *result = format_br_nnn("lbzu", i->RT, i->D, i->RA);
 }
 
-EMU(LBZU, DForm_1) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    TH->setGPR(i->RT, MM->load<1>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LBZU(_ds, _ra, _rt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setGPR(_rt, MM->load<1>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LBZU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
+
 
 // Load Byte and Zero with Update Indexed, p34
 
@@ -379,11 +401,13 @@ PRINT(LBZUX, XForm_1) {
     *result = format_nnn("lbzux", i->RT, i->RA, i->RB);
 }
 
-EMU(LBZUX, XForm_1) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<1>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LBZUX(_ra, _rb, _rt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<1>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LBZUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Halfword and Zero, p35
 
@@ -391,11 +415,13 @@ PRINT(LHZ, DForm_1) {
     *result = format_br_nnn("lhz", i->RT, i->D, i->RA);
 }
 
-EMU(LHZ, DForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    TH->setGPR(i->RT, MM->load<2>(ea));
+#define _LHZ(_ra, _ds, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    TH->setGPR(_rt, MM->load<2>(ea)); \
 }
+EMU_REWRITE(LHZ, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
+
 
 // Load Halfword and Zero Indexed, p35
 
@@ -403,11 +429,13 @@ PRINT(LHZX, XForm_1) {
     *result = format_nnn("lhzx", i->RT, i->RA, i->RB);
 }
 
-EMU(LHZX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<2>(ea));
+#define _LHZX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<2>(ea)); \
 }
+EMU_REWRITE(LHZX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Halfword and Zero with Update, p35
 
@@ -415,11 +443,13 @@ PRINT(LHZU, DForm_1) {
     *result = format_br_nnn("lhzu", i->RT, i->D, i->RA);
 }
 
-EMU(LHZU, DForm_1) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    TH->setGPR(i->RT, MM->load<2>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LHZU(_ds, _ra, _rt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setGPR(_rt, MM->load<2>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LHZU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
+
 
 // Load Halfword and Zero with Update Indexed, p35
 
@@ -427,11 +457,13 @@ PRINT(LHZUX, XForm_1) {
     *result = format_nnn("lhzux", i->RT, i->RA, i->RB);
 }
 
-EMU(LHZUX, XForm_1) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<2>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LHZUX(_ra, _rb, _rt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<2>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LHZUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Halfword Algebraic, p36
 
@@ -439,11 +471,13 @@ PRINT(LHA, DForm_1) {
     *result = format_br_nnn("lha", i->RT, i->D, i->RA);
 }
 
-EMU(LHA, DForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    TH->setGPR(i->RT, MM->loads<2>(ea));
+#define _LHA(_ra, _ds, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    TH->setGPR(_rt, MM->loads<2>(ea)); \
 }
+EMU_REWRITE(LHA, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
+
 
 // Load Halfword Algebraic Indexed, p36
 
@@ -451,11 +485,13 @@ PRINT(LHAX, XForm_1) {
     *result = format_nnn("LHAX", i->RT, i->RA, i->RB);
 }
 
-EMU(LHAX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->loads<2>(ea));
+#define _LHAX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->loads<2>(ea)); \
 }
+EMU_REWRITE(LHAX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Halfword Algebraic with Update, p36
 
@@ -463,11 +499,13 @@ PRINT(LHAU, DForm_1) {
     *result = format_br_nnn("lhaux", i->RT, i->D, i->RA);
 }
 
-EMU(LHAU, DForm_1) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    TH->setGPR(i->RT, MM->loads<2>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LHAU(_ds, _ra, _rt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setGPR(_rt, MM->loads<2>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LHAU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
+
 
 // Load Halfword Algebraic with Update Indexed, p36
 
@@ -475,11 +513,13 @@ PRINT(LHAUX, XForm_1) {
     *result = format_nnn("lhaux", i->RT, i->RA, i->RB);
 }
 
-EMU(LHAUX, XForm_1) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->loads<2>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LHAUX(_ra, _rb, _rt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->loads<2>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LHAUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Word and Zero, p37
 
@@ -487,11 +527,13 @@ PRINT(LWZ, DForm_1) {
     *result = format_br_nnn("lwz", i->RT, i->D, i->RA);
 }
 
-EMU(LWZ, DForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    TH->setGPR(i->RT, MM->load<4>(ea));
+#define _LWZ(_ra, _ds, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    TH->setGPR(_rt, MM->load<4>(ea)); \
 }
+EMU_REWRITE(LWZ, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
+
 
 // Load Word and Zero Indexed, p37
 
@@ -499,11 +541,13 @@ PRINT(LWZX, XForm_1) {
     *result = format_nnn("lwzx", i->RT, i->RA, i->RB);
 }
 
-EMU(LWZX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<4>(ea));
+#define _LWZX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<4>(ea)); \
 }
+EMU_REWRITE(LWZX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Word and Zero with Update, p37
 
@@ -511,11 +555,13 @@ PRINT(LWZU, DForm_1) {
     *result = format_br_nnn("lwzu", i->RT, i->D, i->RA);
 }
 
-EMU(LWZU, DForm_1) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    TH->setGPR(i->RT, MM->load<4>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LWZU(_ds, _ra, _rt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setGPR(_rt, MM->load<4>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LWZU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
+
 
 // Load Word and Zero with Update Indexed, p37
 
@@ -523,11 +569,13 @@ PRINT(LWZUX, XForm_1) {
     *result = format_nnn("lwzux", i->RT, i->RA, i->RB);
 }
 
-EMU(LWZUX, XForm_1) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<4>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LWZUX(_ra, _rb, _rt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<4>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LWZUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Word Algebraic, p38
 
@@ -535,11 +583,13 @@ PRINT(LWA, DSForm_1) {
     *result = format_br_nnn("lwa", i->RT, i->DS, i->RA);
 }
 
-EMU(LWA, DSForm_1) {
-    auto b = i->RA.u() == 0 ? 0 : TH->getGPR(i->RA);
-    auto ea = b + i->DS.native();
-    TH->setGPR(i->RT, MM->loads<4>(ea));
+#define _LWA(_ra, _ds, _rt) { \
+    auto b = _ra == 0 ? 0 : TH->getGPR(_ra); \
+    auto ea = b + _ds; \
+    TH->setGPR(_rt, MM->loads<4>(ea)); \
 }
+EMU_REWRITE(LWA, DSForm_1, i->RA.u(), i->DS.native(), i->RT.u())
+
 
 // Load Word Algebraic Indexed, p38
 
@@ -547,11 +597,13 @@ PRINT(LWAX, XForm_1) {
     *result = format_nnn("lwax", i->RT, i->RA, i->RB);
 }
 
-EMU(LWAX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->loads<4>(ea));
+#define _LWAX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->loads<4>(ea)); \
 }
+EMU_REWRITE(LWAX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Word Algebraic with Update Indexed, p38
 
@@ -559,11 +611,13 @@ PRINT(LWAUX, XForm_1) {
     *result = format_nnn("lwaux", i->RT, i->RA, i->RB);
 }
 
-EMU(LWAUX, XForm_1) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->loads<4>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LWAUX(_ra, _rb, _rt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->loads<4>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LWAUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Doubleword, p39
 
@@ -571,11 +625,13 @@ PRINT(LD, DSForm_1) {
     *result = format_br_nnn("ld", i->RT, i->DS, i->RA);
 }
 
-EMU(LD, DSForm_1) {
-    auto b = i->RA.u() == 0 ? 0 : TH->getGPR(i->RA);
-    auto ea = b + i->DS.native();
-    TH->setGPR(i->RT, MM->load<8>(ea));
+#define _LD(_ra, _ds, _rt) { \
+    auto b = _ra == 0 ? 0 : TH->getGPR(_ra); \
+    auto ea = b + _ds; \
+    TH->setGPR(_rt, MM->load<8>(ea)); \
 }
+EMU_REWRITE(LD, DSForm_1, i->RA.u(), i->DS.native(), i->RT.u())
+
 
 // Load Doubleword Indexed, p39
 
@@ -583,11 +639,13 @@ PRINT(LDX, XForm_1) {
     *result = format_nnn("ldx", i->RT, i->RA, i->RB);
 }
 
-EMU(LDX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<8>(ea));
+#define _LDX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<8>(ea)); \
 }
+EMU_REWRITE(LDX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // Load Doubleword with Update, p39
 
@@ -595,11 +653,13 @@ PRINT(LDU, DSForm_1) {
     *result = format_br_nnn("ldu", i->RT, i->DS, i->RA);
 }
 
-EMU(LDU, DSForm_1) {
-    auto ea = TH->getGPR(i->RA) + i->DS.native();
-    TH->setGPR(i->RT, MM->load<8>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LDU(_ds, _ra, _rt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setGPR(_rt, MM->load<8>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LDU, DSForm_1, i->DS.native(), i->RA.u(), i->RT.u())
+
 
 // Load Doubleword with Update Indexed, p39
 
@@ -607,11 +667,13 @@ PRINT(LDUX, XForm_1) {
     *result = format_nnn("ldux", i->RT, i->RA, i->RB);
 }
 
-EMU(LDUX, XForm_1) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, MM->load<8>(ea));
-    TH->setGPR(i->RA, ea);
+#define _LDUX(_ra, _rb, _rt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setGPR(_rt, MM->load<8>(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LDUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 // STORES
 //
@@ -627,177 +689,217 @@ inline void PrintStoreIndexed(const char* mnemonic, XForm_8* i, std::string* res
 PRINT(STB, DForm_3) {
     PrintStore("stb", i, result);
 }
-EMU(STB, DForm_3) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    MM->store<1>(ea, TH->getGPR(i->RS));
+#define _STB(_ra, _ds, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    MM->store<1>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STB, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
+
 PRINT(STBX, XForm_8) {
     PrintStoreIndexed("stbx", i, result);
 }
-EMU(STBX, XForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    MM->store<1>(ea, TH->getGPR(i->RS));
+#define _STBX(_ra, _rb, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store<1>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STBX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 PRINT(STBU, DForm_3) {
     PrintStore("stbu", i, result);
 }
-EMU(STBU, DForm_3) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    MM->store<1>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STBU(_ds, _ra, _rs) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    MM->store<1>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STBU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
+
 PRINT(STBUX, XForm_8) {
     PrintStoreIndexed("stbux", i, result);
 }
-EMU(STBUX, XForm_8) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    MM->store<1>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STBUX(_ra, _rb, _rs) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    MM->store<1>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STBUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 
 PRINT(STH, DForm_3) {
     PrintStore("sth", i, result);
 }
-EMU(STH, DForm_3) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    MM->store<2>(ea, TH->getGPR(i->RS));
+#define _STH(_ra, _ds, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    MM->store<2>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STH, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
+
 PRINT(STHX, XForm_8) {
     PrintStoreIndexed("sthx", i, result);
 }
-EMU(STHX, XForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    MM->store<2>(ea, TH->getGPR(i->RS));
+#define _STHX(_ra, _rb, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store<2>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STHX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 PRINT(STHU, DForm_3) {
     PrintStore("sthu", i, result);
 }
-EMU(STHU, DForm_3) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    MM->store<2>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STHU(_ds, _ra, _rs) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    MM->store<2>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STHU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
+
 PRINT(STHUX, XForm_8) {
     PrintStoreIndexed("sthux", i, result);
 }
-EMU(STHUX, XForm_8) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    MM->store<2>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STHUX(_ra, _rb, _rs) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    MM->store<2>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STHUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 
 PRINT(STW, DForm_3) {
     PrintStore("stw", i, result);
 }
-EMU(STW, DForm_3) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    MM->store<4>(ea, TH->getGPR(i->RS));
+#define _STW(_ra, _ds, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    MM->store<4>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STW, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
+
 PRINT(STWX, XForm_8) {
     PrintStoreIndexed("stwx", i, result);
 }
-EMU(STWX, XForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    MM->store<4>(ea, TH->getGPR(i->RS));
+#define _STWX(_ra, _rb, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store<4>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STWX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 PRINT(STWU, DForm_3) {
     PrintStore("stwu", i, result);
 }
-EMU(STWU, DForm_3) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    MM->store<4>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STWU(_ds, _ra, _rs) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    MM->store<4>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STWU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
+
 PRINT(STWUX, XForm_8) {
     PrintStoreIndexed("stwux", i, result);
 }
-EMU(STWUX, XForm_8) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    MM->store<4>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STWUX(_ra, _rb, _rs) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    MM->store<4>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STWUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
-PRINT(STD, DSForm_2) { 
+
+PRINT(STD, DSForm_2) {
     *result = format_br_nnn("std", i->RS, i->DS, i->RA);
 }
 
-EMU(STD, DSForm_2) { 
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->DS.native();
-    MM->store<8>(ea, TH->getGPR(i->RS));
+#define _STD(_ra, _ds, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    MM->store<8>(ea, TH->getGPR(_rs)); \
+}
+EMU_REWRITE(STD, DSForm_2, i->RA.u(), i->DS.native(), i->RS.u())
+
+
+PRINT(STDX, XForm_8) {
+    PrintStoreIndexed("stdx", i, result);
 }
 
-PRINT(STDX, XForm_8) { 
-    PrintStoreIndexed("stdx", i, result);     
+#define _STDX(_ra, _rb, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store<8>(ea, TH->getGPR(_rs)); \
 }
+EMU_REWRITE(STDX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
-EMU(STDX, XForm_8) { 
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    MM->store<8>(ea, TH->getGPR(i->RS));
-}
 
-PRINT(STDU, DSForm_2) { 
+PRINT(STDU, DSForm_2) {
     *result = format_br_nnn("stdu", i->RS, i->DS, i->RA);
 }
 
-EMU(STDU, DSForm_2) { 
-    auto ea = TH->getGPR(i->RA) + i->DS.native();
-    MM->store<8>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
+#define _STDU(_ds, _ra, _rs) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    MM->store<8>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
+}
+EMU_REWRITE(STDU, DSForm_2, i->DS.native(), i->RA.u(), i->RS.u())
+
+
+PRINT(STDUX, XForm_8) {
+    PrintStoreIndexed("stdux", i, result);
 }
 
-PRINT(STDUX, XForm_8) { 
-    PrintStoreIndexed("stdux", i, result);     
+#define _STDUX(_ra, _rb, _rs) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    MM->store<8>(ea, TH->getGPR(_rs)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(STDUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
-EMU(STDUX, XForm_8) {
-    auto ea = TH->getGPR(i->RA.u()) + TH->getGPR(i->RB);
-    MM->store<8>(ea, TH->getGPR(i->RS));
-    TH->setGPR(i->RA, ea);
-}
 
 // Fixed-Point Load and Store with Byte Reversal Instructions, p44
 
 PRINT(LHBRX, XForm_1) {
     *result = format_nnn("lhbrx", i->RT, i->RA, i->RB);
 }
-EMU(LHBRX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, endian_reverse(MM->load<2>(ea)));
+#define _LHBRX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, endian_reverse(MM->load<2>(ea))); \
 }
+EMU_REWRITE(LHBRX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 PRINT(LWBRX, XForm_1) {
     *result = format_nnn("lwbrx", i->RT, i->RA, i->RB);
 }
-EMU(LWBRX, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setGPR(i->RT, endian_reverse(MM->load<4>(ea)));
+#define _LWBRX(_ra, _rb, _rt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setGPR(_rt, endian_reverse(MM->load<4>(ea))); \
 }
+EMU_REWRITE(LWBRX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 PRINT(STHBRX, XForm_8) {
     *result = format_nnn("sthbrx", i->RS, i->RA, i->RB);
 }
-EMU(STHBRX, XForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    MM->store<2>(ea, endian_reverse(TH->getGPR(i->RS)));
+#define _STHBRX(_ra, _rb, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store<2>(ea, endian_reverse(TH->getGPR(_rs))); \
 }
+EMU_REWRITE(STHBRX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 PRINT(STWBRX, XForm_8) {
     *result = format_nnn("stwbrx", i->RS, i->RA, i->RB);
 }
-EMU(STWBRX, XForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    MM->store<4>(ea, endian_reverse(TH->getGPR(i->RS)));
+#define _STWBRX(_ra, _rb, _rs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store<4>(ea, endian_reverse(TH->getGPR(_rs))); \
 }
+EMU_REWRITE(STWBRX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 
 // Fixed-Point Arithmetic Instructions, p51
 
@@ -805,19 +907,23 @@ PRINT(ADDI, DForm_2) {
     *result = format_nnn("addi", i->RT, i->RA, i->SI);
 }
 
-EMU(ADDI, DForm_2) {
-    auto b = getB(i->RA.u(), TH);
-    TH->setGPR(i->RT, i->SI.s() + b);
+#define _ADDI(_ra, _sis, _rt) { \
+    auto b = getB(_ra, TH); \
+    TH->setGPR(_rt, _sis + b); \
 }
+EMU_REWRITE(ADDI, DForm_2, i->RA.u(), i->SI.s(), i->RT.u())
+
 
 PRINT(ADDIS, DForm_2) {
     *result = format_nnn("addis", i->RT, i->RA, i->SI);
 }
 
-EMU(ADDIS, DForm_2) {
-    auto b = getB(i->RA.u(), TH);
-    TH->setGPR(i->RT, (int32_t)(i->SI.u() << 16) + b);
+#define _ADDIS(_ra, _siu, _rt) { \
+    auto b = getB(_ra, TH); \
+    TH->setGPR(_rt, (int32_t)(_siu << 16) + b); \
 }
+EMU_REWRITE(ADDIS, DForm_2, i->RA.u(), i->SI.u(), i->RT.u())
+
 
 template <int N, typename T>
 inline void update_CRFSign(T result, PPUThread* thread) {
@@ -831,8 +937,8 @@ inline void update_CR0(int64_t result, PPUThread* thread) {
     update_CRFSign<0>(result, TH);
 }
 
-inline void update_CR0_OV(unsigned oe, 
-                          unsigned rc, 
+inline void update_CR0_OV(unsigned oe,
+                          unsigned rc,
                           bool ov, int64_t result, PPUThread* thread) {
     if (oe && ov) {
         TH->setOV();
@@ -849,14 +955,16 @@ PRINT(ADD, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(ADD, XOForm_1) {
-    auto ra = TH->getGPR(i->RA);
-    auto rb = TH->getGPR(i->RB);
-    unsigned __int128 res = (__int128)ra + rb;
-    bool ov = res > 0xffffffffffffffff;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _ADD(_ra, _rb, _rt, _oe, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    auto rb = TH->getGPR(_rb); \
+    unsigned __int128 res = (__int128)ra + rb; \
+    bool ov = res > 0xffffffffffffffff; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(ADD, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(ADDZE, XOForm_3) {
     const char* mnemonics[][2] = {
@@ -865,13 +973,15 @@ PRINT(ADDZE, XOForm_3) {
     *result = format_nn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA);
 }
 
-EMU(ADDZE, XOForm_3) {
-    auto ra = TH->getGPR(i->RA);
-    unsigned __int128 res = (__int128)ra + TH->getCA();
-    bool ov = res > 0xffffffffffffffff;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _ADDZE(_ra, _rt, _oe, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    unsigned __int128 res = (__int128)ra + TH->getCA(); \
+    bool ov = res > 0xffffffffffffffff; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(ADDZE, XOForm_3, i->RA.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(SUBF, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -880,58 +990,66 @@ PRINT(SUBF, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(SUBF, XOForm_1) {
-    auto ra = TH->getGPR(i->RA);
-    auto rb = TH->getGPR(i->RB);
-    uint64_t res;
-    bool ov = 0;
-    if (i->OE.u())
-        ov = __builtin_usubl_overflow(rb, ra, &res);
-    else
-        res = rb - ra;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _SUBF(_ra, _rb, _oe, _rt, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    auto rb = TH->getGPR(_rb); \
+    uint64_t res; \
+    bool ov = 0; \
+    if (_oe) \
+        ov = __builtin_usubl_overflow(rb, ra, &res); \
+    else \
+        res = rb - ra; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(SUBF, XOForm_1, i->RA.u(), i->RB.u(), i->OE.u(), i->RT.u(), i->Rc.u())
+
 
 PRINT(ADDIC, DForm_2) {
     *result = format_nnn("addic", i->RT, i->RA, i->SI);
 }
 
-EMU(ADDIC, DForm_2) {
-    auto ra = TH->getGPR(i->RA);
-    auto si = i->SI.s();
-    uint64_t res;
-    auto ov = __builtin_uaddl_overflow(ra, si, &res);
-    TH->setGPR(i->RT, res);
-    TH->setCA(ov);
+#define _ADDIC(_ra, _sis, _rt) { \
+    auto ra = TH->getGPR(_ra); \
+    auto si = _sis; \
+    uint64_t res; \
+    auto ov = __builtin_uaddl_overflow(ra, si, &res); \
+    TH->setGPR(_rt, res); \
+    TH->setCA(ov); \
 }
+EMU_REWRITE(ADDIC, DForm_2, i->RA.u(), i->SI.s(), i->RT.u())
+
 
 PRINT(ADDICD, DForm_2) {
     *result = format_nnn("addic.", i->RT, i->RA, i->SI);
 }
 
-EMU(ADDICD, DForm_2) {
-    auto ra = TH->getGPR(i->RA);
-    auto si = i->SI.s();
-    uint64_t res;
-    auto ov = __builtin_uaddl_overflow(ra, si, &res);
-    TH->setGPR(i->RT, res);
-    TH->setCA(ov);
-    update_CR0(res, TH);
+#define _ADDICD(_ra, _sis, _rt) { \
+    auto ra = TH->getGPR(_ra); \
+    auto si = _sis; \
+    uint64_t res; \
+    auto ov = __builtin_uaddl_overflow(ra, si, &res); \
+    TH->setGPR(_rt, res); \
+    TH->setCA(ov); \
+    update_CR0(res, TH); \
 }
+EMU_REWRITE(ADDICD, DForm_2, i->RA.u(), i->SI.s(), i->RT.u())
+
 
 PRINT(SUBFIC, DForm_2) {
     *result = format_nnn("subfic", i->RT, i->RA, i->SI);
 }
 
-EMU(SUBFIC, DForm_2) {
-    auto ra = TH->getGPR(i->RA);
-    auto si = i->SI.s();
-    int64_t res;
-    auto ov = __builtin_ssubl_overflow(si, ra, &res);
-    TH->setGPR(i->RT, res);
-    TH->setCA(ov);
+#define _SUBFIC(_ra, _sis, _rt) { \
+    auto ra = TH->getGPR(_ra); \
+    auto si = _sis; \
+    int64_t res; \
+    auto ov = __builtin_ssubl_overflow(si, ra, &res); \
+    TH->setGPR(_rt, res); \
+    TH->setCA(ov); \
 }
+EMU_REWRITE(SUBFIC, DForm_2, i->RA.u(), i->SI.s(), i->RT.u())
+
 
 PRINT(ADDC, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -940,16 +1058,18 @@ PRINT(ADDC, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(ADDC, XOForm_1) {
-    auto ra = TH->getGPR(i->RA);
-    auto rb = TH->getGPR(i->RB);
-    unsigned __int128 res = ra;
-    res += rb;
-    auto ca = res >> 64;
-    TH->setCA(ca);
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ca, res, TH);
+#define _ADDC(_ra, _rb, _rt, _oe, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    auto rb = TH->getGPR(_rb); \
+    unsigned __int128 res = ra; \
+    res += rb; \
+    auto ca = res >> 64; \
+    TH->setCA(ca); \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ca, res, TH); \
 }
+EMU_REWRITE(ADDC, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(SUBFC, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -958,17 +1078,19 @@ PRINT(SUBFC, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(SUBFC, XOForm_1) {
-    auto ra = TH->getGPR(i->RA);
-    auto rb = TH->getGPR(i->RB);
-    unsigned __int128 res = ~ra;
-    res += rb;
-    res += 1;
-    auto ca = res >> 64;
-    TH->setCA(ca);
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ca, res, TH);
+#define _SUBFC(_ra, _rb, _rt, _oe, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    auto rb = TH->getGPR(_rb); \
+    unsigned __int128 res = ~ra; \
+    res += rb; \
+    res += 1; \
+    auto ca = res >> 64; \
+    TH->setCA(ca); \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ca, res, TH); \
 }
+EMU_REWRITE(SUBFC, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(SUBFE, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -977,17 +1099,19 @@ PRINT(SUBFE, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(SUBFE, XOForm_1) {
-    auto ra = TH->getGPR(i->RA);
-    auto rb = TH->getGPR(i->RB);
-    unsigned __int128 res = ~ra;
-    res += rb;
-    res += TH->getCA();
-    auto ca = res >> 64;
-    TH->setCA(ca);
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ca, res, TH);
+#define _SUBFE(_ra, _rb, _rt, _oe, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    auto rb = TH->getGPR(_rb); \
+    unsigned __int128 res = ~ra; \
+    res += rb; \
+    res += TH->getCA(); \
+    auto ca = res >> 64; \
+    TH->setCA(ca); \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ca, res, TH); \
 }
+EMU_REWRITE(SUBFE, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 // Fixed-Point Logical Instructions, p65
 
@@ -997,21 +1121,25 @@ PRINT(ANDID, DForm_4) {
     *result = format_nnn("andi.", i->RA, i->RS, i->UI);
 }
 
-EMU(ANDID, DForm_4) {
-    auto res = TH->getGPR(i->RS) & i->UI.u();
-    update_CR0(res, TH);
-    TH->setGPR(i->RA, res);
+#define _ANDID(_ui, _rs, _ra) { \
+    auto res = TH->getGPR(_rs) & _ui; \
+    update_CR0(res, TH); \
+    TH->setGPR(_ra, res); \
 }
+EMU_REWRITE(ANDID, DForm_4, i->UI.u(), i->RS.u(), i->RA.u())
+
 
 PRINT(ANDISD, DForm_4) {
     *result = format_nnn("andis.", i->RA, i->RS, i->UI);
 }
 
-EMU(ANDISD, DForm_4) {
-    auto res = TH->getGPR(i->RS) & (i->UI.u() << 16);
-    update_CR0(res, TH);
-    TH->setGPR(i->RA, res);
+#define _ANDISD(_ui, _rs, _ra) { \
+    auto res = TH->getGPR(_rs) & (_ui << 16); \
+    update_CR0(res, TH); \
+    TH->setGPR(_ra, res); \
 }
+EMU_REWRITE(ANDISD, DForm_4, i->UI.u(), i->RS.u(), i->RA.u())
+
 
 // OR
 
@@ -1023,19 +1151,23 @@ PRINT(ORI, DForm_4) {
     }
 }
 
-EMU(ORI, DForm_4) {
-    auto res = TH->getGPR(i->RS) | i->UI.u();
-    TH->setGPR(i->RA, res);
+#define _ORI(_ui, _rs, _ra) { \
+    auto res = TH->getGPR(_rs) | _ui; \
+    TH->setGPR(_ra, res); \
 }
+EMU_REWRITE(ORI, DForm_4, i->UI.u(), i->RS.u(), i->RA.u())
+
 
 PRINT(ORIS, DForm_4) {
     *result = format_nnn("oris", i->RA, i->RS, i->UI);
 }
 
-EMU(ORIS, DForm_4) {
-    auto res = TH->getGPR(i->RS) | (i->UI.u() << 16);
-    TH->setGPR(i->RA, res);
+#define _ORIS(_ui, _rs, _ra) { \
+    auto res = TH->getGPR(_rs) | (_ui << 16); \
+    TH->setGPR(_ra, res); \
 }
+EMU_REWRITE(ORIS, DForm_4, i->UI.u(), i->RS.u(), i->RA.u())
+
 
 // XOR
 
@@ -1043,19 +1175,23 @@ PRINT(XORI, DForm_4) {
     *result = format_nnn("xori", i->RA, i->RS, i->UI);
 }
 
-EMU(XORI, DForm_4) {
-    auto res = TH->getGPR(i->RS) ^ i->UI.u();
-    TH->setGPR(i->RA, res);
+#define _XORI(_ui, _rs, _ra) { \
+    auto res = TH->getGPR(_rs) ^ _ui; \
+    TH->setGPR(_ra, res); \
 }
+EMU_REWRITE(XORI, DForm_4, i->UI.u(), i->RS.u(), i->RA.u())
+
 
 PRINT(XORIS, DForm_4) {
     *result = format_nnn("xoris", i->RA, i->RS, i->UI);
 }
 
-EMU(XORIS, DForm_4) {
-    auto res = TH->getGPR(i->RS) ^ (i->UI.u() << 16);
-    TH->setGPR(i->RA, res);
+#define _XORIS(_ui, _rs, _ra) { \
+    auto res = TH->getGPR(_rs) ^ (_ui << 16); \
+    TH->setGPR(_ra, res); \
 }
+EMU_REWRITE(XORIS, DForm_4, i->UI.u(), i->RS.u(), i->RA.u())
+
 
 // X-forms
 
@@ -1063,12 +1199,14 @@ PRINT(AND, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "and." : "and", i->RA, i->RS, i->RB);
 }
 
-EMU(AND, XForm_6) {
-    auto res = TH->getGPR(i->RS) & TH->getGPR(i->RB);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _AND(_rs, _rb, _ra, _rc) { \
+    auto res = TH->getGPR(_rs) & TH->getGPR(_rb); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(AND, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(OR, XForm_6) {
     if (i->RS.u() == i->RB.u()) {
@@ -1078,78 +1216,92 @@ PRINT(OR, XForm_6) {
     }
 }
 
-EMU(OR, XForm_6) {
-    auto res = TH->getGPR(i->RS) | TH->getGPR(i->RB);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _OR(_rs, _rb, _ra, _rc) { \
+    auto res = TH->getGPR(_rs) | TH->getGPR(_rb); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(OR, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(XOR, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "xor." : "xor", i->RA, i->RS, i->RB);
 }
 
-EMU(XOR, XForm_6) {
-    auto res = TH->getGPR(i->RS) ^ TH->getGPR(i->RB);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _XOR(_rs, _rb, _ra, _rc) { \
+    auto res = TH->getGPR(_rs) ^ TH->getGPR(_rb); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(XOR, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(NAND, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "nand." : "nand", i->RA, i->RS, i->RB);
 }
 
-EMU(NAND, XForm_6) {
-    auto res = ~(TH->getGPR(i->RS) & TH->getGPR(i->RB));
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _NAND(_rs, _rb, _ra, _rc) { \
+    auto res = ~(TH->getGPR(_rs) & TH->getGPR(_rb)); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(NAND, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(NOR, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "nor." : "nor", i->RA, i->RS, i->RB);
 }
 
-EMU(NOR, XForm_6) {
-    auto res = ~(TH->getGPR(i->RS) | TH->getGPR(i->RB));
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _NOR(_rs, _rb, _ra, _rc) { \
+    auto res = ~(TH->getGPR(_rs) | TH->getGPR(_rb)); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(NOR, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(EQV, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "eqv." : "eqv", i->RA, i->RS, i->RB);
 }
 
-EMU(EQV, XForm_6) {
-    auto res = ~(TH->getGPR(i->RS) ^ TH->getGPR(i->RB));
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _EQV(_rs, _rb, _ra, _rc) { \
+    auto res = ~(TH->getGPR(_rs) ^ TH->getGPR(_rb)); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(EQV, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(ANDC, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "andc." : "andc", i->RA, i->RS, i->RB);
 }
 
-EMU(ANDC, XForm_6) {
-    auto res = TH->getGPR(i->RS) & ~TH->getGPR(i->RB);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _ANDC(_rs, _rb, _ra, _rc) { \
+    auto res = TH->getGPR(_rs) & ~TH->getGPR(_rb); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(ANDC, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(ORC, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "orc." : "orc", i->RA, i->RS, i->RB);
 }
 
-EMU(ORC, XForm_6) {
-    auto res = TH->getGPR(i->RS) | ~TH->getGPR(i->RB);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _ORC(_rs, _rb, _ra, _rc) { \
+    auto res = TH->getGPR(_rs) | ~TH->getGPR(_rb); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(ORC, XForm_6, i->RS.u(), i->RB.u(), i->RA.u(), i->Rc.u())
+
 
 // Extend Sign
 
@@ -1157,25 +1309,31 @@ PRINT(EXTSB, XForm_11) {
     *result = format_nn(i->Rc.u() ? "extsb." : "extsb", i->RA, i->RS);
 }
 
-EMU(EXTSB, XForm_11) {
-    TH->setGPR(i->RA, (int64_t)static_cast<int8_t>(TH->getGPR(i->RS)));
+#define _EXTSB(_rs, _ra) { \
+    TH->setGPR(_ra, (int64_t)static_cast<int8_t>(TH->getGPR(_rs))); \
 }
+EMU_REWRITE(EXTSB, XForm_11, i->RS.u(), i->RA.u())
+
 
 PRINT(EXTSH, XForm_11) {
     *result = format_nn(i->Rc.u() ? "extsh." : "extsh", i->RA, i->RS);
 }
 
-EMU(EXTSH, XForm_11) {
-    TH->setGPR(i->RA, (int64_t)static_cast<int16_t>(TH->getGPR(i->RS)));
+#define _EXTSH(_rs, _ra) { \
+    TH->setGPR(_ra, (int64_t)static_cast<int16_t>(TH->getGPR(_rs))); \
 }
+EMU_REWRITE(EXTSH, XForm_11, i->RS.u(), i->RA.u())
+
 
 PRINT(EXTSW, XForm_11) {
     *result = format_nn(i->Rc.u() ? "extsw." : "extsw", i->RA, i->RS);
 }
 
-EMU(EXTSW, XForm_11) {
-    TH->setGPR(i->RA, (int64_t)static_cast<int32_t>(TH->getGPR(i->RS)));
+#define _EXTSW(_rs, _ra) { \
+    TH->setGPR(_ra, (int64_t)static_cast<int32_t>(TH->getGPR(_rs))); \
 }
+EMU_REWRITE(EXTSW, XForm_11, i->RS.u(), i->RA.u())
+
 
 // Move To/From System Register Instructions, p81
 
@@ -1196,16 +1354,18 @@ PRINT(MTSPR, XFXForm_7) {
     }
 }
 
-EMU(MTSPR, XFXForm_7) {
-    auto rs = TH->getGPR(i->RS);
-    switch (i->spr.u()) {
-        case SPR_XER: TH->setXER(rs); break;
-        case SPR_LR: TH->setLR(rs); break;
-        case SPR_CTR: TH->setCTR(rs); break;
-        case SPR_VRSAVE: TH->setVRSAVE(rs); break;
-        default: throw IllegalInstructionException();
-    }
+#define _MTSPR(_rs, _spr) { \
+    auto rs = TH->getGPR(_rs); \
+    switch (_spr) { \
+        case SPR_XER: TH->setXER(rs); break; \
+        case SPR_LR: TH->setLR(rs); break; \
+        case SPR_CTR: TH->setCTR(rs); break; \
+        case SPR_VRSAVE: TH->setVRSAVE(rs); break; \
+        default: throw IllegalInstructionException(); \
+    } \
 }
+EMU_REWRITE(MTSPR, XFXForm_7, i->RS.u(), i->spr.u())
+
 
 PRINT(MFSPR, XFXForm_7) {
     switch (i->spr.u()) {
@@ -1217,17 +1377,19 @@ PRINT(MFSPR, XFXForm_7) {
     }
 }
 
-EMU(MFSPR, XFXForm_7) {
-    uint32_t v;
-    switch (i->spr.u()) {
-        case SPR_XER: v = TH->getXER(); break;
-        case SPR_LR: v = TH->getLR(); break;
-        case SPR_CTR: v = TH->getCTR(); break;
-        case SPR_VRSAVE: v = TH->getVRSAVE(); break;
-        default: throw IllegalInstructionException();
-    }
-    TH->setGPR(i->RS, v);
+#define _MFSPR(_spr, _rs) { \
+    uint32_t v; \
+    switch (_spr) { \
+        case SPR_XER: v = TH->getXER(); break; \
+        case SPR_LR: v = TH->getLR(); break; \
+        case SPR_CTR: v = TH->getCTR(); break; \
+        case SPR_VRSAVE: v = TH->getVRSAVE(); break; \
+        default: throw IllegalInstructionException(); \
+    } \
+    TH->setGPR(_rs, v); \
 }
+EMU_REWRITE(MFSPR, XFXForm_7, i->spr.u(), i->RS.u())
+
 
 template <int Pos04, int Pos5>
 inline uint8_t getNBE(BitField<Pos04, Pos04 + 5> _04, BitField<Pos5, Pos5 + 1> _05) {
@@ -1252,16 +1414,18 @@ PRINT(RLDICL, MDForm_1) {
     }
 }
 
-EMU(RLDICL, MDForm_1) {
-    auto n = getNBE(i->sh04, i->sh5);
-    auto b = getNBE(i->mb04, i->mb5);
-    auto r = rol<64>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(b, 63);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLDICL(nbe_sh, nbe_mb, _rs, _ra, _rc) { \
+    auto n = nbe_sh; \
+    auto b = nbe_mb; \
+    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(b, 63); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLDICL, MDForm_1, getNBE(i->sh04, i->sh5), getNBE(i->mb04, i->mb5), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLDICR, MDForm_2) {
     auto n = getNBE(i->sh04, i->sh5);
@@ -1277,16 +1441,18 @@ PRINT(RLDICR, MDForm_2) {
     }
 }
 
-EMU(RLDICR, MDForm_2) {
-    auto n = getNBE(i->sh04, i->sh5);
-    auto e = getNBE(i->me04, i->me5);
-    auto r = rol<64>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(0, e);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLDICR(nbe_sh, nbe_me, _rs, _ra, _rc) { \
+    auto n = nbe_sh; \
+    auto e = nbe_me; \
+    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(0, e); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLDICR, MDForm_2, getNBE(i->sh04, i->sh5), getNBE(i->me04, i->me5), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLDIMI, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
@@ -1298,16 +1464,18 @@ PRINT(RLDIMI, MDForm_1) {
     }
 }
 
-EMU(RLDIMI, MDForm_1) {
-    auto n = getNBE(i->sh04, i->sh5);
-    auto b = getNBE(i->mb04, i->mb5);
-    auto r = rol<64>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(b, ~n & 63);
-    auto res = (r & m) | (TH->getGPR(i->RA) & (~m));
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLDIMI(nbe_sh, nbe_mb, _rs, _ra, _rc) { \
+    auto n = nbe_sh; \
+    auto b = nbe_mb; \
+    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(b, ~n & 63); \
+    auto res = (r & m) | (TH->getGPR(_ra) & (~m)); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLDIMI, MDForm_1, getNBE(i->sh04, i->sh5), getNBE(i->mb04, i->mb5), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLDCL, MDSForm_1) {
     if (i->mb.u() == 0) {
@@ -1316,32 +1484,36 @@ PRINT(RLDCL, MDSForm_1) {
         *result = format_nnnn(i->Rc.u() ? "rotld." : "rotld", i->RA, i->RS, i->RB, i->mb);
     }
 }
-    
-EMU(RLDCL, MDSForm_1) {
-    auto n = TH->getGPR(i->RB) & 127;
-    auto r = rol<64>(TH->getGPR(i->RS), n);
-    auto b = i->mb.u();
-    auto m = mask<64>(b, 63);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+
+#define _RLDCL(_rb, _rs, _mb, _ra, _rc) { \
+    auto n = TH->getGPR(_rb) & 127; \
+    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto b = _mb; \
+    auto m = mask<64>(b, 63); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLDCL, MDSForm_1, i->RB.u(), i->RS.u(), i->mb.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLDCR, MDSForm_2) {
     *result = format_nnnn(i->Rc.u() ? "rldcr." : "rldcr", i->RA, i->RS, i->RB, i->me);
 }
 
-EMU(RLDCR, MDSForm_2) {
-    auto n = TH->getGPR(i->RB) & 127;
-    auto r = rol<64>(TH->getGPR(i->RS), n);
-    auto e = i->me.u();
-    auto m = mask<64>(0, e);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLDCR(_rb, _rs, _me, _ra, _rc) { \
+    auto n = TH->getGPR(_rb) & 127; \
+    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto e = _me; \
+    auto m = mask<64>(0, e); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLDCR, MDSForm_2, i->RB.u(), i->RS.u(), i->me.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLDIC, MDForm_1) {
     auto n = getNBE(i->sh04, i->sh5);
@@ -1349,20 +1521,22 @@ PRINT(RLDIC, MDForm_1) {
     if (n <= b + n && b + n < 64) {
         *result = format_nnuu(i->Rc.u() ? "clrlsldi." : "clrlsldi", i->RA, i->RS, b + n, n);
     } else {
-        *result = format_nnuu(i->Rc.u() ? "rldic." : "rldic", i->RA, i->RS, n, b);   
+        *result = format_nnuu(i->Rc.u() ? "rldic." : "rldic", i->RA, i->RS, n, b);
     }
 }
 
-EMU(RLDIC, MDForm_1) {
-    auto n = getNBE(i->sh04, i->sh5);
-    auto b = getNBE(i->mb04, i->mb5);    
-    auto r = rol<64>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(b, ~n & 63);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLDIC(nbe_sh, nbe_mb, _rs, _ra, _rc) { \
+    auto n = nbe_sh; \
+    auto b = nbe_mb; \
+    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(b, ~n & 63); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLDIC, MDForm_1, getNBE(i->sh04, i->sh5), getNBE(i->mb04, i->mb5), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLWINM, MForm_2) {
     auto s = i->SH.u();
@@ -1393,15 +1567,17 @@ PRINT(RLWINM, MForm_2) {
     }
 }
 
-EMU(RLWINM, MForm_2) {
-    auto n = i->SH.u();
-    auto r = rol<32>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLWINM(_shu, _rs, _mb, _me, _ra, _rc) { \
+    auto n = _shu; \
+    auto r = rol<32>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(_mb + 32, _me + 32); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLWINM, MForm_2, i->SH.u(), i->RS.u(), i->mb.u(), i->me.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLWNM, MForm_1) {
     if (i->mb.u() == 0 && i->me.u() == 31) {
@@ -1411,15 +1587,17 @@ PRINT(RLWNM, MForm_1) {
     }
 }
 
-EMU(RLWNM, MForm_1) {
-    auto n = TH->getGPR(i->RB) & 31;
-    auto r = rol<32>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
-    auto res = r & m;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLWNM(_rb, _rs, _mb, _me, _ra, _rc) { \
+    auto n = TH->getGPR(_rb) & 31; \
+    auto r = rol<32>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(_mb + 32, _me + 32); \
+    auto res = r & m; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLWNM, MForm_1, i->RB.u(), i->RS.u(), i->mb.u(), i->me.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(RLWIMI, MForm_2) {
     auto s = i->SH.u();
@@ -1434,31 +1612,37 @@ PRINT(RLWIMI, MForm_2) {
     }
 }
 
-EMU(RLWIMI, MForm_2) {
-    auto n = i->SH.u();
-    auto r = rol<32>(TH->getGPR(i->RS), n);
-    auto m = mask<64>(i->mb.u() + 32, i->me.u() + 32);
-    auto res = (r & m) | (TH->getGPR(i->RA) & ~m);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _RLWIMI(_shu, _rs, _mb, _me, _ra, _rc) { \
+    auto n = _shu; \
+    auto r = rol<32>(TH->getGPR(_rs), n); \
+    auto m = mask<64>(_mb + 32, _me + 32); \
+    auto res = (r & m) | (TH->getGPR(_ra) & ~m); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(RLWIMI, MForm_2, i->SH.u(), i->RS.u(), i->mb.u(), i->me.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SC, SCForm) {
     *result = "sc";
 }
 
-EMU(SC, SCForm) {
-    TH->scall();
+#define _SC(_) { \
+    TH->scall(); \
 }
+EMU_REWRITE(SC, SCForm, 0)
+
 
 PRINT(NCALL, NCallForm) {
     *result = format_u("ncall", i->idx.u());
 }
 
-EMU(NCALL, NCallForm) {
-    TH->ncall(i->idx.u());
+#define _NCALL(_idx) { \
+    TH->ncall(_idx); \
 }
+EMU_REWRITE(NCALL, NCallForm, i->idx.u())
+
 
 inline int64_t get_cmp_ab(unsigned l, uint64_t value) {
     return l == 0 ? (int64_t)static_cast<int32_t>(value) : value;
@@ -1478,13 +1662,15 @@ PRINT(CMPI, DForm_5) {
     }
 }
 
-EMU(CMPI, DForm_5) {
-    auto a = get_cmp_ab(i->L.u(), TH->getGPR(i->RA));
-    auto c = a < i->SI.s() ? 4
-           : a > i->SI.s() ? 2
-           : 1;
-    TH->setCRF_sign(i->BF.u(), c);
+#define _CMPI(_ra, _l, _sis, _bf) { \
+    auto a = get_cmp_ab(_l, TH->getGPR(_ra)); \
+    auto c = a < _sis ? 4 \
+           : a > _sis ? 2 \
+           : 1; \
+    TH->setCRF_sign(_bf, c); \
 }
+EMU_REWRITE(CMPI, DForm_5, i->RA.u(), i->L.u(), i->SI.s(), i->BF.u())
+
 
 PRINT(CMP, XForm_16) {
     auto mnemonic = i->L.u() ? "cmpd" : "cmpw";
@@ -1495,14 +1681,16 @@ PRINT(CMP, XForm_16) {
     }
 }
 
-EMU(CMP, XForm_16) {
-    auto a = get_cmp_ab(i->L.u(), TH->getGPR(i->RA));
-    auto b = get_cmp_ab(i->L.u(), TH->getGPR(i->RB));
-    auto c = a < b ? 4
-           : a > b ? 2
-           : 1;
-    TH->setCRF_sign(i->BF.u(), c);
+#define _CMP(_ra, _l, _rb, _bf) { \
+    auto a = get_cmp_ab(_l, TH->getGPR(_ra)); \
+    auto b = get_cmp_ab(_l, TH->getGPR(_rb)); \
+    auto c = a < b ? 4 \
+           : a > b ? 2 \
+           : 1; \
+    TH->setCRF_sign(_bf, c); \
 }
+EMU_REWRITE(CMP, XForm_16, i->RA.u(), i->L.u(), i->RB.u(), i->BF.u())
+
 
 inline uint64_t get_cmpl_ab(unsigned l, uint64_t value) {
     return l == 0 ? static_cast<uint32_t>(value) : value;
@@ -1517,13 +1705,15 @@ PRINT(CMPLI, DForm_6) {
     }
 }
 
-EMU(CMPLI, DForm_6) {
-    auto a = get_cmpl_ab(i->L.u(), TH->getGPR(i->RA));
-    auto c = a < i->UI.u() ? 4
-           : a > i->UI.u() ? 2
-           : 1;
-    TH->setCRF_sign(i->BF.u(), c);
+#define _CMPLI(_ra, _l, _ui, _bf) { \
+    auto a = get_cmpl_ab(_l, TH->getGPR(_ra)); \
+    auto c = a < _ui ? 4 \
+           : a > _ui ? 2 \
+           : 1; \
+    TH->setCRF_sign(_bf, c); \
 }
+EMU_REWRITE(CMPLI, DForm_6, i->RA.u(), i->L.u(), i->UI.u(), i->BF.u())
+
 
 PRINT(CMPL, XForm_16) {
     auto mnemonic = i->L.u() ? "cmpld" : "cmplw";
@@ -1534,126 +1724,144 @@ PRINT(CMPL, XForm_16) {
     }
 }
 
-EMU(CMPL, XForm_16) {
-    auto a = get_cmpl_ab(i->L.u(), TH->getGPR(i->RA));
-    auto b = get_cmpl_ab(i->L.u(), TH->getGPR(i->RB));
-    auto c = a < b ? 4
-           : a > b ? 2
-           : 1;
-    TH->setCRF_sign(i->BF.u(), c);
+#define _CMPL(_ra, _l, _rb, _bf) { \
+    auto a = get_cmpl_ab(_l, TH->getGPR(_ra)); \
+    auto b = get_cmpl_ab(_l, TH->getGPR(_rb)); \
+    auto c = a < b ? 4 \
+           : a > b ? 2 \
+           : 1; \
+    TH->setCRF_sign(_bf, c); \
 }
+EMU_REWRITE(CMPL, XForm_16, i->RA.u(), i->L.u(), i->RB.u(), i->BF.u())
+
 
 PRINT(MFCR, XFXForm_3) {
     *result = format_n("mfcr", i->RT);
 }
 
-EMU(MFCR, XFXForm_3) {
-    TH->setGPR(i->RT, TH->getCR());
+#define _MFCR(_rt) { \
+    TH->setGPR(_rt, TH->getCR()); \
 }
+EMU_REWRITE(MFCR, XFXForm_3, i->RT.u())
+
 
 PRINT(SLD, XForm_6) {
-   *result = format_nnn(i->Rc.u() ? "sld." : "sld", i->RA, i->RS, i->RB); 
+   *result = format_nnn(i->Rc.u() ? "sld." : "sld", i->RA, i->RS, i->RB);
 }
 
-EMU(SLD, XForm_6) {
-    auto b = TH->getGPR(i->RB) & 127;
-    auto res = b > 63 ? 0 : TH->getGPR(i->RS) << b;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _SLD(_rb, _rs, _ra, _rc) { \
+    auto b = TH->getGPR(_rb) & 127; \
+    auto res = b > 63 ? 0 : TH->getGPR(_rs) << b; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(SLD, XForm_6, i->RB.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SLW, XForm_6) {
-    *result = format_nnn(i->Rc.u() ? "slw." : "slw", i->RA, i->RS, i->RB); 
+    *result = format_nnn(i->Rc.u() ? "slw." : "slw", i->RA, i->RS, i->RB);
 }
 
-EMU(SLW, XForm_6) {
-    auto b = TH->getGPR(i->RB) & 63;
-    auto res = b > 31 ? 0 : (uint32_t)TH->getGPR(i->RS) << b;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _SLW(_rb, _rs, _ra, _rc) { \
+    auto b = TH->getGPR(_rb) & 63; \
+    auto res = b > 31 ? 0 : (uint32_t)TH->getGPR(_rs) << b; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(SLW, XForm_6, i->RB.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SRD, XForm_6) {
-    *result = format_nnn(i->Rc.u() ? "srd." : "srd", i->RA, i->RS, i->RB); 
+    *result = format_nnn(i->Rc.u() ? "srd." : "srd", i->RA, i->RS, i->RB);
 }
 
-EMU(SRD, XForm_6) {
-    auto b = TH->getGPR(i->RB) & 127;
-    auto res = b > 63 ? 0 : TH->getGPR(i->RS) >> b;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _SRD(_rb, _rs, _ra, _rc) { \
+    auto b = TH->getGPR(_rb) & 127; \
+    auto res = b > 63 ? 0 : TH->getGPR(_rs) >> b; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(SRD, XForm_6, i->RB.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SRW, XForm_6) {
-    *result = format_nnn(i->Rc.u() ? "srw." : "srw", i->RA, i->RS, i->RB); 
+    *result = format_nnn(i->Rc.u() ? "srw." : "srw", i->RA, i->RS, i->RB);
 }
 
-EMU(SRW, XForm_6) {
-    auto b = TH->getGPR(i->RB) & 63;
-    auto res = b > 31 ? 0 : (uint32_t)TH->getGPR(i->RS) >> b;
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _SRW(_rb, _rs, _ra, _rc) { \
+    auto b = TH->getGPR(_rb) & 63; \
+    auto res = b > 31 ? 0 : (uint32_t)TH->getGPR(_rs) >> b; \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(SRW, XForm_6, i->RB.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SRADI, XSForm) {
     auto n =  getNBE(i->sh04, i->sh5);
     *result = format_nnu(i->Rc.u() ? "sradi." : "sradi", i->RA, i->RS, n);
 }
 
-EMU(SRADI, XSForm) {
-    auto n =  getNBE(i->sh04, i->sh5);
-    auto rs = TH->getGPR(i->RS);
-    auto r = rol<64>(rs, 64 - n);
-    auto m = mask<64>(n, 63);
-    auto s = bit_test(rs, 64, 0);
-    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
-    auto ca = s & ((r & ~m) != 0);
-    TH->setGPR(i->RA, ra);
-    TH->setCA(ca);
-    if (i->Rc.u())
-        update_CR0(ra, TH);
+#define _SRADI(nbe_sh, _rs, _ra, _rc) { \
+    auto n =  nbe_sh; \
+    auto rs = TH->getGPR(_rs); \
+    auto r = rol<64>(rs, 64 - n); \
+    auto m = mask<64>(n, 63); \
+    auto s = bit_test(rs, 64, 0); \
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
+    auto ca = s & ((r & ~m) != 0); \
+    TH->setGPR(_ra, ra); \
+    TH->setCA(ca); \
+    if (_rc) \
+        update_CR0(ra, TH); \
 }
+EMU_REWRITE(SRADI, XSForm, getNBE(i->sh04, i->sh5), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SRAWI, XForm_10) {
     *result = format_nnn(i->Rc.u() ? "srawi." : "srawi", i->RA, i->RS, i->SH);
 }
 
-EMU(SRAWI, XForm_10) {
-    auto n =  i->SH.u();
-    auto rs = TH->getGPR(i->RS) & 0xffffffff;
-    auto r = rol<32>(rs, 64 - n);
-    auto m = mask<64>(n + 32, 63);
-    auto s = bit_test(rs, 64, 32);
-    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
-    auto ca = s & ((r & ~m) != 0);
-    TH->setGPR(i->RA, ra);
-    TH->setCA(ca);
-    if (i->Rc.u())
-        update_CR0(ra, TH);
+#define _SRAWI(_shu, _rs, _ra, _rc) { \
+    auto n =  _shu; \
+    auto rs = TH->getGPR(_rs) & 0xffffffff; \
+    auto r = rol<32>(rs, 64 - n); \
+    auto m = mask<64>(n + 32, 63); \
+    auto s = bit_test(rs, 64, 32); \
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
+    auto ca = s & ((r & ~m) != 0); \
+    TH->setGPR(_ra, ra); \
+    TH->setCA(ca); \
+    if (_rc) \
+        update_CR0(ra, TH); \
 }
+EMU_REWRITE(SRAWI, XForm_10, i->SH.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(SRAW, XForm_6) {
     *result = format_nnn(i->Rc.u() ? "sraw." : "sraw", i->RA, i->RS, i->RB);
 }
 
-EMU(SRAW, XForm_6) {
-    auto rb = TH->getGPR(i->RB);
-    auto n = rb & 0b11111;
-    auto rs = TH->getGPR(i->RS) & 0xffffffff;
-    auto r = rol<32>(rs, 64 - n);
-    uint64_t m = (rb & 0b100000) == 0 ? mask<64>(n + 32, 63) : 0;
-    auto s = bit_test(rs, 64, 32);
-    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m);
-    auto ca = s & (((r & ~m) & 0xffffffff) != 0);
-    TH->setGPR(i->RA, ra);
-    TH->setCA(ca);
-    if (i->Rc.u())
-        update_CR0(ra, TH);
+#define _SRAW(_rb, _rs, _ra, _rc) { \
+    auto rb = TH->getGPR(_rb); \
+    auto n = rb & 0b11111; \
+    auto rs = TH->getGPR(_rs) & 0xffffffff; \
+    auto r = rol<32>(rs, 64 - n); \
+    uint64_t m = (rb & 0b100000) == 0 ? mask<64>(n + 32, 63) : 0; \
+    auto s = bit_test(rs, 64, 32); \
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
+    auto ca = s & (((r & ~m) & 0xffffffff) != 0); \
+    TH->setGPR(_ra, ra); \
+    TH->setCA(ca); \
+    if (_rc) \
+        update_CR0(ra, TH); \
 }
+EMU_REWRITE(SRAW, XForm_6, i->RB.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(NEG, XOForm_3) {
     const char* mnemonics[][2] = {
@@ -1662,13 +1870,15 @@ PRINT(NEG, XOForm_3) {
     *result = format_nn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA);
 }
 
-EMU(NEG, XOForm_3) {
-    auto ra = TH->getGPR(i->RA);
-    auto ov = ra == (1ull << 63);
-    auto res = ov ? ra : (~ra + 1);
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);    
+#define _NEG(_ra, _rt, _oe, _rc) { \
+    auto ra = TH->getGPR(_ra); \
+    auto ov = ra == (1ull << 63); \
+    auto res = ov ? ra : (~ra + 1); \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(NEG, XOForm_3, i->RA.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(DIVD, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -1677,14 +1887,16 @@ PRINT(DIVD, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(DIVD, XOForm_1) {
-    int64_t dividend = TH->getGPR(i->RA);
-    int64_t divisor = TH->getGPR(i->RB);
-    auto ov = divisor == 0 || ((uint64_t)dividend == 0x8000000000000000 && divisor == -1ll);
-    int64_t res = ov ? 0 : dividend / divisor;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _DIVD(_ra, _rb, _rt, _oe, _rc) { \
+    int64_t dividend = TH->getGPR(_ra); \
+    int64_t divisor = TH->getGPR(_rb); \
+    auto ov = divisor == 0 || ((uint64_t)dividend == 0x8000000000000000 && divisor == -1ll); \
+    int64_t res = ov ? 0 : dividend / divisor; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(DIVD, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(DIVW, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -1693,14 +1905,16 @@ PRINT(DIVW, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(DIVW, XOForm_1) {
-    int64_t dividend = (int32_t)(TH->getGPR(i->RA) & 0xffffffff);
-    int64_t divisor = (int32_t)(TH->getGPR(i->RB) & 0xffffffff);
-    auto ov = divisor == 0 || ((uint64_t)dividend == 0x80000000 && divisor == -1l);
-    int64_t res = ov ? 0 : dividend / divisor;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _DIVW(_ra, _rb, _rt, _oe, _rc) { \
+    int64_t dividend = (int32_t)(TH->getGPR(_ra) & 0xffffffff); \
+    int64_t divisor = (int32_t)(TH->getGPR(_rb) & 0xffffffff); \
+    auto ov = divisor == 0 || ((uint64_t)dividend == 0x80000000 && divisor == -1l); \
+    int64_t res = ov ? 0 : dividend / divisor; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(DIVW, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(DIVDU, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -1709,14 +1923,16 @@ PRINT(DIVDU, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(DIVDU, XOForm_1) {
-    auto dividend = TH->getGPR(i->RA);
-    auto divisor = TH->getGPR(i->RB);
-    auto ov = divisor == 0;
-    auto res = ov ? 0 : dividend / divisor;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _DIVDU(_ra, _rb, _rt, _oe, _rc) { \
+    auto dividend = TH->getGPR(_ra); \
+    auto divisor = TH->getGPR(_rb); \
+    auto ov = divisor == 0; \
+    auto res = ov ? 0 : dividend / divisor; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(DIVDU, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(DIVWU, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -1725,14 +1941,16 @@ PRINT(DIVWU, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(DIVWU, XOForm_1) {
-    auto dividend = static_cast<uint32_t>(TH->getGPR(i->RA));
-    auto divisor = static_cast<uint32_t>(TH->getGPR(i->RB));
-    auto ov = divisor == 0;
-    auto res = ov ? 0 : dividend / divisor;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _DIVWU(_ra, _rb, _rt, _oe, _rc) { \
+    auto dividend = static_cast<uint32_t>(TH->getGPR(_ra)); \
+    auto divisor = static_cast<uint32_t>(TH->getGPR(_rb)); \
+    auto ov = divisor == 0; \
+    auto res = ov ? 0 : dividend / divisor; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(DIVWU, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(MULLD, XOForm_1) {
     const char* mnemonics[][2] = {
@@ -1741,14 +1959,16 @@ PRINT(MULLD, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(MULLD, XOForm_1) {
-    auto a = TH->getGPR(i->RA);
-    auto b = TH->getGPR(i->RB);
-    unsigned __int128 res = a * b;
-    auto ov = res > 0xffffffffffffffff;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _MULLD(_ra, _rb, _rt, _oe, _rc) { \
+    auto a = TH->getGPR(_ra); \
+    auto b = TH->getGPR(_rb); \
+    unsigned __int128 res = a * b; \
+    auto ov = res > 0xffffffffffffffff; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(MULLD, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 
 PRINT(MULLW, XOForm_1) {
@@ -1758,421 +1978,495 @@ PRINT(MULLW, XOForm_1) {
     *result = format_nnn(mnemonics[i->OE.u()][i->Rc.u()], i->RT, i->RA, i->RB);
 }
 
-EMU(MULLW, XOForm_1) {
-    auto res = (TH->getGPR(i->RA) & 0xffffffff)
-             * (TH->getGPR(i->RB) & 0xffffffff);
-    auto ov = res > 0xffffffff;
-    TH->setGPR(i->RT, res);
-    update_CR0_OV(i->OE.u(), i->Rc.u(), ov, res, TH);
+#define _MULLW(_ra, _rb, _rt, _oe, _rc) { \
+    auto res = (TH->getGPR(_ra) & 0xffffffff) \
+             * (TH->getGPR(_rb) & 0xffffffff); \
+    auto ov = res > 0xffffffff; \
+    TH->setGPR(_rt, res); \
+    update_CR0_OV(_oe, _rc, ov, res, TH); \
 }
+EMU_REWRITE(MULLW, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->OE.u(), i->Rc.u())
+
 
 PRINT(MULHD, XOForm_1) {
     *result = format_nnn(i->Rc.u() ? "mulhd." : "mulhd", i->RT, i->RA, i->RB);
 }
 
-EMU(MULHD, XOForm_1) {
-    unsigned __int128 prod = (__int128)TH->getGPR(i->RA) * TH->getGPR(i->RB);
-    auto res = prod >> 64;
-    TH->setGPR(i->RT, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _MULHD(_ra, _rb, _rt, _rc) { \
+    unsigned __int128 prod = (__int128)TH->getGPR(_ra) * TH->getGPR(_rb); \
+    auto res = prod >> 64; \
+    TH->setGPR(_rt, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(MULHD, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->Rc.u())
+
 
 PRINT(MULHW, XOForm_1) {
     *result = format_nnn(i->Rc.u() ? "mulhw." : "mulhw", i->RT, i->RA, i->RB);
 }
 
-EMU(MULHW, XOForm_1) {
-    int64_t prod = (int64_t)(int32_t)TH->getGPR(i->RA)
-                 * (int64_t)(int32_t)TH->getGPR(i->RB);
-    auto res = (int64_t)((uint64_t)prod >> 32);
-    TH->setGPR(i->RT, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _MULHW(_ra, _rb, _rt, _rc) { \
+    int64_t prod = (int64_t)(int32_t)TH->getGPR(_ra) \
+                 * (int64_t)(int32_t)TH->getGPR(_rb); \
+    auto res = (int64_t)((uint64_t)prod >> 32); \
+    TH->setGPR(_rt, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(MULHW, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->Rc.u())
+
 
 PRINT(MULHWU, XOForm_1) {
     *result = format_nnn(i->Rc.u() ? "mulhwu." : "mulhwu", i->RT, i->RA, i->RB);
 }
 
-EMU(MULHWU, XOForm_1) {
-    uint64_t prod = (uint64_t)(uint32_t)TH->getGPR(i->RA)
-                  * (uint64_t)(uint32_t)TH->getGPR(i->RB);
-    auto res = (uint64_t)((uint64_t)prod >> 32);
-    TH->setGPR(i->RT, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _MULHWU(_ra, _rb, _rt, _rc) { \
+    uint64_t prod = (uint64_t)(uint32_t)TH->getGPR(_ra) \
+                  * (uint64_t)(uint32_t)TH->getGPR(_rb); \
+    auto res = (uint64_t)((uint64_t)prod >> 32); \
+    TH->setGPR(_rt, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(MULHWU, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->Rc.u())
+
 
 PRINT(MULHDU, XOForm_1) {
     *result = format_nnn(i->Rc.u() ? "mulhdu." : "mulhdu", i->RT, i->RA, i->RB);
 }
 
-EMU(MULHDU, XOForm_1) {
-    unsigned __int128 prod = (unsigned __int128)TH->getGPR(i->RA) * 
-                             (unsigned __int128)TH->getGPR(i->RB);
-    auto res = prod >> 64;
-    TH->setGPR(i->RT, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _MULHDU(_ra, _rb, _rt, _rc) { \
+    unsigned __int128 prod = (unsigned __int128)TH->getGPR(_ra) * \
+                             (unsigned __int128)TH->getGPR(_rb); \
+    auto res = prod >> 64; \
+    TH->setGPR(_rt, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(MULHDU, XOForm_1, i->RA.u(), i->RB.u(), i->RT.u(), i->Rc.u())
+
 
 PRINT(MULLI, DForm_2) {
     *result = format_nnn("mulli", i->RT, i->RA, i->SI);
 }
 
-EMU(MULLI, DForm_2) {
-    __int128 a = (int64_t)TH->getGPR(i->RA);
-    auto prod = a * i->SI.s();
-    TH->setGPR(i->RT, prod);
+#define _MULLI(_ra, _sis, _rt) { \
+    __int128 a = (int64_t)TH->getGPR(_ra); \
+    auto prod = a * _sis; \
+    TH->setGPR(_rt, prod); \
 }
+EMU_REWRITE(MULLI, DForm_2, i->RA.u(), i->SI.s(), i->RT.u())
+
 
 PRINT(MTOCRF, XFXForm_6) {
     *result = format_nn("mtocrf", i->FXM, i->RS);
 }
 
-EMU(MTOCRF, XFXForm_6) {
-    auto fxm = i->FXM.u();
-    auto n = fxm & 128 ? 0
-           : fxm & 64 ? 1
-           : fxm & 32 ? 2
-           : fxm & 16 ? 3
-           : fxm & 8 ? 4
-           : fxm & 4 ? 5
-           : fxm & 2 ? 6
-           : 7;
-    auto cr = TH->getCR() & ~mask<32>(4*n, 4*n + 3);
-    auto rs = TH->getGPR(i->RS) & mask<32>(4*n, 4*n + 3);
-    TH->setCR(cr | rs);
+#define _MTOCRF(_fxm, _rs) { \
+    auto fxm = _fxm; \
+    auto n = fxm & 128 ? 0 \
+           : fxm & 64 ? 1 \
+           : fxm & 32 ? 2 \
+           : fxm & 16 ? 3 \
+           : fxm & 8 ? 4 \
+           : fxm & 4 ? 5 \
+           : fxm & 2 ? 6 \
+           : 7; \
+    auto cr = TH->getCR() & ~mask<32>(4*n, 4*n + 3); \
+    auto rs = TH->getGPR(_rs) & mask<32>(4*n, 4*n + 3); \
+    TH->setCR(cr | rs); \
 }
+EMU_REWRITE(MTOCRF, XFXForm_6, i->FXM.u(), i->RS.u())
+
 
 PRINT(DCBT, XForm_31) {
     *result = format_nn("dcbt", i->RA, i->RB);
 }
 
-EMU(DCBT, XForm_31) {
+#define _DCBT(_) { \
 }
+EMU_REWRITE(DCBT, XForm_31, 0)
+
 
 PRINT(CNTLZD, XForm_11) {
     *result = format_nn(i->Rc.u() ? "cntlzd." : "cntlzd", i->RA, i->RS);
 }
 
-EMU(CNTLZD, XForm_11) {
-    static_assert(sizeof(unsigned long long int) == 8, "");
-    auto rs = TH->getGPR(i->RS);
-    auto res = !rs ? 64 : __builtin_clzll(rs);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _CNTLZD(_rs, _ra, _rc) { \
+    static_assert(sizeof(unsigned long long int) == 8, ""); \
+    auto rs = TH->getGPR(_rs); \
+    auto res = !rs ? 64 : __builtin_clzll(rs); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(CNTLZD, XForm_11, i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(CNTLZW, XForm_11) {
     *result = format_nn(i->Rc.u() ? "cntlzw." : "cntlzw", i->RA, i->RS);
 }
 
-EMU(CNTLZW, XForm_11) {
-    static_assert(sizeof(unsigned int) == 4, "");
-    uint32_t rs = TH->getGPR(i->RS);
-    auto res = !rs ? 32 : __builtin_clz(rs);
-    TH->setGPR(i->RA, res);
-    if (i->Rc.u())
-        update_CR0(res, TH);
+#define _CNTLZW(_rs, _ra, _rc) { \
+    static_assert(sizeof(unsigned int) == 4, ""); \
+    uint32_t rs = TH->getGPR(_rs); \
+    auto res = !rs ? 32 : __builtin_clz(rs); \
+    TH->setGPR(_ra, res); \
+    if (_rc) \
+        update_CR0(res, TH); \
 }
+EMU_REWRITE(CNTLZW, XForm_11, i->RS.u(), i->RA.u(), i->Rc.u())
+
 
 PRINT(LFS, DForm_8) {
     *result = format_br_nnn("lfs", i->FRT, i->D, i->RA);
 }
 
-EMU(LFS, DForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    TH->setFPRd(i->FRT, MM->loadf(ea));
+#define _LFS(_ra, _ds, _frt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    TH->setFPRd(_frt, MM->loadf(ea)); \
 }
+EMU_REWRITE(LFS, DForm_8, i->RA.u(), i->D.s(), i->FRT.u())
+
 
 PRINT(LFSX, XForm_26) {
     *result = format_nnn("lfsx", i->FRT, i->RA, i->RB);
 }
 
-EMU(LFSX, XForm_26) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setFPRd(i->FRT, MM->loadf(ea));
+#define _LFSX(_ra, _rb, _frt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setFPRd(_frt, MM->loadf(ea)); \
 }
+EMU_REWRITE(LFSX, XForm_26, i->RA.u(), i->RB.u(), i->FRT.u())
+
 
 PRINT(LFSU, DForm_8) {
     *result = format_br_nnn("lfsu", i->FRT, i->D, i->RA);
 }
 
-EMU(LFSU, DForm_8) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    TH->setFPRd(i->FRT, MM->loadf(ea));
-    TH->setGPR(i->RA, ea);
+#define _LFSU(_ds, _ra, _frt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setFPRd(_frt, MM->loadf(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LFSU, DForm_8, i->D.s(), i->RA.u(), i->FRT.u())
+
 
 PRINT(LFSUX, XForm_26) {
     *result = format_nnn("lfsux", i->FRT, i->RA, i->RB);
 }
 
-EMU(LFSUX, XForm_26) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setFPRd(i->FRT, MM->loadf(ea));
-    TH->setGPR(i->RA, ea);
+#define _LFSUX(_ra, _rb, _frt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setFPRd(_frt, MM->loadf(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LFSUX, XForm_26, i->RA.u(), i->RB.u(), i->FRT.u())
+
 
 PRINT(LFD, DForm_8) {
     *result = format_br_nnn("lfd", i->FRT, i->D, i->RA);
 }
 
-EMU(LFD, DForm_8) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    TH->setFPRd(i->FRT, MM->loadd(ea));
+#define _LFD(_ra, _ds, _frt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    TH->setFPRd(_frt, MM->loadd(ea)); \
 }
+EMU_REWRITE(LFD, DForm_8, i->RA.u(), i->D.s(), i->FRT.u())
+
 
 PRINT(LFDX, XForm_26) {
     *result = format_nnn("lfdx", i->FRT, i->RA, i->RB);
 }
 
-EMU(LFDX, XForm_26) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    TH->setFPRd(i->FRT, MM->loadd(ea));
+#define _LFDX(_ra, _rb, _frt) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setFPRd(_frt, MM->loadd(ea)); \
 }
+EMU_REWRITE(LFDX, XForm_26, i->RA.u(), i->RB.u(), i->FRT.u())
+
 
 PRINT(LFDU, DForm_8) {
     *result = format_br_nnn("lfdu", i->FRT, i->D, i->RA);
 }
 
-EMU(LFDU, DForm_8) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    TH->setFPRd(i->FRT, MM->loadd(ea));
-    TH->setGPR(i->RA, ea);
+#define _LFDU(_ds, _ra, _frt) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    TH->setFPRd(_frt, MM->loadd(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LFDU, DForm_8, i->D.s(), i->RA.u(), i->FRT.u())
+
 
 PRINT(LFDUX, XForm_26) {
     *result = format_nnn("lfdux", i->FRT, i->RA, i->RB);
 }
 
-EMU(LFDUX, XForm_26) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    TH->setFPRd(i->FRT, MM->loadd(ea));
-    TH->setGPR(i->RA, ea);
+#define _LFDUX(_ra, _rb, _frt) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    TH->setFPRd(_frt, MM->loadd(ea)); \
+    TH->setGPR(_ra, ea); \
 }
+EMU_REWRITE(LFDUX, XForm_26, i->RA.u(), i->RB.u(), i->FRT.u())
+
 
 PRINT(STFS, DForm_9) {
     *result = format_br_nnn("stfs", i->FRS, i->D, i->RA);
 }
 
-EMU(STFS, DForm_9) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    auto frs = TH->getFPRd(i->FRS);
-    MM->storef(ea, frs);
+#define _STFS(_ra, _ds, _frs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    auto frs = TH->getFPRd(_frs); \
+    MM->storef(ea, frs); \
 }
+EMU_REWRITE(STFS, DForm_9, i->RA.u(), i->D.s(), i->FRS.u())
+
 
 PRINT(STFSX, XForm_29) {
     *result = format_br_nnn("stfsx", i->FRS, i->RA, i->RB);
 }
 
-EMU(STFSX, XForm_29) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    auto frs = TH->getFPRd(i->FRS);
-    MM->storef(ea, frs);
+#define _STFSX(_ra, _rb, _frs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto frs = TH->getFPRd(_frs); \
+    MM->storef(ea, frs); \
 }
+EMU_REWRITE(STFSX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
+
 
 PRINT(STFSU, DForm_9) {
     *result = format_br_nnn("stfsu", i->FRS, i->D, i->RA);
 }
 
-EMU(STFSU, DForm_9) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    auto frs = TH->getFPRd(i->FRS);
-    TH->setGPR(i->RA, ea);
-    MM->storef(ea, frs);
+#define _STFSU(_ds, _ra, _frs) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    auto frs = TH->getFPRd(_frs); \
+    TH->setGPR(_ra, ea); \
+    MM->storef(ea, frs); \
 }
+EMU_REWRITE(STFSU, DForm_9, i->D.s(), i->RA.u(), i->FRS.u())
+
 
 PRINT(STFSUX, XForm_29) {
     *result = format_br_nnn("sftsux", i->FRS, i->RA, i->RB);
 }
 
-EMU(STFSUX, XForm_29) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    auto frs = TH->getFPRd(i->FRS);
-    TH->setGPR(i->RA, ea);
-    MM->storef(ea, frs);
+#define _STFSUX(_ra, _rb, _frs) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    auto frs = TH->getFPRd(_frs); \
+    TH->setGPR(_ra, ea); \
+    MM->storef(ea, frs); \
 }
+EMU_REWRITE(STFSUX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
+
 
 PRINT(STFD, DForm_9) {
     *result = format_br_nnn("stfd", i->FRS, i->D, i->RA);
 }
 
-EMU(STFD, DForm_9) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + i->D.s();
-    auto frs = TH->getFPRd(i->FRS);
-    MM->stored(ea, frs);
+#define _STFD(_ra, _ds, _frs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + _ds; \
+    auto frs = TH->getFPRd(_frs); \
+    MM->stored(ea, frs); \
 }
+EMU_REWRITE(STFD, DForm_9, i->RA.u(), i->D.s(), i->FRS.u())
+
 
 PRINT(STFDX, XForm_29) {
     *result = format_br_nnn("stfdx", i->FRS, i->RA, i->RB);
 }
 
-EMU(STFDX, XForm_29) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    auto frs = TH->getFPRd(i->FRS);
-    MM->stored(ea, frs);
+#define _STFDX(_ra, _rb, _frs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto frs = TH->getFPRd(_frs); \
+    MM->stored(ea, frs); \
 }
+EMU_REWRITE(STFDX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
+
 
 PRINT(STFDU, DForm_9) {
     *result = format_br_nnn("stfdu", i->FRS, i->D, i->RA);
 }
 
-EMU(STFDU, DForm_9) {
-    auto ea = TH->getGPR(i->RA) + i->D.s();
-    auto frs = TH->getFPRd(i->FRS);
-    TH->setGPR(i->RA, ea);
-    MM->stored(ea, frs);
+#define _STFDU(_ds, _ra, _frs) { \
+    auto ea = TH->getGPR(_ra) + _ds; \
+    auto frs = TH->getFPRd(_frs); \
+    TH->setGPR(_ra, ea); \
+    MM->stored(ea, frs); \
 }
+EMU_REWRITE(STFDU, DForm_9, i->D.s(), i->RA.u(), i->FRS.u())
+
 
 PRINT(STFDUX, XForm_29) {
     *result = format_br_nnn("sftdux", i->FRS, i->RA, i->RB);
 }
 
-EMU(STFDUX, XForm_29) {
-    auto ea = TH->getGPR(i->RA) + TH->getGPR(i->RB);
-    auto frs = TH->getFPRd(i->FRS);
-    TH->setGPR(i->RA, ea);
-    MM->stored(ea, frs);
+#define _STFDUX(_ra, _rb, _frs) { \
+    auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
+    auto frs = TH->getFPRd(_frs); \
+    TH->setGPR(_ra, ea); \
+    MM->stored(ea, frs); \
 }
+EMU_REWRITE(STFDUX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
+
 
 PRINT(STFIWX, XForm_29) {
     *result = format_br_nnn("stfiwx", i->FRS, i->RA, i->RB);
 }
 
-EMU(STFIWX, XForm_29) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    auto frs = (uint32_t)TH->getFPR(i->FRS);
-    MM->store<4>(ea, frs);
+#define _STFIWX(_ra, _rb, _frs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto frs = (uint32_t)TH->getFPR(_frs); \
+    MM->store<4>(ea, frs); \
 }
+EMU_REWRITE(STFIWX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
+
 
 PRINT(FMR, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fmr." : "fmr", i->FRT, i->FRB);
 }
 
-EMU(FMR, XForm_27) {
-    auto res = TH->getFPRd(i->FRB);
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FMR(_frb, _frt, _rc) { \
+    auto res = TH->getFPRd(_frb); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FMR, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FNEG, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fneg." : "fneg", i->FRT, i->FRB);
 }
 
-EMU(FNEG, XForm_27) {
-    auto res = -TH->getFPRd(i->FRB);
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FNEG(_frb, _frt, _rc) { \
+    auto res = -TH->getFPRd(_frb); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FNEG, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FABS, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fabs." : "fabs", i->FRT, i->FRB);
 }
 
-EMU(FABS, XForm_27) {
-    auto res = std::abs(TH->getFPRd(i->FRB));
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FABS(_frb, _frt, _rc) { \
+    auto res = std::abs(TH->getFPRd(_frb)); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FABS, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FNABS, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fnabs." : "fnabs", i->FRT, i->FRB);
 }
 
-EMU(FNABS, XForm_27) {
-    auto res = -std::abs(TH->getFPRd(i->FRB));
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FNABS(_frb, _frt, _rc) { \
+    auto res = -std::abs(TH->getFPRd(_frb)); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FNABS, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FSQRT, AForm_4) {
     *result = format_nn(i->Rc.u() ? "fsqrt." : "fsqrt", i->FRT, i->FRB);
 }
 
-EMU(FSQRT, AForm_4) {
-    auto rb = TH->getFPRd(i->FRB);
-    auto res = sqrt(rb);
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FSQRT(_frb, _frt, _rc) { \
+    auto rb = TH->getFPRd(_frb); \
+    auto res = sqrt(rb); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FSQRT, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FSQRTS, AForm_4) {
     *result = format_nn(i->Rc.u() ? "fsqrts." : "fsqrts", i->FRT, i->FRB);
 }
 
-EMU(FSQRTS, AForm_4) {
-    float rb = TH->getFPRd(i->FRB);
-    auto res = sqrt(rb);
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FSQRTS(_frb, _frt, _rc) { \
+    float rb = TH->getFPRd(_frb); \
+    auto res = sqrt(rb); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FSQRTS, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FRE, AForm_4) {
     *result = format_nn(i->Rc.u() ? "fre." : "fre", i->FRT, i->FRB);
 }
 
-EMU(FRE, AForm_4) {
-    auto rb = TH->getFPRd(i->FRB);
-    auto res = 1. / rb;
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FRE(_frb, _frt, _rc) { \
+    auto rb = TH->getFPRd(_frb); \
+    auto res = 1. / rb; \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FRE, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FRES, AForm_4) {
     *result = format_nn(i->Rc.u() ? "fres." : "fres", i->FRT, i->FRB);
 }
 
-EMU(FRES, AForm_4) {
-    float rb = TH->getFPRd(i->FRB);
-    auto res = 1.f / rb;
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FRES(_frb, _frt, _rc) { \
+    float rb = TH->getFPRd(_frb); \
+    auto res = 1.f / rb; \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FRES, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FRSQRTE, AForm_4) {
     *result = format_nn(i->Rc.u() ? "frsqrte." : "frsqrte", i->FRT, i->FRB);
 }
 
-EMU(FRSQRTE, AForm_4) {
-    auto rb = TH->getFPRd(i->FRB);
-    auto res = 1. / sqrt(rb);
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FRSQRTE(_frb, _frt, _rc) { \
+    auto rb = TH->getFPRd(_frb); \
+    auto res = 1. / sqrt(rb); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FRSQRTE, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FRSQRTES, AForm_4) {
     *result = format_nn(i->Rc.u() ? "frsqrtes." : "frsqrtes", i->FRT, i->FRB);
 }
 
-EMU(FRSQRTES, AForm_4) {
-    float rb = TH->getFPRd(i->FRB);
-    auto res = 1.f / sqrt(rb);
-    TH->setFPRd(i->FRT, res);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FRSQRTES(_frb, _frt, _rc) { \
+    float rb = TH->getFPRd(_frb); \
+    auto res = 1.f / sqrt(rb); \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FRSQRTES, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 namespace FPRF {
     enum t {
@@ -2240,1183 +2534,1353 @@ PRINT(FADD, AForm_2) {
     *result = format_nnn(i->Rc.u() ? "fadd." : "fadd", i->FRT, i->FRA, i->FRB);
 }
 
-EMU(FADD, AForm_2) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a + b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc.u(), TH);
+#define _FADD(_fra, _frb, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a + b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0, r, _rc, TH); \
 }
+EMU_REWRITE(FADD, AForm_2, i->FRA.u(), i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FSUB, AForm_2) {
     *result = format_nnn(i->Rc.u() ? "fsub." : "fsub", i->FRT, i->FRA, i->FRB);
 }
 
-EMU(FSUB, AForm_2) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a - b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc.u(), TH);
+#define _FSUB(_fra, _frb, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a - b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0, r, _rc, TH); \
 }
+EMU_REWRITE(FSUB, AForm_2, i->FRA.u(), i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FSUBS, AForm_2) {
     *result = format_nnn(i->Rc.u() ? "fsubs." : "fsubs", i->FRT, i->FRA, i->FRB);
 }
 
-EMU(FSUBS, AForm_2) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a - b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc.u(), TH);
+#define _FSUBS(_fra, _frb, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a - b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0, r, _rc, TH); \
 }
+EMU_REWRITE(FSUBS, AForm_2, i->FRA.u(), i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FADDS, AForm_2) {
     *result = format_nnn(i->Rc.u() ? "fadds." : "fadds", i->FRT, i->FRA, i->FRB);
 }
 
-EMU(FADDS, AForm_2) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRB);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a + b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0f, r, i->Rc.u(), TH);
+#define _FADDS(_fra, _frb, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frb); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a + b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0f, r, _rc, TH); \
 }
+EMU_REWRITE(FADDS, AForm_2, i->FRA.u(), i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FMUL, AForm_3) {
     *result = format_nnn(i->Rc.u() ? "fmul." : "fmul", i->FRT, i->FRA, i->FRC);
 }
 
-EMU(FMUL, AForm_3) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a * b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc.u(), TH);
+#define _FMUL(_fra, _frc, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a * b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0, r, _rc, TH); \
 }
+EMU_REWRITE(FMUL, AForm_3, i->FRA.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FMULS, AForm_3) {
     *result = format_nnn(i->Rc.u() ? "fmuls." : "fmuls", i->FRT, i->FRA, i->FRC);
 }
 
-EMU(FMULS, AForm_3) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a * b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0f, r, i->Rc.u(), TH);
+#define _FMULS(_fra, _frc, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a * b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0f, r, _rc, TH); \
 }
+EMU_REWRITE(FMULS, AForm_3, i->FRA.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FDIV, AForm_2) {
     *result = format_nnn(i->Rc.u() ? "fdiv." : "fdiv", i->FRT, i->FRA, i->FRB);
 }
 
-EMU(FDIV, AForm_2) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a / b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0, r, i->Rc.u(), TH);
+#define _FDIV(_fra, _frb, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a / b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0, r, _rc, TH); \
 }
+EMU_REWRITE(FDIV, AForm_2, i->FRA.u(), i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FDIVS, AForm_2) {
     *result = format_nnn(i->Rc.u() ? "fdivs." : "fdivs", i->FRT, i->FRA, i->FRB);
 }
 
-EMU(FDIVS, AForm_2) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRB);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a / b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, .0f, r, i->Rc.u(), TH);
+#define _FDIVS(_fra, _frb, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frb); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a / b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, .0f, r, _rc, TH); \
 }
+EMU_REWRITE(FDIVS, AForm_2, i->FRA.u(), i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FMADD, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fmadd." : "fmadd", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FMADD, AForm_1) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    auto c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a * c + b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FMADD(_fra, _frb, _frc, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    auto c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a * c + b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FMADD, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FMADDS, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fmadds." : "fmadds", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FMADDS, AForm_1) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRB);
-    float c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a * c + b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FMADDS(_fra, _frb, _frc, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frb); \
+    float c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a * c + b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FMADDS, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FMSUB, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fsub." : "fmsub", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FMSUB, AForm_1) {
-    double a = TH->getFPRd(i->FRA);
-    double b = TH->getFPRd(i->FRB);
-    double c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a * c - b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FMSUB(_fra, _frb, _frc, _frt, _rc) { \
+    double a = TH->getFPRd(_fra); \
+    double b = TH->getFPRd(_frb); \
+    double c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a * c - b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FMSUB, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 
 PRINT(FMSUBS, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fsubs." : "fmsubs", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FMSUBS, AForm_1) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRB);
-    float c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = a * c - b;
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FMSUBS(_fra, _frb, _frc, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frb); \
+    float c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = a * c - b; \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FMSUBS, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FNMADD, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fnmadd." : "fnmadd", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FNMADD, AForm_1) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    auto c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = -(a * c + b);
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FNMADD(_fra, _frb, _frc, _frt, _rc) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    auto c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = -(a * c + b); \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FNMADD, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FNMADDS, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fnmadds." : "fnmadds", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FNMADDS, AForm_1) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRB);
-    float c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = -(a * c + b);
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FNMADDS(_fra, _frb, _frc, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frb); \
+    float c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = -(a * c + b); \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FNMADDS, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FNMSUB, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fnsub." : "fnmsub", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FNMSUB, AForm_1) {
-    double a = TH->getFPRd(i->FRA);
-    double b = TH->getFPRd(i->FRB);
-    double c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = -(a * c - b);
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FNMSUB(_fra, _frb, _frc, _frt, _rc) { \
+    double a = TH->getFPRd(_fra); \
+    double b = TH->getFPRd(_frb); \
+    double c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = -(a * c - b); \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FNMSUB, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 
 PRINT(FNMSUBS, AForm_1) {
     *result = format_nnnn(i->Rc.u() ? "fnsubs." : "fnmsubs", i->FRT, i->FRA, i->FRC, i->FRB);
 }
 
-EMU(FNMSUBS, AForm_1) {
-    float a = TH->getFPRd(i->FRA);
-    float b = TH->getFPRd(i->FRB);
-    float c = TH->getFPRd(i->FRC);
-    std::feclearexcept(FE_ALL_EXCEPT);
-    auto r = -(a * c - b);
-    TH->setFPRd(i->FRT, r);
-    completeFPInstr(a, b, c, r, i->Rc.u(), TH);
+#define _FNMSUBS(_fra, _frb, _frc, _frt, _rc) { \
+    float a = TH->getFPRd(_fra); \
+    float b = TH->getFPRd(_frb); \
+    float c = TH->getFPRd(_frc); \
+    std::feclearexcept(FE_ALL_EXCEPT); \
+    auto r = -(a * c - b); \
+    TH->setFPRd(_frt, r); \
+    completeFPInstr(a, b, c, r, _rc, TH); \
 }
+EMU_REWRITE(FNMSUBS, AForm_1, i->FRA.u(), i->FRB.u(), i->FRC.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FCFID, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fcfid." : "fcfid", i->FRT, i->FRB);
 }
 
-EMU(FCFID, XForm_27) {
-    double b = (int64_t)TH->getFPR(i->FRB);
-    TH->setFPRd(i->FRT, b);
-    auto fpscr = TH->getFPSCR();
-    fpscr.fprf.v = getFPRF(b);
-    TH->setFPSCR(fpscr.v);
-    /* TODO: FX XX */
-    if (i->Rc.u())
-        update_CRFSign<1>(b, TH);
+#define _FCFID(_frb, _frt, _rc) { \
+    double b = (int64_t)TH->getFPR(_frb); \
+    TH->setFPRd(_frt, b); \
+    auto fpscr = TH->getFPSCR(); \
+    fpscr.fprf.v = getFPRF(b); \
+    TH->setFPSCR(fpscr.v); \
+    /* TODO: FX XX */ \
+    if (_rc) \
+        update_CRFSign<1>(b, TH); \
 }
+EMU_REWRITE(FCFID, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FCMPU, XForm_17) {
     *result = format_nnn("fcmpu", i->BF, i->FRA, i->FRB);
 }
 
-EMU(FCMPU, XForm_17) {
-    auto a = TH->getFPRd(i->FRA);
-    auto b = TH->getFPRd(i->FRB);
-    uint32_t c = std::isnan(a) || std::isnan(b) ? 1
-               : a < b ? 8
-               : a > b ? 4
-               : 2;
-    auto fpscr = TH->getFPSCR();
-    fpscr.fpcc.v = c;
-    TH->setCRF(i->BF.u(), c);
-    if (issignaling(a) || issignaling(b)) {
-        fpscr.f.FX |= 1;
-        fpscr.f.VXSNAN = 1;
-    }
-    TH->setFPSCR(fpscr.v);
+#define _FCMPU(_fra, _frb, _bf) { \
+    auto a = TH->getFPRd(_fra); \
+    auto b = TH->getFPRd(_frb); \
+    uint32_t c = std::isnan(a) || std::isnan(b) ? 1 \
+               : a < b ? 8 \
+               : a > b ? 4 \
+               : 2; \
+    auto fpscr = TH->getFPSCR(); \
+    fpscr.fpcc.v = c; \
+    TH->setCRF(_bf, c); \
+    if (issignaling(a) || issignaling(b)) { \
+        fpscr.f.FX |= 1; \
+        fpscr.f.VXSNAN = 1; \
+    } \
+    TH->setFPSCR(fpscr.v); \
 }
+EMU_REWRITE(FCMPU, XForm_17, i->FRA.u(), i->FRB.u(), i->BF.u())
+
 
 PRINT(FCTIWZ, XForm_27) {
     *result = format_nn(i->Rc.u() ? "fctiwz." : "fctiwz", i->FRT, i->FRB);
 }
 
-EMU(FCTIWZ, XForm_27) {
-    auto b = TH->getFPRd(i->FRB);
-    int32_t res = b > 2147483647. ? 0x7fffffff
-                : b < -2147483648. ? 0x80000000
-                : (int32_t)b;
-    /* TODO invalid operation, XX */
-    auto fpscr = TH->getFPSCR();
-    if (issignaling(b)) {
-        fpscr.f.FX = 1;
-        fpscr.f.VXSNAN = 1;
-    }
-    TH->setFPR(i->FRT, res);
-    TH->setFPSCR(fpscr.v);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FCTIWZ(_frb, _frt, _rc) { \
+    auto b = TH->getFPRd(_frb); \
+    int32_t res = b > 2147483647. ? 0x7fffffff \
+                : b < -2147483648. ? 0x80000000 \
+                : (int32_t)b; \
+    /* TODO invalid operation, XX */ \
+    auto fpscr = TH->getFPSCR(); \
+    if (issignaling(b)) { \
+        fpscr.f.FX = 1; \
+        fpscr.f.VXSNAN = 1; \
+    } \
+    TH->setFPR(_frt, res); \
+    TH->setFPSCR(fpscr.v); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FCTIWZ, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FCTIDZ, XForm_27) { // test, change rounding mode
     *result = format_nn(i->Rc.u() ? "fctidz." : "fctidz", i->FRT, i->FRB);
 }
 
-EMU(FCTIDZ, XForm_27) {
-    auto b = TH->getFPRd(i->FRB);
-    int32_t res = b > 2147483647. ? 0x7fffffff
-    : b < -2147483648. ? 0x80000000
-    : (int32_t)b;
-    /* TODO invalid operation, XX */
-    auto fpscr = TH->getFPSCR();
-    if (issignaling(b)) {
-        fpscr.f.FX = 1;
-        fpscr.f.VXSNAN = 1;
-    }
-    TH->setFPR(i->FRT, res);
-    TH->setFPSCR(fpscr.v);
-    if (i->Rc.u())
-        update_CRFSign<1>(res, TH);
+#define _FCTIDZ(_frb, _frt, _rc) { \
+    auto b = TH->getFPRd(_frb); \
+    int32_t res = b > 2147483647. ? 0x7fffffff \
+    : b < -2147483648. ? 0x80000000 \
+    : (int32_t)b; \
+    /* TODO invalid operation, XX */ \
+    auto fpscr = TH->getFPSCR(); \
+    if (issignaling(b)) { \
+        fpscr.f.FX = 1; \
+        fpscr.f.VXSNAN = 1; \
+    } \
+    TH->setFPR(_frt, res); \
+    TH->setFPSCR(fpscr.v); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
 }
+EMU_REWRITE(FCTIDZ, XForm_27, i->FRB.u(), i->FRT.u(), i->Rc.u())
+
 
 PRINT(FRSP, XForm_27) {
     *result = format_nn(i->Rc.u() ? "frsp." : "frsp", i->FRT, i->FRB);
 }
 
-EMU(FRSP, XForm_27) {
-    /* TODO: set class etc */
-    float b = TH->getFPRd(i->FRB);
-    TH->setFPRd(i->FRT, b);
+#define _FRSP(_frb, _frt) { \
+    /* TODO: set class etc */ \
+    float b = TH->getFPRd(_frb); \
+    TH->setFPRd(_frt, b); \
 }
+EMU_REWRITE(FRSP, XForm_27, i->FRB.u(), i->FRT.u())
+
 
 PRINT(MFFS, XForm_28) {
     *result = format_n(i->Rc.u() ? "mffs." : "mffs", i->FRT);
 }
 
-EMU(MFFS, XForm_28) {
-    uint32_t fpscr = TH->getFPSCR().v;
-    TH->setFPR(i->FRT, fpscr);
-    if (i->Rc.u())
-        update_CRFSign<1>(fpscr, TH);
+#define _MFFS(_frt, _rc) { \
+    uint32_t fpscr = TH->getFPSCR().v; \
+    TH->setFPR(_frt, fpscr); \
+    if (_rc) \
+        update_CRFSign<1>(fpscr, TH); \
 }
+EMU_REWRITE(MFFS, XForm_28, i->FRT.u(), i->Rc.u())
+
 
 PRINT(MTFSF, XFLForm) {
     *result = format_nn(i->Rc.u() ? "mtfsf." : "mtfsf", i->FLM, i->FRB);
 }
 
-EMU(MTFSF, XFLForm) {
-    auto n = __builtin_clzll(i->FLM.u()) - 64 + FLM_t::W;
-    auto r = TH->getFPSCRF(n);
-    TH->setFPSCRF(n, r);
-    if (i->Rc.u())
-        update_CRFSign<1>(r, TH);
+#define _MTFSF(_flm, _rc) { \
+    auto n = __builtin_clzll(_flm) - 64 + FLM_t::W; \
+    auto r = TH->getFPSCRF(n); \
+    TH->setFPSCRF(n, r); \
+    if (_rc) \
+        update_CRFSign<1>(r, TH); \
 }
+EMU_REWRITE(MTFSF, XFLForm, i->FLM.u(), i->Rc.u())
+
 
 PRINT(LWARX, XForm_1) {
     *result = format_nnn("lwarx", i->RT, i->RA, i->RB);
 }
 
-EMU(LWARX, XForm_1) {
-    auto ra = getB(i->RA.u(), TH);
-    auto ea = ra + TH->getGPR(i->RB);
-    big_uint32_t val;
-    MM->loadReserve(ea, &val, 4);
-    TH->setGPR(i->RT, val);
+#define _LWARX(_ra, _rb, _rt) { \
+    auto ra = getB(_ra, TH); \
+    auto ea = ra + TH->getGPR(_rb); \
+    big_uint32_t val; \
+    MM->loadReserve(ea, &val, 4); \
+    TH->setGPR(_rt, val); \
 }
+EMU_REWRITE(LWARX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 PRINT(STWCX, XForm_8) {
     *result = format_nnn("stwcx.", i->RS, i->RA, i->RB);
 }
 
-EMU(STWCX, XForm_8) {
-    auto ra = getB(i->RA.u(), TH);
-    auto ea = ra + TH->getGPR(i->RB);
-    big_uint32_t val = TH->getGPR(i->RS);
-    auto stored = MM->writeCond(ea, &val, 4);
-    TH->setCRF_sign(0, stored);
+#define _STWCX(_ra, _rb, _rs) { \
+    auto ra = getB(_ra, TH); \
+    auto ea = ra + TH->getGPR(_rb); \
+    big_uint32_t val = TH->getGPR(_rs); \
+    auto stored = MM->writeCond(ea, &val, 4); \
+    TH->setCRF_sign(0, stored); \
 }
+EMU_REWRITE(STWCX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 
 PRINT(LDARX, XForm_1) {
     *result = format_nnn("ldarx", i->RT, i->RA, i->RB);
 }
 
-EMU(LDARX, XForm_1) {
-    auto ra = getB(i->RA.u(), TH);
-    auto ea = ra + TH->getGPR(i->RB);
-    big_uint64_t val;
-    MM->loadReserve(ea, &val, 8);
-    TH->setGPR(i->RT, val);
+#define _LDARX(_ra, _rb, _rt) { \
+    auto ra = getB(_ra, TH); \
+    auto ea = ra + TH->getGPR(_rb); \
+    big_uint64_t val; \
+    MM->loadReserve(ea, &val, 8); \
+    TH->setGPR(_rt, val); \
 }
+EMU_REWRITE(LDARX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
+
 
 PRINT(STDCX, XForm_8) {
     *result = format_nnn("stdcx.", i->RS, i->RA, i->RB);
 }
 
-EMU(STDCX, XForm_8) {
-    auto ra = getB(i->RA.u(), TH);
-    auto ea = ra + TH->getGPR(i->RB);
-    big_uint64_t val = TH->getGPR(i->RS);
-    auto stored = MM->writeCond(ea, &val, 8);
-    TH->setCRF_sign(0, stored);
+#define _STDCX(_ra, _rb, _rs) { \
+    auto ra = getB(_ra, TH); \
+    auto ea = ra + TH->getGPR(_rb); \
+    big_uint64_t val = TH->getGPR(_rs); \
+    auto stored = MM->writeCond(ea, &val, 8); \
+    TH->setCRF_sign(0, stored); \
 }
+EMU_REWRITE(STDCX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
+
 
 PRINT(SYNC, XForm_24) {
     *result = format_n("sync", i->L);
 }
 
-EMU(SYNC, XForm_24) {
-    __sync_synchronize();
+#define _SYNC(_) { \
+    __sync_synchronize(); \
 }
+EMU_REWRITE(SYNC, XForm_24, 0)
+
 
 PRINT(ISYNC, XLForm_1) {
     *result = "sync";
 }
 
-EMU(ISYNC, XLForm_1) {
-    __sync_synchronize();
+#define _ISYNC(_) { \
+    __sync_synchronize(); \
 }
+EMU_REWRITE(ISYNC, XLForm_1, 0)
+
 
 PRINT(EIEIO, XForm_24) {
     *result = "eieio";
 }
 
-EMU(EIEIO, XForm_24) {
-    __sync_synchronize();
+#define _EIEIO(_) { \
+    __sync_synchronize(); \
 }
+EMU_REWRITE(EIEIO, XForm_24, 0)
+
 
 PRINT(TD, XForm_25) {
     *result = format_nnn("td", i->TO, i->RA, i->RB);
 }
 
-EMU(TD, XForm_25) {
-    if (i->TO.u() == 31 && i->RA.u() == i->RB.u())
-        throw BreakpointException();
-    throw IllegalInstructionException();
+#define _TD(_to, _ra, _rb) { \
+    if (_to == 31 && _ra == _rb) \
+        throw BreakpointException(); \
+    throw IllegalInstructionException(); \
 }
+EMU_REWRITE(TD, XForm_25, i->TO.u(), i->RA.u(), i->RB.u())
+
 
 PRINT(TW, XForm_25) {
     *result = format_nnn("tw", i->TO, i->RA, i->RB);
 }
 
-EMU(TW, XForm_25) {
-    if (i->TO.u() == 31 && i->RA.u() == i->RB.u())
-        throw BreakpointException();
-    throw IllegalInstructionException();
+#define _TW(_to, _ra, _rb) { \
+    if (_to == 31 && _ra == _rb) \
+        throw BreakpointException(); \
+    throw IllegalInstructionException(); \
 }
+EMU_REWRITE(TW, XForm_25, i->TO.u(), i->RA.u(), i->RB.u())
+
 
 PRINT(MFTB, XFXForm_2) {
     *result = format_nn("mftb", i->RT, i->tbr);
 }
 
-EMU(MFTB, XFXForm_2) {
-    auto tbr = i->tbr.u();
-    auto tb = g_state.proc->getTimeBase();
-    assert(tbr == 392 || tbr == 424);
-    if (tbr == 424)
-        tb &= 0xffffffff;
-    TH->setGPR(i->RT, tb);
+#define _MFTB(_tbr, _rt) { \
+    auto tbr = _tbr; \
+    auto tb = g_state.proc->getTimeBase(); \
+    assert(tbr == 392 || tbr == 424); \
+    if (tbr == 424) \
+        tb &= 0xffffffff; \
+    TH->setGPR(_rt, tb); \
 }
+EMU_REWRITE(MFTB, XFXForm_2, i->tbr.u(), i->RT.u())
+
 
 PRINT(STVX, SIMDForm) {
     *result = format_nnn("stvx", i->vS, i->rA, i->rB);
 }
 
-EMU(STVX, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    MM->store16(ea, TH->getV(i->vS));
+#define _STVX(_ra, _rb, _vs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    MM->store16(ea, TH->getV(_vs)); \
 }
+EMU_REWRITE(STVX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
+
 
 PRINT(STVXL, SIMDForm) {
     *result = format_nnn("stvxl", i->vS, i->rA, i->rB);
 }
 
-EMU(STVXL, SIMDForm) {
-    emulateSTVX(i, cia, thread);
+#define _STVXL(_) { \
+    emulateSTVX(i, cia, thread); \
 }
+EMU_REWRITE(STVXL, SIMDForm, 0)
+
 
 PRINT(LVX, SIMDForm) {
     *result = format_nnn("lvx", i->vD, i->rA, i->rB);
 }
 
-EMU(LVX, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    TH->setV(i->vD, MM->load16(ea));
+#define _LVX(_ra, _rb, _vd) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    TH->setV(_vd, MM->load16(ea)); \
 }
+EMU_REWRITE(LVX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
+
 
 PRINT(LVXL, SIMDForm) {
     *result = format_nnn("lvxl", i->vD, i->rA, i->rB);
 }
 
-EMU(LVXL, SIMDForm) {
-    emulateLVX(i, cia, thread);
+#define _LVXL(_) { \
+    emulateLVX(i, cia, thread); \
 }
+EMU_REWRITE(LVXL, SIMDForm, 0)
+
 
 PRINT(LVLX, SIMDForm) {
     *result = format_nnn("lvlx", i->vD, i->rA, i->rB);
 }
 
-EMU(LVLX, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    auto eb = ea & 0b1111ull;
-    uint8_t be[16] = {0};
-    MM->readMemory(ea, be, 16 - eb);
-    TH->setV(i->vD, be);
+#define _LVLX(_ra, _rb, _vd) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto eb = ea & 0b1111ull; \
+    uint8_t be[16] = {0}; \
+    MM->readMemory(ea, be, 16 - eb); \
+    TH->setV(_vd, be); \
 }
+EMU_REWRITE(LVLX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
+
 
 PRINT(LVRX, SIMDForm) {
     *result = format_nnn("lvrx", i->vD, i->rA, i->rB);
 }
 
-EMU(LVRX, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    auto eb = ea & 0b1111ull;
-    uint8_t be[16] = {0};
-    if (eb) {
-        MM->readMemory(ea - eb, be + 16 - eb, eb);
-    }
-    TH->setV(i->vD, be);
+#define _LVRX(_ra, _rb, _vd) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto eb = ea & 0b1111ull; \
+    uint8_t be[16] = {0}; \
+    if (eb) { \
+        MM->readMemory(ea - eb, be + 16 - eb, eb); \
+    } \
+    TH->setV(_vd, be); \
 }
+EMU_REWRITE(LVRX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
+
 
 PRINT(VSLDOI, SIMDForm) {
     *result = format_nnnn("vsldoi", i->vD, i->vA, i->vB, i->SHB);
 }
 
-EMU(VSLDOI, SIMDForm) {
-    assert(i->SHB.u() <= 16);
-    uint8_t be[32];
-    TH->getV(i->vA, be);
-    TH->getV(i->vB, be + 16);
-    TH->setV(i->vD, be + i->SHB.u());
+#define _VSLDOI(_shb, _va, _vb, _vd) { \
+    assert(_shb <= 16); \
+    uint8_t be[32]; \
+    TH->getV(_va, be); \
+    TH->getV(_vb, be + 16); \
+    TH->setV(_vd, be + _shb); \
 }
+EMU_REWRITE(VSLDOI, SIMDForm, i->SHB.u(), i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(LVEWX, SIMDForm) { // TODO: test
     *result = format_nnn("lvewx", i->vD, i->rA, i->rB);
 }
 
-EMU(LVEWX, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    uint8_t be[16];
-    MM->readMemory(ea, be, 16);
-    TH->setV(i->vD, be);
+#define _LVEWX(_ra, _rb, _vd) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    uint8_t be[16]; \
+    MM->readMemory(ea, be, 16); \
+    TH->setV(_vd, be); \
 }
+EMU_REWRITE(LVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
+
 
 PRINT(VSPLTW, SIMDForm) { // TODO: test
     *result = format_nnn("vspltw", i->vD, i->vB, i->UIMM);
 }
 
-EMU(VSPLTW, SIMDForm) {
-    uint32_t be[4];
-    TH->getV(i->vB, (uint8_t*)be);
-    auto b = i->UIMM.u();
-    be[0] = be[b];
-    be[1] = be[b];
-    be[2] = be[b];
-    be[3] = be[b];
-    TH->setV(i->vD, (uint8_t*)be);
+#define _VSPLTW(_vb, _uimm, _vd) { \
+    uint32_t be[4]; \
+    TH->getV(_vb, (uint8_t*)be); \
+    auto b = _uimm; \
+    be[0] = be[b]; \
+    be[1] = be[b]; \
+    be[2] = be[b]; \
+    be[3] = be[b]; \
+    TH->setV(_vd, (uint8_t*)be); \
 }
+EMU_REWRITE(VSPLTW, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
+
 
 PRINT(VSPLTISH, SIMDForm) { // TODO: test
     *result = format_nn("vspltish", i->vD, i->SIMM);
 }
 
-EMU(VSPLTISH, SIMDForm) {
-    int16_t v = i->SIMM.s();
-    int16_t be[8] = {
-        v, v, v, v,
-        v, v, v, v
-    };
-    TH->setV(i->vD, (uint8_t*)be);
+#define _VSPLTISH(_simms, _vd) { \
+    int16_t v = _simms; \
+    int16_t be[8] = { \
+        v, v, v, v, \
+        v, v, v, v \
+    }; \
+    TH->setV(_vd, (uint8_t*)be); \
 }
+EMU_REWRITE(VSPLTISH, SIMDForm, i->SIMM.s(), i->vD.u())
+
 
 PRINT(VMRGHH, SIMDForm) { // TODO: test
     *result = format_nnn("vmrghh", i->vD, i->vA, i->vB);
 }
 
-EMU(VMRGHH, SIMDForm) {
-    int16_t abe[8], bbe[8];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    int16_t dbe[8] = {
-        abe[0], bbe[0],
-        abe[1], bbe[1],
-        abe[2], bbe[2],
-        abe[3], bbe[3],
-    };
-    TH->setV(i->vD, (uint8_t*)dbe);
+#define _VMRGHH(_va, _vb, _vd) { \
+    int16_t abe[8], bbe[8]; \
+    TH->getV(_va, (uint8_t*)abe); \
+    TH->getV(_vb, (uint8_t*)bbe); \
+    int16_t dbe[8] = { \
+        abe[0], bbe[0], \
+        abe[1], bbe[1], \
+        abe[2], bbe[2], \
+        abe[3], bbe[3], \
+    }; \
+    TH->setV(_vd, (uint8_t*)dbe); \
 }
+EMU_REWRITE(VMRGHH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VMULOSH, SIMDForm) { // TODO: test
     *result = format_nnn("vmulosh", i->vD, i->vA, i->vB);
 }
 
-EMU(VMULOSH, SIMDForm) {
-    int16_t abe[8], bbe[8];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    int32_t dbe[4] = {
-        (int32_t)abe[1] * (int32_t)bbe[1],
-        (int32_t)abe[3] * (int32_t)bbe[3],
-        (int32_t)abe[5] * (int32_t)bbe[5],
-        (int32_t)abe[7] * (int32_t)bbe[7],
-    };
-    TH->setV(i->vD, (uint8_t*)dbe);
+#define _VMULOSH(_va, _vb, _vd) { \
+    int16_t abe[8], bbe[8]; \
+    TH->getV(_va, (uint8_t*)abe); \
+    TH->getV(_vb, (uint8_t*)bbe); \
+    int32_t dbe[4] = { \
+        (int32_t)abe[1] * (int32_t)bbe[1], \
+        (int32_t)abe[3] * (int32_t)bbe[3], \
+        (int32_t)abe[5] * (int32_t)bbe[5], \
+        (int32_t)abe[7] * (int32_t)bbe[7], \
+    }; \
+    TH->setV(_vd, (uint8_t*)dbe); \
 }
+EMU_REWRITE(VMULOSH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VMRGLH, SIMDForm) { // TODO: test
     *result = format_nnn("vmrglh", i->vD, i->vA, i->vB);
 }
 
-EMU(VMRGLH, SIMDForm) {
-    int16_t abe[8], bbe[8];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    int16_t dbe[8] = {
-        abe[4], bbe[4],
-        abe[5], bbe[5],
-        abe[6], bbe[6],
-        abe[7], bbe[7],
-    };
-    TH->setV(i->vD, (uint8_t*)dbe);
+#define _VMRGLH(_va, _vb, _vd) { \
+    int16_t abe[8], bbe[8]; \
+    TH->getV(_va, (uint8_t*)abe); \
+    TH->getV(_vb, (uint8_t*)bbe); \
+    int16_t dbe[8] = { \
+        abe[4], bbe[4], \
+        abe[5], bbe[5], \
+        abe[6], bbe[6], \
+        abe[7], bbe[7], \
+    }; \
+    TH->setV(_vd, (uint8_t*)dbe); \
 }
+EMU_REWRITE(VMRGLH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VSPLTISW, SIMDForm) { // TODO: test
     *result = format_nn("vspltisw", i->vD, i->SIMM);
 }
 
-EMU(VSPLTISW, SIMDForm) {
-    int32_t v = i->SIMM.s();
-    big_uint32_t be[4] = { v, v, v, v };
-    TH->setV(i->vD, (uint8_t*)be);
+#define _VSPLTISW(_simms, _vd) { \
+    int32_t v = _simms; \
+    big_uint32_t be[4] = { v, v, v, v }; \
+    TH->setV(_vd, (uint8_t*)be); \
 }
+EMU_REWRITE(VSPLTISW, SIMDForm, i->SIMM.s(), i->vD.u())
+
 
 PRINT(VMADDFP, SIMDForm) {
     *result = format_nnnn("vmaddfp", i->vD, i->vA, i->vC, i->vB);
 }
 
-EMU(VMADDFP, SIMDForm) {
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    auto c = TH->getVf(i->vC);
-    std::array<float, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] * c[i] + b[i];
-    }
-    TH->setVf(i->vD, d);
+#define _VMADDFP(_va, _vb, _vc, _vd) { \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    auto c = TH->getVf(_vc); \
+    std::array<float, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] * c[i] + b[i]; \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VMADDFP, SIMDForm, i->vA.u(), i->vB.u(), i->vC.u(), i->vD.u())
+
 
 PRINT(VNMSUBFP, SIMDForm) {
     *result = format_nnnn("vnmsubfp", i->vD, i->vA, i->vC, i->vB);
 }
 
-EMU(VNMSUBFP, SIMDForm) {
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    auto c = TH->getVf(i->vC);
-    std::array<float, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = -(a[i] * c[i] - b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VNMSUBFP(_va, _vb, _vc, _vd) { \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    auto c = TH->getVf(_vc); \
+    std::array<float, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = -(a[i] * c[i] - b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VNMSUBFP, SIMDForm, i->vA.u(), i->vB.u(), i->vC.u(), i->vD.u())
+
 
 PRINT(VXOR, SIMDForm) {
     *result = format_nnn("vxor", i->vD, i->vA, i->vB);
 }
 
-EMU(VXOR, SIMDForm) {
-    auto d = TH->getV(i->vA) ^ TH->getV(i->vB);
-    TH->setV(i->vD, d);
+#define _VXOR(_va, _vb, _vd) { \
+    auto d = TH->getV(_va) ^ TH->getV(_vb); \
+    TH->setV(_vd, d); \
 }
+EMU_REWRITE(VXOR, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VNOR, SIMDForm) {
     *result = format_nnn("vnor", i->vD, i->vA, i->vB);
 }
 
-EMU(VNOR, SIMDForm) {
-    auto d = ~(TH->getV(i->vA) | TH->getV(i->vB));
-    TH->setV(i->vD, d);
+#define _VNOR(_va, _vb, _vd) { \
+    auto d = ~(TH->getV(_va) | TH->getV(_vb)); \
+    TH->setV(_vd, d); \
 }
+EMU_REWRITE(VNOR, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VOR, SIMDForm) {
     *result = format_nnn("vor", i->vD, i->vA, i->vB);
 }
 
-EMU(VOR, SIMDForm) {
-    auto d = TH->getV(i->vA) | TH->getV(i->vB);
-    TH->setV(i->vD, d);
+#define _VOR(_va, _vb, _vd) { \
+    auto d = TH->getV(_va) | TH->getV(_vb); \
+    TH->setV(_vd, d); \
 }
+EMU_REWRITE(VOR, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VAND, SIMDForm) {
     *result = format_nnn("vand", i->vD, i->vA, i->vB);
 }
 
-EMU(VAND, SIMDForm) {
-    auto d = TH->getV(i->vA) & TH->getV(i->vB);
-    TH->setV(i->vD, d);
+#define _VAND(_va, _vb, _vd) { \
+    auto d = TH->getV(_va) & TH->getV(_vb); \
+    TH->setV(_vd, d); \
 }
+EMU_REWRITE(VAND, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VSEL, SIMDForm) {
     *result = format_nnnn("vsel", i->vD, i->vA, i->vB, i->vC);
 }
 
-EMU(VSEL, SIMDForm) {
-    auto m = TH->getV(i->vC);
-    auto a = TH->getV(i->vA);
-    auto b = TH->getV(i->vB);
-    auto d = (m & b) | (~m & a);
-    TH->setV(i->vD, d);
+#define _VSEL(_vc, _va, _vb, _vd) { \
+    auto m = TH->getV(_vc); \
+    auto a = TH->getV(_va); \
+    auto b = TH->getV(_vb); \
+    auto d = (m & b) | (~m & a); \
+    TH->setV(_vd, d); \
 }
+EMU_REWRITE(VSEL, SIMDForm, i->vC.u(), i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VADDFP, SIMDForm) {
     *result = format_nnn("vaddfp", i->vD, i->vA, i->vB);
 }
 
-EMU(VADDFP, SIMDForm) {
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    std::array<float, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] + b[i];
-    }
-    TH->setVf(i->vD, d);
+#define _VADDFP(_va, _vb, _vd) { \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    std::array<float, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] + b[i]; \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VADDFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VSUBFP, SIMDForm) {
     *result = format_nnn("vsubfp", i->vD, i->vA, i->vB);
 }
 
-EMU(VSUBFP, SIMDForm) {
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    std::array<float, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] - b[i];
-    }
-    TH->setVf(i->vD, d);
+#define _VSUBFP(_va, _vb, _vd) { \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    std::array<float, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] - b[i]; \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VSUBFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VRSQRTEFP, SIMDForm) {
     *result = format_nn("vrsqrtefp", i->vD, i->vB);
 }
 
-EMU(VRSQRTEFP, SIMDForm) {
-    auto b = TH->getVf(i->vB);
-    std::array<float, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = 1.f / sqrt(b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VRSQRTEFP(_vb, _vd) { \
+    auto b = TH->getVf(_vb); \
+    std::array<float, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = 1.f / sqrt(b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VRSQRTEFP, SIMDForm, i->vB.u(), i->vD.u())
+
 
 PRINT(VCTSXS, SIMDForm) {
     *result = format_nnn("vctsxs", i->vD, i->vB, i->UIMM);
 }
 
-EMU(VCTSXS, SIMDForm) {
-    auto b = TH->getVf(i->vB);
-    std::array<uint32_t, 4> d;
-    auto m = 1u << i->UIMM.u();
-    for (int i = 0; i < 4; ++i) {
-        d[i] = b[i] * m;
-    }
-    TH->setVuw(i->vD, d);
+#define _VCTSXS(_vb, _uimm, _vd) { \
+    auto b = TH->getVf(_vb); \
+    std::array<uint32_t, 4> d; \
+    auto m = 1u << _uimm; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = b[i] * m; \
+    } \
+    TH->setVuw(_vd, d); \
 }
+EMU_REWRITE(VCTSXS, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
+
 
 PRINT(VCFSX, SIMDForm) {
     *result = format_nnn("vcfsx", i->vD, i->vB, i->UIMM);
 }
 
-EMU(VCFSX, SIMDForm) {
-    auto b = TH->getVw(i->vB);
-    auto div = 1u << i->UIMM.u();
-    std::array<float, 4> d;
-    for (int n = 0; n < 4; ++n) {
-        d[n] = b[n];
-        d[n] /= div;
-    }
-    TH->setVf(i->vD, d);
+#define _VCFSX(_vb, _uimm, _vd) { \
+    auto b = TH->getVw(_vb); \
+    auto div = 1u << _uimm; \
+    std::array<float, 4> d; \
+    for (int n = 0; n < 4; ++n) { \
+        d[n] = b[n]; \
+        d[n] /= div; \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VCFSX, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
+
 
 PRINT(VADDUWM, SIMDForm) {
     *result = format_nnn("vadduwm", i->vD, i->vA, i->vB);
 }
 
-EMU(VADDUWM, SIMDForm) {
-    auto a = TH->getVuw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int n = 0; n < 4; ++n) {
-        d[n] = a[n] + b[n];
-    }
-    TH->setVuw(i->vD, d);
+#define _VADDUWM(_va, _vb, _vd) { \
+    auto a = TH->getVuw(_va); \
+    auto b = TH->getVuw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int n = 0; n < 4; ++n) { \
+        d[n] = a[n] + b[n]; \
+    } \
+    TH->setVuw(_vd, d); \
 }
+EMU_REWRITE(VADDUWM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VSUBUWM, SIMDForm) {
     *result = format_nnn("vsubuwm", i->vD, i->vA, i->vB);
 }
 
-EMU(VSUBUWM, SIMDForm) {
-    auto a = TH->getVuw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int n = 0; n < 4; ++n) {
-        d[n] = a[n] - b[n];
-    }
-    TH->setVuw(i->vD, d);
+#define _VSUBUWM(_va, _vb, _vd) { \
+    auto a = TH->getVuw(_va); \
+    auto b = TH->getVuw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int n = 0; n < 4; ++n) { \
+        d[n] = a[n] - b[n]; \
+    } \
+    TH->setVuw(_vd, d); \
 }
+EMU_REWRITE(VSUBUWM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VCMPEQUW, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpequw." : "vcmpequw", i->vD, i->vA, i->vB);
 }
 
-EMU(VCMPEQUW, SIMDForm) {
-    auto a = TH->getVuw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] == b[i] ? 0xffffffff : 0;
-    }
-    TH->setVuw(i->vD, d);
-    if (i->Rc.u()) {
-        auto d128 = TH->getV(i->vD);
-        auto t = ~d128 == 0;
-        auto f = d128 == 0;
-        auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);  
-    }
+#define _VCMPEQUW(_va, _vb, _vd, _rc) { \
+    auto a = TH->getVuw(_va); \
+    auto b = TH->getVuw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] == b[i] ? 0xffffffff : 0; \
+    } \
+    TH->setVuw(_vd, d); \
+    if (_rc) { \
+        auto d128 = TH->getV(_vd); \
+        auto t = ~d128 == 0; \
+        auto f = d128 == 0; \
+        auto c = t << 3 | f << 1; \
+        TH->setCRF(6, c); \
+    } \
 }
+EMU_REWRITE(VCMPEQUW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VCMPGTFP, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpgtfp." : "vcmpgtfp", i->vD, i->vA, i->vB);
 }
 
-EMU(VCMPGTFP, SIMDForm) {
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] > b[i] ? 0xffffffff : 0;
-    }
-    TH->setVuw(i->vD, d);
-    if (i->Rc.u()) {
-        auto d128 = TH->getV(i->vD);
-        auto t = ~d128 == 0;
-        auto f = d128 == 0;
-        auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);
-    }
+#define _VCMPGTFP(_va, _vb, _vd, _rc) { \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] > b[i] ? 0xffffffff : 0; \
+    } \
+    TH->setVuw(_vd, d); \
+    if (_rc) { \
+        auto d128 = TH->getV(_vd); \
+        auto t = ~d128 == 0; \
+        auto f = d128 == 0; \
+        auto c = t << 3 | f << 1; \
+        TH->setCRF(6, c); \
+    } \
 }
+EMU_REWRITE(VCMPGTFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VCMPGTUW, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpgtuw." : "vcmpgtuw", i->vD, i->vA, i->vB);
 }
 
-EMU(VCMPGTUW, SIMDForm) {
-    auto a = TH->getVuw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] > b[i] ? 0xffffffff : 0;
-    }
-    TH->setVuw(i->vD, d);
-    if (i->Rc.u()) {
-        auto d128 = TH->getV(i->vD);
-        auto t = ~d128 == 0;
-        auto f = d128 == 0;
-        auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);
-    }
+#define _VCMPGTUW(_va, _vb, _vd, _rc) { \
+    auto a = TH->getVuw(_va); \
+    auto b = TH->getVuw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] > b[i] ? 0xffffffff : 0; \
+    } \
+    TH->setVuw(_vd, d); \
+    if (_rc) { \
+        auto d128 = TH->getV(_vd); \
+        auto t = ~d128 == 0; \
+        auto f = d128 == 0; \
+        auto c = t << 3 | f << 1; \
+        TH->setCRF(6, c); \
+    } \
 }
+EMU_REWRITE(VCMPGTUW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VCMPGTSW, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpgtsw." : "vcmpgtsw", i->vD, i->vA, i->vB);
 }
 
-EMU(VCMPGTSW, SIMDForm) {
-    auto a = TH->getVw(i->vA);
-    auto b = TH->getVw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] > b[i] ? 0xffffffff : 0;
-    }
-    TH->setVuw(i->vD, d);
-    if (i->Rc.u()) {
-        auto d128 = TH->getV(i->vD);
-        auto t = ~d128 == 0;
-        auto f = d128 == 0;
-        auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);
-    }
+#define _VCMPGTSW(_va, _vb, _vd, _rc) { \
+    auto a = TH->getVw(_va); \
+    auto b = TH->getVw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] > b[i] ? 0xffffffff : 0; \
+    } \
+    TH->setVuw(_vd, d); \
+    if (_rc) { \
+        auto d128 = TH->getV(_vd); \
+        auto t = ~d128 == 0; \
+        auto f = d128 == 0; \
+        auto c = t << 3 | f << 1; \
+        TH->setCRF(6, c); \
+    } \
 }
+EMU_REWRITE(VCMPGTSW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VCMPEQFP, SIMDForm) { // TODO: test
     *result = format_nnn(i->Rc.u() ? "vcmpeqfp." : "vcmpeqfp", i->vD, i->vA, i->vB);
 }
 
-EMU(VCMPEQFP, SIMDForm) {
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] == b[i] ? 0xffffffff : 0;
-    }
-    TH->setVuw(i->vD, d);
-    if (i->Rc.u()) {
-        auto d128 = TH->getV(i->vD);
-        auto t = ~d128 == 0;
-        auto f = d128 == 0;
-        auto c = t << 3 | f << 1;
-        TH->setCRF(6, c);
-    }
+#define _VCMPEQFP(_va, _vb, _vd, _rc) { \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] == b[i] ? 0xffffffff : 0; \
+    } \
+    TH->setVuw(_vd, d); \
+    if (_rc) { \
+        auto d128 = TH->getV(_vd); \
+        auto t = ~d128 == 0; \
+        auto f = d128 == 0; \
+        auto c = t << 3 | f << 1; \
+        TH->setCRF(6, c); \
+    } \
 }
+EMU_REWRITE(VCMPEQFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VSRW, SIMDForm) {
     *result = format_nnn("vsrw", i->vD, i->vA, i->vB);
 }
 
-EMU(VSRW, SIMDForm) {
-    auto a = TH->getVuw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] >> (b[i] & 31);
-    }
-    TH->setVuw(i->vD, d);
+#define _VSRW(_va, _vb, _vd) { \
+    auto a = TH->getVuw(_va); \
+    auto b = TH->getVuw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] >> (b[i] & 31); \
+    } \
+    TH->setVuw(_vd, d); \
 }
+EMU_REWRITE(VSRW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VSLW, SIMDForm) {
     *result = format_nnn("vslw", i->vD, i->vA, i->vB);
 }
 
-EMU(VSLW, SIMDForm) {
-    auto a = TH->getVuw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    std::array<uint32_t, 4> d;
-    for (int i = 0; i < 4; ++i) {
-        d[i] = a[i] << (b[i] & 31);
-    }
-    TH->setVuw(i->vD, d);
+#define _VSLW(_va, _vb, _vd) { \
+    auto a = TH->getVuw(_va); \
+    auto b = TH->getVuw(_vb); \
+    std::array<uint32_t, 4> d; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = a[i] << (b[i] & 31); \
+    } \
+    TH->setVuw(_vd, d); \
 }
+EMU_REWRITE(VSLW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VMRGHW, SIMDForm) {
     *result = format_nnn("vmrghw", i->vD, i->vA, i->vB);
 }
 
-EMU(VMRGHW, SIMDForm) {
-    uint32_t abe[4];
-    uint32_t bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    uint32_t dbe[4];
-    dbe[0] = abe[0];
-    dbe[1] = bbe[0];
-    dbe[2] = abe[1];
-    dbe[3] = bbe[1];
-    TH->setV(i->vD, (uint8_t*)dbe);
+#define _VMRGHW(_va, _vb, _vd) { \
+    uint32_t abe[4]; \
+    uint32_t bbe[4]; \
+    TH->getV(_va, (uint8_t*)abe); \
+    TH->getV(_vb, (uint8_t*)bbe); \
+    uint32_t dbe[4]; \
+    dbe[0] = abe[0]; \
+    dbe[1] = bbe[0]; \
+    dbe[2] = abe[1]; \
+    dbe[3] = bbe[1]; \
+    TH->setV(_vd, (uint8_t*)dbe); \
 }
+EMU_REWRITE(VMRGHW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VMRGLW, SIMDForm) { // TODO: test
     *result = format_nnn("vmrglw", i->vD, i->vA, i->vB);
 }
 
-EMU(VMRGLW, SIMDForm) {
-    uint32_t abe[4];
-    uint32_t bbe[4];
-    TH->getV(i->vA, (uint8_t*)abe);
-    TH->getV(i->vB, (uint8_t*)bbe);
-    uint32_t dbe[4];
-    dbe[0] = abe[2];
-    dbe[1] = bbe[2];
-    dbe[2] = abe[3];
-    dbe[3] = bbe[3];
-    TH->setV(i->vD, (uint8_t*)dbe);
+#define _VMRGLW(_va, _vb, _vd) { \
+    uint32_t abe[4]; \
+    uint32_t bbe[4]; \
+    TH->getV(_va, (uint8_t*)abe); \
+    TH->getV(_vb, (uint8_t*)bbe); \
+    uint32_t dbe[4]; \
+    dbe[0] = abe[2]; \
+    dbe[1] = bbe[2]; \
+    dbe[2] = abe[3]; \
+    dbe[3] = bbe[3]; \
+    TH->setV(_vd, (uint8_t*)dbe); \
 }
+EMU_REWRITE(VMRGLW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VPERM, SIMDForm) { // TODO: test
     *result = format_nnnn("vperm", i->vD, i->vA, i->vB, i->vC);
 }
 
-EMU(VPERM, SIMDForm) {
-    uint8_t be[32];
-    TH->getV(i->vA, be);
-    TH->getV(i->vB, be + 16);
-    uint8_t cbe[16];
-    TH->getV(i->vC, cbe);
-    uint8_t dbe[16] = { 0 };
-    for (int i = 0; i < 16; ++i) {
-        auto b = cbe[i] & 31;
-        dbe[i] = be[b];
-    }
-    TH->setV(i->vD, dbe);
+#define _VPERM(_va, _vb, _vc, _vd) { \
+    uint8_t be[32]; \
+    TH->getV(_va, be); \
+    TH->getV(_vb, be + 16); \
+    uint8_t cbe[16]; \
+    TH->getV(_vc, cbe); \
+    uint8_t dbe[16] = { 0 }; \
+    for (int i = 0; i < 16; ++i) { \
+        auto b = cbe[i] & 31; \
+        dbe[i] = be[b]; \
+    } \
+    TH->setV(_vd, dbe); \
 }
+EMU_REWRITE(VPERM, SIMDForm, i->vA.u(), i->vB.u(), i->vC.u(), i->vD.u())
+
 
 PRINT(LVSR, SIMDForm) { // TODO: test
     *result = format_nnn("lvsr", i->vD, i->rA, i->rB);
 }
 
-EMU(LVSR, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    auto sh = ea & 15;
-    unsigned __int128 vd = 0;
-    switch (sh) {
-        case 0: vd = make128(0x1011121314151617ull, 0x18191A1B1C1D1E1Full); break;
-        case 1: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break;
-        case 2: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break;
-        case 3: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break;
-        case 4: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break;
-        case 5: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break;
-        case 6: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break;
-        case 7: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break;
-        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break;
-        case 9: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break;
-        case 10: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break;
-        case 11: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break;
-        case 12: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break;
-        case 13: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break;
-        case 14: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break;
-        case 15: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break;
-    }
-    TH->setV(i->vD, vd);
+#define _LVSR(_ra, _rb, _vd) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto sh = ea & 15; \
+    unsigned __int128 vd = 0; \
+    switch (sh) { \
+        case 0: vd = make128(0x1011121314151617ull, 0x18191A1B1C1D1E1Full); break; \
+        case 1: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break; \
+        case 2: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break; \
+        case 3: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break; \
+        case 4: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break; \
+        case 5: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break; \
+        case 6: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break; \
+        case 7: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break; \
+        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break; \
+        case 9: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break; \
+        case 10: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break; \
+        case 11: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break; \
+        case 12: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break; \
+        case 13: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break; \
+        case 14: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break; \
+        case 15: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break; \
+    } \
+    TH->setV(_vd, vd); \
 }
+EMU_REWRITE(LVSR, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
+
 
 PRINT(LVSL, SIMDForm) {
     *result = format_nnn("lvsl", i->vD, i->rA, i->rB);
 }
 
-EMU(LVSL, SIMDForm) {
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    auto sh = ea & 15;
-    unsigned __int128 vd = 0;
-    switch (sh) {
-        case 0: vd = make128(0x0001020304050607ull, 0x08090A0B0C0D0E0Full); break;
-        case 1: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break;
-        case 2: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break;
-        case 3: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break;
-        case 4: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break;
-        case 5: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break;
-        case 6: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break;
-        case 7: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break;
-        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break;
-        case 9: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break;
-        case 10: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break;
-        case 11: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break;
-        case 12: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break;
-        case 13: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break;
-        case 14: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break;
-        case 15: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break;
-    }
-    TH->setV(i->vD, vd);
+#define _LVSL(_ra, _rb, _vd) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto sh = ea & 15; \
+    unsigned __int128 vd = 0; \
+    switch (sh) { \
+        case 0: vd = make128(0x0001020304050607ull, 0x08090A0B0C0D0E0Full); break; \
+        case 1: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break; \
+        case 2: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break; \
+        case 3: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break; \
+        case 4: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break; \
+        case 5: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break; \
+        case 6: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break; \
+        case 7: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break; \
+        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break; \
+        case 9: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break; \
+        case 10: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break; \
+        case 11: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break; \
+        case 12: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break; \
+        case 13: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break; \
+        case 14: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break; \
+        case 15: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break; \
+    } \
+    TH->setV(_vd, vd); \
 }
+EMU_REWRITE(LVSL, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
+
 
 PRINT(VANDC, SIMDForm) { // TODO: test
     *result = format_nnn("vandc", i->vD, i->vA, i->vB);
 }
 
-EMU(VANDC, SIMDForm) {
-    auto a = TH->getV(i->vA);
-    auto b = TH->getV(i->vB);
-    auto d = a & ~b;
-    TH->setV(i->vD, d);
+#define _VANDC(_va, _vb, _vd) { \
+    auto a = TH->getV(_va); \
+    auto b = TH->getV(_vb); \
+    auto d = a & ~b; \
+    TH->setV(_vd, d); \
 }
+EMU_REWRITE(VANDC, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VREFP, SIMDForm) {
     *result = format_nn("vrefp", i->vD, i->vB);
 }
 
-EMU(VREFP, SIMDForm) {
-    std::array<float, 4> d;
-    auto b = TH->getVf(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        d[i] = 1.f / b[i];
-    }
-    TH->setVf(i->vD, d);
+#define _VREFP(_vb, _vd) { \
+    std::array<float, 4> d; \
+    auto b = TH->getVf(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = 1.f / b[i]; \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VREFP, SIMDForm, i->vB.u(), i->vD.u())
+
 
 PRINT(VSRAW, SIMDForm) {
     *result = format_nnn("vsraw", i->vD, i->vA, i->vB);
 }
 
-EMU(VSRAW, SIMDForm) {
-    std::array<int32_t, 4> d;
-    auto a = TH->getVw(i->vA);
-    auto b = TH->getVuw(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        auto sh = b[i] & 31;
-        d[i] = a[i] >> sh;
-    }
-    TH->setVw(i->vD, d);
+#define _VSRAW(_va, _vb, _vd) { \
+    std::array<int32_t, 4> d; \
+    auto a = TH->getVw(_va); \
+    auto b = TH->getVuw(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        auto sh = b[i] & 31; \
+        d[i] = a[i] >> sh; \
+    } \
+    TH->setVw(_vd, d); \
 }
+EMU_REWRITE(VSRAW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VRFIP, SIMDForm) {
     *result = format_nn("vrfip", i->vD, i->vB);
 }
 
-EMU(VRFIP, SIMDForm) {
-    std::array<float, 4> d;
-    auto b = TH->getVf(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        d[i] = std::ceil(b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VRFIP(_vb, _vd) { \
+    std::array<float, 4> d; \
+    auto b = TH->getVf(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = std::ceil(b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VRFIP, SIMDForm, i->vB.u(), i->vD.u())
+
 
 PRINT(VRFIM, SIMDForm) {
     *result = format_nn("vrfim", i->vD, i->vB);
 }
 
-EMU(VRFIM, SIMDForm) {
-    std::array<float, 4> d;
-    auto b = TH->getVf(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        d[i] = std::floor(b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VRFIM(_vb, _vd) { \
+    std::array<float, 4> d; \
+    auto b = TH->getVf(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = std::floor(b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VRFIM, SIMDForm, i->vB.u(), i->vD.u())
+
 
 PRINT(VRFIZ, SIMDForm) {
     *result = format_nn("vrfiz", i->vD, i->vB);
 }
 
-EMU(VRFIZ, SIMDForm) {
-    std::array<float, 4> d;
-    auto b = TH->getVf(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        d[i] = std::trunc(b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VRFIZ(_vb, _vd) { \
+    std::array<float, 4> d; \
+    auto b = TH->getVf(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = std::trunc(b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VRFIZ, SIMDForm, i->vB.u(), i->vD.u())
+
 
 PRINT(VMAXFP, SIMDForm) {
     *result = format_nnn("vmaxfp", i->vD, i->vA, i->vB);
 }
 
-EMU(VMAXFP, SIMDForm) {
-    std::array<float, 4> d;
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        d[i] = std::max(a[i], b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VMAXFP(_va, _vb, _vd) { \
+    std::array<float, 4> d; \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = std::max(a[i], b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VMAXFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VMINFP, SIMDForm) {
     *result = format_nnn("vminfp", i->vD, i->vA, i->vB);
 }
 
-EMU(VMINFP, SIMDForm) {
-    std::array<float, 4> d;
-    auto a = TH->getVf(i->vA);
-    auto b = TH->getVf(i->vB);
-    for (int i = 0; i < 4; ++i) {
-        d[i] = std::min(a[i], b[i]);
-    }
-    TH->setVf(i->vD, d);
+#define _VMINFP(_va, _vb, _vd) { \
+    std::array<float, 4> d; \
+    auto a = TH->getVf(_va); \
+    auto b = TH->getVf(_vb); \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = std::min(a[i], b[i]); \
+    } \
+    TH->setVf(_vd, d); \
 }
+EMU_REWRITE(VMINFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
 
 PRINT(VCTUXS, SIMDForm) {
     *result = format_nnn("vctuxs", i->vD, i->vB, i->UIMM);
 }
 
-EMU(VCTUXS, SIMDForm) { // TODO: SAT
-    std::array<uint32_t, 4> d;
-    auto b = TH->getVf(i->vB);
-    auto scale = 1 << i->UIMM.u();
-    for (int i = 0; i < 4; ++i) {
-        d[i] = b[i] * scale;
-    }
-    TH->setVuw(i->vD, d);
+#define _VCTUXS(_vb, _uimm, _vd) { \
+    std::array<uint32_t, 4> d; \
+    auto b = TH->getVf(_vb); \
+    auto scale = 1 << _uimm; \
+    for (int i = 0; i < 4; ++i) { \
+        d[i] = b[i] * scale; \
+    } \
+    TH->setVuw(_vd, d); \
 }
+EMU_REWRITE(VCTUXS, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
+
 
 PRINT(STVEWX, SIMDForm) {
     *result = format_nnn("stvewx", i->vS, i->rA, i->rB);
 }
 
-EMU(STVEWX, SIMDForm) { // TODO: SAT
-    auto b = getB(i->rA.u(), TH);
-    auto ea = b + TH->getGPR(i->rB);
-    auto s = TH->getVuw(i->vS);
-    auto eb = ea & 3;
-    MM->store<4>(ea, s[eb]);
+#define _STVEWX(_ra, _rb, _vs) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto s = TH->getVuw(_vs); \
+    auto eb = ea & 3; \
+    MM->store<4>(ea, s[eb]); \
 }
+EMU_REWRITE(STVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
+
 
 PRINT(DCBZ, XForm_1) {
     *result = format_nn("dcbz", i->RA, i->RB);
 }
 
-EMU(DCBZ, XForm_1) {
-    auto b = getB(i->RA.u(), TH);
-    auto ea = b + TH->getGPR(i->RB);
-    auto line = ea & ~127;
-    MM->setMemory(line, 0, 128);
+#define _DCBZ(_ra, _rb) { \
+    auto b = getB(_ra, TH); \
+    auto ea = b + TH->getGPR(_rb); \
+    auto line = ea & ~127; \
+    MM->setMemory(line, 0, 128); \
 }
+EMU_REWRITE(DCBZ, XForm_1, i->RA.u(), i->RB.u())
+
 
 PRINT(DCBTST, XForm_1) {
     *result = format_nn("dcbtst", i->RA, i->RB);
 }
 
-EMU(DCBTST, XForm_1) {
+#define _DCBTST(_) { \
 }
+EMU_REWRITE(DCBTST, XForm_1, 0)
+
 
 struct PPUDasmInstruction {
     const char* mnemonic;
