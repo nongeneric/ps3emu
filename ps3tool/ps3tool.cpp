@@ -11,7 +11,8 @@ typedef boost::variant<ShaderDasmCommand,
                        UnsceCommand,
                        RestoreElfCommand,
                        ReadPrxCommand,
-                       ParseSpursTraceCommand>
+                       ParseSpursTraceCommand,
+                       RewriteCommand>
     Command;
 
 Command ParseOptions(int argc, const char *argv[])
@@ -103,6 +104,19 @@ Command ParseOptions(int argc, const char *argv[])
         store(command_line_parser(opts).options(desc).run(), vm);
         notify(vm);
         return command;
+    } else if (commandName == "rewrite") {
+        RewriteCommand command;
+        options_description desc("rewrite");
+
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
+            ("cpp", value<std::string>(&command.elf)->required(), "output cpp file");
+
+        auto opts = collect_unrecognized(parsed.options, include_positional);
+        opts.erase(opts.begin());
+        store(command_line_parser(opts).options(desc).run(), vm);
+        notify(vm);
+        return command;
     } else {
         throw std::runtime_error("unknown command");
     }
@@ -128,6 +142,10 @@ public:
     
     void operator()(ParseSpursTraceCommand& command) const {
         HandleParseSpursTrace(command);
+    }
+    
+    void operator()(RewriteCommand& command) const {
+        HandleRewrite(command);
     }
 };
 

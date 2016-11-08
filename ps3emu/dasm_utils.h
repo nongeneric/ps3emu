@@ -5,17 +5,6 @@
 #include <boost/type_traits.hpp>
 #include <string>
 
-inline std::string rewrite_u(const char* mnemonic, uint64_t u) {
-    return ssnprintf("%s(%" PRIx64 ")", mnemonic, u);
-}
-
-template <typename OP1>
-inline std::string rewrite_nu(const char* mnemonic, OP1 op1, uint64_t u) {
-    return ssnprintf("%s(%s%d,0x%" PRIx64 ")", mnemonic, 
-                     op1.prefix(), op1.native(), 
-                     u);
-}
-
 inline std::string format_u(const char* mnemonic, uint64_t u) {
     return ssnprintf("%s %" PRIx64, mnemonic, u);
 }
@@ -109,5 +98,5 @@ void invoke_impl(const char* name, P* phandler, E* ehandler, R* rhandler, void* 
     if (M == DasmMode::Name)
         *reinterpret_cast<std::string*>(s) = name;
     if (M == DasmMode::Rewrite)
-        phandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<RS>(s));
+        rhandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<RS>(s));
 }

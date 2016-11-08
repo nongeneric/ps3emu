@@ -189,7 +189,7 @@ public:
     int priority();
     
 #ifdef DEBUG
-    void singleStepBreakpoint();
+    void singleStepBreakpoint(bool value);
     void dbgPause(bool val);
     bool dbgIsPaused();
 #endif

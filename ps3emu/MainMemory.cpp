@@ -62,7 +62,7 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
                                             uint size,
                                             uint32_t va,
                                             bool cond) {
-    boost::unique_lock<boost::mutex> lock(_storeLock);
+    boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
     if (!cond || isReservedByCurrentThread(va, size)) {
         destroyReservationWithoutLocking(va, size);
         memcpy(dest, source, size);

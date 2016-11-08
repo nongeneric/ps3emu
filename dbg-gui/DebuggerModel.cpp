@@ -8,11 +8,13 @@
 #include "ps3emu/state.h"
 #include "ps3emu/libs/spu/sysSpu.h"
 #include "ps3emu/EmuCallbacks.h"
+#include "ps3emu/log.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
 #include <boost/regex.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/thread/locks.hpp>
 #include <set>
 
 class GridModelChangeTracker {
@@ -433,6 +435,13 @@ void DebuggerModel::loadElfHandler(LoadElfCommand command) {
     emit message(QString("Loaded %1").arg(command.path));
 }
 
+void DebuggerModel::runAndWait() {
+    _isRunning = true;
+    boost::unique_lock<boost::mutex> lock(_runMutex);
+    run();
+    _runCv.wait(lock, [&] { return !_isRunning; });
+}
+
 void DebuggerModel::run() {
     if (_paused) {
         _proc->dbgPause(false);
@@ -449,11 +458,13 @@ void DebuggerModel::dbgLoop() {
             loadElfHandler(*c);
         } else if (auto c = boost::get<RunCommand>(&untyped)) {
             runHandler(*c);
+        } else if (auto c = boost::get<TraceToCommand>(&untyped)) {
+            traceToHandler(*c);
         }
     }
 }
 
-DebuggerModel::DebuggerModel() : _debugThreadQueue(10) {
+DebuggerModel::DebuggerModel() : _debugThreadQueue(1) {
     _debugThread = boost::thread([&] { dbgLoop(); });
     if (g_config.config().CaptureRsx) {
         Rsx::setOperationMode(RsxOperationMode::RunCapture);
@@ -489,11 +500,13 @@ void DebuggerModel::loadFile(QString path, QStringList args) {
 
 void DebuggerModel::stepIn() {
     if (_activeThread) {
-        _activeThread->singleStepBreakpoint();
+        _activeThread->singleStepBreakpoint(true);
+        runAndWait();
+        _activeThread->singleStepBreakpoint(false);
     } else if (_activeSPUThread) {
         _activeSPUThread->singleStepBreakpoint();
+        run();
     }
-    run();
 }
 
 void DebuggerModel::stepOver() {
@@ -577,7 +590,13 @@ void DebuggerModel::runHandler(RunCommand command) {
             }
         }
     }
-    updateUI();
+    if (_updateUIWhenRunning) {
+        updateUI();
+    }
+
+    boost::unique_lock<boost::mutex> _lock(_runMutex);
+    _isRunning = false;
+    _runCv.notify_all();
 }
 
 void DebuggerModel::log(std::string str) {
@@ -904,6 +923,8 @@ void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
 void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
     ps3_uintptr_t nip;
     std::string str;
+    _updateUIWhenRunning = false;
+    _activeThread->singleStepBreakpoint(true);
     while ((nip = _activeThread->getNIP()) != va) {
         uint32_t instr;
         g_state.mm->readMemory(nip, &instr, sizeof instr);
@@ -926,11 +947,12 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
                     (uint32_t)v);
         }
         fprintf(f, " #%s\n", str.c_str());
-        
         fflush(f);
-        _activeThread->singleStepBreakpoint();
         _proc->run();
     }
+    _updateUIWhenRunning = true;
+    _activeThread->singleStepBreakpoint(false);
+    updateUI();
     printFrequencies(f, counts);
 }
 
@@ -962,12 +984,16 @@ void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
     message(QString("trace completed and saved to ") + tracefile);
 }
 
-void DebuggerModel::traceTo(ps3_uintptr_t va) {
+void DebuggerModel::traceToHandler(TraceToCommand command) {
     if (_activeSPUThread) {
-        spuTraceTo(va);
+        spuTraceTo(command.to);
     } else {
-        ppuTraceTo(va);
+        ppuTraceTo(command.to);
     }
+}
+
+void DebuggerModel::traceTo(ps3_uintptr_t va) {
+    _debugThreadQueue.enqueue(TraceToCommand{va});
 }
 
 void DebuggerModel::updateUI() {

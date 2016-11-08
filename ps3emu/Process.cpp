@@ -1,5 +1,6 @@
 #include "Process.h"
 
+#include "rsx/Rsx.h"
 #include "MainMemory.h"
 #include "ContentManager.h"
 #include "InternalMemoryManager.h"
@@ -243,7 +244,7 @@ Event Process::run() {
         };
         
         dbgPause(false);
-        auto threadEvent = _eventQueue.receive(0);
+        auto threadEvent = _eventQueue.dequeue();
         dbgPause(true);
         threadEvent.promise->signal();
         
@@ -444,7 +445,7 @@ uint32_t Process::createSpuThread(std::string name) {
     _spuThreads.emplace_back(
         std::make_shared<SPUThread>(this, name, [=](auto t, auto e) {
             auto oneTime = std::make_shared<OneTimeEvent>();
-            _eventQueue.send(ThreadEvent{SPUThreadEventInfo{e, t}, oneTime});
+            _eventQueue.enqueue(ThreadEvent{SPUThreadEventInfo{e, t}, oneTime});
             oneTime->wait();
         }));
     auto t = _spuThreads.back();
@@ -470,7 +471,7 @@ std::shared_ptr<SPUThread> Process::getSpuThreadBySpuNum(uint32_t spuNum) {
 
 void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
     auto oneTime = std::make_shared<OneTimeEvent>();
-    _eventQueue.send(ThreadEvent{PPUThreadEventInfo{event, thread}, oneTime});
+    _eventQueue.enqueue(ThreadEvent{PPUThreadEventInfo{event, thread}, oneTime});
     oneTime->wait();
 }
 
@@ -494,7 +495,7 @@ CallbackThread* Process::getCallbackThread() {
 
 Process::~Process() = default;
 
-Process::Process() {
+Process::Process() : _eventQueue(1) {
     g_state.proc = this;
     _mainMemory.reset(new MainMemory());
     g_state.mm = _mainMemory.get();

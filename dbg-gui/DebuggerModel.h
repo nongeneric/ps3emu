@@ -4,6 +4,8 @@
 #include "ps3emu/libs/ConcurrentBoundedQueue.h"
 #include "MonospaceGrid.h"
 #include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <boost/variant.hpp>
 #include <QString>
 #include <string>
@@ -31,7 +33,11 @@ struct RunCommand {
     
 };
 
-using DebugCommand = boost::variant<LoadElfCommand, RunCommand>;
+struct TraceToCommand {
+    uint32_t to;
+};
+
+using DebugCommand = boost::variant<LoadElfCommand, RunCommand, TraceToCommand>;
 
 class GPRModel;
 class DasmModel;
@@ -76,8 +82,13 @@ class DebuggerModel : public QWidget {
     void dbgLoop();
     void loadElfHandler(LoadElfCommand command);
     void runHandler(RunCommand command);
+    void traceToHandler(TraceToCommand command);
     void printBacktrace();
     uint64_t evalExpr(std::string expr);
+    bool _isRunning = false;
+    bool _updateUIWhenRunning = true;
+    boost::mutex _runMutex;
+    boost::condition_variable _runCv;
     
     template<typename... Ts>
     void messagef(const char* format, Ts... args) {
@@ -98,6 +109,7 @@ public:
     void stepIn();
     void stepOver();
     void run();
+    void runAndWait();
     void runto(ps3_uintptr_t va);
     void runToLR();
     void pause();

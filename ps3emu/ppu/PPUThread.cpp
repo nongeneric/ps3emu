@@ -41,7 +41,6 @@ void PPUThread::innerLoop() {
 #ifdef DEBUG
         if (_singleStep) {
             _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
-            _singleStep = false;
         }
         
         while (_dbgPaused) {
@@ -107,8 +106,8 @@ void PPUThread::loop() {
 PPUThread::PPUThread() {}
 
 #ifdef DEBUG
-void PPUThread::singleStepBreakpoint() {
-    _singleStep = true;
+void PPUThread::singleStepBreakpoint(bool value) {
+    _singleStep = value;
 }
 
 void PPUThread::dbgPause(bool val) {

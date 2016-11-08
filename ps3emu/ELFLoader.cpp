@@ -7,9 +7,11 @@
 #include "log.h"
 #include "state.h"
 #include "InternalMemoryManager.h"
+#include "ppu/rewriter.h"
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
 #include <map>
+#include <dlfcn.h>
 
 using namespace boost::endian;
 
@@ -175,6 +177,22 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         if (ph->p_type != PT_TLS) {
             makeSegment(va, ph->p_memsz, index);
         }
+    }
+    
+    static bool already = false;
+    if (!already) {
+        auto handle = dlopen((std::string(elfName()) + ".x86.so").c_str(), RTLD_NOW);
+        if (handle) {
+            auto info = (RewrittenFunctions*)dlsym(handle, "info");
+            auto fs = info->functions;
+            for (auto i = 0u; i < info->len; ++i) {
+                typedef void (*f_t)(PPUThread*);
+                NCallEntry entry{fs[i].name, 0, (f_t)dlsym(handle, fs[i].name)};
+                auto findex = addNCallEntry(entry);
+                encodeNCall(mm, fs[i].va, findex);
+            }
+        }
+        already = true;
     }
     
     if (!imageBase)

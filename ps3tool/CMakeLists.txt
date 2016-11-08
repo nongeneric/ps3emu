@@ -6,6 +6,7 @@ set(SRC
     restore_elf.cpp
     read_prx.cpp
     parse_spurs_trace.cpp
+    rewrite.cpp
     ps3tool.h
     ps3tool.cpp
 )

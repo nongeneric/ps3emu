@@ -36,19 +36,27 @@
 
 using namespace boost::endian;
 
+#ifdef EMU_REWRITER
+    #define SET_NIP(x) goto _##x
+    #define BRANCH_TO_LR return
+#else
+    #define SET_NIP(x) TH->setNIP(x)
+    #define BRANCH_TO_LR TH->setNIP(TH->getLR() & ~3ul)
+#endif
+
 #define MM g_state.mm
 #define TH thread
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 #define REWRITE(name, form) inline void rewrite##name(form* i, uint64_t cia, std::string* result)
 #define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPUThread* thread)
-#define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, rewriteX, &x, cia, state); break
+#define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, rewrite##name, &x, cia, state); break
 
 template <typename T>
 std::string printSorU(T v) {
     if (std::is_signed<T>::value) {
-        return ssnprintf("-%x", -v);
+        return ssnprintf("%d", v);
     }
-    return ssnprintf("%x", v);
+    return ssnprintf("0x%x", v);
 }
 
 std::string print_args(std::vector<std::string> vec) {
@@ -67,8 +75,9 @@ std::string rewrite_print(const char* mnemonic, Ts... ts) {
     return ssnprintf("_%s(%s)", mnemonic, print_args(std::vector<std::string>{ printSorU(ts)... }));
 }
 
-inline void rewriteX(void* i, uint64_t cia, std::string* result) { }
-
+#ifdef EMU_REWRITER
+#define EMU_REWRITE(...)
+#else
 #define EMU_REWRITE(...) \
     inline void BOOST_PP_CAT(rewrite, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)) \
         (BOOST_PP_VARIADIC_ELEM(1, __VA_ARGS__)* i, uint64_t cia, std::string* result) { \
@@ -85,6 +94,7 @@ inline void rewriteX(void* i, uint64_t cia, std::string* result) { }
                     BOOST_PP_LIST_REST_N(2, BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__)))) \
             ); \
         }
+#endif
 
 // Branch I-form, p24
 
@@ -93,13 +103,13 @@ inline uint64_t getNIA(IForm* i, uint64_t cia) {
     return i->AA.u() ? ext : (cia + ext);
 }
 
-#define _B(nia, lk) { \
+#define _B(nia, lk, cia) { \
     if (lk) \
         TH->setLR(cia + 4); \
-    TH->setNIP(nia); \
+    SET_NIP(nia); \
 }
 
-EMU_REWRITE(B, IForm, getNIA(i, cia), i->LK.u())
+EMU_REWRITE(B, IForm, getNIA(i, cia), i->LK.u(), cia)
 
 PRINT(B, IForm) {
     const char* mnemonics[][2] = {
@@ -160,16 +170,16 @@ inline bool isTaken(unsigned bo0,
     return ctr_ok && cond_ok;
 }
 
-#define _BC(bo0, bo1, bo2, bo3, bi, lk) { \
+#define _BC(bo0, bo1, bo2, bo3, bi, lk, nia, cia) { \
     if (!bo2) \
         TH->setCTR(TH->getCTR() - 1); \
     if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) \
-        TH->setNIP(getNIA(i, cia)); \
+        SET_NIP(nia); \
     if (lk) \
         TH->setLR(cia + 4); \
 }
 
-EMU_REWRITE(BC, BForm, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u())
+EMU_REWRITE(BC, BForm, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u(), getNIA(i, cia), cia)
 
 // Branch Conditional to Link Register XL-form, p25
 
@@ -192,16 +202,16 @@ PRINT(BCLR, XLForm_2) {
 }
 
 
-#define _BCLR(bo0, bo1, bo2, bo3, bi, lk) { \
+#define _BCLR(bo0, bo1, bo2, bo3, bi, lk, cia) { \
     if (!bo2) \
         TH->setCTR(TH->getCTR() - 1); \
     if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) \
-        TH->setNIP(TH->getLR() & ~3ul); \
+        BRANCH_TO_LR; \
     if (lk) \
         TH->setLR(cia + 4); \
 }
 
-EMU_REWRITE(BCLR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u())
+EMU_REWRITE(BCLR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u(), cia)
 
 // Branch Conditional to Count Register, p25
 
@@ -3887,6 +3897,7 @@ struct PPUDasmInstruction {
     std::string operands;
 };
 
+#if !defined(EMU_REWRITER)
 template <DasmMode M, typename S>
 void ppu_dasm(void* instr, uint64_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
@@ -4348,11 +4359,12 @@ uint64_t getTargetAddress(void* branchInstr, uint64_t cia) {
 template void ppu_dasm<DasmMode::Print, std::string>(
     void* instr, uint64_t cia, std::string* state);
 
-template void ppu_dasm<DasmMode::Emulate, PPUThread>(
-    void* instr, uint64_t cia, PPUThread* th);
-
 template void ppu_dasm<DasmMode::Name, std::string>(
     void* instr, uint64_t cia, std::string* name);
 
 template void ppu_dasm<DasmMode::Rewrite, std::string>(
     void* instr, uint64_t cia, std::string* name);
+
+template void ppu_dasm<DasmMode::Emulate, PPUThread>(
+    void* instr, uint64_t cia, PPUThread* th);
+#endif

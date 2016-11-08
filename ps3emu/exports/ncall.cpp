@@ -298,20 +298,28 @@ NCallEntry ncallTable[] {
     ENTRY(cellSpursAttributeSetSpuThreadGroupType_proxy),
 };
 
+constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry); }
+
+static std::vector<NCallEntry> dynamicEntries;
+
 void PPUThread::ncall(uint32_t index) {
     //INFO(libs) << ssnprintf("ncall %s", ncallTable[index].name);
-    if (index >= sizeof(ncallTable) / sizeof(NCallEntry)) {
+    if (index >= staticTableSize() + dynamicEntries.size()) {
         auto msg = ssnprintf("unknown ncall index %x", index);
         ERROR(libs) << msg;
         throw std::runtime_error(msg);
     }
     setEMUREG(0, getNIP());
     setNIP(getLR());
-    ncallTable[index].stub(this);
+    if (index >= staticTableSize()) {
+        dynamicEntries[index - staticTableSize()].stub(this);
+    } else {
+        ncallTable[index].stub(this);
+    }
 }
 
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound) {
-    auto count = sizeof(ncallTable) / sizeof(NCallEntry);
+    auto count = staticTableSize();
     for (uint32_t i = 0; i < count; ++i) {
         if (ncallTable[i].fnid == fnid) {
             index = i;
@@ -320,4 +328,9 @@ const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFoun
     }
     assert(!assertFound);
     return nullptr;
+}
+
+uint32_t addNCallEntry(NCallEntry entry) {
+    dynamicEntries.push_back(entry);
+    return staticTableSize() + dynamicEntries.size() - 1;
 }

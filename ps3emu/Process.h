@@ -1,11 +1,10 @@
 #pragma once
 
-#include "rsx/Rsx.h"
 #include "ppu/PPUThread.h"
 #include "spu/SPUThread.h"
 #include "ELFLoader.h"
 #include "IDMap.h"
-#include "libs/ConcurrentQueue.h"
+#include "libs/ConcurrentBoundedQueue.h"
 #include "OneTimeEvent.h"
 
 #include <boost/chrono.hpp>
@@ -127,7 +126,7 @@ struct ModuleSegment {
 };
 
 class Process {
-    ConcurrentFifoQueue<ThreadEvent> _eventQueue;
+    ConcurrentBoundedQueue<ThreadEvent> _eventQueue;
     std::unique_ptr<ThreadInitInfo> _threadInitInfo;
     std::unique_ptr<Rsx> _rsx;
     std::shared_ptr<ELFLoader> _elf;

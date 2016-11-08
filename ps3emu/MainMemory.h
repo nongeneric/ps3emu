@@ -81,7 +81,9 @@ class MainMemory {
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     Process* _proc;
     boost::mutex _pageMutex;
-    boost::mutex _storeLock;
+    //boost::mutex _storeLock;
+    boost::detail::spinlock _storeLock = BOOST_DETAIL_SPINLOCK_INIT;
+    
     std::vector<Reservation> _reservations;
     
     template <bool Read>
@@ -169,7 +171,7 @@ public:
                      void* buf,
                      uint len,
                      std::function<void(boost::thread::id)> notify = {}) {
-        boost::unique_lock<boost::mutex> lock(_storeLock);
+        boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
         destroyReservationOfCurrentThread();
         _reservations.push_back({va, len, boost::this_thread::get_id(), notify});
         readMemory(va, buf, len, false, false);
@@ -185,4 +187,5 @@ uint32_t calcFnid(const char* name);
 uint32_t calcEid(const char* name);
 void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index);
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound = false);
+uint32_t addNCallEntry(NCallEntry entry);
 void readString(MainMemory* mm, uint32_t va, std::string& str);
