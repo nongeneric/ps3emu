@@ -54,7 +54,7 @@ CallbackThread::CallbackThread(Process* proc) : _queue(1) {
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
     auto lr = ppuThread->getLR();
-    auto thread = (CallbackThread*)g_state.mm->load<8>(lr);
+    auto thread = (CallbackThread*)g_state.mm->load64(lr);
     
     if (!thread->_lastCallback.terminate)
         thread->_lastCallback.promise->set_value();

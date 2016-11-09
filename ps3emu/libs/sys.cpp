@@ -530,11 +530,11 @@ int32_t sys_prx_load_module_list(int32_t n,
                                  PPUThread* thread) {
     assert(flags == 0);
     for (auto i = 0; i < n; ++i) {
-        auto pathVa = g_state.mm->load<8>(path_list_va);
+        auto pathVa = g_state.mm->load64(path_list_va);
         std::string path;
         readString(g_state.mm, pathVa, path);
         uint32_t id = sys_prx_load_module({path}, flags, pOpt, g_state.proc);
-        g_state.mm->store<4>(idlist, id);
+        g_state.mm->store32(idlist, id);
         path_list_va += 8;
         idlist += 4;
     }
@@ -591,9 +591,9 @@ int32_t sys_prx_get_module_list(uint32_t flags, sys_prx_get_module_list_t* info)
     }
     for (auto i = 0u; i < segments.size() / 2 - 1; ++i) {
         auto& segment = segments.at((i + 1) * 2);
-        g_state.mm->store<4>(info->ids_va + 4 * i, segment.va);
+        g_state.mm->store32(info->ids_va + 4 * i, segment.va);
         if (i < info->max_levels_size) {
-            g_state.mm->store<4>(info->levels_va + 4 * i, SYS_MODULE_STOP_LEVEL_SYSTEM);
+            g_state.mm->store32(info->levels_va + 4 * i, SYS_MODULE_STOP_LEVEL_SYSTEM);
         }
     }
     return CELL_OK;

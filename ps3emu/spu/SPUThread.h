@@ -224,7 +224,7 @@ public:
         return &_ls[lsa];
     }
     
-    inline void setNip(uint32_t nip) {
+    inline void setNip(uint32_t nip) override {
         assert(nip < LSLR);
         _nip = nip;
     }
@@ -262,7 +262,7 @@ public:
     void singleStepBreakpoint();
     void dbgPause(bool val);
     bool dbgIsPaused();
-    void run();
+    void run() override;
     void cancel();
     SPUThreadExitInfo tryJoin(unsigned ms);
     SPUThreadExitInfo join();

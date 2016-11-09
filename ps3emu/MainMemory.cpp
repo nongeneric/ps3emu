@@ -5,10 +5,11 @@
 #include "rsx/Rsx.h"
 #include "log.h"
 #include "utils.h"
+#include <stdlib.h>
 
 using namespace boost::endian;
 
-bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
+inline bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
     return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
 }
 
@@ -62,7 +63,7 @@ bool MainMemory::storeMemoryWithReservation(void* dest,
                                             uint size,
                                             uint32_t va,
                                             bool cond) {
-    boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
+    boost::unique_lock<SpinLock> lock(_storeLock);
     if (!cond || isReservedByCurrentThread(va, size)) {
         destroyReservationWithoutLocking(va, size);
         memcpy(dest, source, size);
@@ -91,18 +92,7 @@ void MainMemory::copy(ps3_uintptr_t va,
                 _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize,
                                     DefaultMainMemoryPageSize);
             }
-        }
-        if (!page.ptr) {
-            boost::unique_lock<boost::mutex> lock(_pageMutex);
-            if (!page.ptr) {
-                if (allocate) {
-                    page.alloc();
-                } else {
-                    throw MemoryAccessException();
-                }
-            }
-        }
-        
+        }        
         auto offset = split.offset.u();
         auto source = chars + (curVa - va);
         auto dest = (uint8_t*)((page.ptr & PagePtrMask) + offset);
@@ -119,6 +109,99 @@ void MainMemory::copy(ps3_uintptr_t va,
         curVa = end;
     }
 }
+
+bool MainMemory::writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len) {
+    if ((va & SpuThreadBaseAddr) == SpuThreadBaseAddr) {
+        writeSpuThreadVa(va, buf, len);
+        return true;
+    }
+    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
+        writeRawSpuVa(va, buf, len);
+        return true;
+    }
+    if (coversRsxRegsRange(va, len)) {
+        if (!g_state.rsx) {
+            throw std::runtime_error("rsx not set");
+        }
+        if (len == 4) {
+            uint32_t val = *(boost::endian::big_uint32_t*)buf;
+            if (va == GcmControlRegisters) {
+                g_state.rsx->setPut(val);
+            } else if (va == GcmControlRegisters + 4) {
+                g_state.rsx->setGet(val);
+            } else {
+                throw std::runtime_error("only put and get rsx registers are supported");
+            }
+        } else {
+            throw std::runtime_error("only one rsx register can be set at a time");
+        }
+        return true;
+    }
+    return false;
+}
+
+bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
+    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
+        assert(len == 4);
+        *(big_uint32_t*)buf = readRawSpuVa(va);
+        return true;
+    }
+    
+    auto GcmControlRegistersSegment = 0x40000000u;
+    
+    if ((va & GcmControlRegistersSegment) && coversRsxRegsRange(va, len)) {
+        assert(len == 4);
+        if (va == GcmControlRegisters) {
+            *(big_uint32_t*)buf = g_state.rsx->getPut();
+            return true;
+        } else if (va == GcmControlRegisters + 4) {
+            *(big_uint32_t*)buf = g_state.rsx->getGet();
+            return true;
+        } else if (va == GcmControlRegisters + 8) {
+            *(big_uint32_t*)buf = g_state.rsx->getRef();
+            return true;
+        }
+        throw std::runtime_error("unknown rsx register");
+    }
+    return false;
+}
+
+#define DEFINE_LOAD_X(x) \
+    uint##x##_t MainMemory::load##x(ps3_uintptr_t va) { \
+        uint##x##_t special; \
+        if (readSpecialMemory(va, &special, x / 8)) \
+            return endian_reverse(special); \
+        VirtualAddress split { va }; \
+        auto& page = _pages[split.page.u()]; \
+        auto offset = split.offset.u(); \
+        auto ptr = (page.ptr & PagePtrMask) + offset; \
+        boost::unique_lock<SpinLock> lock(_storeLock); \
+        return endian_reverse(*(uint##x##_t*)ptr); \
+    }
+
+DEFINE_LOAD_X(8)
+DEFINE_LOAD_X(16)
+DEFINE_LOAD_X(32)
+DEFINE_LOAD_X(64)
+
+#define DEFINE_STORE_X(x) \
+    void MainMemory::store##x(ps3_uintptr_t va, uint##x##_t value) { \
+        auto reversed = endian_reverse(value); \
+        if (writeSpecialMemory(va, &reversed, x / 8)) \
+            return; \
+        VirtualAddress split { va }; \
+        auto& page = _pages[split.page.u()]; \
+        auto offset = split.offset.u(); \
+        auto ptr = (page.ptr & PagePtrMask) + offset; \
+        boost::unique_lock<SpinLock> lock(_storeLock); \
+        *(uint##x##_t*)ptr = reversed; \
+        destroyReservationWithoutLocking(va, x / 8); \
+    }
+
+DEFINE_STORE_X(8)
+DEFINE_STORE_X(16)
+DEFINE_STORE_X(32)
+DEFINE_STORE_X(64)
 
 void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
     if ((va & SpuThreadBaseAddr) == SpuThreadBaseAddr) {
@@ -149,6 +232,10 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool a
     }
     
     copy<false>(va, buf, len, allocate, true);
+}
+
+MainMemory::~MainMemory() {
+    dealloc();
 }
 
 void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
@@ -204,51 +291,47 @@ int MainMemory::allocatedPages() {
     return i;
 }
 
-void MainMemory::reset() {
+void MainMemory::dealloc() {
     if (_pages) {
         for (auto i = 0u; i != DefaultMainMemoryPageCount; ++i) {
-            if (!_providedMemoryPages[i]) {
+            if (!_providedMemoryPages.test(i)) {
                 _pages[i].dealloc();
             }
-            _providedMemoryPages[i] = false;
         }
     }
-    _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
 }
 
-struct alignas(2) page_byte { uint8_t v; };
+void MainMemory::reset() {
+    dealloc();
+    _pages.reset(new MemoryPage[DefaultMainMemoryPageCount]);
+    auto realloc = [&] (uint32_t i) {
+        auto page = (i << 28) / DefaultMainMemoryPageSize;
+        auto count = 0x10000000u / DefaultMainMemoryPageSize;
+        for (auto i = page; i < page + count; ++i) {
+            _pages[i].alloc();
+        }
+    };
+    realloc(0);
+    realloc(1);
+    realloc(3);
+    realloc(4);
+    realloc(7);
+    realloc(0xd);
+}
 
 void MemoryPage::alloc() {
-    auto mem = new page_byte[DefaultMainMemoryPageSize];
+    auto mem = (uint8_t*)aligned_alloc(2, DefaultMainMemoryPageSize);
     memset(mem, 0, DefaultMainMemoryPageSize);
     uintptr_t e = 0;
     if (!ptr.compare_exchange_strong(e, (uintptr_t)mem))
-        delete [] mem;
-    assert((ptr & 1) == 0);    
+        free(mem);
+    assert((ptr & 1) == 0);
 }
 
 void MemoryPage::dealloc() {
     auto mem = ptr.exchange(0);
     if (mem) {
-        delete [] (page_byte*)mem;
-    }
-}
-
-void MainMemory::map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size) {
-    if (src == 0 || size == 0)
-        throw std::runtime_error("zero size or zero source address");
-    auto mbMask = 1024 * 1024 - 1;
-    if (src & mbMask || dest & mbMask || size & mbMask)
-        throw std::runtime_error("size, source or dest isn't multiple of 1 MB");
-    auto srcPageIndex =  VirtualAddress { src }.page.u();
-    auto destPageIndex = VirtualAddress { dest }.page.u();
-    auto pageCount = size / DefaultMainMemoryPageSize;
-    for (auto i = 0u; i < pageCount; ++i) {
-        auto& destPage = _pages[destPageIndex + i];
-        destPage.alloc();
-        auto& srcPage = _pages[srcPageIndex + i];
-        srcPage.dealloc();
-        srcPage.ptr.store(destPage.ptr.load());
+        free((void*)(mem & PagePtrMask));
     }
 }
 
@@ -277,7 +360,7 @@ void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
             memcpy(memoryPtr, (void*)(page.ptr & PagePtrMask), DefaultMainMemoryPageSize);
         }
         page.ptr = (uintptr_t)memoryPtr;
-        _providedMemoryPages[firstPage + i] = true;
+        _providedMemoryPages.set(firstPage + i);
     }
 }
 
@@ -297,7 +380,7 @@ void MainMemory::memoryBreakHandler(std::function<void(uint32_t, uint32_t)> hand
 
 void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
     uint32_t ncall = (1 << 26) | index;
-    mm->store<4>(va, ncall);
+    mm->store32(va, ncall);
 }
 
 MainMemory::MainMemory() {

@@ -53,11 +53,11 @@ int64_t cellSysutilCheckCallback() {
     if (!count) {
         return CELL_OK;
     }
-    g_state.th->setGPR(2, g_state.mm->load<4>(info->va + 4));
+    g_state.th->setGPR(2, g_state.mm->load32(info->va + 4));
     for (auto i = 1u; i < info->args.size(); ++i) {
         g_state.th->setGPR(3 + i, info->args.at(i));
     }
-    g_state.th->ps3call(g_state.mm->load<4>(info->va), [=] {
+    g_state.th->ps3call(g_state.mm->load32(info->va), [=] {
         info->promise.set_value(g_state.th->getGPR(3));
         cellSysutilCheckCallback();
     });

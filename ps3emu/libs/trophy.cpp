@@ -211,6 +211,7 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
     
     int64_t res = emuCallback(
         context.callback, {1, SCE_NP_TROPHY_STATUS_INSTALLED, 0, 0, context.arg}, true);
+    (void)res;
     assert(res >= 0);
     
     emuCallback(context.callback,

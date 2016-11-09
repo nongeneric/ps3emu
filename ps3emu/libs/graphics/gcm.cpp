@@ -141,7 +141,7 @@ emu_void_t cellGcmGetConfiguration(CellGcmConfig* config) {
 
 void setCurrentCommandBuffer(MainMemory* mm, ps3_uintptr_t va) {
     INFO(rsx) << __FUNCTION__;
-    mm->store<4>(emuGcmState.gCellGcmCurrentContext, va);
+    mm->store32(emuGcmState.gCellGcmCurrentContext, va);
 }
 
 uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
@@ -254,10 +254,10 @@ void setFlipCommand(uint32_t contextEa, uint32_t label, uint32_t labelValue, uin
         exit(1);
     }
     uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
-    g_state.mm->store<4>(context->current, header);
-    g_state.mm->store<4>(context->current + 4, buffer);
-    g_state.mm->store<4>(context->current + 8, label);
-    g_state.mm->store<4>(context->current + 12, labelValue);
+    g_state.mm->store32(context->current, header);
+    g_state.mm->store32(context->current + 4, buffer);
+    g_state.mm->store32(context->current + 8, label);
+    g_state.mm->store32(context->current + 12, labelValue);
     context->current += 4 * sizeof(uint32_t);
 }
 
@@ -453,7 +453,7 @@ emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc) {
 uint32_t cellGcmGetReportDataLocation(uint32_t index, uint32_t location, MainMemory* mm) {
     const auto valueOffset = 8;
     auto ea = cellGcmGetReportDataAddressLocation(index, location);
-    return mm->load<4>(ea + valueOffset);
+    return mm->load32(ea + valueOffset);
 }
 
 uint32_t cellGcmGetReportDataAddressLocation(uint32_t index, uint32_t location) {
@@ -501,7 +501,7 @@ uint64_t cellGcmGetTimeStamp(uint32_t index) {
     WARNING(rsx) << "not implemented cellGcmGetTimeStamp";
     const auto valueOffset = 0;
     auto ea = getReportDataAddressLocation(index, MemoryLocation::Local);
-    return g_state.mm->load<8>(ea + valueOffset);
+    return g_state.mm->load64(ea + valueOffset);
 }
 
 }}

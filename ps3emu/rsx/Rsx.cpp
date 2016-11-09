@@ -73,7 +73,7 @@ void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
     INFO(rsx) << ssnprintf("setting rsx label at offset %x (%08x)",
                            offset,
                            GcmLabelBaseOffset + offset);
-    g_state.mm->store<4>(GcmLabelBaseOffset + offset, value);
+    g_state.mm->store32(GcmLabelBaseOffset + offset, value);
 }
 
 void Rsx::ChannelSetContextDmaSemaphore(uint32_t handle) {
@@ -89,7 +89,7 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     INFO(rsx) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    while (g_state.mm->load<4>(GcmLabelBaseOffset + offset) != value) ;
+    while (g_state.mm->load32(GcmLabelBaseOffset + offset) != value) ;
     INFO(rsx) << ssnprintf("acquired");
 }
 
@@ -98,7 +98,7 @@ void Rsx::SemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("releasing semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    g_state.mm->store<4>(GcmLabelBaseOffset + offset, value);
+    g_state.mm->store32(GcmLabelBaseOffset + offset, value);
 }
 
 void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
@@ -106,7 +106,7 @@ void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    g_state.mm->store<4>(GcmLabelBaseOffset + offset, value);
+    g_state.mm->store32(GcmLabelBaseOffset + offset, value);
 }
 
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -1408,7 +1408,7 @@ void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t
     buffer.height = height;
 }
 
-void glDebugCallbackFunction(GLenum source,
+inline void glDebugCallbackFunction(GLenum source,
             GLenum type,
             GLuint id,
             GLenum severity,
@@ -1460,8 +1460,9 @@ void Rsx::initGcm() {
     _context->feedbackBuffer = GLPersistentCpuBuffer(48u << 20);
     _context->fragmentConstBuffer = GLPersistentCpuBuffer(FragmentProgramSize / 2);
     
-    g_state.mm->provideMemory(
-        RsxFbBaseAddr, GcmLocalMemorySize, _context->localMemoryBuffer.mapped());
+    g_state.mm->provideMemory(RsxFbBaseAddr,
+                              GcmLocalMemorySize,
+                              _context->localMemoryBuffer.mapped());
     
     _context->elementArrayIndexBuffer = GLPersistentCpuBuffer(10 * (1u << 20));
         
@@ -1569,7 +1570,7 @@ void Rsx::waitForIdle() {
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
     waitForIdle();
-    g_state.mm->store<4>(_context->semaphoreOffset + GcmLabelBaseOffset, value);
+    g_state.mm->store32(_context->semaphoreOffset + GcmLabelBaseOffset, value);
     __sync_synchronize();
 }
 
@@ -2147,8 +2148,8 @@ void Rsx::GetReport(uint8_t type, uint32_t offset) {
     
     // TODO: report zpass/zcull
     auto ea = getReportDataAddressLocation(offset / 16, _context->reportLocation);
-    g_state.mm->store<8>(ea, g_state.proc->getTimeBaseNanoseconds().count());
-    g_state.mm->store<8>(ea + 8 + 4, 0);
+    g_state.mm->store64(ea, g_state.proc->getTimeBaseNanoseconds().count());
+    g_state.mm->store64(ea + 8 + 4, 0);
     __sync_synchronize();
 }
 

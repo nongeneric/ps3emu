@@ -102,7 +102,7 @@ int32_t executeExportedFunction(uint32_t imageBase,
     //thread->setGPR(3, args);
     //thread->setGPR(4, argp);
     thread->ps3call(func->va,
-                    [=] { /*g_state.mm->store<4>(modres, thread->getGPR(3));*/ });
+                    [=] { /*g_state.mm->store32(modres, thread->getGPR(3));*/ });
     return thread->getGPR(3);
 }
 

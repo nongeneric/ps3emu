@@ -6,7 +6,6 @@
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/smart_ptr/detail/spinlock.hpp>
 #include <functional>
 #include <bitset>
 #include <memory>
@@ -41,38 +40,24 @@ struct MemoryPage {
     inline MemoryPage() { ptr = 0; }
 };
 
-template <int Bytes>
-struct BytesToBEType { };
-template <>
-struct BytesToBEType<1> { 
-    typedef boost::endian::big_uint8_t beType;
-    typedef uint8_t type;
-    typedef int8_t stype;
-};
-template <>
-struct BytesToBEType<2> { 
-    typedef boost::endian::big_uint16_t beType;
-    typedef uint16_t type;
-    typedef int16_t stype;
-};
-template <>
-struct BytesToBEType<4> { 
-    typedef boost::endian::big_uint32_t beType;
-    typedef uint32_t type;
-    typedef int32_t stype;
-};
-template <>
-struct BytesToBEType<8> { 
-    typedef boost::endian::big_uint64_t beType;
-    typedef uint64_t type;
-    typedef int64_t stype;
-};
-
 struct Reservation {
     uint32_t va;
     uint32_t size;
     boost::thread::id thread;
     std::function<void(boost::thread::id)> notify;
+};
+
+class SpinLock {
+    std::atomic_flag flag = ATOMIC_FLAG_INIT;
+
+public:
+    void lock() {
+        while (flag.test_and_set(std::memory_order_acquire)) ;
+    }
+    
+    void unlock() {
+        flag.clear(std::memory_order_release);
+    }
 };
 
 class MainMemory {
@@ -81,8 +66,7 @@ class MainMemory {
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     Process* _proc;
     boost::mutex _pageMutex;
-    //boost::mutex _storeLock;
-    boost::detail::spinlock _storeLock = BOOST_DETAIL_SPINLOCK_INIT;
+    SpinLock _storeLock;
     
     std::vector<Reservation> _reservations;
     
@@ -103,81 +87,76 @@ class MainMemory {
     void destroyReservationWithoutLocking(uint32_t va, uint32_t size);
     void destroyReservationOfCurrentThread();
     bool isReservedByCurrentThread(uint32_t va, uint32_t size);
+    bool writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len);
+    bool readSpecialMemory(ps3_uintptr_t va, void* buf, uint len);
+    void dealloc();
 
 public:
     MainMemory();
+    ~MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
     void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false, bool locked = true);
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
     void reset();
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);
-    void map(ps3_uintptr_t src, ps3_uintptr_t dest, uint32_t size);
     void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
     void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
     void memoryBreak(uint32_t va, uint32_t size);
     
-    void store16(uint64_t va, unsigned __int128 value) {
+    uint8_t load8(ps3_uintptr_t va);
+    uint16_t load16(ps3_uintptr_t va);
+    uint32_t load32(ps3_uintptr_t va);
+    uint64_t load64(ps3_uintptr_t va);
+    
+    void store8(ps3_uintptr_t va, uint8_t val);
+    void store16(ps3_uintptr_t va, uint16_t val);
+    void store32(ps3_uintptr_t va, uint32_t val);
+    void store64(ps3_uintptr_t va, uint64_t val);
+    
+    inline void storef(ps3_uintptr_t va, float value) {
+        store32(va, union_cast<float, uint32_t>(value));
+    }
+    
+    inline void stored(ps3_uintptr_t va, double value) {
+        store64(va, union_cast<double, uint64_t>(value));
+    }
+    
+    inline float loadf(ps3_uintptr_t va) {
+        auto f = load32(va);
+        return union_cast<uint32_t, float>(f);
+    }
+    
+    inline double loadd(ps3_uintptr_t va) {
+         auto f = load64(va);
+         return union_cast<uint64_t, double>(f);
+    }
+    
+    inline unsigned __int128 load128(uint64_t va) {
+        unsigned __int128 i = load64(va);
+        i <<= 64;
+        i |= load64(va + 8);
+        return i;
+    }
+    
+    inline void store128(uint64_t va, unsigned __int128 value) {
         uint8_t *bytes = (uint8_t*)&value;
         std::reverse(bytes, bytes + 16);
         writeMemory(va, bytes, 16);
     }
-    
-    template <int Bytes>
-    typename BytesToBEType<Bytes>::type load(ps3_uintptr_t va) {
-        typename BytesToBEType<Bytes>::beType res;
-        readMemory(va, &res, Bytes);
-        return res;
-    }
-    
-    template <int Bytes>
-    typename BytesToBEType<Bytes>::stype loads(ps3_uintptr_t va) {
-        return load<Bytes>(va);
-    }
-    
-    template <int Bytes, typename V>
-    void store(uint64_t va, V value) {
-        typename BytesToBEType<Bytes>::beType x = getUValue(value);
-        writeMemory(va, &x, Bytes);
-    }
-    
-    void storef(ps3_uintptr_t va, float value) {
-        store<sizeof(float)>(va, union_cast<float, uint32_t>(value));
-    }
-    
-    void stored(ps3_uintptr_t va, double value) {
-        store<sizeof(double)>(va, union_cast<double, uint64_t>(value));
-    }
-    
-    float loadf(ps3_uintptr_t va) {
-        auto f = (uint32_t)load<sizeof(float)>(va);
-        return union_cast<uint32_t, float>(f);
-    }
-    
-    unsigned __int128 load16(uint64_t va) {
-        unsigned __int128 i = load<8>(va);
-        i <<= 64;
-        i |= load<8>(va + 8);
-        return i;
-    }
-    
-    double loadd(ps3_uintptr_t va) {
-        auto f = (uint64_t)load<sizeof(double)>(va);
-        return union_cast<uint64_t, double>(f);
-    }
 
-    void loadReserve(ps3_uintptr_t va,
+    inline void loadReserve(ps3_uintptr_t va,
                      void* buf,
                      uint len,
                      std::function<void(boost::thread::id)> notify = {}) {
-        boost::unique_lock<boost::detail::spinlock> lock(_storeLock);
+        boost::unique_lock<SpinLock> lock(_storeLock);
         destroyReservationOfCurrentThread();
         _reservations.push_back({va, len, boost::this_thread::get_id(), notify});
         readMemory(va, buf, len, false, false);
     }
 
-    bool writeCond(ps3_uintptr_t va, const void* buf, uint len) {
+    inline bool writeCond(ps3_uintptr_t va, const void* buf, uint len) {
         auto dest = getMemoryPointer(va, len);
         return storeMemoryWithReservation(dest, buf, len, va, true);
     }

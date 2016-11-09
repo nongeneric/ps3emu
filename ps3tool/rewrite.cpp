@@ -17,7 +17,7 @@ void HandleRewrite(RewriteCommand const& command) {
     elf.map(&mm, [&](auto va, auto size, auto index) { if (vaBase == 0) vaBase = va; });
     
     for (auto i = 0x126dc; i != 0x1440c; i += 4) {
-        big_uint32_t instr = mm.load<4>(i);
+        big_uint32_t instr = mm.load32(i);
         std::string rewritten, printed;
         ppu_dasm<DasmMode::Rewrite>(&instr, i, &rewritten);
         ppu_dasm<DasmMode::Print>(&instr, i, &printed);

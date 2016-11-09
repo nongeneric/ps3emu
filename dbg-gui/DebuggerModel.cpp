@@ -207,7 +207,7 @@ public:
                 case 6: return printBit(_thread->getSO());
                 case 17: return print(_thread->getNIP());
                 case 19: {
-                    auto pages = g_state.mm->allocatedPages();
+                    auto pages = 0;
                     auto usage = pages * DefaultMainMemoryPageSize;
                     auto measure = "";
                     if (usage > (1 << 30)) {
@@ -826,8 +826,8 @@ void DebuggerModel::dumpImports() {
                     auto segment = boost::find_if(segments, [=](auto& s) {
                         auto stub = stubs[j];
                         if (isVar) {
-                            auto tocVa = g_state.mm->load<4>(stubs[j] + 4);
-                            stub = g_state.mm->load<4>(tocVa);
+                            auto tocVa = g_state.mm->load32(stubs[j] + 4);
+                            stub = g_state.mm->load32(tocVa);
                         }
                         return s.va <= stub && stub < s.va + s.size;
                     });
@@ -1023,8 +1023,8 @@ void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
         setSPUSoftBreak(_activeSPUThread->getElfSource(), va);
         return;
     }
-    auto bytes = g_state.mm->load<4>(va);
-    g_state.mm->store<4>(va, 0x7fe00088);
+    auto bytes = g_state.mm->load32(va);
+    g_state.mm->store32(va, 0x7fe00088);
     _softBreaks.push_back({va, bytes});
 }
 
@@ -1043,7 +1043,7 @@ void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {
             QString::fromStdString(ssnprintf("there is no breakpoint at %x", va)));
         return;
     }
-    g_state.mm->store<4>(va, it->bytes);
+    g_state.mm->store32(va, it->bytes);
     _softBreaks.erase(it);
 }
 
@@ -1100,10 +1100,10 @@ struct StackFrame {
 std::vector<StackFrame> walkStack(uint64_t backChain) {
     std::vector<StackFrame> frames;   
     for (;;) {
-        backChain = g_state.mm->load<8>(backChain);
+        backChain = g_state.mm->load64(backChain);
         if (!backChain)
             break;
-        auto lr = g_state.mm->load<8>(backChain + 16);
+        auto lr = g_state.mm->load64(backChain + 16);
         frames.push_back({lr});
     }
     return frames;

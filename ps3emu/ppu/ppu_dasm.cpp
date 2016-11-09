@@ -59,7 +59,7 @@ std::string printSorU(T v) {
     return ssnprintf("0x%x", v);
 }
 
-std::string print_args(std::vector<std::string> vec) {
+inline std::string print_args(std::vector<std::string> vec) {
     std::string res;
     for (auto i = 0u; i < vec.size(); ++i) {
         if (i) {
@@ -372,7 +372,7 @@ PRINT(LBZ, DForm_1) {
 #define _LBZ(_ra, _ds, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    TH->setGPR(_rt, MM->load<1>(ea)); \
+    TH->setGPR(_rt, MM->load8(ea)); \
 }
 EMU_REWRITE(LBZ, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
 
@@ -386,7 +386,7 @@ PRINT(LBZX, XForm_1) {
 #define _LBZX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<1>(ea)); \
+    TH->setGPR(_rt, MM->load8(ea)); \
 }
 EMU_REWRITE(LBZX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -399,7 +399,7 @@ PRINT(LBZU, DForm_1) {
 
 #define _LBZU(_ds, _ra, _rt) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    TH->setGPR(_rt, MM->load<1>(ea)); \
+    TH->setGPR(_rt, MM->load8(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LBZU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
@@ -413,7 +413,7 @@ PRINT(LBZUX, XForm_1) {
 
 #define _LBZUX(_ra, _rb, _rt) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<1>(ea)); \
+    TH->setGPR(_rt, MM->load8(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LBZUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
@@ -428,7 +428,7 @@ PRINT(LHZ, DForm_1) {
 #define _LHZ(_ra, _ds, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    TH->setGPR(_rt, MM->load<2>(ea)); \
+    TH->setGPR(_rt, MM->load16(ea)); \
 }
 EMU_REWRITE(LHZ, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
 
@@ -442,7 +442,7 @@ PRINT(LHZX, XForm_1) {
 #define _LHZX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<2>(ea)); \
+    TH->setGPR(_rt, MM->load16(ea)); \
 }
 EMU_REWRITE(LHZX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -455,7 +455,7 @@ PRINT(LHZU, DForm_1) {
 
 #define _LHZU(_ds, _ra, _rt) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    TH->setGPR(_rt, MM->load<2>(ea)); \
+    TH->setGPR(_rt, MM->load16(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LHZU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
@@ -469,7 +469,7 @@ PRINT(LHZUX, XForm_1) {
 
 #define _LHZUX(_ra, _rb, _rt) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<2>(ea)); \
+    TH->setGPR(_rt, MM->load16(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LHZUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
@@ -484,7 +484,7 @@ PRINT(LHA, DForm_1) {
 #define _LHA(_ra, _ds, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    TH->setGPR(_rt, MM->loads<2>(ea)); \
+    TH->setGPR(_rt, (int16_t)MM->load16(ea)); \
 }
 EMU_REWRITE(LHA, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
 
@@ -498,7 +498,7 @@ PRINT(LHAX, XForm_1) {
 #define _LHAX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->loads<2>(ea)); \
+    TH->setGPR(_rt, (int16_t)MM->load16(ea)); \
 }
 EMU_REWRITE(LHAX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -511,7 +511,7 @@ PRINT(LHAU, DForm_1) {
 
 #define _LHAU(_ds, _ra, _rt) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    TH->setGPR(_rt, MM->loads<2>(ea)); \
+    TH->setGPR(_rt, (int16_t)MM->load16(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LHAU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
@@ -525,7 +525,7 @@ PRINT(LHAUX, XForm_1) {
 
 #define _LHAUX(_ra, _rb, _rt) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->loads<2>(ea)); \
+    TH->setGPR(_rt, (int16_t)MM->load16(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LHAUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
@@ -540,7 +540,7 @@ PRINT(LWZ, DForm_1) {
 #define _LWZ(_ra, _ds, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    TH->setGPR(_rt, MM->load<4>(ea)); \
+    TH->setGPR(_rt, MM->load32(ea)); \
 }
 EMU_REWRITE(LWZ, DForm_1, i->RA.u(), i->D.s(), i->RT.u())
 
@@ -554,7 +554,7 @@ PRINT(LWZX, XForm_1) {
 #define _LWZX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<4>(ea)); \
+    TH->setGPR(_rt, MM->load32(ea)); \
 }
 EMU_REWRITE(LWZX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -567,7 +567,7 @@ PRINT(LWZU, DForm_1) {
 
 #define _LWZU(_ds, _ra, _rt) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    TH->setGPR(_rt, MM->load<4>(ea)); \
+    TH->setGPR(_rt, MM->load32(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LWZU, DForm_1, i->D.s(), i->RA.u(), i->RT.u())
@@ -581,7 +581,7 @@ PRINT(LWZUX, XForm_1) {
 
 #define _LWZUX(_ra, _rb, _rt) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<4>(ea)); \
+    TH->setGPR(_rt, MM->load32(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LWZUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
@@ -596,7 +596,7 @@ PRINT(LWA, DSForm_1) {
 #define _LWA(_ra, _ds, _rt) { \
     auto b = _ra == 0 ? 0 : TH->getGPR(_ra); \
     auto ea = b + _ds; \
-    TH->setGPR(_rt, MM->loads<4>(ea)); \
+    TH->setGPR(_rt, (int32_t)MM->load32(ea)); \
 }
 EMU_REWRITE(LWA, DSForm_1, i->RA.u(), i->DS.native(), i->RT.u())
 
@@ -610,7 +610,7 @@ PRINT(LWAX, XForm_1) {
 #define _LWAX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->loads<4>(ea)); \
+    TH->setGPR(_rt, (int32_t)MM->load32(ea)); \
 }
 EMU_REWRITE(LWAX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -623,7 +623,7 @@ PRINT(LWAUX, XForm_1) {
 
 #define _LWAUX(_ra, _rb, _rt) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->loads<4>(ea)); \
+    TH->setGPR(_rt, (int32_t)MM->load32(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LWAUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
@@ -638,7 +638,7 @@ PRINT(LD, DSForm_1) {
 #define _LD(_ra, _ds, _rt) { \
     auto b = _ra == 0 ? 0 : TH->getGPR(_ra); \
     auto ea = b + _ds; \
-    TH->setGPR(_rt, MM->load<8>(ea)); \
+    TH->setGPR(_rt, MM->load64(ea)); \
 }
 EMU_REWRITE(LD, DSForm_1, i->RA.u(), i->DS.native(), i->RT.u())
 
@@ -652,7 +652,7 @@ PRINT(LDX, XForm_1) {
 #define _LDX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<8>(ea)); \
+    TH->setGPR(_rt, MM->load64(ea)); \
 }
 EMU_REWRITE(LDX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -665,7 +665,7 @@ PRINT(LDU, DSForm_1) {
 
 #define _LDU(_ds, _ra, _rt) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    TH->setGPR(_rt, MM->load<8>(ea)); \
+    TH->setGPR(_rt, MM->load64(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LDU, DSForm_1, i->DS.native(), i->RA.u(), i->RT.u())
@@ -679,7 +679,7 @@ PRINT(LDUX, XForm_1) {
 
 #define _LDUX(_ra, _rb, _rt) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    TH->setGPR(_rt, MM->load<8>(ea)); \
+    TH->setGPR(_rt, MM->load64(ea)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(LDUX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
@@ -702,7 +702,7 @@ PRINT(STB, DForm_3) {
 #define _STB(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store<1>(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STB, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
 
@@ -712,7 +712,7 @@ PRINT(STBX, XForm_8) {
 #define _STBX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store<1>(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STBX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -721,7 +721,7 @@ PRINT(STBU, DForm_3) {
 }
 #define _STBU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store<1>(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STBU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
@@ -731,7 +731,7 @@ PRINT(STBUX, XForm_8) {
 }
 #define _STBUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store<1>(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STBUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -743,7 +743,7 @@ PRINT(STH, DForm_3) {
 #define _STH(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store<2>(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STH, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
 
@@ -753,7 +753,7 @@ PRINT(STHX, XForm_8) {
 #define _STHX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store<2>(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STHX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -762,7 +762,7 @@ PRINT(STHU, DForm_3) {
 }
 #define _STHU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store<2>(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STHU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
@@ -772,7 +772,7 @@ PRINT(STHUX, XForm_8) {
 }
 #define _STHUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store<2>(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STHUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -784,7 +784,7 @@ PRINT(STW, DForm_3) {
 #define _STW(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store<4>(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STW, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
 
@@ -794,7 +794,7 @@ PRINT(STWX, XForm_8) {
 #define _STWX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store<4>(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STWX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -803,7 +803,7 @@ PRINT(STWU, DForm_3) {
 }
 #define _STWU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store<4>(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STWU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
@@ -813,7 +813,7 @@ PRINT(STWUX, XForm_8) {
 }
 #define _STWUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store<4>(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STWUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -826,7 +826,7 @@ PRINT(STD, DSForm_2) {
 #define _STD(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store<8>(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STD, DSForm_2, i->RA.u(), i->DS.native(), i->RS.u())
 
@@ -838,7 +838,7 @@ PRINT(STDX, XForm_8) {
 #define _STDX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store<8>(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs)); \
 }
 EMU_REWRITE(STDX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -849,7 +849,7 @@ PRINT(STDU, DSForm_2) {
 
 #define _STDU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store<8>(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STDU, DSForm_2, i->DS.native(), i->RA.u(), i->RS.u())
@@ -861,7 +861,7 @@ PRINT(STDUX, XForm_8) {
 
 #define _STDUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store<8>(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs)); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STDUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -875,7 +875,7 @@ PRINT(LHBRX, XForm_1) {
 #define _LHBRX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, endian_reverse(MM->load<2>(ea))); \
+    TH->setGPR(_rt, endian_reverse(MM->load16(ea))); \
 }
 EMU_REWRITE(LHBRX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -885,7 +885,7 @@ PRINT(LWBRX, XForm_1) {
 #define _LWBRX(_ra, _rb, _rt) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setGPR(_rt, endian_reverse(MM->load<4>(ea))); \
+    TH->setGPR(_rt, endian_reverse(MM->load32(ea))); \
 }
 EMU_REWRITE(LWBRX, XForm_1, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -896,7 +896,7 @@ PRINT(STHBRX, XForm_8) {
 #define _STHBRX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store<2>(ea, endian_reverse(TH->getGPR(_rs))); \
+    MM->store16(ea, endian_reverse(TH->getGPR(_rs))); \
 }
 EMU_REWRITE(STHBRX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -906,7 +906,7 @@ PRINT(STWBRX, XForm_8) {
 #define _STWBRX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store<4>(ea, endian_reverse(TH->getGPR(_rs))); \
+    MM->store32(ea, endian_reverse(TH->getGPR(_rs))); \
 }
 EMU_REWRITE(STWBRX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -2337,7 +2337,7 @@ PRINT(STFIWX, XForm_29) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto frs = (uint32_t)TH->getFPR(_frs); \
-    MM->store<4>(ea, frs); \
+    MM->store32(ea, frs); \
 }
 EMU_REWRITE(STFIWX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
 
@@ -2509,8 +2509,9 @@ inline uint32_t getFPRF(double r) {
     return fprf;
 }
 
-inline void completeFPInstr(
-    unsigned a, unsigned b, unsigned c, unsigned r, unsigned rc, PPUThread* thread) {
+template <typename A, typename B>
+void completeFPInstr(
+    A a, B b, unsigned c, unsigned r, unsigned rc, PPUThread* thread) {
     // TODO: set FI
     // TODO: set FR
     auto fpscr = TH->getFPSCR();
@@ -3047,7 +3048,7 @@ PRINT(STVX, SIMDForm) {
 #define _STVX(_ra, _rb, _vs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store16(ea, TH->getV(_vs)); \
+    MM->store128(ea, TH->getV(_vs)); \
 }
 EMU_REWRITE(STVX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 
@@ -3069,7 +3070,7 @@ PRINT(LVX, SIMDForm) {
 #define _LVX(_ra, _rb, _vd) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setV(_vd, MM->load16(ea)); \
+    TH->setV(_vd, MM->load128(ea)); \
 }
 EMU_REWRITE(LVX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
@@ -3865,7 +3866,7 @@ PRINT(STVEWX, SIMDForm) {
     auto ea = b + TH->getGPR(_rb); \
     auto s = TH->getVuw(_vs); \
     auto eb = ea & 3; \
-    MM->store<4>(ea, s[eb]); \
+    MM->store32(ea, s[eb]); \
 }
 EMU_REWRITE(STVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 

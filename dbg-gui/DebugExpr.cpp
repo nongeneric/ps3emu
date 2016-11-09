@@ -219,7 +219,7 @@ public:
     MemExpr(Expr* expr) : expr(expr) { }
     Expr* expr;
     uint64_t eval(PPUThread* th) override {
-        return g_state.mm->load<4>(expr->eval(th));
+        return g_state.mm->load32(expr->eval(th));
     }
     
     uint64_t eval(SPUThread* th) override {

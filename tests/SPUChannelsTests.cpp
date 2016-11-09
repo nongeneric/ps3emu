@@ -116,12 +116,12 @@ TEST_CASE("spuchannels_event_reservation") {
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
  
     // the same thread destroys the reservation but doesn't raise the event
-    mm.store<4>(0x10000, 0);
+    mm.store32(0x10000, 0);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
     
     // there is no reservation, and therefore no event is raised
     boost::thread ppu([&] {
-        mm.store<4>(0x10000, 0);
+        mm.store32(0x10000, 0);
     });
     ppu.join();
     
@@ -137,7 +137,7 @@ TEST_CASE("spuchannels_event_reservation") {
     
     // another thread destroys the reservation and raises the event
     boost::thread ppu1([&] {
-        mm.store<4>(0x10000, 0);
+        mm.store32(0x10000, 0);
     });
     ppu1.join();
     
@@ -240,7 +240,7 @@ TEST_CASE("spuchannels_event_reservation_2threads") {
     
     // a third thread removes reservation, th1 and th2 lose their reservations
     boost::thread ppu([&] {
-        mm.store<4>(0x10000, 0);
+        mm.store32(0x10000, 0);
     });
     
     ppu.join();
@@ -288,7 +288,7 @@ TEST_CASE("spuchannels_event_reservation_putllc_should_not_raise_event") {
     
     // there is no reservation, and therefore no event is raised
     boost::thread ppu([&] {
-        mm.store<4>(0x10000, 0);
+        mm.store32(0x10000, 0);
     });
     ppu.join();
     
@@ -304,7 +304,7 @@ TEST_CASE("spuchannels_event_reservation_putllc_should_not_raise_event") {
     
     // another thread destroys the reservation and raises the event
     boost::thread ppu1([&] {
-        mm.store<4>(0x10000, 0);
+        mm.store32(0x10000, 0);
     });
     ppu1.join();
     

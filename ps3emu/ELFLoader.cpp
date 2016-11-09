@@ -181,15 +181,20 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
     
     static bool already = false;
     if (!already) {
-        auto handle = dlopen((std::string(elfName()) + ".x86.so").c_str(), RTLD_NOW);
-        if (handle) {
-            auto info = (RewrittenFunctions*)dlsym(handle, "info");
-            auto fs = info->functions;
-            for (auto i = 0u; i < info->len; ++i) {
-                typedef void (*f_t)(PPUThread*);
-                NCallEntry entry{fs[i].name, 0, (f_t)dlsym(handle, fs[i].name)};
-                auto findex = addNCallEntry(entry);
-                encodeNCall(mm, fs[i].va, findex);
+        auto path = std::string(elfName()) + ".x86.so";
+        if (boost::filesystem::exists(path)) {
+            auto handle = dlopen((std::string(elfName()) + ".x86.so").c_str(), RTLD_NOW);
+            if (handle) {
+                auto info = (RewrittenFunctions*)dlsym(handle, "info");
+                auto fs = info->functions;
+                for (auto i = 0u; i < info->len; ++i) {
+                    typedef void (*f_t)(PPUThread*);
+                    NCallEntry entry{fs[i].name, 0, (f_t)dlsym(handle, fs[i].name)};
+                    auto findex = addNCallEntry(entry);
+                    encodeNCall(mm, fs[i].va, findex);
+                }
+            } else {
+                WARNING(libs) << ssnprintf("could not load %s: %s", path, dlerror());
             }
         }
         already = true;
@@ -220,13 +225,13 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         auto base = pointsToSegment ? prxPh1Va : imageBase;
         auto val = rel->r_addend + base;
         if (type == R_PPC64_ADDR32) {
-            mm->store<4>(offset, val);
+            mm->store32(offset, val);
         } else if (type == R_PPC64_ADDR16_LO) {
-            mm->store<2>(offset, lo(val));
+            mm->store16(offset, lo(val));
         } else if (type == R_PPC64_ADDR16_HI) {
-            mm->store<2>(offset, hi(val));
+            mm->store16(offset, hi(val));
         } else if (type == R_PPC64_ADDR16_HA) {
-            mm->store<2>(offset, ha(val));
+            mm->store16(offset, ha(val));
         } else {
             throw std::runtime_error("unimplemented reloc type");
         }
@@ -257,10 +262,10 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         auto stub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
         if (stub == 0)
             continue;
-        auto codeVa = mm->load<4>(stub);
+        auto codeVa = mm->load32(stub);
         uint32_t index;
         findNCallEntry(fnid, index, true);
-        stolenInfos.push_back({codeVa, stub, mm->load<4>(codeVa), index});
+        stolenInfos.push_back({codeVa, stub, mm->load32(codeVa), index});
         encodeNCall(mm, codeVa, index);
     }
     
@@ -285,7 +290,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         auto exportStub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
         if (exportStub == 0)
             continue;
-        auto codeVa = mm->load<4>(exportStub);
+        auto codeVa = mm->load32(exportStub);
         
         uint32_t enterIndex, exitIndex, branchIndex, index;
         findNCallEntry(calcFnid("emuProxyEnter"), enterIndex, true);
@@ -298,7 +303,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
         encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall), index);
         encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
-        g_state.mm->store<4>(stubVa + offsetof(ProxyStub, stolen1), mm->load<4>(codeVa));
+        g_state.mm->store32(stubVa + offsetof(ProxyStub, stolen1), mm->load32(codeVa));
         encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
         branchMap[stubVa + offsetof(ProxyStub, ncall_abs_branch)] = codeVa + 4;
         
@@ -370,7 +375,7 @@ uint32_t findExportedEmuFunction(uint32_t id) {
     LOG << ssnprintf("    %s (ncall %x)", name, index);
     
     g_state.mm->setMemory(ncallDescrVa, 0, 8, true);
-    g_state.mm->store<4>(ncallDescrVa, ncallDescrVa + 4);
+    g_state.mm->store32(ncallDescrVa, ncallDescrVa + 4);
     encodeNCall(g_state.mm, ncallDescrVa + 4, index);
     ncallDescrVa += 8;
     return ncallDescrVa - 8;
@@ -462,7 +467,7 @@ void ELFLoader::link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prx
         for (auto j = 0; j < imports[i].variables; ++j) {
             auto descr = (vdescr*)mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
             auto symbol = findExportedSymbol(prxs, vnids[j], library, prx_symbol_type_t::variable);
-            mm->store<4>(descr->toc, symbol);
+            mm->store32(descr->toc, symbol);
         }
         auto fstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].fstubs, imports[i].functions);
         auto fnids = (big_uint32_t*)mm->getMemoryPointer(imports[i].fnids, imports[i].functions);

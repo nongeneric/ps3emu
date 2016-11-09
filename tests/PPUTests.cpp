@@ -42,55 +42,38 @@ TEST_CASE("swizzle_coord_convert") {
     }
 }
 
-TEST_CASE("read write memory") {
+TEST_CASE("read_write_memory") {
     MainMemory mm;
     uint32_t original = 0xA1B2C3D4, read;
     mm.writeMemory(0x400, &original, 4, true);
     mm.readMemory(0x400, &read, 4);
     REQUIRE(original == read);
     
-    mm.store<4>(0x400, 0x1122334455667788);
-    REQUIRE(mm.load<4>(0x400) == 0x55667788);
+    mm.store32(0x400, (uint32_t)0x1122334455667788);
+    REQUIRE(mm.load32(0x400) == 0x55667788);
 }
 
 TEST_CASE("read memory 128") {
     MainMemory mm;
     mm.setMemory(0x400, 0, 16, true);
     unsigned __int128 i128 = 0;
-    REQUIRE((mm.load16(0x400) == i128));
+    REQUIRE((mm.load128(0x400) == i128));
 }
 
-TEST_CASE("map memory") {
-    MainMemory mm;
-    auto mb = 1024 * 1024;
-    mm.map(100 * mb, 200 * mb, 2 * mb);
-    mm.store<4>(100 * mb, 13);
-    REQUIRE( mm.load<4>(100 * mb) == 13 );
-    REQUIRE( mm.load<4>(200 * mb) == 13 );
-    mm.store<4>(100 * mb, 33);
-    REQUIRE( mm.load<4>(100 * mb) == 33 );
-    REQUIRE( mm.load<4>(200 * mb) == 33 );
-    mm.setMemory(102 * mb, 0, 2, true);
-    mm.setMemory(202 * mb, 0, 2, true);
-    mm.store<4>(102 * mb - 2, 0xffffffff);
-    REQUIRE( mm.load<4>(102 * mb - 2) == 0xffffffff );
-    REQUIRE( mm.load<4>(202 * mb - 2) == 0xffff0000 );
-}
-
-TEST_CASE("provide memory") {
+TEST_CASE("provide_memory") {
     MainMemory mm;
     mm.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1, true);
-    mm.store<4>(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
+    mm.store32(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
     std::vector<uint8_t> vec(DefaultMainMemoryPageSize * 4);
     mm.provideMemory(DefaultMainMemoryPageSize * 2, DefaultMainMemoryPageSize * 4, vec.data());
-    REQUIRE( mm.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0x11223344 );
+    REQUIRE( mm.load32(DefaultMainMemoryPageSize * 5 + 0x300) == 0x11223344 );
     REQUIRE( *(uint32_t*)&vec[DefaultMainMemoryPageSize * 3 + 0x300] == 0x44332211 );
     uint8_t* buf = &vec[DefaultMainMemoryPageSize * 3 + 0x300];
     buf[0] = 0xaa;
     buf[1] = 0xbb;
     buf[2] = 0xcc;
     buf[3] = 0xdd;
-    REQUIRE( mm.load<4>(DefaultMainMemoryPageSize * 5 + 0x300) == 0xaabbccdd );
+    REQUIRE( mm.load32(DefaultMainMemoryPageSize * 5 + 0x300) == 0xaabbccdd );
 }
 
 TEST_CASE("internal alloc") {
@@ -104,8 +87,8 @@ TEST_CASE("internal alloc") {
     
     pair->first = 0xaaaaaaaa;
     pair->second = 0xbbbbbbbb;
-    REQUIRE( mm.load<sizeof(int)>(ea) == 0xaaaaaaaa );
-    REQUIRE( mm.load<sizeof(int)>(ea + sizeof(int)) == 0xbbbbbbbb );
+    REQUIRE( mm.load32(ea) == 0xaaaaaaaa );
+    REQUIRE( mm.load32(ea + sizeof(int)) == 0xbbbbbbbb );
 }
 
 TEST_CASE("internal_alloc_unique_ptr") {
@@ -119,8 +102,8 @@ TEST_CASE("internal_alloc_unique_ptr") {
     
     pair->first = 0xaaaaaaaa;
     pair->second = 0xbbbbbbbb;
-    REQUIRE( mm.load<sizeof(int)>(ea) == 0xaaaaaaaa );
-    REQUIRE( mm.load<sizeof(int)>(ea + sizeof(int)) == 0xbbbbbbbb );
+    REQUIRE( mm.load32(ea) == 0xaaaaaaaa );
+    REQUIRE( mm.load32(ea + sizeof(int)) == 0xbbbbbbbb );
 }
 
 TEST_CASE("fixed loads") {
@@ -211,9 +194,9 @@ TEST_CASE("fixed loads") {
         i++;
     };
     
-    mm.store<8>(32,       0x55ff44ff332211ff);
-    mm.store<8>(0x300000, 0xeeffddffccbbaaff);
-    mm.store<8>(0x300020, 0xaaffbbffccddeeff);
+    mm.store64(32,       0x55ff44ff332211ff);
+    mm.store64(0x300000, 0xeeffddffccbbaaff);
+    mm.store64(0x300020, 0xaaffbbffccddeeff);
     
     next();
     REQUIRE( th.getGPR(3) == 0x0000000000000055 );
@@ -245,9 +228,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(8) == 0x000000000000eeff );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store<8>(32,       0xff11223344556677);
-    mm.store<8>(0x300000, 0xffaabbccddee9988);
-    mm.store<8>(0x300020, 0xff00aa11bb22cc33);
+    mm.store64(32,       0xff11223344556677);
+    mm.store64(0x300000, 0xffaabbccddee9988);
+    mm.store64(0x300020, 0xff00aa11bb22cc33);
     
     next();
     REQUIRE( th.getGPR(3) == 0xffffffffffffff11 );
@@ -264,9 +247,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(8) == 0xffffffffffffffaa );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store<8>(32,       0x55ff44ff332211ff);
-    mm.store<8>(0x300000, 0xeeffddffccbbaaff);
-    mm.store<8>(0x300020, 0xaaffbbffccddeeff);
+    mm.store64(32,       0x55ff44ff332211ff);
+    mm.store64(0x300000, 0xeeffddffccbbaaff);
+    mm.store64(0x300020, 0xaaffbbffccddeeff);
     
     next();
     REQUIRE( th.getGPR(3) == 0x0000000055ff44ff );
@@ -283,9 +266,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(8) == 0x00000000eeffddff );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store<8>(32,       0xff11223344556677);
-    mm.store<8>(0x300000, 0xffaabbccddee9988);
-    mm.store<8>(0x300020, 0xff00aa11bb22cc33);
+    mm.store64(32,       0xff11223344556677);
+    mm.store64(0x300000, 0xffaabbccddee9988);
+    mm.store64(0x300020, 0xff00aa11bb22cc33);
     
     next();
     REQUIRE( th.getGPR(3) == 0xffffffffff112233 );
@@ -299,9 +282,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(7) == 0xffffffffffaabbcc );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store<8>(32,       0x55ff44ff332211ff);
-    mm.store<8>(0x300000, 0xeeffddffccbbaaff);
-    mm.store<8>(0x300020, 0xaaffbbffccddeeff);
+    mm.store64(32,       0x55ff44ff332211ff);
+    mm.store64(0x300000, 0xeeffddffccbbaaff);
+    mm.store64(0x300020, 0xaaffbbffccddeeff);
     
     next();
     REQUIRE( th.getGPR(3) == 0x55ff44ff332211ff );
@@ -387,63 +370,63 @@ TEST_CASE("fixed stores") {
     };
     
     next();
-    REQUIRE( mm.load<8>(16) ==       0x8800000000000000 );
+    REQUIRE( mm.load64(16) ==       0x8800000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x8800000000000000 );
+    REQUIRE( mm.load64(0x300000) == 0x8800000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300010) == 0x8800000000000000 );
+    REQUIRE( mm.load64(0x300010) == 0x8800000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x8800000000000000 );
+    REQUIRE( mm.load64(0x300050) == 0x8800000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x8800000000000000 );
+    REQUIRE( mm.load64(0x300000) == 0x8800000000000000 );
     REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x8800000000000000 );
+    REQUIRE( mm.load64(0x300050) == 0x8800000000000000 );
     REQUIRE( th.getGPR(1) == 0x300050 );
     
     next();
-    REQUIRE( mm.load<8>(16) ==       0x7788000000000000 );
+    REQUIRE( mm.load64(16) ==       0x7788000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x7788000000000000 );
+    REQUIRE( mm.load64(0x300000) == 0x7788000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300010) == 0x7788000000000000 );
+    REQUIRE( mm.load64(0x300010) == 0x7788000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x7788000000000000 );
+    REQUIRE( mm.load64(0x300050) == 0x7788000000000000 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x7788000000000000 );
+    REQUIRE( mm.load64(0x300000) == 0x7788000000000000 );
     REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x7788000000000000 );
+    REQUIRE( mm.load64(0x300050) == 0x7788000000000000 );
     REQUIRE( th.getGPR(1) == 0x300050 );
     
     next();
-    REQUIRE( mm.load<8>(16) ==       0x5566778800000000 );
+    REQUIRE( mm.load64(16) ==       0x5566778800000000 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x5566778800000000 );
+    REQUIRE( mm.load64(0x300000) == 0x5566778800000000 );
     next();
-    REQUIRE( mm.load<8>(0x300010) == 0x5566778800000000 );
+    REQUIRE( mm.load64(0x300010) == 0x5566778800000000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x5566778800000000 );
+    REQUIRE( mm.load64(0x300050) == 0x5566778800000000 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x5566778800000000 );
+    REQUIRE( mm.load64(0x300000) == 0x5566778800000000 );
     REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x5566778800000000 );
+    REQUIRE( mm.load64(0x300050) == 0x5566778800000000 );
     REQUIRE( th.getGPR(1) == 0x300050 );
     
     next();
-    REQUIRE( mm.load<8>(16) ==       0x1122334455667788 );
+    REQUIRE( mm.load64(16) ==       0x1122334455667788 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x1122334455667788 );
+    REQUIRE( mm.load64(0x300000) == 0x1122334455667788 );
     next();
-    REQUIRE( mm.load<8>(0x300010) == 0x1122334455667788 );
+    REQUIRE( mm.load64(0x300010) == 0x1122334455667788 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x1122334455667788 );
+    REQUIRE( mm.load64(0x300050) == 0x1122334455667788 );
     next();
-    REQUIRE( mm.load<8>(0x300000) == 0x1122334455667788 );
+    REQUIRE( mm.load64(0x300000) == 0x1122334455667788 );
     REQUIRE( th.getGPR(1) == 0x300000 );
     next();
-    REQUIRE( mm.load<8>(0x300050) == 0x1122334455667788 );
+    REQUIRE( mm.load64(0x300050) == 0x1122334455667788 );
     REQUIRE( th.getGPR(1) == 0x300050 );
 }
 
@@ -475,8 +458,8 @@ TEST_CASE("fixed load store with reversal") {
     mm.setMemory(0x300010, 0, 100, true);
     th.setGPR(1, 0x300010);
     th.setGPR(2, 0x40);
-    mm.store<8>(0x300010, 0x1122334455667788);
-    mm.store<8>(0x300050, 0xaabbccddeeff0099);
+    mm.store64(0x300010, 0x1122334455667788);
+    mm.store64(0x300050, 0xaabbccddeeff0099);
     
     ppu_dasm<DasmMode::Emulate>(instr + 0*4, 0, &th);
     REQUIRE( th.getGPR(3) == 0x2211 );
@@ -491,16 +474,16 @@ TEST_CASE("fixed load store with reversal") {
     
     mm.setMemory(0x300010, 0, 100, true);
     ppu_dasm<DasmMode::Emulate>(instr + 4*4, 0, &th);
-    REQUIRE( mm.load<8>(0x300010) == 0x2211000000000000 );
+    REQUIRE( mm.load64(0x300010) == 0x2211000000000000 );
     mm.setMemory(0x300010, 0, 100, true);
     ppu_dasm<DasmMode::Emulate>(instr + 5*4, 0, &th);
-    REQUIRE( mm.load<8>(0x300050) == 0x2211000000000000 );
+    REQUIRE( mm.load64(0x300050) == 0x2211000000000000 );
     mm.setMemory(0x300010, 0, 100, true);
     ppu_dasm<DasmMode::Emulate>(instr + 6*4, 0, &th);
-    REQUIRE( mm.load<8>(0x300010) == 0x4433221100000000 );
+    REQUIRE( mm.load64(0x300010) == 0x4433221100000000 );
     mm.setMemory(0x300010, 0, 100, true);
     ppu_dasm<DasmMode::Emulate>(instr + 7*4, 0, &th);
-    REQUIRE( mm.load<8>(0x300050) == 0x4433221100000000 );
+    REQUIRE( mm.load64(0x300050) == 0x4433221100000000 );
 }
 
 TEST_CASE("fixed arithmetic") {
@@ -625,7 +608,7 @@ TEST_CASE("emu stw") {
     mm.setMemory(0x400000, 0, 8, true);
     uint8_t instr[] = { 0x93, 0xab, 0x00, 0x00 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE(mm.load<4>(0x400000) == 0x55667788); 
+    REQUIRE(mm.load32(0x400000) == 0x55667788); 
 }
 
 TEST_CASE("emu mtctr") {
@@ -727,7 +710,7 @@ TEST_CASE("list3") {
     }
     REQUIRE(i < 50);
     REQUIRE(th.getNIP() == 0x10370);
-    REQUIRE(mm.load<4>(mem) == 0x05050505);
+    REQUIRE(mm.load32(mem) == 0x05050505);
 }
 
 TEST_CASE("set crf") {
@@ -1160,7 +1143,7 @@ TEST_CASE("lwz r27,112(r1)") {
     PPUThread th;
     auto mem = 0x400000;
     mm.setMemory(mem, 0, 8, true);
-    mm.store<8>(mem, 0x11223344aabbccdd);
+    mm.store64(mem, 0x11223344aabbccdd);
     th.setGPR(1, mem - 112);
     uint8_t instr[] = { 0x83, 0x61, 0x00, 0x70 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1205,8 +1188,8 @@ TEST_CASE("float loads") {
     PPUThread th;
     auto mem = 0x400000;
     mm.setMemory(mem, 0, 16, true);
-    mm.store<8>(mem,     0x3f92339c00000000); // float
-    mm.store<8>(mem + 8, 0x3ff2467381d7dbf5); // double
+    mm.store64(mem,     0x3f92339c00000000); // float
+    mm.store64(mem + 8, 0x3ff2467381d7dbf5); // double
     uint8_t instr[] = { 
         0xc0, 0x21, 0x00, 0x00, 0x7c, 0x41, 0x04, 0x2e, 0xc4, 0x61, 0x00,
         0x00, 0x7c, 0x81, 0x04, 0x6e, 0xc8, 0xa2, 0x00, 0x00, 0x7c, 0xc2,
@@ -1293,19 +1276,19 @@ TEST_CASE("float stores") {
     for (auto i = 0u; i < sizeof(instr); i += 4) {
         ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
-    REQUIRE( mm.load<8>(mem + 0*8) == 0x3f8ccccd00000000 );
-    REQUIRE( mm.load<8>(mem + 1*8) == 0x3f8ccccd00000000 );
-    REQUIRE( mm.load<8>(mem + 2*8) == 0x3f8ccccd00000000 );
+    REQUIRE( mm.load64(mem + 0*8) == 0x3f8ccccd00000000 );
+    REQUIRE( mm.load64(mem + 1*8) == 0x3f8ccccd00000000 );
+    REQUIRE( mm.load64(mem + 2*8) == 0x3f8ccccd00000000 );
     REQUIRE( th.getGPR(3) == mem + 2*8);
-    REQUIRE( mm.load<8>(mem + 3*8) == 0x3f8ccccd00000000 );
+    REQUIRE( mm.load64(mem + 3*8) == 0x3f8ccccd00000000 );
     REQUIRE( th.getGPR(4) == mem + 3*8);
-    REQUIRE( mm.load<8>(mem + 4*8) == 0x3ff199999999999a );
-    REQUIRE( mm.load<8>(mem + 5*8) == 0x3ff199999999999a );
-    REQUIRE( mm.load<8>(mem + 6*8) == 0x3ff199999999999a );
+    REQUIRE( mm.load64(mem + 4*8) == 0x3ff199999999999a );
+    REQUIRE( mm.load64(mem + 5*8) == 0x3ff199999999999a );
+    REQUIRE( mm.load64(mem + 6*8) == 0x3ff199999999999a );
     REQUIRE( th.getGPR(7) == mem + 6*8);
-    REQUIRE( mm.load<8>(mem + 7*8) == 0x3ff199999999999a );
+    REQUIRE( mm.load64(mem + 7*8) == 0x3ff199999999999a );
     REQUIRE( th.getGPR(8) == mem + 7*8);
-    REQUIRE( mm.load<8>(mem + 8*8) == 0x9999999a00000000 );
+    REQUIRE( mm.load64(mem + 8*8) == 0x9999999a00000000 );
 }
 
 TEST_CASE("float moves") {
@@ -1870,7 +1853,7 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
         REQUIRE(buf == 0x11111111);
         buf = 0xaabbccdd;
         REQUIRE(mm.writeCond(0x10000, &buf, 4) == true);
-        REQUIRE(mm.load<4>(0x10000) == 0xddccbbaa);
+        REQUIRE(mm.load32(0x10000) == 0xddccbbaa);
     });
     ppu.join();
     
@@ -1885,7 +1868,7 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
         // reservation still active, th2 didn't destroy it with writeCond
         buf = 0xffffffff;
         REQUIRE(mm.writeCond(0x10000, &buf, 4) == true);
-        REQUIRE(mm.load<4>(0x10000) == 0xffffffff);
+        REQUIRE(mm.load32(0x10000) == 0xffffffff);
     });
     
     while (!step1) ;
@@ -1894,7 +1877,7 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     boost::thread th2([&] {
         auto buf = 0x12345678;
         REQUIRE(mm.writeCond(0x10000, &buf, 4) == false);
-        REQUIRE(mm.load<4>(0x10000) == 0xddccbbaa);
+        REQUIRE(mm.load32(0x10000) == 0xddccbbaa);
     });
     th2.join();
     

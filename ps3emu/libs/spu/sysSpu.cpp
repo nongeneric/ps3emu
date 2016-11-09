@@ -79,11 +79,11 @@ std::vector<sys_spu_segment_t> spuImageInit(MainMemory* mm,
         
         if (ph.p_type == SYS_SPU_SEGMENT_TYPE_INFO) {
             uint32_t pos = ph.p_offset + elf;
-            auto namesz = mm->load<4>(pos);
+            auto namesz = mm->load32(pos);
             pos += 4;
-            auto descsz = mm->load<4>(pos);
+            auto descsz = mm->load32(pos);
             pos += 4;
-            auto type = mm->load<4>(pos);
+            auto type = mm->load32(pos);
             pos += 4;
             assert(type == 1); (void)type;
             std::string name, desc;
@@ -137,7 +137,7 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
     auto thread = g_state.proc->getSpuThread(id);
     big_uint64_t v = 0;
     memcpy((char*)&v + 8 - type, thread->ptr(address), type);
-    g_state.mm->store<8>(value, v);
+    g_state.mm->store64(value, v);
     return CELL_OK;
 }
 
@@ -519,8 +519,8 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
     auto entry = findNCallEntry(fnid, index);
     assert(entry); (void)entry;
     auto info = g_state.proc->getStolenInfo(index);
-    auto ncall = g_state.mm->load<4>(info.va);
-    g_state.mm->store<4>(info.va, info.bytes);
+    auto ncall = g_state.mm->load32(info.va);
+    g_state.mm->store32(info.va, info.bytes);
 
     auto modules = g_state.proc->loadedModules();
     auto initSpursStubVa =
@@ -537,8 +537,8 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
                                               "cellSpurs",
                                               prx_symbol_type_t::function);
 
-    g_state.th->ps3call(g_state.mm->load<4>(initSpursStubVa), [=] {
-        g_state.mm->store<4>(info.va, ncall);
+    g_state.th->ps3call(g_state.mm->load32(initSpursStubVa), [=] {
+        g_state.mm->store32(info.va, ncall);
         if (!spursTrace.enabled)
             return g_state.th->getGPR(3);
         spursTrace.buffer = (char*)g_state.memalloc->allocInternalMemory(
@@ -548,10 +548,10 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
         g_state.th->setGPR(5, spursTraceBufferSize);
         g_state.th->setGPR(6, CELL_SPURS_TRACE_MODE_FLAG_WRAP_BUFFER |
                               CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP);
-        g_state.th->ps3call(g_state.mm->load<4>(initTraceStubVa), [&] {
+        g_state.th->ps3call(g_state.mm->load32(initTraceStubVa), [&] {
             assert(g_state.th->getGPR(3) == 0);
             g_state.th->setGPR(3, spurs_va);
-            g_state.th->ps3call(g_state.mm->load<4>(startTraceStubVa), [&] {
+            g_state.th->ps3call(g_state.mm->load32(startTraceStubVa), [&] {
                 assert(g_state.th->getGPR(3) == 0);
                 return g_state.th->getGPR(3);
             });
@@ -578,8 +578,8 @@ int32_t cellSpursFinalize(uint32_t spurs_va) {
 //     auto entry = findNCallEntry(calcFnid("cellSpursFinalize"), index);
 //     assert(entry);
 //     auto info = g_state.proc->getStolenInfo(index);
-//     auto ncall = g_state.mm->load<4>(info.va);
-//     g_state.mm->store<4>(info.va, info.bytes);
+//     auto ncall = g_state.mm->load32(info.va);
+//     g_state.mm->store32(info.va, info.bytes);
 // 
 //     auto modules = g_state.proc->loadedModules();
 //     auto spursFinalizeStubVa =
@@ -593,16 +593,16 @@ int32_t cellSpursFinalize(uint32_t spurs_va) {
 //                                               prx_symbol_type_t::function);
 // 
 //     if (!spursTrace.enabled) {
-//         g_state.th->ps3call(g_state.mm->load<4>(spursFinalizeStubVa), [=] {
-//             g_state.mm->store<4>(info.va, ncall);
+//         g_state.th->ps3call(g_state.mm->load32(spursFinalizeStubVa), [=] {
+//             g_state.mm->store32(info.va, ncall);
 //             return g_state.th->getGPR(3);
 //         });
 //     } else {
-//         g_state.th->ps3call(g_state.mm->load<4>(stopTraceStubVa), [=] {
+//         g_state.th->ps3call(g_state.mm->load32(stopTraceStubVa), [=] {
 //             assert(g_state.th->getGPR(3) == 0);
-//             g_state.mm->store<4>(info.va, ncall);
+//             g_state.mm->store32(info.va, ncall);
 //             g_state.th->setGPR(3, spurs_va);
-//             g_state.th->ps3call(g_state.mm->load<4>(spursFinalizeStubVa), [&] {
+//             g_state.th->ps3call(g_state.mm->load32(spursFinalizeStubVa), [&] {
 //                 return g_state.th->getGPR(3);
 //             });
 //             return g_state.th->getGPR(3);

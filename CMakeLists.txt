@@ -23,6 +23,9 @@ pkg_search_module(PNG REQUIRED libpng)
 pkg_search_module(ZLIB REQUIRED zlib)
 pkg_search_module(FREETYPE2 REQUIRED freetype2)
 
+set(CMAKE_AR gcc-ar)
+set(CMAKE_RANLIB gcc-ranlib)
+
 include_directories(SYSTEM ps3emu/libs/graphics/GL/include)
 #-fsanitize=undefined
 #-fsanitize=thread
@@ -38,7 +41,7 @@ add_definitions(-DTESTS)
 set(CMAKE_CXX_FLAGS "-ggdb3 -O0 -Wall -Werror ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
-#set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-O3 -march=native -Wall -Werror ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
