@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include "log.h"
 #include "state.h"
+#include "Config.h"
 #include "InternalMemoryManager.h"
 #include "ppu/rewriter.h"
 #include <boost/range/algorithm.hpp>
@@ -180,16 +181,17 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
     }
     
     static bool already = false;
-    if (!already) {
-        auto path = std::string(elfName()) + ".x86.so";
+    auto path = g_state.config->x86Path;
+    if (!path.empty() && !already) {
         if (boost::filesystem::exists(path)) {
-            auto handle = dlopen((std::string(elfName()) + ".x86.so").c_str(), RTLD_NOW);
+            auto handle = dlopen(path.c_str(), RTLD_NOW);
             if (handle) {
                 auto info = (RewrittenFunctions*)dlsym(handle, "info");
+                INFO(libs) << ssnprintf("loading %s with %d functions", path, info->len);
+                info->init();
                 auto fs = info->functions;
                 for (auto i = 0u; i < info->len; ++i) {
-                    typedef void (*f_t)(PPUThread*);
-                    NCallEntry entry{fs[i].name, 0, (f_t)dlsym(handle, fs[i].name)};
+                    NCallEntry entry{fs[i].name, 0, fs[i].ptr};
                     auto findex = addNCallEntry(entry);
                     encodeNCall(mm, fs[i].va, findex);
                 }

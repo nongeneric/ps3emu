@@ -37,11 +37,10 @@
 using namespace boost::endian;
 
 #ifdef EMU_REWRITER
-    #define SET_NIP(x) goto _##x
-    #define BRANCH_TO_LR return
+    #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul); LOG_RET(lr); return;
 #else
     #define SET_NIP(x) TH->setNIP(x)
-    #define BRANCH_TO_LR TH->setNIP(TH->getLR() & ~3ul)
+    #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul)
 #endif
 
 #define MM g_state.mm
@@ -173,10 +172,11 @@ inline bool isTaken(unsigned bo0,
 #define _BC(bo0, bo1, bo2, bo3, bi, lk, nia, cia) { \
     if (!bo2) \
         TH->setCTR(TH->getCTR() - 1); \
-    if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) \
-        SET_NIP(nia); \
     if (lk) \
         TH->setLR(cia + 4); \
+    if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) { \
+        SET_NIP(nia); \
+    } \
 }
 
 EMU_REWRITE(BC, BForm, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u(), getNIA(i, cia), cia)
@@ -201,14 +201,15 @@ PRINT(BCLR, XLForm_2) {
     }
 }
 
-
 #define _BCLR(bo0, bo1, bo2, bo3, bi, lk, cia) { \
     if (!bo2) \
         TH->setCTR(TH->getCTR() - 1); \
-    if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) \
-        BRANCH_TO_LR; \
+    auto lr = TH->getLR(); \
     if (lk) \
         TH->setLR(cia + 4); \
+    if (isTaken(bo0, bo1, bo2, bo3, TH, bi)) { \
+        BRANCH_TO_LR(lr); \
+    } \
 }
 
 EMU_REWRITE(BCLR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BO2.u(), i->BO3.u(), i->BI.u(), i->LK.u(), cia)
@@ -231,10 +232,10 @@ PRINT(BCCTR, XLForm_2) {
 
 #define _BCCTR(bo0, bo1, bi, lk) { \
     auto cond_ok = bo0 || bit_test(TH->getCR(), 32, bi) == bo1; \
-    if (cond_ok) \
-        TH->setNIP(TH->getCTR() & ~3); \
     if (lk) \
         TH->setLR(cia + 4); \
+    if (cond_ok) \
+        TH->setNIP(TH->getCTR() & ~3); \
 }
 
 EMU_REWRITE(BCCTR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BI.u(), i->LK.u())
@@ -4328,33 +4329,64 @@ std::string formatCRbit(BI_t bi) {
     return ssnprintf("4*cr%d+%s", bi.u() / 4, crbit);
 }
 
-bool isAbsoluteBranch(void* instr) {
-    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
-    auto iform = reinterpret_cast<IForm*>(&x);
+bool isAbsoluteBranch(uint32_t instr) {
+    auto iform = reinterpret_cast<IForm*>(&instr);
     return iform->OPCD.u() == 18 || iform->OPCD.u() == 16;
 }
 
-bool isTaken(void* branchInstr, uint64_t cia, PPUThread* thread) {
-    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(branchInstr));
-    auto iform = reinterpret_cast<IForm*>(&x);
+bool isTaken(uint32_t branchInstr, uint32_t cia, PPUThread* thread) {
+    auto iform = reinterpret_cast<IForm*>(&branchInstr);
     if (iform->OPCD.u() == 18) {
         return true;
     } else if (iform->OPCD.u() == 16) {
-        auto b = reinterpret_cast<BForm*>(&x);
+        auto b = reinterpret_cast<BForm*>(&branchInstr);
         return isTaken(b->BO0.u(), b->BO1.u(), b->BO2.u(), b->BO3.u(), thread, b->BI.u());
     }
     throw std::runtime_error("not absolute branch");
 }
 
-uint64_t getTargetAddress(void* branchInstr, uint64_t cia) {
-    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(branchInstr));
-    auto iform = reinterpret_cast<IForm*>(&x);
+uint64_t getTargetAddress(uint32_t branchInstr, uint32_t cia) {
+    auto iform = reinterpret_cast<IForm*>(&branchInstr);
     if (iform->OPCD.u() == 18) {
         return getNIA(iform, cia);
     } else if (iform->OPCD.u() == 16) {
-        return getNIA(reinterpret_cast<BForm*>(&x), cia);
+        return getNIA(reinterpret_cast<BForm*>(&branchInstr), cia);
     }
     throw std::runtime_error("not absolute branch");
+}
+
+PPUInstructionInfo analyze(uint32_t instr, uint32_t cia) {
+    PPUInstructionInfo info;
+    auto iform = reinterpret_cast<IForm*>(&instr);
+    auto bform = reinterpret_cast<BForm*>(&instr);
+    auto xlform1 = reinterpret_cast<XLForm_1*>(&instr);
+    auto xlform2 = reinterpret_cast<XLForm_2*>(&instr);
+    if (iform->OPCD.u() == 18) { // b
+        info.isAlwaysTaken = true;
+        info.targetVa = getNIA(iform, cia);
+        info.isFunctionCall = iform->LK.u();
+    }
+    if (iform->OPCD.u() == 16) { // bc
+        info.isAlwaysTaken = bform->BO2.u() && bform->BO0.u();
+        info.isConditionalBranch = !info.isAlwaysTaken;
+        info.targetVa = getNIA(bform, cia);
+        info.isFunctionCall = bform->LK.u();
+    }
+    if (iform->OPCD.u() == 19) {
+        if (xlform1->XO.u() == 16) {
+            info.isBCLR = true;
+            info.isFunctionCall = xlform2->LK.u();
+            info.isAlwaysTaken = xlform2->BO2.u() && xlform2->BO0.u();
+            info.isConditionalBranch = !info.isAlwaysTaken;
+        }
+        if (xlform1->XO.u() == 528) {
+            info.isBCCTR = true;
+            info.isFunctionCall = xlform2->LK.u();
+            info.isAlwaysTaken = xlform2->BO0.u();
+            info.isConditionalBranch = !info.isAlwaysTaken;
+        }
+    }
+    return info;
 }
 
 template void ppu_dasm<DasmMode::Print, std::string>(

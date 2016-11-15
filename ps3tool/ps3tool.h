@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <stdint.h>
 
 struct ShaderDasmCommand {
     std::string binary;
@@ -30,6 +32,9 @@ struct ParseSpursTraceCommand {
 struct RewriteCommand {
     std::string elf;
     std::string cpp;
+    bool trace;
+    std::vector<uint32_t> entryPoints;
+    std::vector<uint32_t> ignoredEntryPoints;
 };
 
 void HandleUnsce(UnsceCommand const& command);

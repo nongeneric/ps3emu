@@ -33,6 +33,18 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
         r = 0;
 }
 
+void PPUThread::vmenter(uint32_t to) {
+    for (;;) {
+        uint32_t instr;
+        auto cia = getNIP();
+        if (cia == to)
+            return;
+        g_state.mm->readMemory(cia, &instr, sizeof instr);
+        setNIP(cia + sizeof instr);
+        ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
+    }
+}
+
 void PPUThread::innerLoop() {
     assert(getNIP());
     g_state.th = this;

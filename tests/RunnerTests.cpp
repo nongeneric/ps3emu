@@ -1,25 +1,7 @@
 #include <catch.hpp>
 
-#include <QProcess>
+#include "TestUtils.h"
 #include <vector>
-
-static const char* runnerPath = "../ps3run/ps3run";
-
-std::string startWaitGetOutput(std::vector<std::string> args) {
-    QProcess proc;
-    std::string argstr;
-    for (size_t i = 1; i < args.size(); ++i) {
-        argstr += args[i];
-        if (i != args.size() - 1)
-             argstr += " ";
-    }
-    proc.start(runnerPath,
-               QStringList() << "--elf" << QString::fromStdString(args.front())
-                             << "--args" << QString::fromStdString(argstr));
-    proc.waitForStarted();
-    proc.waitForFinished();
-    return QString(proc.readAll()).toStdString();
-}
 
 TEST_CASE("simple_printf") {
     auto output = startWaitGetOutput({"./binaries/simple_printf/a.elf"});

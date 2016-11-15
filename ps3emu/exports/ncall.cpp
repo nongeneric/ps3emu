@@ -303,7 +303,7 @@ constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry
 static std::vector<NCallEntry> dynamicEntries;
 
 void PPUThread::ncall(uint32_t index) {
-    //INFO(libs) << ssnprintf("ncall %s", ncallTable[index].name);
+    
     if (index >= staticTableSize() + dynamicEntries.size()) {
         auto msg = ssnprintf("unknown ncall index %x", index);
         ERROR(libs) << msg;
@@ -311,11 +311,14 @@ void PPUThread::ncall(uint32_t index) {
     }
     setEMUREG(0, getNIP());
     setNIP(getLR());
+    NCallEntry* entry;
     if (index >= staticTableSize()) {
-        dynamicEntries[index - staticTableSize()].stub(this);
+        entry = &dynamicEntries[index - staticTableSize()];
     } else {
-        ncallTable[index].stub(this);
+        entry = &ncallTable[index];
     }
+    //INFO(libs) << ssnprintf("ncall %s", entry->name);
+    entry->stub(this);
 }
 
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound) {

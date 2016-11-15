@@ -60,8 +60,8 @@ if args.changes:
                 trace.regs = parse_regs(split[1:-1])
                 trace.vregs = []
             else:
-                trace.regs = parse_regs(split[1:33])
-                trace.vregs = parse_regs(split[33:-1])
+                trace.regs = parse_regs(split[1:34])
+                trace.vregs = parse_regs(split[34:-1])
             traces.append(trace)
             
     print(len(traces), "lines")

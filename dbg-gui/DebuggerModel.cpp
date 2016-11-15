@@ -409,11 +409,10 @@ public:
     virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) override {
         if (!_thread || !g_state.mm->isAllocated(row))
             return false;
-        uint32_t instr;
-        g_state.mm->readMemory(row, &instr, sizeof instr);
-        if (isAbsoluteBranch(&instr)) {
-            to = getTargetAddress(&instr, row);
-            highlighted = row == _thread->getNIP() && isTaken(&instr, row, _thread);
+        uint32_t instr = g_state.mm->load32(row);
+        if (isAbsoluteBranch(instr)) {
+            to = getTargetAddress(instr, row);
+            highlighted = row == _thread->getNIP() && isTaken(instr, row, _thread);
             return true;
         }
         return false;
@@ -938,6 +937,7 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
             auto r = _activeThread->getGPR(i);
             fprintf(f, "r%d:%08x%08x;", i, (uint32_t)(r >> 32), (uint32_t)r);
         }
+        fprintf(f, "r%d:%08x%08x;", 32, 0, (uint32_t)_activeThread->getLR());
         for (auto i = 0u; i < 32; ++i) {
             auto v = _activeThread->getV(i);
             fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
@@ -948,7 +948,9 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
         }
         fprintf(f, " #%s\n", str.c_str());
         fflush(f);
-        _proc->run();
+        auto ev = _proc->run();
+        if (boost::get<ProcessFinishedEvent>(&ev))
+            break;
     }
     _updateUIWhenRunning = true;
     _activeThread->singleStepBreakpoint(false);

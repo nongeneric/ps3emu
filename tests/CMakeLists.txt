@@ -15,6 +15,8 @@ set(SRC
     SPUChannelsTests.cpp
     EnumTests.cpp
     TextureCacheTests.cpp
+    RewriterTests.cpp
+    TestUtils.cpp
 )
 
 add_executable(tests ${SRC})

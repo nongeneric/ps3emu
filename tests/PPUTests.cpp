@@ -725,13 +725,13 @@ TEST_CASE("set crf") {
     REQUIRE(th.getCR() == 9);
 }
 
-TEST_CASE("branch info bge") {
+TEST_CASE("branch_info_bge") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
     th.setGPR(10, ~0ull);
     // bge cr7,103b4
-    uint8_t instr[] = { 0x40, 0x9c, 0xff, 0xe0 };
+    uint32_t instr = 0x409cffe0;
     REQUIRE(isAbsoluteBranch(instr));
     REQUIRE(getTargetAddress(instr, 0x103d4) == 0x103b4);
     th.setCRF_sign(7, 2);

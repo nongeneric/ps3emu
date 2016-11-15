@@ -1,6 +1,8 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/log.h"
+#include "ps3emu/state.h"
+#include "ps3emu/Config.h"
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 #include "stdio.h"
@@ -35,6 +37,8 @@ int main(int argc, char* argv[]) {
                 "logging filter: spu, libs, ppu, debugger [e.g. spu,libs]")
             ("sinks,s", value<std::string>(&sinks)->default_value(""),
                 "logging sinks: file, console [e.g. file,console]")
+            ("x86", value<std::string>(&g_state.config->x86Path)->default_value(""),
+                "rewritten and compiled x86 so file")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);

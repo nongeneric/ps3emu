@@ -17,7 +17,7 @@ namespace {
 mutex_map_t::const_iterator find_mutex_iter(ps3_uintptr_t mutex_id) {
     auto it = mutexes.find(mutex_id);
     if (it == end(mutexes))
-        throw std::runtime_error("destroying uninitialized mutex");
+        throw std::runtime_error(ssnprintf("using uninitialized mutex %x", mutex_id));
     return it;
 }
 

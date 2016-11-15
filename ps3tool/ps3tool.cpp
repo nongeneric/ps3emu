@@ -108,14 +108,29 @@ Command ParseOptions(int argc, const char *argv[])
         RewriteCommand command;
         options_description desc("rewrite");
 
+        std::vector<std::string> entries, ignored;
+        
         desc.add_options()
             ("elf", value<std::string>(&command.elf)->required(), "elf file")
-            ("cpp", value<std::string>(&command.elf)->required(), "output cpp file");
-
+            ("cpp", value<std::string>(&command.cpp)->required(), "output cpp file")
+            ("trace", bool_switch()->default_value(false), "enable trace")
+            ("entries", value<std::vector<std::string>>(&entries)->multitoken(), "entry points")
+            ("ignored", value<std::vector<std::string>>(&ignored)->multitoken(), "ignored entry points");
+        
         auto opts = collect_unrecognized(parsed.options, include_positional);
         opts.erase(opts.begin());
         store(command_line_parser(opts).options(desc).run(), vm);
         notify(vm);
+        command.trace = vm["trace"].as<bool>();
+        
+        for (auto str : entries) {
+            command.entryPoints.push_back(std::stoi(str, 0, 16));
+        }
+        
+        for (auto str : ignored) {
+            command.ignoredEntryPoints.push_back(std::stoi(str, 0, 16));
+        }
+        
         return command;
     } else {
         throw std::runtime_error("unknown command");

@@ -147,7 +147,7 @@ class PPUThread {
     boost::mutex _mutexRunning;
     std::string _name;
     
-    uint64_t _NIP;
+    uint32_t _NIP;
     uint64_t _LR = 0;
     uint64_t _CTR = 0;
     
@@ -187,6 +187,7 @@ public:
     uint32_t getStackBase();
     uint32_t getStackSize();
     int priority();
+    void vmenter(uint32_t to);
     
 #ifdef DEBUG
     void singleStepBreakpoint(bool value);
@@ -408,11 +409,11 @@ public:
         return _XER.f.SO;
     }
     
-    inline void setNIP(uint64_t value) {
+    inline void setNIP(uint32_t value) {
         _NIP = value;
     }
     
-    inline uint64_t getNIP() {
+    inline uint32_t getNIP() {
         return _NIP;
     }
     
