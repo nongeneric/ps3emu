@@ -1,7 +1,8 @@
 #include <catch.hpp>
 
 #include <QProcess>
-#include "../ps3emu/utils.h"
+#include "TestUtils.h"
+#include "ps3emu/utils.h"
 
 static const char* runnerPath = "../ps3run/ps3run";
 
@@ -93,6 +94,12 @@ TEST_CASE("gcm_cube_mrt") {
 
 TEST_CASE("gcm_human") {
     runAndWait("./binaries/gcm_human/a.elf");
+    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);
+    
+    REQUIRE( rewrite_and_compile("./binaries/gcm_human/a.elf") );
+    auto output = startWaitGetOutput({"./binaries/gcm_human/a.elf"}, {"--x86", "/tmp/x86.so"});
     compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0);
     compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
     compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);

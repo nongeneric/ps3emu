@@ -3,6 +3,8 @@
 #include "ps3emu/log.h"
 #include "ps3emu/libs/spu/sysSpu.h"
 #include "Config.h"
+#include "ps3emu/state.h"
+#include "ps3emu/Config.h"
 #include <boost/program_options.hpp>
 #include <string>
 #include <stdint.h>
@@ -29,6 +31,8 @@ int main(int argc, char *argv[]) {
             ("help", "produce help message")
             ("elf,e", value<std::string>(&elfPath), "elf file")
             ("args,a", value<std::string>(&arguments), "arguments")
+            ("x86", value<std::string>(&g_state.config->x86Path)->default_value(""),
+                "rewritten and compiled x86 so file")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);

@@ -92,6 +92,9 @@ struct FunctionInfo {
     std::vector<bool> map;
     std::vector<std::string> body;
     std::vector<uint32_t> dirty;
+    bool contains(uint32_t va) {
+        return (start <= va && va < start + len) && map[(va - start) / 4];
+    }
 };
 
 void HandleRewrite(RewriteCommand const& command) {
@@ -195,16 +198,18 @@ void HandleRewrite(RewriteCommand const& command) {
             big_uint32_t instr = mm.load32(i);
             auto info = analyze(instr, i);
             ppu_dasm<DasmMode::Rewrite>(&instr, i, &rewritten);
+            bool nolabel = false;
             if (info.targetVa) {
                 auto it = std::find_if(begin(functions), end(functions), [&](auto& f) {
                     return f.ep == info.targetVa;
                 });
-                if (fn.start <= info.targetVa && info.targetVa < fn.start + fn.len) {
+                if (fn.contains(info.targetVa) && !info.isFunctionCall) {
                     fn.body.push_back("#ifdef SET_NIP");
                     fn.body.push_back("#undef SET_NIP");
                     fn.body.push_back("#endif");
                     fn.body.push_back(ssnprintf("#define SET_NIP(x) goto _0x%x", info.targetVa));
                 } else if (it != end(functions) && it->dirty.empty()) {
+                    assert(info.isFunctionCall);
                     fn.body.push_back("#ifdef SET_NIP");
                     fn.body.push_back("#undef SET_NIP");
                     fn.body.push_back("#endif");
@@ -215,16 +220,20 @@ void HandleRewrite(RewriteCommand const& command) {
                                   info.targetVa,
                                   i + 4));
                 } else {
+                    assert(info.isFunctionCall);
+                    fn.body.push_back(ssnprintf("_0x%x:", i));
                     fn.body.push_back(ssnprintf("LOG_VMENTER(0x%x);", i));
                     fn.body.push_back(ssnprintf("TH->setNIP(0x%x);", i));
                     fn.body.push_back(ssnprintf("TH->vmenter(0x%x);", i + 4));
                     fn.body.push_back(ssnprintf("LOG_RET_TO(0x%x);", i + 4));
                     rewritten = "";
+                    nolabel = true;
                 }
             }
             ppu_dasm<DasmMode::Print>(&instr, i, &printed);
             std::string log = command.trace ? ssnprintf(" log(0x%x, TH); ", i) : "";
-            fn.body.push_back(ssnprintf("_0x%x:%s\t%s; // %s", i, log, rewritten, printed));
+            std::string label = nolabel ? "" : ssnprintf("_0x%x:", i);
+            fn.body.push_back(ssnprintf("%s%s\t%s; // %s", label, log, rewritten, printed));
         }
     }
     

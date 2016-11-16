@@ -6,6 +6,10 @@
 TEST_CASE("simple_printf") {
     auto output = startWaitGetOutput({"./binaries/simple_printf/a.elf"});
     REQUIRE( output == "some output\n" );
+    
+    REQUIRE( rewrite_and_compile("./binaries/simple_printf/a.elf") );
+    output = startWaitGetOutput({"./binaries/simple_printf/a.elf"}, {"--x86", "/tmp/x86.so"});
+    REQUIRE( output == "some output\n" );
 }
 
 TEST_CASE("bubblesort") {
@@ -306,6 +310,14 @@ TEST_CASE("ppu_threads_lwmutex_lwcond") {
         "test_lwmutex_recursive: 0; i: 4000\n"
         "test_lwcond: 5015; i: 0\n"
     );
+    
+    REQUIRE( rewrite_and_compile("./binaries/ppu_threads_lwmutex_lwcond/a.elf") );
+    output = startWaitGetOutput({"./binaries/ppu_threads_lwmutex_lwcond/a.elf"}, {"--x86", "/tmp/x86.so"});
+    REQUIRE( output == 
+        "test_lwmutex: 0; i: 4000\n"
+        "test_lwmutex_recursive: 0; i: 4000\n"
+        "test_lwcond: 5015; i: 0\n"
+    );
 }
 
 TEST_CASE("ppu_threads_mutex_cond") {
@@ -400,6 +412,17 @@ TEST_CASE("ppu_fios") {
 
 TEST_CASE("ppu_hash") {
     auto output = startWaitGetOutput({"./binaries/ppu_hash/a.elf"});
+    REQUIRE( output == 
+        "md5 0 b1a49029323448bf6407b94ad6f6f2cf\n"
+        "sha1 0 6eb89053fa6048876d0210e5524b55752908af55\n"
+        "sha224 0 2d47a0c20145d4ee365abd1de270b9b8747f7574c664f5db8179d86b\n"
+        "sha256 0 3b3b7c0e64a7030bb6b36b9eb8afa279818f75bb4f962f89a3fd0df93d510c5f\n"
+        "sha384 0 48070f66c4a1dac55fc4c5a4a0db8677ae1f8ac13e473dd73bab525832d73999fc2fea7f83b95d2aab0c95fe41df11c4\n"
+        "sha512 0 9478b106b00d65f506d196006d59b59cf2ba38837abea1adc634cd89a583eac615f60102f482892906c3442b2e5d95dc04f63cf2b66cf9de62ae99a8b42639ef\n"
+    );
+    
+    REQUIRE( rewrite_and_compile("./binaries/ppu_hash/a.elf") );
+    output = startWaitGetOutput({"./binaries/ppu_hash/a.elf"}, {"--x86", "/tmp/x86.so"});
     REQUIRE( output == 
         "md5 0 b1a49029323448bf6407b94ad6f6f2cf\n"
         "sha1 0 6eb89053fa6048876d0210e5524b55752908af55\n"
