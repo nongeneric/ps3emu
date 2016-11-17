@@ -1884,3 +1884,20 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     step2 = true;
     th1.join();
 }
+
+TEST_CASE("ppu_memory_breakpoint") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    int called = 0;
+    mm.setMemory(0x10000, 0x11, 1000, true);
+    mm.memoryBreakHandler([&](auto va, auto size) {
+        called++;
+    });
+    mm.store8(0x10000, 0xff);
+    REQUIRE(called == 0);
+    mm.memoryBreak(0x10000, 100);
+    mm.store8(0x10000, 0xff);
+    REQUIRE(called == 1);
+    mm.store8(0x10000, 0xff);
+    REQUIRE(called == 1);
+}

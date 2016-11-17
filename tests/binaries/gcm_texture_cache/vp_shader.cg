@@ -1,0 +1,31 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 400.001 */
+/*   Copyright (C) 2007 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+struct a2vConnector
+{
+    float4 objCoord;
+    float4 color;
+    float4 tex;
+};
+
+struct v2fConnector
+{
+    float4 projCoord : POSITION;
+    float4 color     : COLOR0;
+    float4 tex       : TEX0;
+};
+
+v2fConnector main
+(
+    a2vConnector a2v,
+    uniform float4x4 modelViewProj
+)
+{
+    v2fConnector v2f;
+    v2f.projCoord = mul(modelViewProj, a2v.objCoord);
+    v2f.color     = a2v.color; 
+    v2f.tex       = a2v.tex; 
+    return v2f;
+}

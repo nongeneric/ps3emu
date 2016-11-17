@@ -190,9 +190,15 @@ DEFINE_LOAD_X(64)
         if (writeSpecialMemory(va, &reversed, x / 8)) \
             return; \
         VirtualAddress split { va }; \
-        auto& page = _pages[split.page.u()]; \
+        auto pageIndex = split.page.u(); \
+        auto& page = _pages[pageIndex]; \
         auto offset = split.offset.u(); \
-        auto ptr = (page.ptr & PagePtrMask) + offset; \
+        auto ptr = page.ptr.fetch_and(PagePtrMask); \
+        if (ptr & 1) { \
+            _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize, \
+                                DefaultMainMemoryPageSize); \
+        } \
+        ptr = (ptr & PagePtrMask) + offset; \
         boost::unique_lock<SpinLock> lock(_storeLock); \
         *(uint##x##_t*)ptr = reversed; \
         destroyReservationWithoutLocking(va, x / 8); \

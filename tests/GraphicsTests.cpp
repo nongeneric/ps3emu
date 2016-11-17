@@ -237,3 +237,11 @@ TEST_CASE("particle_simulator_01_ppu_particles") {
     runAndWait("./binaries/particle_simulator_01_ppu_particles/a.elf");
     compareLastFrame("./binaries/particle_simulator_01_ppu_particles/ps3frame1.png", 1);
 }
+
+TEST_CASE("gcm_texture_cache") {
+    runAndWait("./binaries/gcm_texture_cache/a.elf");
+    compareLastFrame("./binaries/gcm_texture_cache/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_texture_cache/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_texture_cache/ps3frame2.png", 2);
+}
+
