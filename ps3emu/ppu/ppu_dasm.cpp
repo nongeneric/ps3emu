@@ -1649,7 +1649,14 @@ PRINT(NCALL, NCallForm) {
     *result = format_u("ncall", i->idx.u());
 }
 
+#ifdef EMU_REWRITER
+#define SET_REWRITER_NCALL g_state.rewriter_ncall = true
+#else
+#define SET_REWRITER_NCALL g_state.rewriter_ncall = false
+#endif
+
 #define _NCALL(_idx) { \
+    SET_REWRITER_NCALL; \
     TH->ncall(_idx); \
 }
 EMU_REWRITE(NCALL, NCallForm, i->idx.u())

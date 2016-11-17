@@ -191,6 +191,14 @@ struct CallStub {
 
 void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
     INFO(libs) << ssnprintf("ps3call: %x", va);
+    
+    if (g_state.rewriter_ncall) {
+        setNIP(va);
+        vmenter(getLR());
+        then();
+        return;
+    }
+    
     _ps3calls.push({getNIP(), getLR(), then});
     
     uint32_t stubVa;
