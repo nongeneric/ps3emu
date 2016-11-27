@@ -7,6 +7,7 @@
 #include "ELFLoader.h"
 #include "ppu/CallbackThread.h"
 #include "state.h"
+#include "Config.h"
 
 #include "ppu/InterruptPPUThread.h"
 #include <GLFW/glfw3.h>
@@ -107,16 +108,8 @@ int32_t executeExportedFunction(uint32_t imageBase,
 }
 
 void Process::loadPrxStore() {
-    auto storePath = g_state.content->prxStore();
-    if (storePath.empty())
-        return;
-    for (auto f = directory_iterator(storePath); f != directory_iterator(); ++f) {
-        if (is_directory(*f))
-            continue;
-        if (extension(*f) != ".prx")
-            continue;
-        loadPrx(f->path().string());
-    }
+    path storePath = g_state.config->prxStorePath;
+    loadPrx((storePath / "sys" / "external" / "liblv2.sprx.elf").string());
 }
 
 int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
@@ -147,7 +140,11 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf->load(elfPath);
     _elf->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({_elf, index, va, size});
-    });
+    }, 0, g_state.config->x86Path);
+    if (!g_state.config->sysPrxInfos.empty()) {
+        assert(_segments.back().va + _segments.back().size <
+               g_state.config->sysPrxInfos.front().imageBase);
+    }
     _prxs.push_back(_elf);
     loadPrxStore();
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
@@ -177,15 +174,37 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threadIds.create(std::move(thread));
 }
 
+boost::optional<SysPrxInfo> getSysPrxInfo(std::string prxPath) {
+    auto& infos = g_state.config->sysPrxInfos;
+    auto it = std::find_if(begin(infos), end(infos), [&](auto& info) {
+        return info.name == path(prxPath).filename().string();
+    });
+    if (it == end(infos))
+        return {};
+    return *it;
+}
+
 uint32_t Process::loadPrx(std::string path) {
     auto prx = std::make_shared<ELFLoader>();
     _prxs.push_back(prx);
     prx->load(path);
-    assert(_segments.size());
-    auto imageBase = ::align(_segments.back().va + _segments.back().size, 1 << 10);
+    assert(!_segments.empty());
+    auto prxInfo = getSysPrxInfo(path);
+    uint32_t imageBase;
+    if (prxInfo) {
+        imageBase = prxInfo->imageBase;
+    } else {
+        auto& lastSegment = _segments.back();
+        uint32_t available = lastSegment.va + lastSegment.size;
+        if (!g_state.config->sysPrxInfos.empty()) {
+            auto& lastInfo = g_state.config->sysPrxInfos.back();
+            available = std::max(available, lastInfo.imageBase + lastInfo.size);
+        }
+        imageBase = ::align(available, 1 << 10);
+    }
     auto stolen = prx->map(_mainMemory.get(), [&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
-    }, imageBase);
+    }, imageBase, prxInfo && prxInfo->loadx86 ? path + ".x86.so" : "");
     std::copy(begin(stolen), end(stolen), std::back_inserter(_stolenInfos));
     for (auto p : _prxs) {
         p->link(_mainMemory.get(), _prxs);

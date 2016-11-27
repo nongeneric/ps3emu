@@ -1,4 +1,5 @@
 #include "ps3emu/utils.h"
+#include "ps3emu/RewriterUtils.h"
 #include "TestUtils.h"
 #include <catch.hpp>
 #include <boost/filesystem.hpp>
@@ -15,7 +16,7 @@ TEST_CASE("rewriter_simple") {
         "--ignored 1045c 104c8",
         output);
     REQUIRE(res);
-    res = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    res = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false, false});
     REQUIRE(res);
     
     output = startWaitGetOutput({"./binaries/rewriter_simple/a.elf"}, {"--x86", "/tmp/x86.so"});

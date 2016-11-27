@@ -188,7 +188,8 @@ public:
     void load(std::string filePath);
     std::vector<StolenFuncInfo> map(MainMemory* mm,
                                     make_segment_t makeSegment,
-                                    ps3_uintptr_t imageBase = 0);
+                                    ps3_uintptr_t imageBase,
+                                    std::string x86path);
     void link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
     std::string elfName();

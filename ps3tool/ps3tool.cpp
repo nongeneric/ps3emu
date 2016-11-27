@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <fstream>
 
 using namespace boost::program_options;
 
@@ -12,11 +13,11 @@ typedef boost::variant<ShaderDasmCommand,
                        RestoreElfCommand,
                        ReadPrxCommand,
                        ParseSpursTraceCommand,
-                       RewriteCommand>
+                       RewriteCommand,
+                       PrxStoreCommand>
     Command;
 
-Command ParseOptions(int argc, const char *argv[])
-{
+Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
     std::string commandName;
     global.add_options()
@@ -109,12 +110,15 @@ Command ParseOptions(int argc, const char *argv[])
         options_description desc("rewrite");
 
         std::vector<std::string> entries, ignored;
+        std::string entriesFile, imageBaseStr;
         
         desc.add_options()
             ("elf", value<std::string>(&command.elf)->required(), "elf file")
             ("cpp", value<std::string>(&command.cpp)->required(), "output cpp file")
             ("trace", bool_switch()->default_value(false), "enable trace")
             ("entries", value<std::vector<std::string>>(&entries)->multitoken(), "entry points")
+            ("entries-file", value<std::string>(&entriesFile), "entry points file")
+            ("image-base", value<std::string>(&imageBaseStr)->default_value("0"), "image base")
             ("ignored", value<std::vector<std::string>>(&ignored)->multitoken(), "ignored entry points");
         
         auto opts = collect_unrecognized(parsed.options, include_positional);
@@ -122,14 +126,47 @@ Command ParseOptions(int argc, const char *argv[])
         store(command_line_parser(opts).options(desc).run(), vm);
         notify(vm);
         command.trace = vm["trace"].as<bool>();
+        command.imageBase = std::stoi(imageBaseStr, 0, 16);
         
         for (auto str : entries) {
             command.entryPoints.push_back(std::stoi(str, 0, 16));
         }
         
+        if (!entriesFile.empty()) {
+            std::ifstream f(entriesFile);
+            assert(f.is_open());
+            std::string line;
+            while (std::getline(f, line)) {
+                command.entryPoints.push_back(std::stoi(line, 0, 16));
+            }
+        }
+        
         for (auto str : ignored) {
             command.ignoredEntryPoints.push_back(std::stoi(str, 0, 16));
         }
+        
+        return command;
+    } else if (commandName == "prx-store") {
+        PrxStoreCommand command;
+        options_description desc("prx-store");
+
+        std::vector<std::string> entries, ignored;
+        std::string entriesFile;
+        
+        desc.add_options()
+            ("map", bool_switch()->default_value(false), "update prx segment bases in ps3 config")
+            ("rewrite", bool_switch()->default_value(false), "rewrite prx binaries")
+            ("compile", bool_switch()->default_value(false), "compile rewritten binaries")
+            ;
+        
+        auto opts = collect_unrecognized(parsed.options, include_positional);
+        opts.erase(opts.begin());
+        store(command_line_parser(opts).options(desc).run(), vm);
+        notify(vm);
+        
+        command.map = vm["map"].as<bool>();
+        command.rewrite = vm["rewrite"].as<bool>();
+        command.compile = vm["compile"].as<bool>();
         
         return command;
     } else {
@@ -161,6 +198,10 @@ public:
     
     void operator()(RewriteCommand& command) const {
         HandleRewrite(command);
+    }
+    
+    void operator()(PrxStoreCommand& command) const {
+        HandlePrxStore(command);
     }
 };
 

@@ -20,6 +20,7 @@ set(SRC
     log.cpp
     state.cpp
     Config.cpp
+    RewriterUtils.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
     spu/SPUChannels.cpp

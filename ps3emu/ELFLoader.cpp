@@ -150,7 +150,8 @@ uint64_t emuBranch() {
 
 std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
                                            make_segment_t makeSegment,
-                                           ps3_uintptr_t imageBase) {
+                                           ps3_uintptr_t imageBase,
+                                           std::string x86path) {
     uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD && ph->p_type != PT_TLS)
@@ -180,14 +181,12 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         }
     }
     
-    static bool already = false;
-    auto path = g_state.config->x86Path;
-    if (!path.empty() && !already) {
-        if (boost::filesystem::exists(path)) {
-            auto handle = dlopen(path.c_str(), RTLD_NOW);
+    if (!x86path.empty()) {
+        if (boost::filesystem::exists(x86path)) {
+            auto handle = dlopen(x86path.c_str(), RTLD_NOW);
             if (handle) {
                 auto info = (RewrittenFunctions*)dlsym(handle, "info");
-                INFO(libs) << ssnprintf("loading %s with %d functions", path, info->len);
+                INFO(libs) << ssnprintf("loading %s with %d functions", x86path, info->len);
                 info->init();
                 auto fs = info->functions;
                 for (auto i = 0u; i < info->len; ++i) {
@@ -196,10 +195,9 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
                     encodeNCall(mm, fs[i].va, findex);
                 }
             } else {
-                WARNING(libs) << ssnprintf("could not load %s: %s", path, dlerror());
+                WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());
             }
         }
-        already = true;
     }
     
     if (!imageBase)

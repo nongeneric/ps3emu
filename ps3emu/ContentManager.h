@@ -51,6 +51,5 @@ public:
     std::string contentDir();
     std::string toHost(std::experimental::string_view path);
     std::string cacheDir();
-    std::string prxStore();
     std::vector<SFOEntry> sfo();
 };

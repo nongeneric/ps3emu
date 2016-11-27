@@ -52,7 +52,7 @@ emu_void_t cellSpursCreateTask2_proxy(uint32_t taskset,
     }
     std::string name = "NULL";
     if (attr && attr->name) {
-        readString(g_state.mm, attr->name, name);
+        //readString(g_state.mm, attr->name, name);
     }
     INFO(libs) << ssnprintf(
         "cellSpursCreateTask2_proxy(%x, %x, %x, %s, attr: %d, %x, %llx, \"%s\")",

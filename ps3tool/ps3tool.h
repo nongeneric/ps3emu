@@ -33,8 +33,15 @@ struct RewriteCommand {
     std::string elf;
     std::string cpp;
     bool trace;
+    uint32_t imageBase;
     std::vector<uint32_t> entryPoints;
     std::vector<uint32_t> ignoredEntryPoints;
+};
+
+struct PrxStoreCommand {
+    bool map;
+    bool rewrite;
+    bool compile;
 };
 
 void HandleUnsce(UnsceCommand const& command);
@@ -43,3 +50,4 @@ void HandleRestoreElf(RestoreElfCommand const& command);
 void HandleReadPrx(ReadPrxCommand const& command);
 void HandleParseSpursTrace(ParseSpursTraceCommand const& command);
 void HandleRewrite(RewriteCommand const& command);
+void HandlePrxStore(PrxStoreCommand const& command);

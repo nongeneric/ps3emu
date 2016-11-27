@@ -108,19 +108,19 @@ void HandleRewrite(RewriteCommand const& command) {
             vaBase = va;
             segmentSize = size;
         }
-    }, 0);
-    fdescr epDescr;
-    mm.readMemory(elf.entryPoint(), &epDescr, sizeof(fdescr));
+    }, command.imageBase, "");
     std::cout << ssnprintf("analyzing segment %x-%x\n", vaBase, vaBase + segmentSize);
     
     std::vector<FunctionInfo> functions;
     
     std::stack<uint32_t> eps;
     if (command.entryPoints.empty()) {
+        fdescr epDescr;
+        mm.readMemory(elf.entryPoint(), &epDescr, sizeof(fdescr));
         eps.push(epDescr.va);
     }
     for (auto ep : command.entryPoints) {
-        eps.push(ep);
+        eps.push(ep + command.imageBase);
     }
     std::set<uint32_t> visitedFunctions;
     for (auto ep : command.ignoredEntryPoints) {
@@ -197,7 +197,12 @@ void HandleRewrite(RewriteCommand const& command) {
             std::string rewritten, printed;
             big_uint32_t instr = mm.load32(i);
             auto info = analyze(instr, i);
-            ppu_dasm<DasmMode::Rewrite>(&instr, i, &rewritten);
+            try {
+                ppu_dasm<DasmMode::Rewrite>(&instr, i, &rewritten);
+            } catch (...) {
+                std::cout << ssnprintf("error disassembling instruction at %x\n", i);
+                continue;
+            }
             bool nolabel = false;
             if (info.targetVa) {
                 auto it = std::find_if(begin(functions), end(functions), [&](auto& f) {

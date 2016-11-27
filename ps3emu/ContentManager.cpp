@@ -1,5 +1,7 @@
 #include "ContentManager.h"
 
+#include "ps3emu/Config.h"
+#include "ps3emu/state.h"
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <assert.h>
@@ -58,10 +60,6 @@ std::string ContentManager::cacheDir() {
     return dir;
 }
 
-std::string ContentManager::prxStore() {
-    return std::getenv("PS3_PRX_STORE");
-}
-
 std::string ContentManager::toHost(std::experimental::string_view path) {
     const char* point;
     const char* relative;
@@ -78,7 +76,7 @@ std::string ContentManager::toHost(std::experimental::string_view path) {
         case MountPoint::Bluray: return absolute(approot / ".." / relative).string();
         case MountPoint::GameData: return absolute(approot / relative).string();
         case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
-        case MountPoint::DevFlash: return absolute(prxStore() / relative).string();
+        case MountPoint::DevFlash: return absolute(g_state.config->prxStorePath / relative).string();
         default: throw std::runtime_error("unknown mount point");
     }
 }
