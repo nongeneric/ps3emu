@@ -1234,7 +1234,7 @@ EMU(roth) {
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 8; ++i) {
         auto sh = rb.hw(i) & 0b1111;
-        rt.hw(i) = rol<16>((uint16_t)ra.hw(i), sh);
+        rt.hw(i) = rol<uint16_t>(ra.hw(i), sh);
     }
 }
 
@@ -1247,7 +1247,7 @@ EMU(rothi) {
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b1111;
     for (int i = 0; i < 8; ++i) {
-        rt.hw(i) = rol<16>((uint16_t)ra.hw(i), sh);
+        rt.hw(i) = rol<uint16_t>(ra.hw(i), sh);
     }
 }
 
@@ -1261,7 +1261,7 @@ EMU(rot) {
     auto& rt = th->r(i->RT);
     for (int i = 0; i < 4; ++i) {
         auto sh = (uint32_t)rb.w(i) & 0b11111;
-        rt.w(i) = rol<32>((uint32_t)ra.w(i), sh);
+        rt.w(i) = rol<uint32_t>(ra.w(i), sh);
     }
 }
 
@@ -1274,7 +1274,7 @@ EMU(roti) {
     auto& rt = th->r(i->RT);
     auto sh = i->I7.u() & 0b11111;
     for (int i = 0; i < 4; ++i) {
-        rt.w(i) = rol<32>((uint32_t)ra.w(i), sh);
+        rt.w(i) = rol<uint32_t>(ra.w(i), sh);
     }
 }
 
@@ -1288,7 +1288,7 @@ EMU(rotqby) {
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b1111;
-    u128 = rol<128, uint128_t>(u128, sh * 8);
+    u128 = rol<uint128_t>(u128, sh * 8);
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
 }
@@ -1302,7 +1302,7 @@ EMU(rotqbyi) {
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b1111;
-    u128 = rol<128, uint128_t>(u128, sh * 8);
+    u128 = rol<uint128_t>(u128, sh * 8);
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
 }
@@ -1317,7 +1317,7 @@ EMU(rotqbybi) {
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = ((uint32_t)rb.w<0>() >> 3) & 0b11111;
-    u128 = rol<128, uint128_t>(u128, sh * 8);
+    u128 = rol<uint128_t>(u128, sh * 8);
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
 }
@@ -1332,7 +1332,7 @@ EMU(rotqbi) {
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = (uint32_t)rb.w<0>() & 0b111;
-    u128 = rol<128, uint128_t>(u128, sh);
+    u128 = rol<uint128_t>(u128, sh);
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
 }
@@ -1346,7 +1346,7 @@ EMU(rotqbii) {
     auto& rt = th->r(i->RT);
     auto u128 = make128(ra.dw<0>(), ra.dw<1>());
     auto sh = i->I7.u() & 0b111;
-    u128 = rol<128, uint128_t>(u128, sh);
+    u128 = rol<uint128_t>(u128, sh);
     rt.dw<0>() = u128 >> 64;
     rt.dw<1>() = u128;
 }

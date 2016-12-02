@@ -2,7 +2,7 @@
 #include "../ps3emu/BitField.h"
 #include <catch.hpp>
 
-TEST_CASE("common bitfield operations") {
+TEST_CASE("bitfield_common") {
     BitField<0, 32> word;
     auto ptr = reinterpret_cast<uint32_t*>(&word);
     *ptr = 0;

@@ -902,7 +902,8 @@ TEST_CASE("lis r9,22616") {
     REQUIRE( th.getGPR(9) == 0x58580000 );
 }
 
-TEST_CASE("sradi r0,r1,3") {
+TEST_CASE("sradi_1") {
+    // sradi r0,r1,3
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
@@ -927,7 +928,8 @@ TEST_CASE("sradi r0,r1,3") {
     REQUIRE( th.getCA() == 0);
 }
 
-TEST_CASE("sradi r0,r1,0") {
+TEST_CASE("sradi_2") {
+    // sradi r0,r1,0
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
@@ -1472,8 +1474,8 @@ TEST_CASE("shifts") {
 }
 
 TEST_CASE("rolls") {
-    REQUIRE( rol<64>(0x8000000000000001ull, 1) == 3 );
-    REQUIRE( rol<32>(0x40000001, 2) == 5 );
+    REQUIRE( rol<uint64_t>(0x8000000000000001ull, 1) == 3 );
+    REQUIRE( rol<uint32_t>(0x40000001, 2) == 5 );
 }
 
 TEST_CASE("fixed mulls") {

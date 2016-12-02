@@ -47,7 +47,7 @@ class BitField {
     static_assert(Next > Pos, "bad range");
     uint32_t _v;
     uint32_t v() const {
-        return (_v >> (32 - Next)) & ~(~0ull << (Next - Pos));
+        return __builtin_ia32_bextr_u32(_v, ((Next - Pos) << 8) | (32 - Next));
     }
 public:
     static constexpr int P = Pos;
@@ -127,32 +127,17 @@ inline int32_t signed_rshift32(int32_t v, int n) {
 }
 
 inline unsigned count_ones32(uint32_t x) {
-    x -= ((x >> 1) & 0x55555555);
-    x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
-    x = (((x >> 4) + x) & 0x0f0f0f0f);
-    x += (x >> 8);
-    x += (x >> 16);
-    return x & 0x0000003f;
+    return __builtin_popcount(x);
 }
 
-template <int Size, typename T>
-inline T rol(T n, unsigned sh) {
-    if (sh == 0 || sh == Size)
-        return n;
-    sh %= Size;
-    auto right = n & mask<Size, T>(sh, Size - 1);
-    auto left = n & mask<Size, T>(0, sh);
-    left >>= Size - sh;
-    right <<= sh;
-    return left | right;
+template <typename T>
+inline T rol(T x, unsigned n) {
+    if (n == 0 || n == sizeof(T) * 8)
+        return x;
+    return (x << n) | (x >> (sizeof(T) * 8 - n));
 }
 
-template <int Size>
-inline uint64_t rol(uint64_t n, unsigned sh) {
-    return rol<Size, uint64_t>(n, sh);
-}
-
-template <int Size>
-inline uint64_t ror(uint64_t n, unsigned sh) {
-    return rol<Size, uint64_t>(n, Size - sh);
+template <typename T>
+inline T ror(T x, unsigned n) {
+    return rol<T>(x, sizeof(T) * 8 - n);
 }

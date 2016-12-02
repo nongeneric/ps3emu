@@ -5,6 +5,7 @@
 #include "ps3emu/utils.h"
 
 #include <boost/endian/arithmetic.hpp>
+#include <boost/filesystem.hpp>
 #include <iostream>
 #include <stack>
 #include <set>
@@ -14,6 +15,7 @@
 #include <assert.h>
 
 using namespace boost::endian;
+using namespace boost::filesystem;
 
 auto header =
 R"(#define EMU_REWRITER
@@ -109,7 +111,11 @@ void HandleRewrite(RewriteCommand const& command) {
             segmentSize = size;
         }
     }, command.imageBase, "");
-    std::cout << ssnprintf("analyzing segment %x-%x\n", vaBase, vaBase + segmentSize);
+    
+    std::ofstream log("/tmp/" + path(command.elf).filename().string() + "_rewriter_log");
+    assert(log.is_open());
+    
+    log << ssnprintf("analyzing segment %x-%x\n", vaBase, vaBase + segmentSize);
     
     std::vector<FunctionInfo> functions;
     
@@ -135,7 +141,7 @@ void HandleRewrite(RewriteCommand const& command) {
             continue;
         visitedFunctions.insert(ep);
         
-        std::cout << ssnprintf("following an entry point %x\n", ep);
+        log << ssnprintf("following an entry point %x(%x)\n", ep, ep - command.imageBase);
         std::set<uint32_t> visited;
         std::stack<uint32_t> leads;
         leads.push(ep);
@@ -143,7 +149,7 @@ void HandleRewrite(RewriteCommand const& command) {
         while (!leads.empty()) {
             auto cia = leads.top();
             leads.pop();
-            std::cout << ssnprintf("following a lead %x\n", cia);
+            log << ssnprintf("following a lead %x(%x)\n", cia, cia - command.imageBase);
             
             for (;;) {
                 if (visited.find(cia) != end(visited))
@@ -152,10 +158,18 @@ void HandleRewrite(RewriteCommand const& command) {
                 auto info = analyze(mm.load32(cia), cia);
                 if (info.targetVa) {
                     if (info.isFunctionCall) {
-                        std::cout << ssnprintf("function call %x -> %x\n", cia, info.targetVa);
+                        log << ssnprintf("function call %x(%x) -> %x(%x)\n",
+                                         cia,
+                                         cia - command.imageBase,
+                                         info.targetVa,
+                                         info.targetVa - command.imageBase);
                         eps.push(info.targetVa);
                     } else {
-                        std::cout << ssnprintf("new lead %x -> %x\n", cia, info.targetVa);
+                        log << ssnprintf("new lead %x(%x) -> %x(%x)\n",
+                                         cia,
+                                         cia - command.imageBase,
+                                         info.targetVa,
+                                         info.targetVa - command.imageBase);
                         leads.push(info.targetVa);
                     }
                 }
@@ -174,7 +188,7 @@ void HandleRewrite(RewriteCommand const& command) {
             info.map.at((i - info.start) / 4) = visited.find(i) != end(visited);
         }
         functions.push_back(info);
-        std::cout << ssnprintf("function discovered %x-%x\n", ep, ep + functions.back().len);
+        log << ssnprintf("function discovered %x-%x\n", ep, ep + functions.back().len);
     }
     
     for (auto& fn : functions) {
@@ -200,7 +214,9 @@ void HandleRewrite(RewriteCommand const& command) {
             try {
                 ppu_dasm<DasmMode::Rewrite>(&instr, i, &rewritten);
             } catch (...) {
-                std::cout << ssnprintf("error disassembling instruction at %x\n", i);
+                auto file = path(command.elf).filename().string();
+                auto rva = i - command.imageBase;
+                std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
                 continue;
             }
             bool nolabel = false;

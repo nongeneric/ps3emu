@@ -36,12 +36,14 @@ set(CMAKE_CXX_FLAGS "-Wno-format-security ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-missing-braces ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
 
+set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native ${CMAKE_CXX_FLAGS}")
+
 add_definitions(-DDEBUG)
 add_definitions(-DTESTS)
-set(CMAKE_CXX_FLAGS "-ggdb3 -O0 -Wall -Werror ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-ggdb3 -O0 ${CMAKE_CXX_FLAGS}")
 
 #add_definitions(-DNDEBUG)
-#set(CMAKE_CXX_FLAGS "-O3 -march=native -Wall -Werror ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS}")
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})

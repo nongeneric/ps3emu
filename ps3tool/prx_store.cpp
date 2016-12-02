@@ -12,6 +12,7 @@
 #include <boost/algorithm/string.hpp>
 #include <vector>
 #include <algorithm>
+#include <fstream>
 
 using namespace boost::filesystem;
 using namespace boost::endian;
@@ -111,6 +112,16 @@ void rewritePrxStore() {
             for (auto i = 0; i < e.functions; ++i) {
                 auto descr = reinterpret_cast<fdescr*>(&elf[pheader->p_offset + stubs[i]]);
                 rewrite.entryPoints.push_back(descr->va);
+            }
+        }
+        
+        auto funcList = prxPath.string() + ".entries";
+        if (exists(funcList)) {
+            std::ifstream f(funcList);
+            assert(f.is_open());
+            std::string line;
+            while (std::getline(f, line)) {
+                rewrite.entryPoints.push_back(std::stoi(line, 0, 16));
             }
         }
         

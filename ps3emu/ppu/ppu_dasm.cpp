@@ -1428,7 +1428,7 @@ PRINT(RLDICL, MDForm_1) {
 #define _RLDICL(nbe_sh, nbe_mb, _rs, _ra, _rc) { \
     auto n = nbe_sh; \
     auto b = nbe_mb; \
-    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto r = rol<uint64_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(b, 63); \
     auto res = r & m; \
     TH->setGPR(_ra, res); \
@@ -1455,7 +1455,7 @@ PRINT(RLDICR, MDForm_2) {
 #define _RLDICR(nbe_sh, nbe_me, _rs, _ra, _rc) { \
     auto n = nbe_sh; \
     auto e = nbe_me; \
-    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto r = rol<uint64_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(0, e); \
     auto res = r & m; \
     TH->setGPR(_ra, res); \
@@ -1478,7 +1478,7 @@ PRINT(RLDIMI, MDForm_1) {
 #define _RLDIMI(nbe_sh, nbe_mb, _rs, _ra, _rc) { \
     auto n = nbe_sh; \
     auto b = nbe_mb; \
-    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto r = rol<uint64_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(b, ~n & 63); \
     auto res = (r & m) | (TH->getGPR(_ra) & (~m)); \
     TH->setGPR(_ra, res); \
@@ -1498,7 +1498,7 @@ PRINT(RLDCL, MDSForm_1) {
 
 #define _RLDCL(_rb, _rs, _mb, _ra, _rc) { \
     auto n = TH->getGPR(_rb) & 127; \
-    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto r = rol<uint64_t>(TH->getGPR(_rs), n); \
     auto b = _mb; \
     auto m = mask<64>(b, 63); \
     auto res = r & m; \
@@ -1515,7 +1515,7 @@ PRINT(RLDCR, MDSForm_2) {
 
 #define _RLDCR(_rb, _rs, _me, _ra, _rc) { \
     auto n = TH->getGPR(_rb) & 127; \
-    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto r = rol<uint64_t>(TH->getGPR(_rs), n); \
     auto e = _me; \
     auto m = mask<64>(0, e); \
     auto res = r & m; \
@@ -1539,7 +1539,7 @@ PRINT(RLDIC, MDForm_1) {
 #define _RLDIC(nbe_sh, nbe_mb, _rs, _ra, _rc) { \
     auto n = nbe_sh; \
     auto b = nbe_mb; \
-    auto r = rol<64>(TH->getGPR(_rs), n); \
+    auto r = rol<uint64_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(b, ~n & 63); \
     auto res = r & m; \
     TH->setGPR(_ra, res); \
@@ -1580,7 +1580,7 @@ PRINT(RLWINM, MForm_2) {
 
 #define _RLWINM(_shu, _rs, _mb, _me, _ra, _rc) { \
     auto n = _shu; \
-    auto r = rol<32>(TH->getGPR(_rs), n); \
+    auto r = rol<uint32_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(_mb + 32, _me + 32); \
     auto res = r & m; \
     TH->setGPR(_ra, res); \
@@ -1600,7 +1600,7 @@ PRINT(RLWNM, MForm_1) {
 
 #define _RLWNM(_rb, _rs, _mb, _me, _ra, _rc) { \
     auto n = TH->getGPR(_rb) & 31; \
-    auto r = rol<32>(TH->getGPR(_rs), n); \
+    auto r = rol<uint32_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(_mb + 32, _me + 32); \
     auto res = r & m; \
     TH->setGPR(_ra, res); \
@@ -1625,7 +1625,7 @@ PRINT(RLWIMI, MForm_2) {
 
 #define _RLWIMI(_shu, _rs, _mb, _me, _ra, _rc) { \
     auto n = _shu; \
-    auto r = rol<32>(TH->getGPR(_rs), n); \
+    auto r = rol<uint32_t>(TH->getGPR(_rs), n); \
     auto m = mask<64>(_mb + 32, _me + 32); \
     auto res = (r & m) | (TH->getGPR(_ra) & ~m); \
     TH->setGPR(_ra, res); \
@@ -1827,7 +1827,7 @@ PRINT(SRADI, XSForm) {
 #define _SRADI(nbe_sh, _rs, _ra, _rc) { \
     auto n =  nbe_sh; \
     auto rs = TH->getGPR(_rs); \
-    auto r = rol<64>(rs, 64 - n); \
+    auto r = rol<uint64_t>(rs, 64 - n); \
     auto m = mask<64>(n, 63); \
     auto s = bit_test(rs, 64, 0); \
     auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
@@ -1847,7 +1847,7 @@ PRINT(SRAWI, XForm_10) {
 #define _SRAWI(_shu, _rs, _ra, _rc) { \
     auto n =  _shu; \
     auto rs = TH->getGPR(_rs) & 0xffffffff; \
-    auto r = rol<32>(rs, 64 - n); \
+    uint64_t r = rol<uint32_t>(rs, 64 - n); \
     auto m = mask<64>(n + 32, 63); \
     auto s = bit_test(rs, 64, 32); \
     auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
@@ -1868,7 +1868,7 @@ PRINT(SRAW, XForm_6) {
     auto rb = TH->getGPR(_rb); \
     auto n = rb & 0b11111; \
     auto rs = TH->getGPR(_rs) & 0xffffffff; \
-    auto r = rol<32>(rs, 64 - n); \
+    auto r = rol<uint32_t>(rs, 64 - n); \
     uint64_t m = (rb & 0b100000) == 0 ? mask<64>(n + 32, 63) : 0; \
     auto s = bit_test(rs, 64, 32); \
     auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
