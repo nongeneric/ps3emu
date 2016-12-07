@@ -32,7 +32,6 @@ struct ParseSpursTraceCommand {
 struct RewriteCommand {
     std::string elf;
     std::string cpp;
-    bool trace;
     uint32_t imageBase;
     std::vector<uint32_t> entryPoints;
     std::vector<uint32_t> ignoredEntryPoints;

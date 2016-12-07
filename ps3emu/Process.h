@@ -149,6 +149,7 @@ class Process {
     std::vector<StolenFuncInfo> _stolenInfos;
     bool _processFinished = false;
     bool _callbackThreadFinished = false;
+    RewriterStore _rewriterStore;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
     void initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     void initNewThread(PPUThread* thread,
@@ -195,6 +196,10 @@ public:
     std::vector<std::shared_ptr<ELFLoader>> loadedModules();
     StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
     void dbgPause(bool pause);
+    
+    inline void bbcall(unsigned index, unsigned label) {
+        _rewriterStore.invoke(index, label);
+    }
 };
 
 int32_t executeExportedFunction(uint32_t imageBase,

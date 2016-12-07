@@ -29,8 +29,8 @@ struct PPUInstructionInfo {
     bool isConditionalBranch = false;
     bool isAlwaysTaken = false;
     bool isBCLR = false;
-    bool isBLR = false;
     bool isBCCTR = false;
+    bool isNCALL = false;
     uint32_t targetVa = 0;
 };
 

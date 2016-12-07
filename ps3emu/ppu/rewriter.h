@@ -5,14 +5,14 @@
 
 class PPUThread;
 
-struct RewrittenFunction {
-    const char* name;
+struct RewrittenBlock {
     uint32_t va;
-    void (*ptr)(PPUThread*);
+    uint32_t len;
 };
 
-struct RewrittenFunctions {
-    RewrittenFunction* functions;
-    unsigned len;
+struct RewrittenBlocks {
+    void (*entryPoint)(PPUThread*, int);
+    RewrittenBlock* blocks;
+    unsigned count;
     std::function<void()> init;
 };

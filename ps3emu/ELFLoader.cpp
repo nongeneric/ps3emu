@@ -1,5 +1,6 @@
 #include "ELFLoader.h"
 #include "ppu/PPUThread.h"
+#include "ppu/ppu_dasm_forms.h"
 #include "utils.h"
 #include <assert.h>
 #include <stdio.h>
@@ -148,10 +149,10 @@ uint64_t emuBranch() {
     return g_state.th->getGPR(3);
 }
 
-std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
-                                           make_segment_t makeSegment,
+std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                                            ps3_uintptr_t imageBase,
-                                           std::string x86path) {
+                                           std::string x86path,
+                                           RewriterStore* store) {
     uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD && ph->p_type != PT_TLS)
@@ -173,8 +174,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
             (uint64_t)ph->p_filesz, va, va + ph->p_memsz, imageBase);
         
         assert(ph->p_memsz >= ph->p_filesz);
-        mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
-        mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
+        g_state.mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
+        g_state.mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
         
         if (ph->p_type != PT_TLS) {
             makeSegment(va, ph->p_memsz, index);
@@ -185,14 +186,17 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         if (boost::filesystem::exists(x86path)) {
             auto handle = dlopen(x86path.c_str(), RTLD_NOW);
             if (handle) {
-                auto info = (RewrittenFunctions*)dlsym(handle, "info");
-                INFO(libs) << ssnprintf("loading %s with %d functions", x86path, info->len);
+                auto info = (RewrittenBlocks*)dlsym(handle, "info");
+                auto index = store->add(info);
+                INFO(libs) << ssnprintf("loading %s with %d blocks", x86path, info->count);
                 info->init();
-                auto fs = info->functions;
-                for (auto i = 0u; i < info->len; ++i) {
-                    NCallEntry entry{fs[i].name, 0, fs[i].ptr};
-                    auto findex = addNCallEntry(entry);
-                    encodeNCall(mm, fs[i].va, findex);
+                auto blocks = info->blocks;
+                for (auto i = 0u; i < info->count; ++i) {
+                    BBCallForm instr { 0 };
+                    instr.OPCD.set(2);
+                    instr.So.set(index);
+                    instr.Label.set(i);
+                    g_state.mm->store32(blocks[i].va, instr.val);
                 }
             } else {
                 WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());
@@ -208,7 +212,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
     auto lo = [](uint32_t x) { return x & 0xffff; };
     auto hi = [](uint32_t x) { return (x >> 16) & 0xffff; };
     auto ha = [](uint32_t x) { return ((x >> 16) + ((x & 0x8000) ? 1 : 0)) & 0xffff; };
-    
+        
     auto rel = (Elf64_be_Rela*)&_file[_pheaders[2].p_offset];
     auto endRel = rel + _pheaders[2].p_filesz / sizeof(Elf64_be_Rela);
     for (; rel != endRel; ++rel) {
@@ -225,19 +229,19 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         auto base = pointsToSegment ? prxPh1Va : imageBase;
         auto val = rel->r_addend + base;
         if (type == R_PPC64_ADDR32) {
-            mm->store32(offset, val);
+            g_state.mm->store32(offset, val);
         } else if (type == R_PPC64_ADDR16_LO) {
-            mm->store16(offset, lo(val));
+            g_state.mm->store16(offset, lo(val));
         } else if (type == R_PPC64_ADDR16_HI) {
-            mm->store16(offset, hi(val));
+            g_state.mm->store16(offset, hi(val));
         } else if (type == R_PPC64_ADDR16_HA) {
-            mm->store16(offset, ha(val));
+            g_state.mm->store16(offset, ha(val));
         } else {
             throw std::runtime_error("unimplemented reloc type");
         }
     }
     
-    _module = (module_info_t*)mm->getMemoryPointer(
+    _module = (module_info_t*)g_state.mm->getMemoryPointer(
         _pheaders->p_paddr - _pheaders->p_offset + imageBase, sizeof(module_info_t));
     
     std::vector<Replacement> replacements = {
@@ -262,11 +266,11 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         auto stub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
         if (stub == 0)
             continue;
-        auto codeVa = mm->load32(stub);
+        auto codeVa = g_state.mm->load32(stub);
         uint32_t index;
         findNCallEntry(fnid, index, true);
-        stolenInfos.push_back({codeVa, stub, mm->load32(codeVa), index});
-        encodeNCall(mm, codeVa, index);
+        stolenInfos.push_back({codeVa, stub, g_state.mm->load32(codeVa), index});
+        encodeNCall(g_state.mm, codeVa, index);
     }
     
     std::vector<Replacement> proxies = {
@@ -290,7 +294,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         auto exportStub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
         if (exportStub == 0)
             continue;
-        auto codeVa = mm->load32(exportStub);
+        auto codeVa = g_state.mm->load32(exportStub);
         
         uint32_t enterIndex, exitIndex, branchIndex, index;
         findNCallEntry(calcFnid("emuProxyEnter"), enterIndex, true);
@@ -300,14 +304,14 @@ std::vector<StolenFuncInfo> ELFLoader::map(MainMemory* mm,
         
         uint32_t stubVa;
         g_state.memalloc->internalAlloc<4, ProxyStub>(&stubVa);
-        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
-        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall), index);
-        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
-        g_state.mm->store32(stubVa + offsetof(ProxyStub, stolen1), mm->load32(codeVa));
-        encodeNCall(mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
+        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
+        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall), index);
+        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
+        g_state.mm->store32(stubVa + offsetof(ProxyStub, stolen1), g_state.mm->load32(codeVa));
+        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
         branchMap[stubVa + offsetof(ProxyStub, ncall_abs_branch)] = codeVa + 4;
         
-        encodeNCall(mm, codeVa, branchIndex);
+        encodeNCall(g_state.mm, codeVa, branchIndex);
         branchMap[codeVa] = stubVa + offsetof(ProxyStub, ncall_proxy_enter);
     }
     

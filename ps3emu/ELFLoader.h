@@ -1,6 +1,8 @@
 #pragma once
 
 #include "MainMemory.h"
+#include "ps3emu/ppu/rewriter.h"
+#include "ps3emu/state.h"
 #include <stdint.h>
 #include <elf.h>
 #include <string>
@@ -165,6 +167,20 @@ struct StolenFuncInfo {
     uintptr_t ncallIndex;
 };
 
+class RewriterStore {
+    std::vector<RewrittenBlocks> _modules;
+    
+public:
+    inline unsigned add(const RewrittenBlocks *blocks) {
+        _modules.push_back(*blocks);
+        return _modules.size() - 1;
+    }
+    
+    inline void invoke(unsigned index, unsigned label) {
+        _modules[index].entryPoint(g_state.th, label);
+    }
+};
+
 class ELFLoader {
     std::string _elfName;
     std::vector<uint8_t> _file;
@@ -186,10 +202,10 @@ public:
     Elf64_be_Sym* getGlobalSymbolByValue(uint32_t value, uint32_t section);
     uint32_t getSymbolValue(std::string name);
     void load(std::string filePath);
-    std::vector<StolenFuncInfo> map(MainMemory* mm,
-                                    make_segment_t makeSegment,
+    std::vector<StolenFuncInfo> map(make_segment_t makeSegment,
                                     ps3_uintptr_t imageBase,
-                                    std::string x86path);
+                                    std::string x86path,
+                                    RewriterStore* store);
     void link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);
     std::string elfName();

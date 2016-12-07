@@ -57,6 +57,7 @@ void mapPrxStore() {
         return l < r;
     });
     
+    RewriterStore rewriterStore;
     auto imageBase = 10 << 20;
     for (auto& prxPath : prxPaths) {
         auto& prxInfos = g_state.config->sysPrxInfos;
@@ -76,9 +77,9 @@ void mapPrxStore() {
         
         ELFLoader elf;
         elf.load(prxPath.string());
-        auto stolen = elf.map(g_state.mm, [&](auto va, auto size, auto) {
+        auto stolen = elf.map([&](auto va, auto size, auto) {
             imageBase = ::align(va + size, 1 << 10);
-        }, imageBase, "");
+        }, imageBase, "", &rewriterStore);
         
         info->size = imageBase - info->imageBase;
     }
@@ -125,9 +126,11 @@ void rewritePrxStore() {
             }
         }
         
+//         if (basename(prxPath) != "liblv2.sprx")
+//             continue;
+        
         rewrite.elf = prxPath.string();
         rewrite.cpp = prxPath.string() + ".cpp";
-        rewrite.trace = false;
         rewrite.imageBase = prxInfo.imageBase;        
         HandleRewrite(rewrite);
     }
@@ -142,9 +145,8 @@ void compilePrxStore() {
         CompileInfo info;
         info.so = prxPath.string() + ".x86.so";
         info.cpp = prxPath.string() + ".cpp";
-        info.debug = false;
-        info.trace = false;
-        info.log = false;
+        info.debug = prxInfo.x86trace;
+        info.trace = prxInfo.x86trace;
         std::cout << ssnprintf("compiling %s", prxInfo.name) << std::endl;
         compile(info);
     }

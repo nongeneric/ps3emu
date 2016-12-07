@@ -10,6 +10,7 @@ struct SysPrxInfo {
     bool loadx86;
     uint32_t imageBase;
     uint32_t size;
+    bool x86trace;
 };
 
 class Config {

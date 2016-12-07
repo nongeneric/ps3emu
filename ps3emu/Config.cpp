@@ -30,6 +30,7 @@ Config::Config() {
             if (!jsize.is_null()) {
                 info.size = std::stoi(jsize.get<std::string>(), 0, 16);
             }
+            info.x86trace = j["sysPrxInfos"][info.name]["x86trace"];
             sysPrxInfos.push_back(info);
         }
     }
@@ -41,6 +42,7 @@ void Config::save() {
         j["sysPrxInfos"][info.name]["imageBase"] = ssnprintf("%x", info.imageBase);
         j["sysPrxInfos"][info.name]["size"] = ssnprintf("%x", info.size);
         j["sysPrxInfos"][info.name]["loadx86"] = info.loadx86;
+        j["sysPrxInfos"][info.name]["x86trace"] = info.x86trace;
     }
     std::ofstream f(_configPath);
     f << j.dump(4);

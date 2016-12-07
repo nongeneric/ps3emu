@@ -531,3 +531,13 @@ TEST_CASE("ppu_dasm_1") {
     ppu_dasm<DasmMode::Print>(instr + 12, 0x205c8, &res);
     REQUIRE(res == "vmulosh v0,v0,v10");
 }
+
+TEST_CASE("analyze_1") {
+    auto info = analyze(0x4e800020, 0x12e3c);
+    REQUIRE(info.isAlwaysTaken);
+    REQUIRE(!info.isBCCTR);
+    REQUIRE(info.isBCLR);
+    REQUIRE(!info.isConditionalBranch);
+    REQUIRE(!info.isFunctionCall);
+    REQUIRE(info.targetVa == 0);
+}

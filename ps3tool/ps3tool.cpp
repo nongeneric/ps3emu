@@ -115,7 +115,6 @@ Command ParseOptions(int argc, const char *argv[]) {
         desc.add_options()
             ("elf", value<std::string>(&command.elf)->required(), "elf file")
             ("cpp", value<std::string>(&command.cpp)->required(), "output cpp file")
-            ("trace", bool_switch()->default_value(false), "enable trace")
             ("entries", value<std::vector<std::string>>(&entries)->multitoken(), "entry points")
             ("entries-file", value<std::string>(&entriesFile), "entry points file")
             ("image-base", value<std::string>(&imageBaseStr)->default_value("0"), "image base")
@@ -125,7 +124,6 @@ Command ParseOptions(int argc, const char *argv[]) {
         opts.erase(opts.begin());
         store(command_line_parser(opts).options(desc).run(), vm);
         notify(vm);
-        command.trace = vm["trace"].as<bool>();
         command.imageBase = std::stoi(imageBaseStr, 0, 16);
         
         for (auto str : entries) {

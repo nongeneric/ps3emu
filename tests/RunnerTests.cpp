@@ -2259,6 +2259,15 @@ TEST_CASE("l10n_convert_str") {
         "cellSysmoduleLoadModule() : 0\n"
         "l10n_convert_str: CODEPAGE_1251 0xe0 0xe1 0xe2 => UTF8 0xd0 0xb0 0xd0 0xb1 0xd0 0xb2\n"
     );
+    
+    REQUIRE( rewrite_and_compile("./binaries/l10n_convert_str/a.elf") );
+    output = startWaitGetOutput(
+        {"./binaries/l10n_convert_str/a.elf", "CODEPAGE_1251", "UTF8"},
+        {"--x86", "/tmp/x86.so"});
+    REQUIRE( output ==
+        "cellSysmoduleLoadModule() : 0\n"
+        "l10n_convert_str: CODEPAGE_1251 0xe0 0xe1 0xe2 => UTF8 0xd0 0xb0 0xd0 0xb1 0xd0 0xb2\n"
+    );
 }
 
 TEST_CASE("spu_dma_polling") {

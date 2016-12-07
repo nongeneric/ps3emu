@@ -37,9 +37,16 @@
 using namespace boost::endian;
 
 #ifdef EMU_REWRITER
+    #define RETURN_REWRITER_NCALL return
+    #define SET_REWRITER_NCALL g_state.rewriter_ncall = true
+    #define SET_NIP_INDIRECT(x) TH->setNIP(x & ~3ul); return;
+    #define SET_NIP(x) goto _##x
     #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul); LOG_RET(lr); return;
 #else
+    #define SET_REWRITER_NCALL g_state.rewriter_ncall = false
+    #define RETURN_REWRITER_NCALL
     #define SET_NIP(x) TH->setNIP(x)
+    #define SET_NIP_INDIRECT(x) SET_NIP(x)
     #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul)
 #endif
 
@@ -55,7 +62,7 @@ std::string printSorU(T v) {
     if (std::is_signed<T>::value) {
         return ssnprintf("%d", v);
     }
-    return ssnprintf("0x%x", v);
+    return ssnprintf("0x%xu", v);
 }
 
 inline std::string print_args(std::vector<std::string> vec) {
@@ -230,15 +237,15 @@ PRINT(BCCTR, XLForm_2) {
     }
 }
 
-#define _BCCTR(bo0, bo1, bi, lk) { \
+#define _BCCTR(bo0, bo1, bi, lk, cia) { \
     auto cond_ok = bo0 || bit_test(TH->getCR(), 32, bi) == bo1; \
     if (lk) \
         TH->setLR(cia + 4); \
     if (cond_ok) \
-        TH->setNIP(TH->getCTR() & ~3); \
+        SET_NIP_INDIRECT(TH->getCTR() & ~3); \
 }
 
-EMU_REWRITE(BCCTR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BI.u(), i->LK.u())
+EMU_REWRITE(BCCTR, XLForm_2, i->BO0.u(), i->BO1.u(), i->BI.u(), i->LK.u(), cia)
 
 // Condition Register AND, p28
 
@@ -1649,18 +1656,21 @@ PRINT(NCALL, NCallForm) {
     *result = format_u("ncall", i->idx.u());
 }
 
-#ifdef EMU_REWRITER
-#define SET_REWRITER_NCALL g_state.rewriter_ncall = true
-#else
-#define SET_REWRITER_NCALL g_state.rewriter_ncall = false
-#endif
-
 #define _NCALL(_idx) { \
     SET_REWRITER_NCALL; \
     TH->ncall(_idx); \
+    RETURN_REWRITER_NCALL; \
 }
 EMU_REWRITE(NCALL, NCallForm, i->idx.u())
 
+PRINT(BBCALL, BBCallForm) {
+    *result = format_nn("bbcall", i->So, i->Label);
+}
+
+#define _BBCALL(_so, _label) { \
+    assert(false); \
+}
+EMU_REWRITE(BBCALL, BBCallForm, i->So.u(), i->Label.u());
 
 inline int64_t get_cmp_ab(unsigned l, uint64_t value) {
     return l == 0 ? (int64_t)static_cast<int32_t>(value) : value;
@@ -3913,6 +3923,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
         case 1: invoke(NCALL);
+        case 2: invoke(BBCALL);
         case 4: {
             auto simd = reinterpret_cast<SIMDForm*>(&x);
             switch (simd->VA_XO.u()) {
@@ -4368,6 +4379,10 @@ PPUInstructionInfo analyze(uint32_t instr, uint32_t cia) {
     auto bform = reinterpret_cast<BForm*>(&instr);
     auto xlform1 = reinterpret_cast<XLForm_1*>(&instr);
     auto xlform2 = reinterpret_cast<XLForm_2*>(&instr);
+    if (iform->OPCD.u() == 1) { // ncall
+        info.isNCALL = true;
+        info.isAlwaysTaken = true;
+    }
     if (iform->OPCD.u() == 18) { // b
         info.isAlwaysTaken = true;
         info.targetVa = getNIA(iform, cia);

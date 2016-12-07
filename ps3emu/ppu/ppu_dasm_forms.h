@@ -25,10 +25,11 @@ using FRT_t = BitField<6, 11, BitFieldType::FPR>;
 using Rc_t = BitField<31, 32>;
 using FLM_t = BitField<7, 15>;
 using FLM_t = BitField<7, 15>;
+using OPCD_t = BitField<0, 6>;
 
 union IForm {
     uint32_t u32;
-    BitField<0, 6> OPCD;
+    OPCD_t OPCD;
     LI_t LI;
     BitField<30, 31> AA;
     BitField<31, 32> LK;
@@ -337,6 +338,13 @@ union SCForm {
 
 union NCallForm {
     BitField<6, 32> idx;
+};
+
+union BBCallForm {
+    uint32_t val;
+    OPCD_t OPCD;
+    BitField<6, 11> So;
+    BitField<11, 32> Label;
 };
 
 union XSForm {

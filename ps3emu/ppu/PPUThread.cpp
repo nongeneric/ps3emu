@@ -1,10 +1,15 @@
 #include "PPUThread.h"
-#include "../Process.h"
-#include "../MainMemory.h"
-#include "../InternalMemoryManager.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/InternalMemoryManager.h"
 #include "ppu_dasm.h"
-#include "../log.h"
-#include "../state.h"
+#include "ppu_dasm_forms.h"
+#include "ps3emu/log.h"
+#include "ps3emu/state.h"
+
+#include <boost/endian/conversion.hpp>
+
+using namespace boost::endian;
 
 #ifdef DEBUG
 #define dbgpause(value) _dbgPaused = value
@@ -62,11 +67,15 @@ void PPUThread::innerLoop() {
         
         uint32_t cia;
         try {
-            uint32_t instr;
             cia = getNIP();
-            g_state.mm->readMemory(cia, &instr, sizeof instr);
-            setNIP(cia + sizeof instr);
-            ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
+            auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
+            BBCallForm bbcall { instr };
+            if (bbcall.OPCD.u() == 2) {
+                g_state.proc->bbcall(bbcall.So.u(), bbcall.Label.u());
+            } else {
+                setNIP(cia + sizeof instr);
+                ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
+            }
         } catch (BreakpointException& e) {
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Breakpoint);
