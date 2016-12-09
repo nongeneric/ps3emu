@@ -52,6 +52,7 @@ include_directories(SYSTEM thirdparty/cereal/include)
 include_directories(SYSTEM ${FREETYPE2_INCLUDE_DIRS})
 
 add_subdirectory(ps3emu)
+add_subdirectory(ps3tool-core)
 add_subdirectory(dbg-gui)
 add_subdirectory(ps3run)
 add_subdirectory(ps3tool)

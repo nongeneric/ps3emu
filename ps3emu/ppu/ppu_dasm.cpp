@@ -4380,32 +4380,26 @@ PPUInstructionInfo analyze(uint32_t instr, uint32_t cia) {
     auto xlform1 = reinterpret_cast<XLForm_1*>(&instr);
     auto xlform2 = reinterpret_cast<XLForm_2*>(&instr);
     if (iform->OPCD.u() == 1) { // ncall
-        info.isNCALL = true;
-        info.isAlwaysTaken = true;
+        info.flow = true;
     }
     if (iform->OPCD.u() == 18) { // b
-        info.isAlwaysTaken = true;
-        info.targetVa = getNIA(iform, cia);
-        info.isFunctionCall = iform->LK.u();
+        info.flow = true;
+        info.target = getNIA(iform, cia);
+        info.passthrough = iform->LK.u();
     }
     if (iform->OPCD.u() == 16) { // bc
-        info.isAlwaysTaken = bform->BO2.u() && bform->BO0.u();
-        info.isConditionalBranch = !info.isAlwaysTaken;
-        info.targetVa = getNIA(bform, cia);
-        info.isFunctionCall = bform->LK.u();
+        info.flow = true;
+        info.passthrough = !(bform->BO2.u() && bform->BO0.u()) || bform->LK.u();
+        info.target = getNIA(bform, cia);
     }
     if (iform->OPCD.u() == 19) {
         if (xlform1->XO.u() == 16) {
-            info.isBCLR = true;
-            info.isFunctionCall = xlform2->LK.u();
-            info.isAlwaysTaken = xlform2->BO2.u() && xlform2->BO0.u();
-            info.isConditionalBranch = !info.isAlwaysTaken;
+            info.flow = true;
+            info.passthrough = !(xlform2->BO2.u() && xlform2->BO0.u()) || xlform2->LK.u();
         }
         if (xlform1->XO.u() == 528) {
-            info.isBCCTR = true;
-            info.isFunctionCall = xlform2->LK.u();
-            info.isAlwaysTaken = xlform2->BO0.u();
-            info.isConditionalBranch = !info.isAlwaysTaken;
+            info.flow = true;
+            info.passthrough = !xlform2->BO0.u() || xlform2->LK.u();
         }
     }
     return info;

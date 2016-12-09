@@ -3,6 +3,7 @@
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/utils.h"
+#include "ps3tool-core/Rewriter.h"
 
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
@@ -94,12 +95,6 @@ extern "C" {
 
 )";
 
-struct BasicBlock {
-    uint32_t start = 0;
-    uint32_t len = 0;
-    std::vector<std::string> body;
-};
-
 void HandleRewrite(RewriteCommand const& command) {
     ELFLoader elf;
     MainMemory mm;
@@ -132,67 +127,10 @@ void HandleRewrite(RewriteCommand const& command) {
         leads.push(ep + command.imageBase);
     }
     
-    std::set<uint32_t> allLeads;
-    std::set<uint32_t> breaks;
-
-    while (!leads.empty()) {
-        auto cia = leads.top();
-        leads.pop();
-        log << ssnprintf("analyzing basic block %x(%x)\n", cia, cia - command.imageBase);
-        if (allLeads.find(cia) != end(allLeads))
-            continue;
-        allLeads.insert(cia);
-        
-        for (;;) {
-            auto info = analyze(g_state.mm->load32(cia), cia);
-            auto logLead = [&] (uint32_t target) {
-                log << ssnprintf("new lead %x(%x) -> %x(%x)\n",
-                                 cia,
-                                 cia - command.imageBase,
-                                 target,
-                                 target - command.imageBase);
-            };
-            if (info.targetVa) {
-                leads.push(info.targetVa);
-                logLead(info.targetVa);
-            }
-            if (info.isBCCTR || info.isBCLR || info.isNCALL || info.isFunctionCall) {
-                if (!info.isAlwaysTaken) {
-                    leads.push(cia + 4);
-                    logLead(cia + 4);
-                }
-                breaks.insert(cia + 4);
-                log << ssnprintf("new break %x(%x)\n",
-                                 cia + 4,
-                                 cia + 4 - command.imageBase);
-                break;
-            }
-            cia += 4;
-        }
-    }
-   
-    boost::optional<BasicBlock> block;
-    std::vector<BasicBlock> blocks;
-    for (auto cia = vaBase; cia < vaBase + segmentSize; cia += 4) {
-        bool isLead = allLeads.find(cia) != end(allLeads);
-        bool isBreak = breaks.find(cia) != end(breaks);
-        
-        if (isLead || isBreak) {
-            if (block) {
-                blocks.push_back(*block);
-            }
-            if (isLead) {
-                block = BasicBlock();
-                block->start = cia;
-            } else {
-                block = boost::none;
-            }
-        }
-        
-        if (block) {
-            block->len += 4;
-        }
-    }
+    auto blocks = discoverBasicBlocks(
+        vaBase, segmentSize, command.imageBase, leads, log, [](uint32_t cia) {
+            return g_state.mm->load32(cia);
+        });
     
     for (auto& block : blocks) {
         for (auto cia = block.start; cia < block.start + block.len; cia += 4) {

@@ -20,4 +20,4 @@ set(SRC
 )
 
 add_executable(tests ${SRC})
-target_link_libraries(tests ps3emu Qt5::Core)
+target_link_libraries(tests ps3emu ps3tool-core Qt5::Core)

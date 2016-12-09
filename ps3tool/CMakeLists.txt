@@ -12,4 +12,4 @@ set(SRC
     ps3tool.cpp
 )
 add_executable(ps3tool ${SRC})
-target_link_libraries(ps3tool ps3emu ${Boost_LIBRARIES} z)
+target_link_libraries(ps3tool ps3emu ps3tool-core ${Boost_LIBRARIES} z)

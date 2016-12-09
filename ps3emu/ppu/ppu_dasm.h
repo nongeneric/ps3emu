@@ -25,13 +25,9 @@ enum class DasmMode {
 };
 
 struct PPUInstructionInfo {
-    bool isFunctionCall = false;
-    bool isConditionalBranch = false;
-    bool isAlwaysTaken = false;
-    bool isBCLR = false;
-    bool isBCCTR = false;
-    bool isNCALL = false;
-    uint32_t targetVa = 0;
+    bool flow = false;
+    bool passthrough = false;
+    uint32_t target = 0;
 };
 
 PPUInstructionInfo analyze(uint32_t instr, uint32_t cia);
