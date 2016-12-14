@@ -1,5 +1,5 @@
 #include <catch.hpp>
-#include "ps3emu/rsx/TextureCache.h"
+//#include "ps3emu/rsx/TextureCache.h"
 
 struct TestTextureInfo {
     uint32_t format;

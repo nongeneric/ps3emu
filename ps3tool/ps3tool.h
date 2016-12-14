@@ -43,6 +43,10 @@ struct PrxStoreCommand {
     bool compile;
 };
 
+struct RsxDasmCommand {
+    std::string bin;
+};
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
@@ -50,3 +54,4 @@ void HandleReadPrx(ReadPrxCommand const& command);
 void HandleParseSpursTrace(ParseSpursTraceCommand const& command);
 void HandleRewrite(RewriteCommand const& command);
 void HandlePrxStore(PrxStoreCommand const& command);
+void HandleRsxDasm(RsxDasmCommand const& command);

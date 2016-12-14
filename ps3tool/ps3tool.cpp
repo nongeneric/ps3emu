@@ -14,7 +14,8 @@ typedef boost::variant<ShaderDasmCommand,
                        ReadPrxCommand,
                        ParseSpursTraceCommand,
                        RewriteCommand,
-                       PrxStoreCommand>
+                       PrxStoreCommand,
+                       RsxDasmCommand>
     Command;
 
 Command ParseOptions(int argc, const char *argv[]) {
@@ -167,6 +168,22 @@ Command ParseOptions(int argc, const char *argv[]) {
         command.compile = vm["compile"].as<bool>();
         
         return command;
+    } else if (commandName == "rsx-dasm") {
+        RsxDasmCommand command;
+        options_description desc("rsx-dasm");
+
+        std::string binFile;
+        
+        desc.add_options()
+            ("bin", value<std::string>(&command.bin)->required(), "bin file")
+            ;
+        
+        auto opts = collect_unrecognized(parsed.options, include_positional);
+        opts.erase(opts.begin());
+        store(command_line_parser(opts).options(desc).run(), vm);
+        notify(vm);
+        
+        return command;
     } else {
         throw std::runtime_error("unknown command");
     }
@@ -200,6 +217,10 @@ public:
     
     void operator()(PrxStoreCommand& command) const {
         HandlePrxStore(command);
+    }
+    
+    void operator()(RsxDasmCommand& command) const {
+        HandleRsxDasm(command);
     }
 };
 

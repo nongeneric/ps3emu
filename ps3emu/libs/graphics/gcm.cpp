@@ -98,7 +98,6 @@ struct OffsetTable {
             eaAddress[io + i] = 0xffff;
         }
         count = 0;
-        g_state.rsx->updateOffsetTableForReplay();
     }
     
     void unmapOffset(uint32_t offset) {
@@ -118,7 +117,6 @@ struct OffsetTable {
             ioIndex++;
             eaIndex++;
         }
-        g_state.rsx->updateOffsetTableForReplay();
     }
 };
 
@@ -249,16 +247,17 @@ emu_void_t cellGcmResetFlipStatus(Process* proc) {
 void setFlipCommand(uint32_t contextEa, uint32_t label, uint32_t labelValue, uint32_t buffer) {
     auto context = (TargetCellGcmContextData*)g_state.mm->getMemoryPointer(
         contextEa, sizeof(TargetCellGcmContextData));
-    if (context->end - context->current <= 16) {
+    if (context->end - context->current <= 20) {
         ERROR(rsx) << "not enough space for EmuFlip in the buffer";
         exit(1);
     }
-    uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
+    uint32_t header = (4 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
     g_state.mm->store32(context->current, header);
     g_state.mm->store32(context->current + 4, buffer);
     g_state.mm->store32(context->current + 8, label);
     g_state.mm->store32(context->current + 12, labelValue);
-    context->current += 4 * sizeof(uint32_t);
+    g_state.mm->store32(context->current + 16, 2); // CALL 0
+    context->current += 5 * sizeof(uint32_t);
 }
 
 emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer) {

@@ -129,6 +129,7 @@ void MainWindow::setupMenu() {
     }
     {
         auto action = new QAction("Capture Frames", this);
+        action->setShortcut(QKeySequence(Qt::Key_F12));
         connect(action, &QAction::triggered, this, [=]() { _model.captureFrames(); });
         trace->addAction(action);
     }

@@ -124,12 +124,10 @@
     X(setSurfaceColorLocation) \
     X(setDisplayBuffer) \
     X(waitForIdle) \
-    X(addTextureToCache) \
     X(updateOffsetTableForReplay) \
     X(EmuFlip) \
     X(StopReplay) \
     X(UpdateBufferCache) \
-    X(UpdateTextureCache) \
     X(PolySmoothEnable) \
     X(PolyOffsetLineEnable) \
     X(PolyOffsetFillEnable) \

@@ -1,10 +1,11 @@
 #pragma once
 
-#include "../libs/graphics/graphics.h"
-#include "../constants.h"
-#include "../libs/graphics/gcm.h"
-#include "../libs/ConcurrentQueue.h"
-#include "../gcmviz/GcmDatabase.h"
+#include "ps3emu/libs/graphics/graphics.h"
+#include "ps3emu/constants.h"
+#include "ps3emu/libs/graphics/gcm.h"
+#include "ps3emu/libs/ConcurrentQueue.h"
+#include "ps3emu/gcmviz/GcmDatabase.h"
+#include "ps3emu/BitField.h"
 #include "GLFramebuffer.h"
 #include "ps3emu/enum.h"
 #include <boost/thread.hpp>
@@ -22,6 +23,17 @@ typedef struct {
 } CellGcmControl;
 
 }
+
+union MethodHeader {
+    uint32_t val;
+    BitField<0, 3> prefix;
+    BitField<3, 14> count;
+    BitField<14, 16> suffix;
+    BitField<16, 32> offset;
+    BitField<3, 32> jumpoffset;
+    BitField<0, 30> calloffset;
+    BitField<30, 32> callsuffix;
+};
 
 ENUM(GcmBlendEquation,
     (FUNC_ADD, 0x8006),
@@ -419,12 +431,6 @@ class Rsx {
     
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);
-    void UpdateTextureCache(uint32_t offset,
-                            uint32_t location,
-                            uint32_t width,
-                            uint32_t height,
-                            GcmTextureFormat format,
-                            GcmTextureLnUn lnUn);
     inline void StopReplay() { }
     void transferImage();
     void startCopy2d();

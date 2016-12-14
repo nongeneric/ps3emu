@@ -467,9 +467,12 @@ GLuint primitiveTypeToFeedbackPrimitiveType(GLuint type) {
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
+    if (_mode != RsxOperationMode::Replay) {
+        updateOffsetTableForReplay();
+    }
     updateVertexDataArrays(first, count);
-    updateShaders();
     updateTextures();
+    updateShaders();
     watchCaches();
     linkShaderProgram();
     updateScissor();
@@ -581,31 +584,7 @@ void Rsx::invokeHandler(uint32_t descrEa) {
 }
 
 void Rsx::resetContext() {
-    AlphaFunc(GcmOperator::ALWAYS, 0);
-    AlphaTestEnable(CELL_GCM_FALSE);
-    //BackStencilFunc(CELL_GCM_ALWAYS, 0, 0xff);
-    //BackStencilMask(0xff);
-    //BackStencilOpFail(CELL_GCM_KEEP, CELL_GCM_KEEP, CELL_GCM_KEEP);
-    //BlendColor(0, 0);
-    BlendEnable(CELL_GCM_FALSE);
-    //BlendEnableMrt(CELL_GCM_FALSE, CELL_GCM_FALSE, CELL_GCM_FALSE);
-    BlendEquation(GcmBlendEquation::FUNC_ADD, GcmBlendEquation::FUNC_ADD);
-    BlendFuncSFactor(GcmBlendFunc::ONE, GcmBlendFunc::ZERO, GcmBlendFunc::ONE, GcmBlendFunc::ZERO);
-    ZStencilClearValue(0xffffff00);
-    ColorClearValue(0);
-    ColorMask(GcmColorMask::A | GcmColorMask::R | GcmColorMask::G | GcmColorMask::B);
-    CullFaceEnable(CELL_GCM_FALSE);
-    CullFace(GcmCullFace::BACK);
-    //DepthBounds(0.0f, 1.0f);
-    //DepthBoundsTestEnable(CELL_GCM_FALSE);
-    DepthFunc(GcmOperator::LESS);
-    //DepthMask(CELL_GCM_TRUE);
-    DepthTestEnable(CELL_GCM_FALSE);
-    //DitherEnable(CELL_GCM_FALSE);
-    StencilFunc(GcmOperator::ALWAYS, 0, 0xff);
-    StencilMask(0xff);
-    StencilOpFail(CELL_GCM_KEEP, CELL_GCM_KEEP, CELL_GCM_KEEP);
-    StencilTestEnable(CELL_GCM_FALSE);
+    _context->reportLocation = MemoryLocation::Local;
     for (auto i = 0u; i < _context->vertexInputs.size(); ++i) {
         _context->vertexInputs[i].rank = 0;
         glDisableVertexAttribArray(i);
@@ -618,8 +597,6 @@ void Rsx::resetContext() {
         s.fragmentMin = CELL_GCM_TEXTURE_NEAREST_LINEAR;
         s.fragmentMag = CELL_GCM_TEXTURE_LINEAR;
     }
-    _context->reportLocation = MemoryLocation::Local;
-    glDisable(GL_MULTISAMPLE);
 }
 
 uint32_t Rsx::getLastFlipTime() {
@@ -695,7 +672,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
         _context->tracer.enable(true);
     }
     
-    if (_context->frame > 4 && _shortTrace) {
+    if (_context->frame > 0 && _shortTrace) {
         _shortTrace = false;
         _mode = RsxOperationMode::Run;
         _context->tracer.enable(false);
@@ -783,6 +760,10 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 }
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
+    if (_mode != RsxOperationMode::Replay) {
+        updateOffsetTableForReplay();
+    }
+    
     assert(first == 0);
     auto destBuffer = &_context->elementArrayIndexBuffer;
     auto sourceBuffer = getBuffer(_context->indexArray.location);
@@ -960,7 +941,6 @@ void Rsx::VertexTextureFilter(unsigned int index, float bias) {
 }
 
 GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
-    TRACE(addTextureToCache, samplerId, isFragment);
     auto& info = isFragment ? _context->fragmentTextureSamplers.at(samplerId).texture
                             : _context->vertexTextureSamplers.at(samplerId).texture;
     TextureCacheKey key { info.offset, (uint32_t)info.location, info.width, info.height, info.format };
@@ -976,16 +956,6 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
             std::vector<uint8_t> buf(size);
             g_state.mm->readMemory(va, &buf[0], size);
             t->update(buf);
-            
-            _context->tracer.pushBlob(&buf[0], buf.size());
-            TRACE(UpdateTextureCache, 
-                   key.offset, 
-                   key.location,
-                   key.width,
-                   key.height,
-                   key.internalType);
-        }, [=](auto t, auto& blob) {
-            t->update(blob);
         }
     };
     auto texture = new GLTexture(info);
@@ -1003,6 +973,11 @@ GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
         info.height,
         info.format
     };
+    
+    if (_mode != RsxOperationMode::Replay) {
+        UpdateBufferCache(info.location, info.offset, info.width * info.height);
+    }
+    
     auto texture = _context->textureCache.retrieve(key);
     if (!texture) {
         texture = addTextureToCache(samplerId, isFragment);
@@ -1350,6 +1325,8 @@ void Rsx::SurfaceClipHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) 
 // then this command is always set last
 void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
     TRACE(ShaderWindow, height, origin, pixelCenters);
+    if (height == 0)
+        return;
     assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
     assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
     waitForIdle();
@@ -2249,19 +2226,6 @@ void Rsx::UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t s
         assert(size == _currentReplayBlob.size());
         memcpy(mapped, &_currentReplayBlob[0], size);
     }
-}
-
-void Rsx::UpdateTextureCache(uint32_t offset,
-                             uint32_t location,
-                             uint32_t width,
-                             uint32_t height,
-                             GcmTextureFormat format,
-                             GcmTextureLnUn lnUn) {
-    TextureCacheKey key { offset, location, width, height, format, lnUn };
-    auto tuple = _context->textureCache.retrieveWithUpdater(key);
-    auto texture = std::get<0>(tuple);
-    auto updater = std::get<1>(tuple);
-    updater->updateWithBlob(texture, _currentReplayBlob);
 }
 
 RsxContext* Rsx::context() {

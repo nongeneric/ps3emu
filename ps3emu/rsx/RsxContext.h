@@ -7,7 +7,6 @@
 #include "GLTexture.h"
 #include "GLFramebuffer.h"
 #include "Cache.h"
-#include "TextureCache.h"
 #include "Rsx.h"
 #include "../shaders/ShaderGenerator.h"
 

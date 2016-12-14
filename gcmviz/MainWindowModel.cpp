@@ -70,8 +70,6 @@ public:
                return QColor(Qt::green);
            }
            if (id == CommandId::UpdateBufferCache ||
-               id == CommandId::addTextureToCache ||
-               id == CommandId::UpdateTextureCache ||
                id == CommandId::updateOffsetTableForReplay)
                return QColor(Qt::yellow);
            return QVariant();

@@ -10,22 +10,6 @@
 
 #include <vector>
 
-union MethodHeader {
-    uint32_t val;
-    BitField<0, 3> prefix;
-    BitField<3, 14> count;
-    BitField<14, 16> suffix;
-    BitField<16, 32> offset;
-    BitField<3, 32> jumpoffset;
-    BitField<0, 30> calloffset;
-    BitField<30, 32> callsuffix;
-};
-
-struct RsxMethodInfo {
-    uint32_t offset;
-    const char* name;
-};
-
 bool isScale(uint32_t value, uint32_t base, uint32_t step, uint32_t maxIndex, uint32_t& index) {
     if (value < base)
         return false;
@@ -171,7 +155,7 @@ int64_t Rsx::interpret(uint32_t get) {
     if (header.callsuffix.u() == 2) {
         auto offset = header.calloffset.u() << 2;
         _ret = get + 4;
-        INFO(rsx) << ssnprintf("rsx call to %x", offset);
+        INFO(rsx) << ssnprintf("rsx call %x to %x", get, offset);
         return offset - get;
     }
     if (header.val == 0x20000) {
