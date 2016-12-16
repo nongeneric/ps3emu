@@ -20,6 +20,7 @@
 #include "ps3emu/shaders/ShaderGenerator.h"
 #include "ps3emu/state.h"
 #include "ps3emu/shaders/shader_dasm.h"
+#include "ps3emu/libs/graphics/gcm.h"
 #include "OpenGLPreview.h"
 #include "OpenGLPreviewWidget.h"
 
@@ -763,6 +764,14 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         _proc.reset(new Process());
         _rsx.reset(new Rsx());
         _rsx->init(_proc.get());
+        _rsx->resetContext();
+        uint32_t last = gcmInitCommandsSize - 4; // except the reset call
+        auto read = [&](uint32_t get) {
+            return *(big_uint32_t*)&gcmInitCommands[get];
+        };
+        for (auto get = 0u; get != last;) {
+            get += _rsx->interpret(get, read);
+        }
     }
     
     std::vector<GcmCommand> commands;

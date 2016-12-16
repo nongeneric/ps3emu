@@ -13,12 +13,14 @@ void HandleRsxDasm(RsxDasmCommand const& command) {
     if (!f.is_open())
         throw std::runtime_error("can't open bin file");
 
-    std::cout << "header   count prefix offset args\n";
+    std::cout << "get  header   count prefix offset args\n";
     
     big_uint32_t raw;
     while (f.read((char*)&raw, sizeof(raw))) {
+        auto get = f.tellg();
+        
         MethodHeader header{raw};
-        std::cout << ssnprintf("%08x ", raw);
+        std::cout << ssnprintf("%04x %08x ", get, raw);
         if (header.val == 0) {
             std::cout << "NOP";
             continue;

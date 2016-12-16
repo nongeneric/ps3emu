@@ -467,9 +467,6 @@ GLuint primitiveTypeToFeedbackPrimitiveType(GLuint type) {
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
-    if (_mode != RsxOperationMode::Replay) {
-        updateOffsetTableForReplay();
-    }
     updateVertexDataArrays(first, count);
     updateTextures();
     updateShaders();
@@ -760,10 +757,6 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 }
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
-    if (_mode != RsxOperationMode::Replay) {
-        updateOffsetTableForReplay();
-    }
-    
     assert(first == 0);
     auto destBuffer = &_context->elementArrayIndexBuffer;
     auto sourceBuffer = getBuffer(_context->indexArray.location);
@@ -944,10 +937,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     auto& info = isFragment ? _context->fragmentTextureSamplers.at(samplerId).texture
                             : _context->vertexTextureSamplers.at(samplerId).texture;
     TextureCacheKey key { info.offset, (uint32_t)info.location, info.width, info.height, info.format };
-    uint32_t va = 0;
-    if (_mode != RsxOperationMode::Replay) {
-        va = rsxOffsetToEa(info.location, key.offset);
-    }
+    uint32_t va = rsxOffsetToEa(info.location, key.offset);
     auto texelByteSize = 16; // TODO: calculate from format
     auto size = (info.pitch == 0 ? (info.width * texelByteSize) : info.pitch) * info.height;
     auto updater = new SimpleCacheItemUpdater<GLTexture> {
@@ -975,7 +965,7 @@ GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
     };
     
     if (_mode != RsxOperationMode::Replay) {
-        UpdateBufferCache(info.location, info.offset, info.width * info.height);
+        UpdateBufferCache(info.location, info.offset, info.width * info.height * 4);
     }
     
     auto texture = _context->textureCache.retrieve(key);
@@ -1574,8 +1564,6 @@ uint32_t Rsx::getPut() {
 }
 
 void Rsx::watchCaches() {
-    if (_mode == RsxOperationMode::Replay)
-        return;
     auto setMemoryBreak = [=](uint32_t va, uint32_t size) { g_state.mm->memoryBreak(va, size); };
     _context->textureCache.syncAll();
     _context->textureCache.watch(setMemoryBreak);
@@ -2217,14 +2205,16 @@ void Rsx::UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t s
     if (_mode == RsxOperationMode::Run)
         return;
     
-    auto buffer = getBuffer(location);
-    auto mapped = buffer->mapped() + offset;
+    auto ea = rsxOffsetToEa(location, offset);
     if (_mode == RsxOperationMode::RunCapture) {
-        _context->tracer.pushBlob(mapped, size);
+        updateOffsetTableForReplay();
+        std::vector<uint8_t> vec(size);
+        g_state.mm->readMemory(ea, &vec[0], size);
+        _context->tracer.pushBlob(&vec[0], vec.size());
         TRACE(UpdateBufferCache, location, offset, size);
     } else if (_mode == RsxOperationMode::Replay) {
         assert(size == _currentReplayBlob.size());
-        memcpy(mapped, &_currentReplayBlob[0], size);
+        g_state.mm->writeMemory(ea, &_currentReplayBlob[0], size);
     }
 }
 

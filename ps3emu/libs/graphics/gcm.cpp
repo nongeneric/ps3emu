@@ -251,7 +251,7 @@ void setFlipCommand(uint32_t contextEa, uint32_t label, uint32_t labelValue, uin
         ERROR(rsx) << "not enough space for EmuFlip in the buffer";
         exit(1);
     }
-    uint32_t header = (4 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
+    uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
     g_state.mm->store32(context->current, header);
     g_state.mm->store32(context->current + 4, buffer);
     g_state.mm->store32(context->current + 8, label);
@@ -509,6 +509,28 @@ ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset) {
     if (location == MemoryLocation::Local)
         return RsxFbBaseAddr + offset;
     return emu::Gcm::emuGcmState.offsetTable->offsetToEa(offset);
+}
+
+void logOffsetTable() {
+    INFO(rsx) << "offset table dump:";
+    auto table = emu::Gcm::emuGcmState.offsetTable;
+    for (auto i = 0u; i < table->ioAddress.size(); ++i) {
+        if (table->ioAddress[i] != 0xffff) {
+            INFO(rsx) << ssnprintf("io: %04x", table->ioAddress[i]);
+        }
+    }
+    
+    for (auto i = 0u; i < table->eaAddress.size(); ++i) {
+        if (table->eaAddress[i] != 0xffff) {
+            INFO(rsx) << ssnprintf("ea: %04x", table->eaAddress[i]);
+        }
+    }
+    
+    for (auto i = 0u; i < table->mapPageCount.size(); ++i) {
+        if (table->mapPageCount[i]) {
+            INFO(rsx) << ssnprintf("count: %04x", table->mapPageCount[i]);
+        }
+    }
 }
 
 std::vector<uint16_t> serializeOffsetTable() {

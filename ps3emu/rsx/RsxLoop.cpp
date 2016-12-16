@@ -51,12 +51,12 @@ float fixedUint9ToFloat(uint32_t val) {
     return (float)val / 8.f;
 }
 
-int64_t Rsx::interpret(uint32_t get) {
-    MethodHeader header { g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get)) };
+int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
+    MethodHeader header { read(get) };
     auto count = header.count.u();
 #define readarg(x) ([=](unsigned n) {\
         assert(n != 0);\
-        return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get) + 4 * n);\
+        return read(get + 4 * n);\
     })(x)
     
     auto parseTextureAddress = [&](int argi, int index) {
@@ -1622,11 +1622,14 @@ void Rsx::loop() {
 
 void Rsx::runLoop() {
     boost::unique_lock<boost::mutex> lock(_mutex);
+    auto read = [&](uint32_t get) {
+        return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get));
+    };
     for (;;) {
         _cv.wait(lock);
         INFO(rsx) << "rsx loop update received";
         while (_get != _put || _ret) {
-            _get += interpret(_get);
+            _get += interpret(_get, read);
         }
         if (_shutdown && _get == _put) {
             waitForIdle();

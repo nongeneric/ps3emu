@@ -174,7 +174,6 @@ class Rsx {
     uint32_t _activeSemaphoreHandle = 0;
     uint32_t _gcmIoSize;
     ps3_uintptr_t _gcmIoAddress;
-    int64_t interpret(uint32_t get);
     Window _window;
     ConcurrentFifoQueue<GcmCommandReplayInfo> _replayQueue;
     ConcurrentFifoQueue<bool> _completionQueue;
@@ -200,7 +199,6 @@ class Rsx {
     GLTexture* getTextureFromCache(uint32_t samplerId, bool isFragment);
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
     GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
-    void resetContext();
     void updateScissor();
     
     void ChannelSetContextDmaSemaphore(uint32_t handle);
@@ -468,6 +466,8 @@ public:
     GLPersistentCpuBuffer* getBuffer(MemoryLocation location);
     uint32_t getLastFlipTime();
     void captureFrames();
+    void resetContext();
+    int64_t interpret(uint32_t get, std::function<uint32_t(uint32_t)> read);
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);
