@@ -1,5 +1,5 @@
 #include "../ps3emu/shaders/shader_dasm.h"
-#include <catch.hpp>
+#include <catch/catch.hpp>
 
 int dasm_print(uint8_t* ptr, std::string& res) {
     FragmentInstr instr;

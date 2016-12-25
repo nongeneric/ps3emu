@@ -6,7 +6,7 @@
 #include "ps3emu/state.h"
 #include <vector>
 #include <atomic>
-#include <catch.hpp>
+#include <catch/catch.hpp>
 
 TEST_CASE("swizzle_coord_convert") {
     SwizzledTextureIterator it(nullptr, 3, 3, 0);

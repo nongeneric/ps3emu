@@ -278,21 +278,21 @@ Event Process::run() {
                 case PPUThreadEvent::ProcessFinished: {
                     dbgPause(false);
                     {
+                        boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
+                        for (auto& t : _spuThreads) {
+                            if (t->tryJoin(500).cause == SPUThreadExitCause::StillRunning) {
+                                t->cancel();
+                            }
+                        }
+                    }
+                    _spuThreads.clear();
+                    {
                         boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
                         assert(ev->thread == _threads[0].get());
                         removeThread(ev->thread);
                     }
                     _rsx->shutdown();
                     _callbackThread->terminate();
-                    {
-                        boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
-                        for (auto& t : _spuThreads) {
-                            if (t->tryJoin(200).cause == SPUThreadExitCause::StillRunning) {
-                                t->cancel();
-                            }
-                        }
-                    }
-                    _spuThreads.clear();
                     _processFinished = true;
                     break;
                 }

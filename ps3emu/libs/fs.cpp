@@ -187,8 +187,12 @@ CellFsErrno cellFsClose(int32_t fd) {
 CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t* nread, MainMemory* mm) {
     std::vector<char> localBuf(nbytes);
     auto file = fileMap.get(fd);
-    *nread = fread(&localBuf[0], 1, nbytes, file);
+    auto bytesRead = fread(&localBuf[0], 1, nbytes, file);
+    if (nread) {
+         *nread = bytesRead;
+    }
     mm->writeMemory(buf, &localBuf[0], *nread);
+    INFO(libs) << ssnprintf("cellFsRead(%x, %x, %d) : %d", fd, buf, nbytes, bytesRead);
     return CELL_FS_SUCCEEDED;
 }
 
@@ -196,7 +200,10 @@ CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint
     auto file = fileMap.get(fd);
     std::vector<char> localBuf(nbytes);
     mm->readMemory(buf, &localBuf[0], nbytes);
-    *nwrite = fwrite(&localBuf[0], 1, nbytes, file);
+    auto bytesWritten = fwrite(&localBuf[0], 1, nbytes, file);
+    if (nwrite) {
+        *nwrite = bytesWritten;
+    }
     return CELL_FS_SUCCEEDED;
 }
 

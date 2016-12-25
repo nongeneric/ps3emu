@@ -1,6 +1,6 @@
 #include "../ps3emu/ppu/ppu_dasm.h"
 #include "../ps3emu/BitField.h"
-#include <catch.hpp>
+#include <catch/catch.hpp>
 
 TEST_CASE("bitfield_common") {
     BitField<0, 32> word;

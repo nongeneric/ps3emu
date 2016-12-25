@@ -43,6 +43,7 @@ namespace {
 
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata) {
     // TODO: implement for handling game termination
+    WARNING(libs) << ssnprintf("NOT IMPLEMENTED: cellSysutilRegisterCallback(%d)", slot);
     return CELL_OK;
 }
 

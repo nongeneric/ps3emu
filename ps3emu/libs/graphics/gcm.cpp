@@ -497,7 +497,6 @@ uint32_t cellGcmGetLastFlipTime(Process* proc) {
 }
 
 uint64_t cellGcmGetTimeStamp(uint32_t index) {
-    WARNING(rsx) << "not implemented cellGcmGetTimeStamp";
     const auto valueOffset = 0;
     auto ea = getReportDataAddressLocation(index, MemoryLocation::Local);
     return g_state.mm->load64(ea + valueOffset);

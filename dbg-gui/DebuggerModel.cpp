@@ -611,7 +611,7 @@ void DebuggerModel::exec(QString command) {
 uint64_t DebuggerModel::evalExpr(std::string expr) {
     try {
         return _activeThread ? ::evalExpr(expr, _activeThread)
-                             : _activeSPUThread ? ::evalExpr(expr, _activeSPUThread) : 0;
+             : _activeSPUThread ? ::evalExpr(expr, _activeSPUThread) : 0;
     } catch (std::exception& e) {
         emit message(QString("expr eval failed: ") + e.what());
         return -1;

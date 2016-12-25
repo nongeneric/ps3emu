@@ -15,7 +15,9 @@ struct g_state_t {
     g_state_t();
     Process* proc;
     MainMemory* mm;
+    // internal emu memory allocator
     InternalMemoryManager* memalloc;
+    // regular ps3 memory allocator
     InternalMemoryManager* heapalloc;
     ContentManager* content;
     Rsx* rsx;

@@ -296,6 +296,10 @@ NCallEntry ncallTable[] {
     ENTRY(cellSpursEventFlagWait_proxy),
     ENTRY(_cellSpursAttributeInitialize_proxy),
     ENTRY(cellSpursAttributeSetSpuThreadGroupType_proxy),
+    ENTRY(cellAudioOutSetCopyControl),
+    ENTRY(cellAudioCreateNotifyEventQueue),
+    ENTRY(cellAudioGetPortBlockTag),
+    ENTRY(cellAudioGetPortTimestamp),
 };
 
 constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry); }

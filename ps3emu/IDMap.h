@@ -70,4 +70,13 @@ public:
     std::map<ID, T>& map() {
         return _map.map();
     }
+    
+    ID search(std::function<bool(T&)> predicate) {
+        boost::lock_guard<boost::mutex> lock(_m);
+        for (auto& pair : _map.map()) {
+            if (predicate(pair.second))
+                return pair.first;
+        }
+        return 0;
+    }
 };

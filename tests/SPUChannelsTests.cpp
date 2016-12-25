@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch/catch.hpp>
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/spu/SPUChannels.h"
 #include "ps3emu/spu/SPUThread.h"

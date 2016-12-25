@@ -203,8 +203,8 @@ public:
 
 class NumExpr : public Expr {
 public:
-    NumExpr(int n) : n(n) { }
-    int n;
+    NumExpr(uint64_t n) : n(n) { }
+    uint64_t n;
     uint64_t eval(PPUThread* th) override {
         return n;
     }

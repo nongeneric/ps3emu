@@ -1,7 +1,14 @@
 #pragma once
 
 #include "../sys_defs.h"
-#include "../../ppu/PPUThread.h"
+#include "ps3emu/ppu/PPUThread.h"
+
+#define SYS_SYNC_FIFO 0x00001
+#define SYS_SYNC_PRIORITY 0x00002
+#define SYS_EVENT_PORT_NO_NAME 0x00
+#define SYS_EVENT_PORT_LOCAL 0x01
+#define SYS_EVENT_QUEUE_LOCAL 0x00
+#define SYS_SPU_THREAD_EVENT_USER 0x1
 
 typedef struct sys_event_queue_attr {
     sys_protocol_t attr_protocol;
@@ -79,3 +86,6 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        sys_event_queue_t eq,
                                                        uint64_t req,
                                                        uint8_t* spup);
+
+sys_event_queue_t getQueueByKey(sys_ipc_key_t key);
+void disableLogging(sys_event_queue_t queue);

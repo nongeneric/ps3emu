@@ -17,24 +17,19 @@ namespace {
     struct queue_info {
         std::shared_ptr<IQueue> queue;
         std::string name;
+        uint64_t key;
+        bool log = true;
     };
     
     struct queue_port_t {
         uint64_t name;
         int32_t type;
-        std::shared_ptr<IQueue> queue;
+        std::shared_ptr<queue_info> queue;
     };
 
     ThreadSafeIDMap<sys_event_queue_t, std::shared_ptr<queue_info>, QueueIdBase> queues;
     ThreadSafeIDMap<sys_event_port_t, std::shared_ptr<queue_port_t>> ports;
 }
-
-#define SYS_SYNC_FIFO 0x00001
-#define SYS_SYNC_PRIORITY 0x00002
-#define SYS_EVENT_QUEUE_LOCAL 0x00
-#define SYS_EVENT_PORT_NO_NAME 0x00
-#define SYS_EVENT_PORT_LOCAL 0x01
-#define SYS_SPU_THREAD_EVENT_USER 0x1
 
 bool isPrintStr(char* str, int len) {
     int i = 0;
@@ -76,6 +71,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
     }
     auto name = printName(attr->name, SYS_SYNC_NAME_SIZE);
     info->name = name;
+    info->key = event_queue_key;
     *equeue_id = queues.create(std::move(info));
     INFO(libs) << ssnprintf("sys_event_queue_create(id = %x, event_queue_key = %llx, "
                             "size = %d, name = %s, %s)",
@@ -102,19 +98,25 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
     // TODO: handle timeout
     //assert(timeout == 0);
     auto info = queues.get(equeue_id);
-    INFO(libs) << ssnprintf("sys_event_queue_receive(%s[%x])", info->name, equeue_id);
+    if (info->log) {
+        INFO(libs) << ssnprintf(
+            "sys_event_queue_receive(%s[%x])", info->name, equeue_id);
+    }
     auto event = info->queue->receive(th->priority());
     th->setGPR(4, event.source);
     th->setGPR(5, event.data1);
     th->setGPR(6, event.data2);
     th->setGPR(7, event.data3);
-    INFO(libs) << ssnprintf("completed sys_event_queue_receive(%s[%x]): %x, %x, %x, %x",
-                            info->name,
-                            equeue_id,
-                            event.source,
-                            event.data1,
-                            event.data2,
-                            event.data3);
+    if (info->log) {
+        INFO(libs) << ssnprintf(
+            "completed sys_event_queue_receive(%s[%x]): %x, %x, %x, %x",
+            info->name,
+            equeue_id,
+            event.source,
+            event.data1,
+            event.data2,
+            event.data3);
+    }
     return CELL_OK;
 }
 
@@ -150,7 +152,7 @@ int32_t sys_event_port_connect_local(sys_event_port_t event_port_id,
     INFO(libs) << ssnprintf("sys_event_port_connect_local(port = %d, queue = %x)",
                             event_port_id, event_queue_id);
     assert(ports.get(event_port_id)->type == SYS_EVENT_PORT_LOCAL);
-    ports.get(event_port_id)->queue = queues.get(event_queue_id)->queue;
+    ports.get(event_port_id)->queue = queues.get(event_queue_id);
     return CELL_OK;
 }
 
@@ -158,10 +160,16 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
                             uint64_t data1,
                             uint64_t data2,
                             uint64_t data3) {
-    INFO(libs) << ssnprintf("sys_event_port_send(port = %d, data = %llx, %llx, %llx)",
-                            eport_id, data1, data2, data3);
     auto port = ports.get(eport_id);
-    port->queue->send({ port->name, data1, data2, data3 });
+    if (port->queue->log) {
+        INFO(libs) << ssnprintf(
+            "sys_event_port_send(port = %d, data = %llx, %llx, %llx)",
+            eport_id,
+            data1,
+            data2,
+            data3);
+    }    
+    port->queue->queue->send({ port->name, data1, data2, data3 });
     return CELL_OK;
 }
 
@@ -263,4 +271,12 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
     }
     assert(false);
     return -1;
+}
+
+sys_event_queue_t getQueueByKey(sys_ipc_key_t key) {
+    return queues.search([=](auto& info) { return info->key == key; });
+}
+
+void disableLogging(sys_event_queue_t queue) {
+    queues.get(queue)->log = false;
 }

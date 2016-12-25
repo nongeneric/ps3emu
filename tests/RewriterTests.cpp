@@ -2,7 +2,7 @@
 #include "ps3emu/RewriterUtils.h"
 #include "ps3tool-core/Rewriter.h"
 #include "TestUtils.h"
-#include <catch.hpp>
+#include <catch/catch.hpp>
 #include <boost/filesystem.hpp>
 #include <string>
 #include <sstream>

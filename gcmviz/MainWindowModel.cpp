@@ -767,7 +767,8 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         _rsx->resetContext();
         uint32_t last = gcmInitCommandsSize - 4; // except the reset call
         auto read = [&](uint32_t get) {
-            return *(big_uint32_t*)&gcmInitCommands[get];
+            auto ptr = &gcmInitCommands[get];
+            return *(big_uint32_t*)ptr;
         };
         for (auto get = 0u; get != last;) {
             get += _rsx->interpret(get, read);
