@@ -1,8 +1,10 @@
 #pragma once
 
 #include "../sys_defs.h"
+#include "ps3emu/state.h"
 #include <boost/chrono.hpp>
 #include <memory>
+#include <map>
 
 typedef big_uint32_t sys_mutex_t;
 
@@ -12,25 +14,35 @@ public:
     virtual void unlock() = 0;
     virtual bool try_lock(usecond_t timeout) = 0;
     virtual void destroy() = 0;
+    virtual PPUThread* owner() = 0;
+    virtual std::string name() = 0;
     virtual ~IMutex() = default;
 };
 
 template <typename M>
 class Mutex : public IMutex {
     M* _m;
+    PPUThread* _owner;
+    std::string _name;
 public:
-    Mutex() : _m(new M()) { }
+    Mutex(std::string name) : _m(new M()), _owner(nullptr), _name(name) { }
     
     bool lock(usecond_t timeout) override {
+        bool locked = false;
         if (timeout == 0) {
             _m->lock();
-            return true;
+            locked = true;
         } else {
-            return _m->try_lock_for( boost::chrono::microseconds(timeout) );
+            locked = _m->try_lock_for( boost::chrono::microseconds(timeout) );
         }
+        if (locked) {
+            _owner = g_state.th;
+        }
+        return locked;
     }
     
     void unlock() override {
+        _owner = nullptr;
         _m->unlock();
     }
     
@@ -40,6 +52,14 @@ public:
         } else {
             return _m->try_lock_for( boost::chrono::microseconds(timeout) );
         }
+    }
+    
+    PPUThread* owner() override {
+        return _owner;
+    }
+    
+    std::string name() override {
+        return _name;
     }
     
     void destroy() override {
@@ -65,3 +85,4 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout);
 int sys_mutex_trylock(sys_mutex_t mutex_id);
 int sys_mutex_unlock(sys_mutex_t mutex_id);
 std::shared_ptr<IMutex> find_mutex(sys_mutex_t id);
+std::map<uint32_t, std::shared_ptr<IMutex>> dbgDumpMutexes();

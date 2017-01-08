@@ -36,7 +36,7 @@ void SPUThread::loop() {
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     
-#ifdef DEBUG
+#ifndef NDEBUG
     auto f = fopen(ssnprintf("/tmp/spu_ls_dump_%x.bin", getNip()).c_str(), "w");
     assert(f);
     fwrite(ptr(0), LocalStorageSize, 1, f);

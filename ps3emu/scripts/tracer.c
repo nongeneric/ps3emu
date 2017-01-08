@@ -471,6 +471,7 @@ void runto(sn_uint32 process, sn_uint64 thread, sn_uint32 to) {
 	PS3AddBreakPoint(process, thread, to_address, 0);
 	PS3ThreadStart(process, thread);
 	while (to_address.word[0] != get_pc(process, thread)) {
+		printf("compared %x to %x\n", to_address.word[0], get_pc(process, thread));
 	}
 	PS3RemoveAllBreakPoints(process, thread);
 }
@@ -648,8 +649,14 @@ void ppu_traceto(unsigned long to, unsigned long* steps, sn_uint32 uProcessID, s
 				break;
 			}
 			fprintf(f, "r%d:%08x%08x;", i, result.val.i64.word[1], result.val.i64.word[0]);
-			fflush(f);
 		}
+		
+		if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, "lr"))) {
+			printf("\nError: %s", GetLastErrorString());
+			break;
+		}
+		
+		fprintf(f, "r%d:%08x%08x;", 32, result.val.i64.word[1], result.val.i64.word[0]);
 		
 		for (i = 0; i < 32; i++) {
 			if (SN_FAILED(PS3EvaluateExpression(uProcessID, uThreadID, &result, vmregstrs[i]))) {
@@ -661,10 +668,10 @@ void ppu_traceto(unsigned long to, unsigned long* steps, sn_uint32 uProcessID, s
 				result.val.i128.word[2],
 				result.val.i128.word[1],
 				result.val.i128.word[0]);
-			fflush(f);
 		}
 		
 		fprintf(f, "\n");
+		fflush(f);
 		
 		PS3UpdateTargetInfo();
 		
@@ -840,9 +847,11 @@ int main(int argc, char ** argv)
 				if (chr == 's') { // skip
 					printf("skipping to %x\n", to);
 					runto(uProcessID, uThreadID, to);
+					printf("done skipping\n");
 				} else { // 't' trace
 					printf("tracing to %x\n", to);
 					spu_traceto(to, &steps, uProcessID, uThreadID, f);
+					printf("done tracing\n");
 				}
 			}
 			
@@ -870,9 +879,11 @@ int main(int argc, char ** argv)
 				if (chr == 's') { // skip
 					printf("skipping to %x\n", to);
 					runto(uProcessID, uThreadID, to);
+					printf("done skipping\n");
 				} else { // 't' trace
 					printf("tracing to %x\n", to);
 					ppu_traceto(to, &steps, uProcessID, uThreadID, f);
+					printf("done tracing\n");
 				}
 			}
 			

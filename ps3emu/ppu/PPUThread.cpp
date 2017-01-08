@@ -11,7 +11,7 @@
 
 using namespace boost::endian;
 
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
 #define dbgpause(value) _dbgPaused = value
 #else
 #define dbgpause(value)
@@ -26,7 +26,7 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
       _priority(1000),
       _id(-1) {
           
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
     _singleStep = false;
     _dbgPaused = false;
 #endif
@@ -53,9 +53,9 @@ void PPUThread::vmenter(uint32_t to) {
 void PPUThread::innerLoop() {
     assert(getNIP());
     g_state.th = this;
-    
+
     for (;;) {
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
         if (_singleStep) {
             _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
         }
@@ -126,7 +126,7 @@ void PPUThread::loop() {
 
 PPUThread::PPUThread() {}
 
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
 void PPUThread::singleStepBreakpoint(bool value) {
     _singleStep = value;
 }

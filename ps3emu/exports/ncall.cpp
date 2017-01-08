@@ -300,6 +300,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellAudioCreateNotifyEventQueue),
     ENTRY(cellAudioGetPortBlockTag),
     ENTRY(cellAudioGetPortTimestamp),
+    ENTRY(cellAudioAddData),
 };
 
 constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry); }

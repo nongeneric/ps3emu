@@ -150,6 +150,7 @@ void PPUThread::scall() {
         case 192: wrap(sys_spu_thread_disconnect_event, this); break;
         case 184: wrap(sys_spu_thread_write_snr, this); break;
         case 351: wrap(sys_memory_get_page_attribute, this); break;
+        case 140: wrap(sys_event_port_connect_ipc, this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

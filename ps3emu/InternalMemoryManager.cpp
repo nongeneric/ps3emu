@@ -29,13 +29,14 @@ void* InternalMemoryManager::allocInternalMemory(uint32_t* ea,
     auto ptr = fitp->allocate_aligned(size, alignment);
     memset(ptr, 0, size);
     *ea = (uintptr_t)ptr - (uintptr_t)fitp + _base;
+    g_state.mm->mark(*ea, size, false, _name);
     assert((*ea & (alignment - 1)) == 0);
     INFO(libs) << ssnprintf("allocating %08x, size %x, alignment %x", *ea, size, alignment);
     return ptr;
 }
 
-InternalMemoryManager::InternalMemoryManager(uint32_t base, uint32_t size)
-    : _base(base) {
+InternalMemoryManager::InternalMemoryManager(uint32_t base, uint32_t size, std::string name)
+    : _base(base), _name(name) {
     auto preallocated = aligned_alloc(g_maxalignment, size);
     g_state.mm->provideMemory(base, size, preallocated);
     new (preallocated) fit_t(size, 0);

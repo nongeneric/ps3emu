@@ -156,6 +156,14 @@ int32_t sys_event_port_connect_local(sys_event_port_t event_port_id,
     return CELL_OK;
 }
 
+int32_t sys_event_port_connect_ipc(sys_event_port_t event_port_id,
+                                   sys_ipc_key_t key) {
+    INFO(libs) << ssnprintf("sys_event_port_connect_ipc(port = %d, key = %llx)",
+                            event_port_id, key);
+    ports.get(event_port_id)->queue = queues.get(getQueueByKey(key));
+    return CELL_OK;
+}
+
 int32_t sys_event_port_send(sys_event_port_t eport_id,
                             uint64_t data1,
                             uint64_t data2,
@@ -168,7 +176,7 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
             data1,
             data2,
             data3);
-    }    
+    }
     port->queue->queue->send({ port->name, data1, data2, data3 });
     return CELL_OK;
 }

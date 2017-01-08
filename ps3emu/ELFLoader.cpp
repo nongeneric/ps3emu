@@ -173,6 +173,11 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         LOG << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
             (uint64_t)ph->p_filesz, va, va + ph->p_memsz, imageBase);
         
+        g_state.mm->mark(va,
+                         ph->p_memsz,
+                         false, //!(ph->p_flags & PF_W),
+                         ssnprintf("%s segment", shortName()));
+        
         assert(ph->p_memsz >= ph->p_filesz);
         g_state.mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
         g_state.mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
@@ -356,8 +361,8 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
         return true;
     }
     if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
-        name == "libsysutil.sprx.elf" || name == "libaudio.sprx.elf" ||
-        name == "libio.sprx.elf" || name == "libfs.sprx.elf" ||
+        name == "libsysutil.sprx.elf" || name == "libio.sprx.elf" ||
+        name == "libaudio.sprx.elf" || name == "libfs.sprx.elf" ||
         name == "libsysutil_np_trophy.sprx.elf") {
         return false;
     }
@@ -366,7 +371,10 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
 
 uint32_t findExportedEmuFunction(uint32_t id) {
     static auto curUnknownNcall = 2000;
-    static auto ncallDescrVa = FunctionDescriptorsVa;
+    static uint32_t ncallDescrVa = 0;
+    if (ncallDescrVa == 0) {
+        g_state.memalloc->allocInternalMemory(&ncallDescrVa, 1u << 20u, 4);
+    }
     uint32_t index;
     auto ncallEntry = findNCallEntry(id, index);
     std::string name;

@@ -162,7 +162,6 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     
     g_state.rsx->setGcmContext(ioSize, ioAddress);
     g_state.rsx->init(proc);
-    g_state.mm->setMemory(GcmLabelBaseOffset, 0, 1, true);
     
     emuGcmState.defaultContext =
         g_state.memalloc->internalAlloc<128, TargetCellGcmContextData>(
@@ -174,6 +173,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     
     emuGcmState.offsetTable->map(ioAddress, 0, ioSize);
     g_state.mm->provideMemory(ioAddress, ioSize, g_state.rsx->context()->mainMemoryBuffer.mapped());
+    g_state.mm->mark(ioAddress, ioSize, false, "initial rsx io region");
     g_state.mm->writeMemory(ioAddress, gcmResetCommands, gcmResetCommandsSize);
     g_state.mm->writeMemory(ioAddress + gcmResetCommandsSize, gcmInitCommands, gcmInitCommandsSize);
     emuGcmState.defaultContext->begin = ioAddress + gcmResetCommandsSize;

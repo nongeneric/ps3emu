@@ -11,6 +11,7 @@
 #include <memory>
 #include <atomic>
 #include <vector>
+#include <map>
 
 class PPUThread;
 class Process;
@@ -60,6 +61,13 @@ public:
     }
 };
 
+struct ProtectionRange {
+    uint32_t start;
+    uint32_t len;
+    bool readonly;
+    std::string comment;
+};
+
 class MainMemory {
     std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;    
     std::unique_ptr<MemoryPage[]> _pages;
@@ -67,8 +75,19 @@ class MainMemory {
     Process* _proc;
     boost::mutex _pageMutex;
     SpinLock _storeLock;
-    
     std::vector<Reservation> _reservations;
+    
+#ifdef MEMORY_PROTECTION
+    struct ProtectionInfo {
+        std::bitset<1u << 10> subrange;
+    };
+    
+    std::map<uint32_t, ProtectionInfo> readInfos;
+    std::map<uint32_t, ProtectionInfo> writeInfos;
+    std::vector<ProtectionRange> protectionRanges;
+    std::bitset<0xffffffffu / (1u << 10)> readMap;
+    std::bitset<0xffffffffu / (1u << 10)> writeMap;
+#endif
     
     template <bool Read>
     void copy(ps3_uintptr_t va, 
@@ -95,7 +114,12 @@ public:
     MainMemory();
     ~MainMemory();
     void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
-    void readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate = false, bool locked = true);
+    void readMemory(ps3_uintptr_t va,
+                    void* buf,
+                    uint len,
+                    bool allocate = false,
+                    bool locked = true,
+                    bool validate = true);
     void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
     void reset();
     int allocatedPages();
@@ -160,6 +184,19 @@ public:
         auto dest = getMemoryPointer(va, len);
         return storeMemoryWithReservation(dest, buf, len, va, true);
     }
+    
+#ifdef MEMORY_PROTECTION
+    void reportViolation(uint32_t ea, uint32_t len, bool write);
+    void mark(uint32_t ea, uint32_t len, bool readonly, std::string comment);
+    void unmark(uint32_t ea, uint32_t len);
+    void validate(uint32_t ea, uint32_t len, bool write);
+    ProtectionRange addressRange(uint32_t ea);
+#else
+    inline void mark(uint32_t ea, uint32_t len, bool readonly, std::string comment) { }
+    inline void unmark(uint32_t ea, uint32_t len) { }
+    inline void validate(uint32_t ea, uint32_t len, bool write) { }
+    inline ProtectionRange addressRange(uint32_t ea) { return {}; }
+#endif
 };
 
 uint32_t calcFnid(const char* name);

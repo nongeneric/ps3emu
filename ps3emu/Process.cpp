@@ -8,6 +8,7 @@
 #include "ppu/CallbackThread.h"
 #include "state.h"
 #include "Config.h"
+#include "ps3emu/libs/sync/queue.h"
 
 #include "ppu/InterruptPPUThread.h"
 #include <GLFW/glfw3.h>
@@ -133,6 +134,18 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
         throw std::runtime_error("glfw initialization failed");
     }
     
+    _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
+                                                           EmuInternalAreaSize,
+                                                           "internal alloc"));
+    _heapMemoryManager.reset(new InternalMemoryManager(HeapArea,
+                                                       HeapAreaSize,
+                                                       "heap alloc"));
+    _stackBlocks.reset(new InternalMemoryManager(StackArea,
+                                                 StackAreaSize,
+                                                 "stack allock"));
+    g_state.memalloc = _internalMemoryManager.get();
+    g_state.heapalloc = _heapMemoryManager.get();
+    
     _threads.emplace_back(std::make_unique<PPUThread>(
         [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
     _rsx.reset(new Rsx());
@@ -147,10 +160,6 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     }
     _prxs.push_back(_elf);
     loadPrxStore();
-    _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
-                                                           EmuInternalAreaSize));
-    _heapMemoryManager.reset(new InternalMemoryManager(HeapArea, HeapAreaSize));
-    _stackBlocks.reset(new InternalMemoryManager(StackArea, StackAreaSize));
     _contentManager.reset(new ContentManager());
     _contentManager->setElfPath(elfPath);
     _threadInitInfo.reset(new ThreadInitInfo());
@@ -158,8 +167,6 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     auto thread = _threads.back().get();
     thread->setId(0, "main");
     
-    g_state.memalloc = _internalMemoryManager.get();
-    g_state.heapalloc = _heapMemoryManager.get();
     g_state.content = _contentManager.get();
     g_state.rsx = _rsx.get();
     g_state.elf = _elf.get();
@@ -216,7 +223,7 @@ uint32_t Process::loadPrx(std::string path) {
 }
 
 void Process::dbgPause(bool pause) {
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
     for (auto& t : _threads) {

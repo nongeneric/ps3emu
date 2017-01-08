@@ -76,6 +76,7 @@ class DebuggerModel : public QWidget {
     void dumpSegments();
     void dumpImports();
     void dumpThreads();
+    void dumpMutexes(bool lw);
     void changeThread(uint32_t index);
     void printSegment(uint32_t ea);
     void execSingleCommand(QString command);

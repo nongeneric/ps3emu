@@ -9,6 +9,8 @@
 #include "ps3emu/libs/spu/sysSpu.h"
 #include "ps3emu/EmuCallbacks.h"
 #include "ps3emu/log.h"
+#include "ps3emu/libs/sync/mutex.h"
+#include "ps3emu/libs/sync/lwmutex.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
@@ -85,7 +87,7 @@ public:
         } else {
             uint8_t buf[16];
             if (ppu) {
-                g_state.mm->readMemory(row, buf, sizeof buf);
+                g_state.mm->readMemory(row, buf, sizeof buf, false, true, false);
             } else if (spu) {
                 memcpy(buf, _spuThread->ptr(row), 16);
             }
@@ -630,6 +632,10 @@ void DebuggerModel::execSingleCommand(QString command) {
     } else if (name == "threads") {
         dumpThreads();
         return;
+    } else if (name == "mutexes") {
+        dumpMutexes(true);
+        dumpMutexes(false);
+        return;
     } else if (name == "clearbps") {
         clearSoftBreaks();
         return;
@@ -723,6 +729,13 @@ void DebuggerModel::execSingleCommand(QString command) {
             return;
         } else if (name == "segment") {
             printSegment(exprVal);
+        } else if (name == "info") {
+            auto range = g_state.mm->addressRange(exprVal);
+            messagef("range: %x-%x, %s, %s",
+                     range.start,
+                     range.start + range.len,
+                     range.readonly ? "R" : "RW",
+                     range.comment);
         }
     } catch (...) {
         emit message("command failed");
@@ -758,6 +771,17 @@ void DebuggerModel::changeThread(uint32_t index) {
         i++;
     }
     updateUI();
+}
+
+void DebuggerModel::dumpMutexes(bool lw) {
+    emit messagef("%smutexes (id, name, owner)", lw ? "lw " : "");
+    for (auto& pair : lw ? dbgDumpLwMutexes() : dbgDumpMutexes()) {
+        auto owner = pair.second->owner();
+        emit messagef("  %x, %s, %s",
+                      pair.first,
+                      pair.second->name(),
+                      owner ? owner->getName() : "unlocked");
+    }
 }
 
 void DebuggerModel::dumpThreads() {
@@ -948,9 +972,12 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
         }
         fprintf(f, " #%s\n", str.c_str());
         fflush(f);
-        auto ev = _proc->run();
-        if (boost::get<ProcessFinishedEvent>(&ev))
-            break;
+        
+        for (;;) {
+            auto ev = _proc->run();
+            if (boost::get<PPUSingleStepBreakpointEvent>(&ev))
+                break;
+        }
     }
     _updateUIWhenRunning = true;
     _activeThread->singleStepBreakpoint(false);

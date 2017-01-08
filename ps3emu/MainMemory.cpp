@@ -171,6 +171,7 @@ bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
         uint##x##_t special; \
         if (readSpecialMemory(va, &special, x / 8)) \
             return endian_reverse(special); \
+        validate(va, x / 8, false); \
         VirtualAddress split { va }; \
         auto& page = _pages[split.page.u()]; \
         auto offset = split.offset.u(); \
@@ -189,6 +190,7 @@ DEFINE_LOAD_X(64)
         auto reversed = endian_reverse(value); \
         if (writeSpecialMemory(va, &reversed, x / 8)) \
             return; \
+        validate(va, x / 8, false); \
         VirtualAddress split { va }; \
         auto pageIndex = split.page.u(); \
         auto& page = _pages[pageIndex]; \
@@ -236,7 +238,7 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool a
         }
         return;
     }
-    
+    validate(va, len, true);
     copy<false>(va, buf, len, allocate, true);
 }
 
@@ -255,9 +257,7 @@ struct IForm {
     uint8_t _ : 2;
 };
 
-void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate, bool locked) {
-    assert(buf);
-    
+void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate, bool locked, bool validate) {
     if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
         assert(len == 4);
         *(big_uint32_t*)buf = readRawSpuVa(va);
@@ -279,6 +279,10 @@ void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate
         throw std::runtime_error("unknown rsx register");
     }
 
+    if (validate) {
+        this->validate(va, len, false);
+    }
+    
     copy<true>(va, buf, len, allocate, locked);
 }
 
@@ -323,6 +327,9 @@ void MainMemory::reset() {
     realloc(4);
     realloc(7);
     realloc(0xd);
+    
+    mark(GcmLabelBaseOffset, 0x100000, false, "gcm labels");
+    mark(RsxFbBaseAddr, 0x10000000, false, "rsx local region");
 }
 
 void MemoryPage::alloc() {
@@ -347,8 +354,7 @@ uint8_t* MainMemory::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
     if (!page.ptr)
         throw std::runtime_error("getting memory pointer for not allocated memory");
     auto offset = split.offset.u();
-    if (offset + len > DefaultMainMemoryPageSize)
-        throw std::runtime_error("getting memory pointer across page boundaries");
+    // TODO: check that the range is continuous
     return (uint8_t*)((page.ptr & PagePtrMask) + offset);
 }
 
@@ -451,3 +457,98 @@ void readString(MainMemory* mm, uint32_t va, std::string& str) {
     } while (std::find(begin(str), end(str), 0) == end(str));
     str = str.c_str();
 }
+
+#ifdef MEMORY_PROTECTION
+
+auto pageSize = 1u << 10;
+
+void iterate(uint32_t start,
+             uint32_t len,
+             std::function<void(uint32_t, uint32_t, uint32_t)> action) {
+    for (auto i = start; i <= start + len;) {
+        auto page = (i / pageSize) * pageSize;
+        auto nextPage = page + pageSize;
+        if (nextPage - page == pageSize) {
+            action(page, 0, pageSize);
+        } else {
+            bool isFirstPage = i == start;
+            auto rangeStart = isFirstPage ? i - start : 0;
+            auto rangeEnd = (start + len) % pageSize;
+            action(page, rangeStart, rangeEnd);
+        }
+        i = nextPage;
+    }
+}
+
+void MainMemory::reportViolation(uint32_t ea, uint32_t len, bool write) {
+    auto range = std::find_if(begin(protectionRanges), end(protectionRanges), [&](auto& range) {
+        return intersects(range.start, range.len, ea, len);
+    });
+    auto rangeMessage = range == end(protectionRanges)
+                            ? "no range"
+                            : ssnprintf("range %08x-%08x %s %s",
+                                        range->start,
+                                        range->start + range->len,
+                                        range->readonly ? "R" : "RW",
+                                        range->comment);
+    auto message = ssnprintf("memory %s violation at %08x size %x (%s)",
+                             write ? "write" : "read",
+                             ea,
+                             len,
+                             rangeMessage);
+    ERROR(libs) << message;
+    throw std::runtime_error("memory access violation");
+}
+
+void MainMemory::mark(uint32_t ea, uint32_t len, bool readonly, std::string comment) {
+    protectionRanges.push_back({ea, len, readonly, comment});
+    iterate(ea, len, [&] (auto page, auto start, auto end) {
+        auto pageIndex = page / pageSize;
+        if (start == 0 && end == pageSize) {
+            readMap[pageIndex] = true;
+            writeMap[pageIndex] = !readonly;
+        } else {
+            auto& readRange = readInfos[pageIndex].subrange;
+            auto& writeRange = writeInfos[pageIndex].subrange;
+            for (; start != end; ++start) {
+                readRange[start] = true;
+                writeRange[start] = !readonly;
+            }
+        }
+    });
+}
+
+void MainMemory::unmark(uint32_t ea, uint32_t len) {
+    
+}
+
+void MainMemory::validate(uint32_t ea, uint32_t len, bool write) {
+    auto& map = write ? writeMap : readMap;
+    auto& infos = write ? writeInfos : readInfos;
+    iterate(ea, len, [&] (auto page, auto start, auto end) {
+        auto index = page / pageSize;
+        if (map.test(index))
+            return;
+        auto info = infos.find(index);
+        if (info == std::end(infos)) {
+            this->reportViolation(ea, len, write);
+            return;
+        }
+        for (; start != end; ++start) {
+            if (!info->second.subrange.test(start)) {
+                this->reportViolation(ea, len, write);
+                return;
+            }
+        }
+    });
+}
+
+ProtectionRange MainMemory::addressRange(uint32_t ea) {
+    for (auto& range : protectionRanges) {
+        if (intersects<uint32_t>(range.start, range.len, ea, 1))
+            return range;
+    }
+    return {0};
+}
+
+#endif

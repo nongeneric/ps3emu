@@ -38,3 +38,4 @@ int32_t cellAudioOutSetCopyControl(CellAudioOut audioOut, CellAudioOutCopyContro
 int32_t cellAudioCreateNotifyEventQueue(sys_event_queue_t *id, sys_ipc_key_t *key);
 int32_t cellAudioGetPortBlockTag(uint32_t portNum, uint64_t index, big_uint64_t *frameTag);
 int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint64_t *timeStamp);
+int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume);

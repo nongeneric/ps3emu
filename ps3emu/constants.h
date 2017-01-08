@@ -36,8 +36,6 @@ static constexpr uint32_t StackAreaSize = 32u << 20;
 
 static constexpr uint32_t DefaultStackSize = 0x10000u;
 
-static constexpr ps3_uintptr_t FunctionDescriptorsVa = 0x7f000000;
-
 static constexpr uint32_t DefaultMainMemoryPageBits = 12;
 static constexpr ps3_uintptr_t MaxMainMemoryAddress = 0xffffffff;
 static constexpr uint32_t DefaultMainMemoryOffsetBits = 32 - DefaultMainMemoryPageBits;

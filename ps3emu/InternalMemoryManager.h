@@ -3,12 +3,14 @@
 #include <cstdint>
 #include <utility>
 #include <memory>
+#include <string>
 
 class InternalMemoryManager {
     uint32_t _base;
+    std::string _name;
     
 public:
-    InternalMemoryManager(uint32_t base, uint32_t size);
+    InternalMemoryManager(uint32_t base, uint32_t size, std::string name);
     void* allocInternalMemory(uint32_t* ea, uint32_t size, uint32_t alignment);
     
     template <int Alignment, typename T, typename... Args>

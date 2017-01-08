@@ -9,6 +9,7 @@ namespace {
     struct cv_info_t {
         boost::condition_variable_any cv;
         IMutex* m;
+        std::string name;
     };
     
     ThreadSafeIDMap<sys_cond_t, std::shared_ptr<cv_info_t>> cvs;
@@ -20,8 +21,9 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
 {
     auto info = std::make_shared<cv_info_t>();
     info->m = find_mutex(lwmutex).get();
+    info->name = attr->name;
     *cond_id = cvs.create(std::move(info));
-    LOG << ssnprintf("sys_cond_create(%d, %d, %s)", *cond_id, lwmutex, attr->name);
+    LOG << ssnprintf("sys_cond_create(%d, %x, %s)", *cond_id, lwmutex, attr->name);
     return CELL_OK;
 }
 
@@ -34,6 +36,10 @@ int32_t sys_cond_destroy(sys_cond_t cond) {
 int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
     assert(timeout == 0);
     auto info = cvs.get(cond);
+    INFO(libs) << ssnprintf("sys_cond_wait(%x) c:%s m:%s",
+                            cond,
+                            info->name,
+                            info->m->name());
     info->cv.wait(*info->m);
     return CELL_OK;
 }
@@ -42,12 +48,20 @@ int32_t sys_cond_signal(sys_cond_t cond) {
     auto info = cvs.try_get(cond);
     if (!info) // noop
         return CELL_OK;
+    INFO(libs) << ssnprintf("sys_cond_signal(%x) c:%s m:%s",
+                            cond,
+                            (*info)->name,
+                            (*info)->m->name());
     info.value()->cv.notify_one();
     return CELL_OK;
 }
 
 int32_t sys_cond_signal_all(sys_cond_t cond) {
     auto info = cvs.get(cond);
+    INFO(libs) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%s",
+                            cond,
+                            info->name,
+                            info->m->name());
     info->cv.notify_all();
     return CELL_OK;
 }

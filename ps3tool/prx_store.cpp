@@ -156,8 +156,8 @@ void HandlePrxStore(PrxStoreCommand const& command) {
     MainMemory mm;
     g_state.mm = &mm;
     auto internalAlloc = std::make_unique<InternalMemoryManager>(
-        EmuInternalArea, EmuInternalAreaSize);
-    auto heapAlloc = std::make_unique<InternalMemoryManager>(HeapArea, HeapAreaSize);
+        EmuInternalArea, EmuInternalAreaSize, "");
+    auto heapAlloc = std::make_unique<InternalMemoryManager>(HeapArea, HeapAreaSize, "");
     g_state.memalloc = internalAlloc.get();
     g_state.heapalloc = heapAlloc.get();
     

@@ -55,6 +55,8 @@ int32_t sys_event_port_create(sys_event_port_t* eport_id,
 
 int32_t sys_event_port_connect_local(sys_event_port_t event_port_id,
                                      sys_event_queue_t event_queue_id);
+int32_t sys_event_port_connect_ipc(sys_event_port_t event_port_id,
+                                   sys_ipc_key_t key);
 
 int32_t sys_event_port_disconnect(sys_event_port_t event_port_id);
 

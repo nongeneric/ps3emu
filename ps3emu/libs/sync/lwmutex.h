@@ -2,8 +2,9 @@
 
 #include "../sys_defs.h"
 #include "mutex.h"
-#include "../../MainMemory.h"
+#include "ps3emu/MainMemory.h"
 #include <memory>
+#include <map>
 
 struct sys_lwmutex_lock_info_t {
     volatile big_uint32_t owner;
@@ -39,3 +40,4 @@ int sys_lwmutex_lock(ps3_uintptr_t lwmutex_id, usecond_t timeout);
 int sys_lwmutex_trylock(ps3_uintptr_t lwmutex_id);
 int sys_lwmutex_unlock(ps3_uintptr_t lwmutex_id);
 std::shared_ptr<IMutex> find_lwmutex(ps3_uintptr_t id);
+std::map<uint32_t, std::shared_ptr<IMutex>> dbgDumpLwMutexes();

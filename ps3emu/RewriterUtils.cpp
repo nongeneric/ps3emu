@@ -24,8 +24,15 @@ bool compile(CompileInfo const& info) {
     auto lib = std::string(getenv("PS3_BIN")) + "/ps3emu";
     auto optimization = info.debug ? "-O0 -ggdb" : "-O3 -DNDEBUG"; // -flto
     auto trace = info.trace ? "-DTRACE" : "";
-    auto line = ssnprintf("g++ -shared -fPIC -std=c++14 %s %s -march=native -isystem%s -L%s %s -lps3emu -o %s",
-        optimization, trace, include, lib, info.cpp, info.so
+    auto memoryProtection =
+#ifdef MEMORY_PROTECTION
+        "-DMEMORY_PROTECTION"
+#else
+        ""
+#endif
+    ;
+    auto line = ssnprintf("g++ -shared -fPIC -std=c++14 %s %s %s -march=native -isystem%s -L%s %s -lps3emu -o %s",
+        memoryProtection, optimization, trace, include, lib, info.cpp, info.so
     );
     auto p = popen(line.c_str(), "r");
     return pclose(p) == 0;

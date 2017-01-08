@@ -44,6 +44,7 @@ TEST_CASE("swizzle_coord_convert") {
 
 TEST_CASE("read_write_memory") {
     MainMemory mm;
+    mm.mark(0, 0x1000, false, "");
     uint32_t original = 0xA1B2C3D4, read;
     mm.writeMemory(0x400, &original, 4, true);
     mm.readMemory(0x400, &read, 4);
@@ -55,6 +56,7 @@ TEST_CASE("read_write_memory") {
 
 TEST_CASE("read memory 128") {
     MainMemory mm;
+    mm.mark(0, 0x1000, false, "");
     mm.setMemory(0x400, 0, 16, true);
     unsigned __int128 i128 = 0;
     REQUIRE((mm.load128(0x400) == i128));
@@ -62,6 +64,7 @@ TEST_CASE("read memory 128") {
 
 TEST_CASE("provide_memory") {
     MainMemory mm;
+    mm.mark(0, DefaultMainMemoryPageSize * 10, false, "");
     mm.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1, true);
     mm.store32(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
     std::vector<uint8_t> vec(DefaultMainMemoryPageSize * 4);
@@ -79,7 +82,7 @@ TEST_CASE("provide_memory") {
 TEST_CASE("internal alloc") {
     MainMemory mm;
     g_state.mm = &mm;
-    InternalMemoryManager internal(EmuInternalArea, EmuInternalAreaSize);
+    InternalMemoryManager internal(EmuInternalArea, EmuInternalAreaSize, "");
     uint32_t ea;
     auto pair = internal.internalAlloc<128, std::pair<uint32_t, uint32_t>>(&ea, 10, 20);
     REQUIRE( pair->first == 10 );
@@ -94,7 +97,7 @@ TEST_CASE("internal alloc") {
 TEST_CASE("internal_alloc_unique_ptr") {
     MainMemory mm;
     g_state.mm = &mm;
-    InternalMemoryManager internal(EmuInternalArea, EmuInternalAreaSize);
+    InternalMemoryManager internal(EmuInternalArea, EmuInternalAreaSize, "");
     uint32_t ea;
     auto pair = internal.internalAllocU<128, std::pair<uint32_t, uint32_t>>(&ea, 10, 20);
     REQUIRE( pair->first == 10 );
@@ -147,6 +150,8 @@ TEST_CASE("fixed loads") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
+    mm.mark(0x300000, 0x1000, false, "");
+    mm.mark(0, 0x1000, false, "");
     mm.setMemory(0x300000, 0, 200, true);
     mm.setMemory(32, 0, 16, true);
     uint8_t instr[] = { 
@@ -302,7 +307,7 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(1) == 0x300000 );
 }
 
-TEST_CASE("fixed stores") {
+TEST_CASE("fixed_stores") {
 /*
 1050c:       98 60 00 10     stb     r3,16(0)
 10510:       98 61 ff f0     stb     r3,-16(r1)              # fffffff0
@@ -332,6 +337,8 @@ TEST_CASE("fixed stores") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
+    mm.mark(0x300000, 0x1000, false, "");
+    mm.mark(0, 0x1000, false, "");
     uint8_t instr[] = { 
           0x98, 0x60, 0x00, 0x10
         , 0x98, 0x61, 0xff, 0xf0
@@ -444,6 +451,7 @@ TEST_CASE("fixed load store with reversal") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
+    mm.mark(0x300000, 0x1000, false, "");
     uint8_t instr[] = {
           0x7c, 0x60, 0x0e, 0x2c
         , 0x7c, 0x81, 0x16, 0x2c
@@ -503,6 +511,7 @@ TEST_CASE("fixed arithmetic") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
+    mm.mark(0, 0x1000, false, "");
     uint8_t instr[] = {
           0x38, 0x40, 0x00, 0x10
         , 0x38, 0x61, 0x00, 0x10
@@ -603,6 +612,7 @@ TEST_CASE("emu stw") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
+    mm.mark(0x400000, 0x1000, false, "");
     th.setGPR(29, 0x1122334455667788);
     th.setGPR(11, 0x400000);
     mm.setMemory(0x400000, 0, 8, true);
@@ -687,6 +697,7 @@ TEST_CASE("list3") {
     auto base = 0x10350;
     auto mem = 0x400000;
     th.setNIP(base);
+    mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 4, true);
     th.setGPR(7, mem);
     uint8_t instr[] = {
@@ -819,6 +830,7 @@ TEST_CASE("strlen") {
     th.setNIP(base);
     th.setLR(0);
     const char* str = "hello there";
+    mm.mark(0x400000, 0x1000, false, "");
     mm.writeMemory(0x400000, str, strlen(str) + 1, true);
     th.setGPR(3, 0x400000);
     for (;;) {
@@ -884,6 +896,7 @@ TEST_CASE("subf r3,r3,r4") {
 TEST_CASE("lwz r11,0(r10)") {
     MainMemory mm;
     g_state.mm = &mm;
+    mm.mark(0x400000, 0x1000, false, "");
     PPUThread th;
     uint32_t i = 0x66778899;
     mm.writeMemory(0x400000, &i, 4, true);
@@ -1119,6 +1132,8 @@ TEST_CASE("memcpy") {
     auto base = 0x17a30;
     uint64_t src = 0x400000;
     uint64_t dest = 0x600000;
+    mm.mark(src, 0x1000, false, "");
+    mm.mark(dest, 0x1000, false, "");
     th.setNIP(base);
     th.setLR(0);
     const char* str = "hello there";
@@ -1144,6 +1159,7 @@ TEST_CASE("lwz r27,112(r1)") {
     g_state.mm = &mm;
     PPUThread th;
     auto mem = 0x400000;
+    mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 8, true);
     mm.store64(mem, 0x11223344aabbccdd);
     th.setGPR(1, mem - 112);
@@ -1189,6 +1205,7 @@ TEST_CASE("float loads") {
     g_state.mm = &mm;
     PPUThread th;
     auto mem = 0x400000;
+    mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 16, true);
     mm.store64(mem,     0x3f92339c00000000); // float
     mm.store64(mem + 8, 0x3ff2467381d7dbf5); // double
@@ -1224,6 +1241,7 @@ TEST_CASE("float loads with update") {
     g_state.mm = &mm;
     PPUThread th;
     auto mem = 0x400000;
+    mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 16, true);
     uint8_t instr[] = { 
           0xc4, 0x61, 0x00, 0x70
@@ -1264,6 +1282,7 @@ TEST_CASE("float stores") {
     g_state.mm = &mm;
     PPUThread th;
     auto mem = 0x400000;
+    mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 100, true);
     th.setFPRd(1, 1.1);
     th.setGPR(0, 0);
@@ -1847,6 +1866,7 @@ TEST_CASE("addc r5,r4,r3") {
 
 TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     MainMemory mm;
+    mm.mark(0x10000, 0x1000, false, "");
     mm.setMemory(0x10000, 0x11, 1000, true);
     
     boost::thread ppu([&] {
@@ -1891,6 +1911,7 @@ TEST_CASE("ppu_memory_breakpoint") {
     MainMemory mm;
     g_state.mm = &mm;
     int called = 0;
+    mm.mark(0x10000, 0x1000, false, "");
     mm.setMemory(0x10000, 0x11, 1000, true);
     mm.memoryBreakHandler([&](auto va, auto size) {
         called++;

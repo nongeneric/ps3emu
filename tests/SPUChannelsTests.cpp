@@ -104,6 +104,7 @@ TEST_CASE("spuchannels_event_reservation") {
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
     
+    mm.mark(0x10000, 0x1000, false, "");
     mm.setMemory(0x10000, 0, 1000, true);
         
     channels.write(SPU_WrEventMask, 1u << 10);
@@ -150,6 +151,8 @@ TEST_CASE("spuchannels_event_reservation_thread_can_only_have_one_reservation_at
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
     
+    mm.mark(0x10000, 0x1000, false, "");
+    mm.mark(0x20000, 0x1000, false, "");
     mm.setMemory(0x10000, 0, 1000, true);
     mm.setMemory(0x20000, 0, 1000, true);
         
@@ -196,6 +199,7 @@ TEST_CASE("spuchannels_event_reservation_2threads") {
     SPUChannels channels(&mm, &thread);
     channels.write(SPU_WrEventMask, (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
     
+    mm.mark(0x10000, 0x1000, false, "");
     mm.setMemory(0x10000, 0, 1000, true);
 
     std::atomic<bool> th1flag, th2flag;
@@ -258,6 +262,7 @@ TEST_CASE("spuchannels_event_reservation_putllc_should_not_raise_event") {
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
     
+    mm.mark(0x10000, 0x1000, false, "");
     mm.setMemory(0x10000, 0, 1000, true);
         
     channels.write(SPU_WrEventMask, 1u << 10);
@@ -353,6 +358,7 @@ TEST_CASE("spuchannels_dma_updates") {
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
     
+    mm.mark(0x10000, 0x1000, false, "");
     mm.setMemory(0x10000, 0, 1000, true);
     
     auto mask1 = 0x10u;

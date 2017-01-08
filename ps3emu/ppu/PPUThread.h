@@ -131,7 +131,7 @@ class PPUThread {
     std::function<void(PPUThread*, PPUThreadEvent)> _eventHandler;
     boost::thread _thread;
     bool _init;
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
 #endif
@@ -189,7 +189,7 @@ public:
     int priority();
     void vmenter(uint32_t to);
     
-#ifdef DEBUG
+#ifdef DEBUGPAUSE
     void singleStepBreakpoint(bool value);
     void dbgPause(bool val);
     bool dbgIsPaused();
