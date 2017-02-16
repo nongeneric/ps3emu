@@ -33,6 +33,7 @@ int32_t cellAudioInit();
 int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam, big_uint32_t* portNum);
 int32_t cellAudioGetPortConfig(uint32_t portNum, CellAudioPortConfig* portConfig);
 int32_t cellAudioPortStart(uint32_t portNum);
+int32_t cellAudioSetNotifyEventQueueEx(sys_ipc_key_t key, uint32_t iFlags);
 int32_t cellAudioSetNotifyEventQueue(sys_ipc_key_t key);
 int32_t cellAudioOutSetCopyControl(CellAudioOut audioOut, CellAudioOutCopyControl control);
 int32_t cellAudioCreateNotifyEventQueue(sys_event_queue_t *id, sys_ipc_key_t *key);

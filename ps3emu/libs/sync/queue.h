@@ -9,6 +9,8 @@
 #define SYS_EVENT_PORT_LOCAL 0x01
 #define SYS_EVENT_QUEUE_LOCAL 0x00
 #define SYS_SPU_THREAD_EVENT_USER 0x1
+#define SYS_PPU_QUEUE 0x01
+#define SYS_SPU_QUEUE 0x02
 
 typedef struct sys_event_queue_attr {
     sys_protocol_t attr_protocol;

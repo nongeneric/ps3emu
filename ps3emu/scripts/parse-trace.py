@@ -74,4 +74,3 @@ if args.changes:
         for creg, nreg, name in zip(c.vregs, n.vregs, vnames):
             if creg != nreg: changed.append((name, nreg))
         print(hex(n.nip), [(name, hex(x)) for name, x in changed])
-        

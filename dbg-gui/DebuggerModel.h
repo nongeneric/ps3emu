@@ -78,7 +78,7 @@ class DebuggerModel : public QWidget {
     void dumpThreads();
     void dumpMutexes(bool lw);
     void changeThread(uint32_t index);
-    void printSegment(uint32_t ea);
+    std::string printSegment(uint32_t ea);
     void execSingleCommand(QString command);
     void dbgLoop();
     void loadElfHandler(LoadElfCommand command);

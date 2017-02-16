@@ -39,5 +39,5 @@ int sys_lwmutex_destroy(ps3_uintptr_t lwmutex_id);
 int sys_lwmutex_lock(ps3_uintptr_t lwmutex_id, usecond_t timeout);
 int sys_lwmutex_trylock(ps3_uintptr_t lwmutex_id);
 int sys_lwmutex_unlock(ps3_uintptr_t lwmutex_id);
-std::shared_ptr<IMutex> find_lwmutex(ps3_uintptr_t id);
-std::map<uint32_t, std::shared_ptr<IMutex>> dbgDumpLwMutexes();
+sys_mutex_t find_lwmutex(ps3_uintptr_t id);
+std::map<uint32_t, std::shared_ptr<PthreadMutexInfo>> dbgDumpLwMutexes();

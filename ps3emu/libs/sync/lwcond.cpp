@@ -3,14 +3,10 @@
 #include "lwmutex.h"
 #include <boost/thread/condition_variable.hpp>
 #include "ps3emu/log.h"
+#include "ps3emu/libs/sync/cond.h"
 
 namespace {
-    struct cv_info_t {
-        boost::condition_variable_any cv;
-        IMutex* m;
-    };
-    
-    using cv_map_t = std::map<ps3_uintptr_t, std::shared_ptr<cv_info_t>>;
+    using cv_map_t = std::map<ps3_uintptr_t, sys_cond_t>;
     cv_map_t cvs;
     boost::mutex map_mutex;
 }
@@ -31,41 +27,52 @@ int32_t sys_lwcond_create(ps3_uintptr_t lwcond,
     type.lwmutex = lwmutex;
     type.lwcond_queue = 0xaabbccdd;
     mm->writeMemory(lwcond, &type, sizeof(type));
-    auto info = std::make_shared<cv_info_t>();
-    info->m = find_lwmutex(lwmutex).get();
+    
+    sys_cond_attribute_t cattr;
+    strncpy(cattr.name, attr->name, SYS_SYNC_NAME_SIZE);
+    
+    sys_cond_t c;
+    auto ret = sys_cond_create(&c, find_lwmutex(lwmutex), &cattr);
+    if (ret)
+        return ret;
+    
     boost::unique_lock<boost::mutex> lock(map_mutex);
-     cvs.emplace(lwcond, std::move(info));
+    cvs[lwcond] = c;
+    
     return CELL_OK;
 }
 
 int32_t sys_lwcond_destroy(ps3_uintptr_t lwcond) {
     LOG << ssnprintf("sys_lwcond_destroy(%x)", lwcond);
+    
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    cvs.erase(find_cv_iter(lwcond));
+    auto it = find_cv_iter(lwcond);
+    
+    auto ret = sys_cond_destroy(it->second);
+    if (ret)
+        return ret;
+    
+    cvs.erase(it);
     return CELL_OK;
 }
 
 int32_t sys_lwcond_wait(ps3_uintptr_t lwcond, usecond_t timeout) {
-    assert(timeout == 0);
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    auto info = find_cv_iter(lwcond)->second;
+    auto cond = find_cv_iter(lwcond)->second;
     lock.unlock();
-    info->cv.wait(*info->m);
-    return CELL_OK;
+    return sys_cond_wait(cond, timeout);
 }
 
 int32_t sys_lwcond_signal(ps3_uintptr_t lwcond) {
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    auto info = find_cv_iter(lwcond)->second;
+    auto cond = find_cv_iter(lwcond)->second;
     lock.unlock();
-    info->cv.notify_one();
-    return CELL_OK;
+    return sys_cond_signal(cond);
 }
 
 int32_t sys_lwcond_signal_all(ps3_uintptr_t lwcond) {
     boost::unique_lock<boost::mutex> lock(map_mutex);
-    auto info = find_cv_iter(lwcond)->second;
+    auto cond = find_cv_iter(lwcond)->second;
     lock.unlock();
-    info->cv.notify_all();
-    return CELL_OK;
+    return sys_cond_signal_all(cond);
 }

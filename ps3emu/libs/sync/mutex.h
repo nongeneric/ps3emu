@@ -5,66 +5,25 @@
 #include <boost/chrono.hpp>
 #include <memory>
 #include <map>
+#include <pthread.h>
 
 typedef big_uint32_t sys_mutex_t;
 
-class IMutex {
-public:
-    virtual bool lock(usecond_t timeout = 0) = 0;
-    virtual void unlock() = 0;
-    virtual bool try_lock(usecond_t timeout) = 0;
-    virtual void destroy() = 0;
-    virtual PPUThread* owner() = 0;
-    virtual std::string name() = 0;
-    virtual ~IMutex() = default;
-};
+#define CELL_EFAULT -2147418099  /* 0x8001000D */
+#define CELL_EINVAL -2147418110  /* 0x80010002 */
+#define CELL_EAGAIN -2147418111  /* 0x80010001 */
+#define CELL_ESRCH -2147418107   /* 0x80010005 */
+#define CELL_EPERM -2147418103   /* 0x80010009 */
+#define CELL_EDEADLK -2147418104 /* 0x80010008 */
+#define CELL_EBUSY -2147418102   /* 0x8001000A */
 
-template <typename M>
-class Mutex : public IMutex {
-    M* _m;
-    PPUThread* _owner;
-    std::string _name;
-public:
-    Mutex(std::string name) : _m(new M()), _owner(nullptr), _name(name) { }
+struct PthreadMutexInfo {
+    pthread_mutex_t mutex;
+    pthread_mutexattr_t attr;
+    std::string name;
     
-    bool lock(usecond_t timeout) override {
-        bool locked = false;
-        if (timeout == 0) {
-            _m->lock();
-            locked = true;
-        } else {
-            locked = _m->try_lock_for( boost::chrono::microseconds(timeout) );
-        }
-        if (locked) {
-            _owner = g_state.th;
-        }
-        return locked;
-    }
-    
-    void unlock() override {
-        _owner = nullptr;
-        _m->unlock();
-    }
-    
-    bool try_lock(usecond_t timeout) override {
-        if (timeout == 0) {
-            return _m->try_lock();
-        } else {
-            return _m->try_lock_for( boost::chrono::microseconds(timeout) );
-        }
-    }
-    
-    PPUThread* owner() override {
-        return _owner;
-    }
-    
-    std::string name() override {
-        return _name;
-    }
-    
-    void destroy() override {
-        delete _m;
-    }
+    std::string typestr();
+    int type();
 };
 
 struct sys_mutex_attribute_t {
@@ -84,5 +43,5 @@ int sys_mutex_destroy(sys_mutex_t mutex_id);
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout);
 int sys_mutex_trylock(sys_mutex_t mutex_id);
 int sys_mutex_unlock(sys_mutex_t mutex_id);
-std::shared_ptr<IMutex> find_mutex(sys_mutex_t id);
-std::map<uint32_t, std::shared_ptr<IMutex>> dbgDumpMutexes();
+std::shared_ptr<PthreadMutexInfo> find_mutex(sys_mutex_t id);
+std::map<uint32_t, std::shared_ptr<PthreadMutexInfo>> dbgDumpMutexes();

@@ -13,7 +13,7 @@ struct sys_cond_attribute_t {
 using sys_cond_t = big_uint32_t;
 
 int32_t sys_cond_create(sys_cond_t* cond_id, 
-                        sys_mutex_t lwmutex,
+                        sys_mutex_t mutex,
                         const sys_cond_attribute_t* attr);
 int32_t sys_cond_destroy(sys_cond_t cond);
 int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout);

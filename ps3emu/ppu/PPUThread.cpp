@@ -6,6 +6,8 @@
 #include "ppu_dasm_forms.h"
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
+#include <sys/types.h>
+#include <sys/syscall.h>
 
 #include <boost/endian/conversion.hpp>
 
@@ -53,6 +55,7 @@ void PPUThread::vmenter(uint32_t to) {
 void PPUThread::innerLoop() {
     assert(getNIP());
     g_state.th = this;
+    _tid = syscall(__NR_gettid);;
 
     for (;;) {
 #ifdef DEBUGPAUSE
@@ -241,4 +244,8 @@ std::string PPUThread::getName() {
 
 void PPUThread::raiseModuleLoaded() {
     _eventHandler(this, PPUThreadEvent::ModuleLoaded);
+}
+
+unsigned PPUThread::getTid() {
+    return _tid;
 }

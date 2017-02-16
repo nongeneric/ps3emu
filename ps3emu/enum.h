@@ -81,7 +81,7 @@ void enum_validate(T val) {
     BOOST_PP_COMMA()
 
 #define ENUM_IMPL(name, isFlags, ...) \
-    enum class name : unsigned { \
+    enum class name : unsigned long long { \
         BOOST_PP_LIST_FOR_EACH(ENUMF_NAME_VALUE_PAIR_LIST, _, \
             BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__) ) \
     }; \

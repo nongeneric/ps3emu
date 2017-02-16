@@ -653,7 +653,6 @@ void DebuggerModel::execSingleCommand(QString command) {
         return;
     } else if (name == "backtraceall") {
         for (auto th : _proc->dbgPPUThreads()) {
-            messagef("thread %s", th->getName());
             _activeThread = th;
             printBacktrace();
         }
@@ -728,7 +727,7 @@ void DebuggerModel::execSingleCommand(QString command) {
             changeThread(exprVal);
             return;
         } else if (name == "segment") {
-            printSegment(exprVal);
+            messagef("%s", printSegment(exprVal));
         } else if (name == "info") {
             auto range = g_state.mm->addressRange(exprVal);
             messagef("range: %x-%x, %s, %s",
@@ -743,17 +742,16 @@ void DebuggerModel::execSingleCommand(QString command) {
     }
 }
 
-void DebuggerModel::printSegment(uint32_t ea) {
+std::string DebuggerModel::printSegment(uint32_t ea) {
     for (auto& segment : _proc->getSegments()) {
         if (intersects(segment.va, segment.size, ea, 0u)) {
-            auto msg = ssnprintf("base: %08x, rva: %08x, name: %s",
+            return ssnprintf("base: %08x, rva: %08x, name: %s",
                                  segment.va,
                                  ea - segment.va,
                                  segment.elf->shortName());
-            emit message(QString::fromStdString(msg));
-            return;
         }
     }
+    return "none";
 }
 
 void DebuggerModel::changeThread(uint32_t index) {
@@ -773,13 +771,23 @@ void DebuggerModel::changeThread(uint32_t index) {
     updateUI();
 }
 
+PPUThread* getThreadByTid(std::vector<PPUThread*>& threads, unsigned tid) {
+    for (auto& th : threads) {
+        if (th->getTid() == tid)
+            return th;
+    }
+    return nullptr;
+}
+
 void DebuggerModel::dumpMutexes(bool lw) {
-    emit messagef("%smutexes (id, name, owner)", lw ? "lw " : "");
+    emit messagef("%smutexes (id, name, type, owner)", lw ? "lw " : "");
+    auto threads = _proc->dbgPPUThreads();
     for (auto& pair : lw ? dbgDumpLwMutexes() : dbgDumpMutexes()) {
-        auto owner = pair.second->owner();
-        emit messagef("  %x, %s, %s",
+        auto owner = getThreadByTid(threads, pair.second->mutex.__data.__owner);
+        emit messagef("  %x, %s, %s, %s",
                       pair.first,
-                      pair.second->name(),
+                      pair.second->name,
+                      pair.second->typestr(),
                       owner ? owner->getName() : "unlocked");
     }
 }
@@ -1140,9 +1148,11 @@ std::vector<StackFrame> walkStack(uint64_t backChain) {
 
 void DebuggerModel::printBacktrace() {
     if (_activeThread) {
-        messagef("backtrace nip = %x", _activeThread->getNIP());
+        messagef("backtrace thread %s", _activeThread->getName());
+        auto print = [&](auto ip) { this->messagef("  %x\t %s", ip, printSegment(ip)); };
+        print(_activeThread->getNIP());
         for (auto frame : walkStack(_activeThread->getGPR(1))) {
-            messagef("  %x", frame.lr);
+            print(frame.lr);
         }
     }
 }

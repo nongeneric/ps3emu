@@ -242,6 +242,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellAudioGetPortConfig),
     ENTRY(cellAudioPortStart),
     ENTRY(cellAudioSetNotifyEventQueue),
+    ENTRY(cellAudioSetNotifyEventQueueEx),
     ENTRY(sys_event_port_disconnect),
     ENTRY(ps3call_then),
     ENTRY(_sys_printf),

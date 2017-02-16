@@ -26,7 +26,7 @@
 #define CELL_ERROR_CAST(err) (static_cast<int>(err))
 #define CELL_AUDIO_MAKE_ERROR(status) CELL_ERROR_MAKE_ERROR(CELL_ERROR_FACILITY_SOUND, status)
 #define CELL_AUDIO_ERROR_ALREADY_INIT       CELL_ERROR_CAST(0x80310701) // aready init
-#define CELL_AUDIO_ERROR_AUDIOSYSTEM        CELL_ERROR_CAST(0x80310702) // error in AudioSystem.
+#define CELL_AUDIO_ERROR_AUDIOSYSTEM        CELL_ERROR_CAST(0x80310702) // error in AudioSystem
 #define CELL_AUDIO_ERROR_NOT_INIT           CELL_ERROR_CAST(0x80310703) // not init
 #define CELL_AUDIO_ERROR_PARAM              CELL_ERROR_CAST(0x80310704) // param error
 #define CELL_AUDIO_ERROR_PORT_FULL          CELL_ERROR_CAST(0x80310705) // audio port is full
@@ -166,12 +166,17 @@ int32_t cellAudioPortStart(uint32_t portNum) {
     return CELL_OK;
 }
 
+int32_t cellAudioSetNotifyEventQueueEx(sys_ipc_key_t key, uint32_t iFlags) {
+    assert(iFlags == 0);
+    return cellAudioSetNotifyEventQueue(key);
+}
+
 int32_t cellAudioSetNotifyEventQueue(sys_ipc_key_t key) {
     INFO(libs) << ssnprintf("cellAudioSetNotifyEventQueue(%x)", key);
     context.notifyQueue = getQueueByKey(key);
     disableLogging(context.notifyQueue);
     auto res = sys_event_port_create(
-        &context.notifyQueuePort, SYS_EVENT_PORT_LOCAL, SYS_EVENT_PORT_NO_NAME);
+        &context.notifyQueuePort, SYS_EVENT_PORT_LOCAL, 0x010003000e001c0aull);
     assert(!res);
     res = sys_event_port_connect_local(context.notifyQueuePort, context.notifyQueue);
     assert(!res);
@@ -188,7 +193,7 @@ int32_t cellAudioCreateNotifyEventQueue(sys_event_queue_t *id, sys_ipc_key_t *ke
     sys_event_queue_attr attr { 0 };
     attr.attr_protocol = SYS_SYNC_FIFO;
     strncpy(attr.name, "EmuAuNo", SYS_SYNC_NAME_SIZE);
-    auto res = sys_event_queue_create(id, &attr, *key, 16);
+    auto res = sys_event_queue_create(id, &attr, *key, 8);
     assert(res == CELL_OK);
     INFO(libs) << ssnprintf("cellAudioCreateNotifyEventQueue(%x, %x)", *id, *key);
     return CELL_OK;

@@ -146,6 +146,7 @@ class PPUThread {
     boost::condition_variable _cvRunning;
     boost::mutex _mutexRunning;
     std::string _name;
+    unsigned _tid;
     
     uint32_t _NIP;
     uint64_t _LR = 0;
@@ -428,6 +429,7 @@ public:
     ~PPUThread() = default;
     friend uint64_t ps3call_then(PPUThread* thread);
     void raiseModuleLoaded();
+    unsigned getTid();
 };
 
 uint64_t ps3call_then(PPUThread* thread);
