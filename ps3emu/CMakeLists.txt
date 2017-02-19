@@ -21,6 +21,7 @@ set(SRC
     state.cpp
     Config.cpp
     RewriterUtils.cpp
+    fileutils.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
     spu/SPUChannels.cpp

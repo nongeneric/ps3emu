@@ -21,8 +21,10 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     proc.start(runnerPath,
                QStringList() << "--elf" << QString::fromStdString(args.front())
                              << "--args" << QString::fromStdString(argstr));
-    proc.waitForStarted();
-    proc.waitForFinished();
+    if (!proc.waitForStarted())
+        throw std::runtime_error("can't start process");
+    if (!proc.waitForFinished())
+        throw std::runtime_error("process timed out");
     return QString(proc.readAll()).toStdString();
 }
 

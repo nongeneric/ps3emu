@@ -2754,3 +2754,56 @@ template void SPUDasm<DasmMode::Emulate, SPUThread>(
 
 template void SPUDasm<DasmMode::Name, std::string>(
     void* instr, uint32_t cia, std::string* name);
+
+InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
+    auto i = reinterpret_cast<SPUForm*>(&instr);
+    InstructionInfo info;
+    info.flow = false;
+    info.passthrough = false;
+    info.target = 0;
+    
+    switch (i->OP11.u()) {
+        case 0b00110101000: // bi
+        case 0b00110101010: // iret
+            info.flow = true;
+            break;
+        case 0b00110101001: // bisl
+            info.flow = true;
+            info.passthrough = true;
+            break;
+        case 0b00100101000: // biz
+        case 0b00100101001: // binz
+        case 0b00100101010: // bihz
+        case 0b00100101011: // bihnz
+            info.passthrough = true;
+            info.flow = true;
+            break;
+    }
+    
+    switch (i->OP9.u()) {
+        case 0b001100100:   // br
+        case 0b001100110: { // brsl
+            int32_t offset = signed_lshift32(i->I16.s(), 2);
+            info.target = (cia + offset) & LSLR;
+            info.flow = true;
+            info.passthrough = i->OP9.u() == 0b001100110;
+        } break;
+        case 0b001100000:   // bra
+        case 0b001100010: { // brasl
+            int32_t address = signed_lshift32(i->I16.s(), 2);
+            info.target = address & LSLR;
+            info.flow = true;
+            info.passthrough = i->OP9.u() == 0b001100010;
+        } break;
+        case 0b001000010:   // brnz
+        case 0b001000000:   // brz
+        case 0b001000110:   // brhnz
+        case 0b001000100: { // brhz
+            info.target = br_cia_lsa(i->I16, cia);
+            info.passthrough = true;
+            info.flow = true;
+        } break;
+    }
+    
+    return info;
+}

@@ -181,16 +181,9 @@ int32_t sys_prx_stop_module(sys_prx_id_t id,
     assert(flags == 0);
     assert(opt->struct_size == sizeof(sys_prx_start_module_t));
     assert(opt->neg1 == -1ull);
-    assert(opt->mode == 1 || opt->mode == 2 || opt->mode == 4 || opt->mode == 8);
+    auto mode = enum_cast<prx_module_mode>(opt->mode);
     
-    if (opt->mode == 4 || opt->mode == 8) {
-        INFO(libs) << ssnprintf("sys_prx_stop_module: modes 4 and 8 not implemented");
-    }
-    
-    if (opt->mode == 1 || opt->mode == 4) {
-        INFO(libs) << ssnprintf("sys_prx_stop_module(find, %08x, %s)",
-                                id,
-                                (char*)&opt->name_or_fdescrva);
+    if (mode == prx_module_mode::user_lookup || mode == prx_module_mode::system_lookup) {
         opt->name_or_fdescrva = id == 0 ? 0 : findExportedModuleFunction(id, "module_stop");
         if (!opt->name_or_fdescrva) {
             uint32_t descrva;
@@ -202,17 +195,29 @@ int32_t sys_prx_stop_module(sys_prx_id_t id,
             encodeNCall(g_state.mm, descrva + 4, index);
             opt->name_or_fdescrva = descrva;
         }
-        return CELL_OK;
-    } else if (opt->mode == 2 || opt->mode == 8) {
-        return CELL_OK;
+    } else if (mode == prx_module_mode::user_confirm || mode == prx_module_mode::system_confirm) {
     }
-    return 0;
+    
+    INFO(libs) << ssnprintf("sys_prx_stop_module(find, %08x, %s, mode: %d)",
+                            id,
+                            (char*)&opt->name_or_fdescrva,
+                            to_string(mode));
+    
+    return CELL_OK;
 }
 
 int32_t sys_prx_unload_module(sys_prx_id_t id, uint64_t flags, uint64_t pOpt) {
     assert(flags == 0);
     assert(pOpt == 0);
-    WARNING(libs) << "sys_prx_unload_module not implemented";
+    auto segments = g_state.proc->getSegments();
+    auto it = std::find_if(begin(segments), end(segments), [&](auto& s) {
+        return s.va == id;
+    });
+    if (it == end(segments))
+        throw std::runtime_error("sys_prx_unload_module failed");
+    auto index = std::distance(begin(segments), it);
+    g_state.proc->unloadSegment(segments[index].va);
+    g_state.proc->unloadSegment(segments[index + 1].va);
     return CELL_OK;
 }
 
@@ -526,8 +531,8 @@ int32_t sys_prx_load_module_list(int32_t n,
                                  ps3_uintptr_t path_list_va,
                                  uint64_t flags,
                                  uint64_t pOpt,
-                                 ps3_uintptr_t idlist,
-                                 PPUThread* thread) {
+                                 ps3_uintptr_t idlist) {
+    INFO(libs) << ssnprintf("sys_prx_load_module_list(%d, ...)", n);
     assert(flags == 0);
     for (auto i = 0; i < n; ++i) {
         auto pathVa = g_state.mm->load64(path_list_va);
@@ -582,6 +587,7 @@ int32_t sys_mmapper_search_and_map(uint32_t start_addr,
 #define SYS_MODULE_STOP_LEVEL_SYSTEM	0x00004000
 
 int32_t sys_prx_get_module_list(uint32_t flags, sys_prx_get_module_list_t* info) {
+    INFO(libs) << ssnprintf("sys_prx_get_module_list(%x, ...)", flags);
     assert(flags == 2);
     auto& segments = g_state.proc->getSegments();
     assert(info->max_ids_size >= segments.size() / 2);

@@ -11,7 +11,7 @@ std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t imageBase,
     std::stack<uint32_t> leads,
     std::ostream& log,
-    std::function<uint32_t(uint32_t)> readInstr)
+    std::function<InstructionInfo(uint32_t)> analyze)
 {
     std::set<uint32_t> allLeads;
     std::set<uint32_t> breaks;
@@ -25,7 +25,7 @@ std::vector<BasicBlock> discoverBasicBlocks(
         allLeads.insert(cia);
         
         for (;;) {
-            auto info = analyze(readInstr(cia), cia);
+            auto info = analyze(cia);
             auto logLead = [&] (uint32_t target) {
                 log << ssnprintf("new lead %x(%x) -> %x(%x)\n",
                                  cia,
@@ -75,4 +75,21 @@ std::vector<BasicBlock> discoverBasicBlocks(
         }
     }
     return blocks;
+}
+
+std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const& elf) {
+    std::vector<uint8_t> magic { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3 };
+    std::vector<EmbeddedElfInfo> elfs;
+    auto it = begin(elf);
+    for (;;) {
+        it = std::search(it, end(elf), begin(magic), end(magic));
+        if (it == end(elf))
+            break;
+        auto elfit = it++;
+        auto header = (const Elf32_be_Ehdr*)&*elfit;
+        if (header->e_ident[EI_CLASS] != ELFCLASS32)
+            continue;
+        elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), header});
+    }
+    return elfs;
 }

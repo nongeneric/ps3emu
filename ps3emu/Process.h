@@ -193,6 +193,7 @@ public:
     boost::chrono::microseconds getTimeBaseMicroseconds();
     boost::chrono::nanoseconds getTimeBaseNanoseconds();
     std::vector<ModuleSegment>& getSegments();
+    void unloadSegment(uint32_t va);
     std::vector<std::shared_ptr<ELFLoader>> loadedModules();
     StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
     void dbgPause(bool pause);

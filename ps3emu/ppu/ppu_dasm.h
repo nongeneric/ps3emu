@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <cstdint>
+#include "ps3emu/dasm_utils.h"
 
 class PPUThread;
 
@@ -20,17 +21,7 @@ public:
     InfiniteLoopException() : std::runtime_error("infinite loop") { }
 };
 
-enum class DasmMode {
-    Print, Emulate, Name, Rewrite
-};
-
-struct PPUInstructionInfo {
-    bool flow = false;
-    bool passthrough = false;
-    uint32_t target = 0;
-};
-
-PPUInstructionInfo analyze(uint32_t instr, uint32_t cia);
+InstructionInfo analyze(uint32_t instr, uint32_t cia);
 bool isAbsoluteBranch(uint32_t instr);
 bool isTaken(uint32_t branchInstr, uint32_t cia, PPUThread* thread);
 uint64_t getTargetAddress(uint32_t branchInstr, uint32_t cia);

@@ -1,9 +1,12 @@
 #pragma once
 
 #include "utils.h"
-#include "ppu/ppu_dasm.h"
 #include <boost/type_traits.hpp>
 #include <string>
+
+enum class DasmMode {
+    Print, Emulate, Name, Rewrite
+};
 
 inline std::string format_u(const char* mnemonic, uint64_t u) {
     return ssnprintf("%s %" PRIx64, mnemonic, u);
@@ -100,3 +103,9 @@ void invoke_impl(const char* name, P* phandler, E* ehandler, R* rhandler, void* 
     if (M == DasmMode::Rewrite)
         rhandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<RS>(s));
 }
+
+struct InstructionInfo {
+    bool flow = false;
+    bool passthrough = false;
+    uint32_t target = 0;
+};

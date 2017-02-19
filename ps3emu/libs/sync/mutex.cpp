@@ -19,7 +19,7 @@ std::string PthreadMutexInfo::typestr() {
 int PthreadMutexInfo::type() {
     int type;
     auto ret = pthread_mutexattr_gettype(&attr, &type);
-    assert(ret == 0);
+    assert(ret == 0); (void)ret;
     return type;
 }
 
@@ -31,7 +31,7 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     info->name = attr->name;
     pthread_mutexattr_t ptattr;
     auto ret = pthread_mutexattr_init(&ptattr);
-    assert(ret == 0);
+    assert(ret == 0); (void)ret;
 
     auto type = attr->attr_recursive == SYS_SYNC_RECURSIVE
                     ? PTHREAD_MUTEX_RECURSIVE

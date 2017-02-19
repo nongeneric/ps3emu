@@ -129,7 +129,7 @@ void HandleRewrite(RewriteCommand const& command) {
     
     auto blocks = discoverBasicBlocks(
         vaBase, segmentSize, command.imageBase, leads, log, [](uint32_t cia) {
-            return g_state.mm->load32(cia);
+            return analyze(g_state.mm->load32(cia), cia);
         });
     
     for (auto& block : blocks) {

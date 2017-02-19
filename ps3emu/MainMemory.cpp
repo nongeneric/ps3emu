@@ -13,7 +13,7 @@ inline bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
     return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
 }
 
-static constexpr auto PagePtrMask = ~uintptr_t() - 1;
+#define PagePtrMask (~uintptr_t() - 1)
 
 bool MainMemory::isReservedByCurrentThread(uint32_t va, uint32_t size) {
     auto thread = boost::this_thread::get_id();
@@ -176,7 +176,6 @@ bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
         auto& page = _pages[split.page.u()]; \
         auto offset = split.offset.u(); \
         auto ptr = (page.ptr & PagePtrMask) + offset; \
-        boost::unique_lock<SpinLock> lock(_storeLock); \
         return endian_reverse(*(uint##x##_t*)ptr); \
     }
 

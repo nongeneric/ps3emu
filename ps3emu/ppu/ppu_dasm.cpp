@@ -4373,8 +4373,8 @@ uint64_t getTargetAddress(uint32_t branchInstr, uint32_t cia) {
     throw std::runtime_error("not absolute branch");
 }
 
-PPUInstructionInfo analyze(uint32_t instr, uint32_t cia) {
-    PPUInstructionInfo info;
+InstructionInfo analyze(uint32_t instr, uint32_t cia) {
+    InstructionInfo info;
     auto iform = reinterpret_cast<IForm*>(&instr);
     auto bform = reinterpret_cast<BForm*>(&instr);
     auto xlform1 = reinterpret_cast<XLForm_1*>(&instr);

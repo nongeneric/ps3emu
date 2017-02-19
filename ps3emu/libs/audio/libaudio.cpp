@@ -177,7 +177,7 @@ int32_t cellAudioSetNotifyEventQueue(sys_ipc_key_t key) {
     disableLogging(context.notifyQueue);
     auto res = sys_event_port_create(
         &context.notifyQueuePort, SYS_EVENT_PORT_LOCAL, 0x010003000e001c0aull);
-    assert(!res);
+    assert(!res); (void)res;
     res = sys_event_port_connect_local(context.notifyQueuePort, context.notifyQueue);
     assert(!res);
     return CELL_OK;
@@ -194,7 +194,7 @@ int32_t cellAudioCreateNotifyEventQueue(sys_event_queue_t *id, sys_ipc_key_t *ke
     attr.attr_protocol = SYS_SYNC_FIFO;
     strncpy(attr.name, "EmuAuNo", SYS_SYNC_NAME_SIZE);
     auto res = sys_event_queue_create(id, &attr, *key, 8);
-    assert(res == CELL_OK);
+    assert(res == CELL_OK); (void)res;
     INFO(libs) << ssnprintf("cellAudioCreateNotifyEventQueue(%x, %x)", *id, *key);
     return CELL_OK;
 }

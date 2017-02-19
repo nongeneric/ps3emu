@@ -4,8 +4,9 @@
 #include "ps3emu/ContentManager.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/log.h"
+#include "ps3emu/fileutils.h"
 #include "libsysutil.h"
-#include "pugixml.hpp"
+#include <pugixml.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
@@ -302,15 +303,6 @@ int32_t sceNpTrophyGetTrophyInfo(SceNpTrophyContext,
     return CELL_OK;
 }
 
-std::vector<uint8_t> readFile(path p) {
-    std::vector<uint8_t> res(file_size(p));
-    auto f = fopen(p.c_str(), "r");
-    assert(f);
-    fread(&res[0], 1, res.size(), f);
-    fclose(f);
-    return res;
-}
-
 int32_t sceNpTrophyGetGameIcon(SceNpTrophyContext,
                                SceNpTrophyHandle,
                                uint32_t buffer,
@@ -324,7 +316,7 @@ int32_t sceNpTrophyGetGameIcon(SceNpTrophyContext,
         return CELL_OK;
     }
     
-    auto file = readFile(context.gameImagePath);
+    auto file = read_all_bytes(context.gameImagePath.string());
     g_state.mm->writeMemory(buffer, &file[0], file.size());
     
     return CELL_OK;
@@ -348,7 +340,7 @@ int32_t sceNpTrophyGetTrophyIcon(SceNpTrophyContext,
         return CELL_OK;
     }
     
-    auto file = readFile(trophy.imagePath);
+    auto file = read_all_bytes(trophy.imagePath.string());
     g_state.mm->writeMemory(buffer, &file[0], file.size());
     
     return CELL_OK;

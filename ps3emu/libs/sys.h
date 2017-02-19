@@ -1,8 +1,9 @@
 #pragma once
 
 #include "sys_defs.h"
-#include "../constants.h"
-#include "../ELFLoader.h"
+#include "ps3emu/constants.h"
+#include "ps3emu/ELFLoader.h"
+#include "ps3emu/enum.h"
 #include <array>
 
 class Process;
@@ -69,6 +70,13 @@ typedef big_uint32_t sys_prx_id_t;
 
 int sys_prx_exitspawn_with_level(uint64_t level);
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc);
+
+ENUM(prx_module_mode,
+    (user_lookup, 1),
+    (user_confirm, 2),
+    (system_lookup, 4),
+    (system_confirm, 8)
+)
 
 struct sys_prx_start_module_t {
     big_uint64_t struct_size;
@@ -198,8 +206,7 @@ int32_t sys_prx_load_module_list(int32_t n,
                                  ps3_uintptr_t path_list,
                                  uint64_t flags,
                                  uint64_t pOpt,
-                                 ps3_uintptr_t idlist,
-                                 PPUThread* thread);
+                                 ps3_uintptr_t idlist);
 int32_t sys_mmapper_allocate_shared_memory(uint32_t id,
                                            uint32_t size,
                                            uint32_t alignment,

@@ -552,6 +552,15 @@ std::vector<ModuleSegment>& Process::getSegments() {
     return _segments;
 }
 
+void Process::unloadSegment(uint32_t va) {
+    auto it = std::find_if(begin(_segments), end(_segments), [&](auto& s) {
+        return s.va == va;  
+    });
+    if (it == end(_segments))
+        throw std::runtime_error("unloading non-existent segment");
+    _segments.erase(it);
+}
+
 std::vector<std::shared_ptr<ELFLoader>> Process::loadedModules() {
     return _prxs;
 }
