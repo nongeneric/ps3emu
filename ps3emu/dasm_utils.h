@@ -3,6 +3,7 @@
 #include "utils.h"
 #include <boost/type_traits.hpp>
 #include <string>
+#include <vector>
 
 enum class DasmMode {
     Print, Emulate, Name, Rewrite
@@ -86,6 +87,30 @@ inline std::string format_nnnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3,
                      op4.prefix(), op4.native(),
                      op5.prefix(), op5.native()
     );
+}
+
+template <typename T>
+std::string printSorU(T v) {
+    if (std::is_signed<T>::value) {
+        return ssnprintf("%d", v);
+    }
+    return ssnprintf("0x%xu", v);
+}
+
+inline std::string print_args(std::vector<std::string> vec) {
+    std::string res;
+    for (auto i = 0u; i < vec.size(); ++i) {
+        if (i) {
+            res += ",";
+        }
+        res += vec[i];
+    }
+    return res;
+}
+
+template <typename... Ts>
+std::string rewrite_print(const char* mnemonic, Ts... ts) {
+    return ssnprintf("_%s(%s)", mnemonic, print_args(std::vector<std::string>{ printSorU(ts)... }));
 }
 
 template <DasmMode M, typename P, typename E, typename S, typename R>

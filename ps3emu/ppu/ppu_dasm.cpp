@@ -52,34 +52,8 @@ using namespace boost::endian;
 
 #define MM g_state.mm
 #define TH thread
-#define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
-#define REWRITE(name, form) inline void rewrite##name(form* i, uint64_t cia, std::string* result)
-#define EMU(name, form) inline void emulate##name(form* i, uint64_t cia, PPUThread* thread)
 #define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, rewrite##name, &x, cia, state); break
-
-template <typename T>
-std::string printSorU(T v) {
-    if (std::is_signed<T>::value) {
-        return ssnprintf("%d", v);
-    }
-    return ssnprintf("0x%xu", v);
-}
-
-inline std::string print_args(std::vector<std::string> vec) {
-    std::string res;
-    for (auto i = 0u; i < vec.size(); ++i) {
-        if (i) {
-            res += ",";
-        }
-        res += vec[i];
-    }
-    return res;
-}
-
-template <typename... Ts>
-std::string rewrite_print(const char* mnemonic, Ts... ts) {
-    return ssnprintf("_%s(%s)", mnemonic, print_args(std::vector<std::string>{ printSorU(ts)... }));
-}
+#define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
 
 #ifdef EMU_REWRITER
 #define EMU_REWRITE(...)
