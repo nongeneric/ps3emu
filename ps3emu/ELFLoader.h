@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MainMemory.h"
-#include "ps3emu/ppu/rewriter.h"
+#include "ps3emu/rewriter.h"
 #include "ps3emu/state.h"
 #include <stdint.h>
 #include <elf.h>
@@ -168,16 +168,20 @@ struct StolenFuncInfo {
 };
 
 class RewriterStore {
-    std::vector<RewrittenBlocks> _modules;
+    std::vector<RewrittenSegment> _modules;
     
 public:
-    inline unsigned add(const RewrittenBlocks *blocks) {
-        _modules.push_back(*blocks);
+    inline unsigned add(const RewrittenSegment *segment) {
+        _modules.push_back(*segment);
         return _modules.size() - 1;
     }
     
-    inline void invoke(unsigned index, unsigned label) {
-        _modules[index].entryPoint(g_state.th, label);
+    inline void invokePPU(unsigned index, unsigned label) {
+        _modules[index].ppuEntryPoint(g_state.th, label);
+    }
+    
+    inline void invokeSPU(unsigned index, unsigned label) {
+        _modules[index].spuEntryPoint(g_state.sth, label);
     }
 };
 

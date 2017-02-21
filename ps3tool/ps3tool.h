@@ -33,6 +33,7 @@ struct RewriteCommand {
     std::string elf;
     std::string cpp;
     uint32_t imageBase;
+    bool isSpu = false;
     std::vector<uint32_t> entryPoints;
     std::vector<uint32_t> ignoredEntryPoints;
 };

@@ -119,13 +119,16 @@ Command ParseOptions(int argc, const char *argv[]) {
             ("entries", value<std::vector<std::string>>(&entries)->multitoken(), "entry points")
             ("entries-file", value<std::string>(&entriesFile), "entry points file")
             ("image-base", value<std::string>(&imageBaseStr)->default_value("0"), "image base")
+            ("spu", bool_switch()->default_value(false), "spu")
             ("ignored", value<std::vector<std::string>>(&ignored)->multitoken(), "ignored entry points");
         
         auto opts = collect_unrecognized(parsed.options, include_positional);
         opts.erase(opts.begin());
         store(command_line_parser(opts).options(desc).run(), vm);
         notify(vm);
+        
         command.imageBase = std::stoi(imageBaseStr, 0, 16);
+        command.isSpu = vm["spu"].as<bool>();
         
         for (auto str : entries) {
             command.entryPoints.push_back(std::stoi(str, 0, 16));

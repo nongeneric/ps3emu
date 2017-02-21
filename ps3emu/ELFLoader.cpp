@@ -9,7 +9,6 @@
 #include "state.h"
 #include "Config.h"
 #include "InternalMemoryManager.h"
-#include "ppu/rewriter.h"
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
 #include <map>
@@ -191,17 +190,17 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         if (boost::filesystem::exists(x86path)) {
             auto handle = dlopen(x86path.c_str(), RTLD_NOW);
             if (handle) {
-                auto info = (RewrittenBlocks*)dlsym(handle, "info");
-                auto index = store->add(info);
-                INFO(libs) << ssnprintf("loading %s with %d blocks", x86path, info->count);
+                auto info = (RewrittenSegmentsInfo*)dlsym(handle, "info");
+                auto index = store->add(&info->segments[0]);
+                INFO(libs) << ssnprintf("loading %s with %d blocks", x86path, info->segments[0].blocks->size());
                 info->init();
-                auto blocks = info->blocks;
-                for (auto i = 0u; i < info->count; ++i) {
+                auto blocks = info->segments[0].blocks;
+                for (auto i = 0u; i < info->segments[0].blocks->size(); ++i) {
                     BBCallForm instr { 0 };
                     instr.OPCD.set(2);
                     instr.So.set(index);
                     instr.Label.set(i);
-                    g_state.mm->store32(blocks[i].va, instr.val);
+                    g_state.mm->store32((*blocks)[i].va, instr.val);
                 }
             } else {
                 WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());

@@ -199,7 +199,7 @@ public:
     void dbgPause(bool pause);
     
     inline void bbcall(unsigned index, unsigned label) {
-        _rewriterStore.invoke(index, label);
+        _rewriterStore.invokePPU(index, label);
     }
 };
 

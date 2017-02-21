@@ -2960,7 +2960,7 @@ PRINT(wrch) {
 }
 EMU_REWRITE(wrch, i->CA.u(), i->RT.u())
 
-
+#if !defined(EMU_REWRITER)
 template <DasmMode M, typename S>
 void SPUDasm(void* instr, uint32_t cia, S* state) {
     uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
@@ -3182,8 +3182,8 @@ template void SPUDasm<DasmMode::Print, std::string>(
 template void SPUDasm<DasmMode::Emulate, SPUThread>(
     void* instr, uint32_t cia, SPUThread* th);
 
-template void SPUDasm<DasmMode::Rewrite, SPUThread>(
-    void* instr, uint32_t cia, SPUThread* th);
+template void SPUDasm<DasmMode::Rewrite, std::string>(
+    void* instr, uint32_t cia, std::string* th);
 
 template void SPUDasm<DasmMode::Name, std::string>(
     void* instr, uint32_t cia, std::string* name);
@@ -3240,3 +3240,4 @@ InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
 
     return info;
 }
+#endif

@@ -343,8 +343,8 @@ union NCallForm {
 union BBCallForm {
     uint32_t val;
     OPCD_t OPCD;
-    BitField<6, 11> So;
-    BitField<11, 32> Label;
+    BitField<6, 14> So;
+    BitField<14, 32> Label;
 };
 
 union XSForm {
