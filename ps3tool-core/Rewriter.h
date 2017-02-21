@@ -16,7 +16,8 @@ struct BasicBlock {
 
 struct EmbeddedElfInfo {
     uint32_t startOffset;
-    const Elf32_be_Ehdr* start;
+    uint32_t size;
+    const Elf32_be_Ehdr* header;
 };
 
 std::vector<BasicBlock> discoverBasicBlocks(

@@ -78,8 +78,14 @@ void SPUThread::loop() {
 //             fprintf(f, " #%s\n", str.c_str());
 //             fflush(f);
 
-            setNip(cia + 4);
-            SPUDasm<DasmMode::Emulate>(ptr(cia), cia, this);
+            auto instr = *(big_uint32_t*)ptr(cia);
+            uint32_t segment, label;
+            if (dasm_bb_call(instr, segment, label)) {
+                g_state.proc->bbcallSpu(segment, label);
+            } else {
+                setNip(cia + 4);
+                SPUDasm<DasmMode::Emulate>(&instr, cia, this);
+            }
         } catch (BreakpointException& e) {
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Breakpoint);

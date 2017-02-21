@@ -79,7 +79,7 @@ void mapPrxStore() {
         elf.load(prxPath.string());
         auto stolen = elf.map([&](auto va, auto size, auto) {
             imageBase = ::align(va + size, 1 << 10);
-        }, imageBase, "", &rewriterStore);
+        }, imageBase, {}, &rewriterStore);
         
         info->size = imageBase - info->imageBase;
     }

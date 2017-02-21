@@ -10,6 +10,14 @@ using sys_raw_spu_t = big_uint32_t;
 using sys_interrupt_tag_t = big_uint32_t;
 using sys_interrupt_thread_handle_t = big_uint32_t;
 
+#define SYS_SPU_IMAGE_TYPE_USER 0x0U
+#define SYS_SPU_IMAGE_TYPE_KERNEL 0x1U
+#define SYS_SPU_SEGMENT_TYPE_COPY 0x0001
+#define SYS_SPU_SEGMENT_TYPE_FILL 0x0002
+#define SYS_SPU_SEGMENT_TYPE_INFO 0x0004
+#define SYS_SPU_IMAGE_PROTECT 0x0U
+#define SYS_SPU_IMAGE_DIRECT 0x1U
+
 struct sys_spu_segment_t {
     big_int32_t type;
     big_uint32_t ls_start;

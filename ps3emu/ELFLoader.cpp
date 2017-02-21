@@ -1,6 +1,6 @@
 #include "ELFLoader.h"
 #include "ppu/PPUThread.h"
-#include "ppu/ppu_dasm_forms.h"
+#include "dasm_utils.h"
 #include "utils.h"
 #include <assert.h>
 #include <stdio.h>
@@ -150,7 +150,7 @@ uint64_t emuBranch() {
 
 std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                                            ps3_uintptr_t imageBase,
-                                           std::string x86path,
+                                           std::vector<std::string> x86paths,
                                            RewriterStore* store) {
     uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
@@ -186,21 +186,20 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         }
     }
     
-    if (!x86path.empty()) {
+    for (auto& x86path : x86paths) {
         if (boost::filesystem::exists(x86path)) {
             auto handle = dlopen(x86path.c_str(), RTLD_NOW);
             if (handle) {
                 auto info = (RewrittenSegmentsInfo*)dlsym(handle, "info");
-                auto index = store->add(&info->segments[0]);
-                INFO(libs) << ssnprintf("loading %s with %d blocks", x86path, info->segments[0].blocks->size());
-                info->init();
-                auto blocks = info->segments[0].blocks;
-                for (auto i = 0u; i < info->segments[0].blocks->size(); ++i) {
-                    BBCallForm instr { 0 };
-                    instr.OPCD.set(2);
-                    instr.So.set(index);
-                    instr.Label.set(i);
-                    g_state.mm->store32((*blocks)[i].va, instr.val);
+                for (auto& segment : info->segments) {
+                    auto index = store->add(&segment);
+                    INFO(libs) << ssnprintf("loading %s with %d blocks", x86path, segment.blocks->size());
+                    info->init();
+                    auto blocks = segment.blocks;
+                    for (auto i = 0u; i < segment.blocks->size(); ++i) {
+                        auto instr = asm_bb_call(index, i);
+                        g_state.mm->store32((*blocks)[i].va, instr);
+                    }
                 }
             } else {
                 WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());

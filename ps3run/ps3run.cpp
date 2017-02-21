@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
                 "logging filter: spu, libs, ppu, debugger [e.g. spu,libs]")
             ("sinks,s", value<std::string>(&sinks)->default_value(""),
                 "logging sinks: file, console [e.g. file,console]")
-            ("x86", value<std::string>(&g_state.config->x86Path)->default_value(""),
+            ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),
                 "rewritten and compiled x86 so file")
             ;
         variables_map console_vm;

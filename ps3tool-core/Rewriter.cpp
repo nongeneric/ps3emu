@@ -89,7 +89,12 @@ std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const&
         auto header = (const Elf32_be_Ehdr*)&*elfit;
         if (header->e_ident[EI_CLASS] != ELFCLASS32)
             continue;
-        elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), header});
+        uint32_t end = 0;
+        auto phs = (Elf32_be_Phdr*)((char*)header + header->e_phoff);
+        for (auto i = 0; i < header->e_phnum; ++i) {
+            end = std::max(end, phs[i].p_offset + phs[i].p_filesz);
+        }
+        elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), end, header});
     }
     return elfs;
 }

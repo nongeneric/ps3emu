@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils.h"
+#include "ps3emu/BitField.h"
 #include <boost/type_traits.hpp>
 #include <string>
 #include <vector>
@@ -134,3 +135,32 @@ struct InstructionInfo {
     bool passthrough = false;
     uint32_t target = 0;
 };
+
+#define BB_CALL_OPCODE 0b111101
+
+union BBCallForm {
+    uint32_t val;
+    BitField<0, 6> OPCD;
+    BitField<6, 14> Segment;
+    BitField<14, 32> Label;
+};
+
+inline uint32_t asm_bb_call(uint32_t segment, uint32_t label) {
+    assert((1u << decltype(BBCallForm::Segment)::W) > segment);
+    assert((1u << decltype(BBCallForm::Label)::W) > label);
+    BBCallForm instr { 0 };
+    instr.OPCD.set(BB_CALL_OPCODE);
+    instr.Segment.set(segment);
+    instr.Label.set(label);
+    return instr.val;
+}
+
+inline bool dasm_bb_call(uint32_t instr, uint32_t& segment, uint32_t& label) {
+    BBCallForm form { instr };
+    if (form.OPCD.u() == BB_CALL_OPCODE) {
+        segment = form.Segment.u();
+        label = form.Label.u();
+        return true;
+    }
+    return false;
+}

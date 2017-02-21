@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../BitField.h"
+#include "ps3emu/BitField.h"
 
 using BD_t = BitField<16, 30, BitFieldType::Signed, 2>;
 using BF_t = BitField<6, 9, BitFieldType::CR>;
@@ -338,13 +338,6 @@ union SCForm {
 
 union NCallForm {
     BitField<6, 32> idx;
-};
-
-union BBCallForm {
-    uint32_t val;
-    OPCD_t OPCD;
-    BitField<6, 14> So;
-    BitField<14, 32> Label;
 };
 
 union XSForm {

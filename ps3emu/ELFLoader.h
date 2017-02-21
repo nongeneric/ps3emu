@@ -208,7 +208,7 @@ public:
     void load(std::string filePath);
     std::vector<StolenFuncInfo> map(make_segment_t makeSegment,
                                     ps3_uintptr_t imageBase,
-                                    std::string x86path,
+                                    std::vector<std::string> x86path,
                                     RewriterStore* store);
     void link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
     ThreadInitInfo getThreadInitInfo(MainMemory* mm);

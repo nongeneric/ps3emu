@@ -43,14 +43,6 @@ namespace {
     constexpr uint32_t spursTraceBufferSize = 0x10000;
 }
 
-#define SYS_SPU_IMAGE_TYPE_USER     0x0U
-#define SYS_SPU_IMAGE_TYPE_KERNEL   0x1U
-#define SYS_SPU_SEGMENT_TYPE_COPY  0x0001
-#define SYS_SPU_SEGMENT_TYPE_FILL  0x0002
-#define SYS_SPU_SEGMENT_TYPE_INFO  0x0004
-#define SYS_SPU_IMAGE_PROTECT       0x0U
-#define SYS_SPU_IMAGE_DIRECT        0x1U
-
 std::vector<sys_spu_segment_t> spuImageInit(MainMemory* mm,
                                             InternalMemoryManager* ialloc,
                                             sys_spu_image_t* image,

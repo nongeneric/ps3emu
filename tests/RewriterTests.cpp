@@ -149,15 +149,15 @@ TEST_CASE("spu_rewriter_discover_elfs") {
     auto infos = discoverEmbeddedSpuElfs(vec);
     REQUIRE( infos.size() == 2 );
     REQUIRE( infos[0].startOffset == 0x12880 );
-    REQUIRE( ((intptr_t)infos[0].start - (intptr_t)&vec[0]) == 0x12880 );
+    REQUIRE( ((intptr_t)infos[0].header - (intptr_t)&vec[0]) == 0x12880 );
     REQUIRE( infos[1].startOffset == 0x13e00 );
-    REQUIRE( ((intptr_t)infos[1].start - (intptr_t)&vec[0]) == 0x13e00 );
+    REQUIRE( ((intptr_t)infos[1].header - (intptr_t)&vec[0]) == 0x13e00 );
     
     vec = read_all_bytes("./binaries/spurs_minimal_pm/hello_work_unit.elf");
     infos = discoverEmbeddedSpuElfs(vec);
     REQUIRE( infos.size() == 1 );
     REQUIRE( infos[0].startOffset == 0 );
-    REQUIRE( ((intptr_t)infos[0].start - (intptr_t)&vec[0]) == 0 );
+    REQUIRE( ((intptr_t)infos[0].header - (intptr_t)&vec[0]) == 0 );
 }
 
 TEST_CASE("spu_rewriter_block_discovery_1") {
@@ -221,4 +221,21 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
     block = blocks[4];
     REQUIRE(block.start == 0x03A8);
     REQUIRE(block.len == 0x03c4 - 0x03A8);
+}
+
+TEST_CASE("spu_rewriter_simple") {
+    std::string output;
+    auto res = rewrite(
+        "./binaries/spurs_task_hello/a.elf",
+        "/tmp/x86spu.cpp",
+        "--spu",
+        output);
+    REQUIRE(res);
+    res = compile({"/tmp/x86spu.cpp", "/tmp/x86spu.so", false, false});
+    REQUIRE(res);
+    
+    output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"}, {"--x86", "/tmp/x86spu.so"});
+    REQUIRE( output ==
+        "SPU: Hello world!\n"
+    );
 }

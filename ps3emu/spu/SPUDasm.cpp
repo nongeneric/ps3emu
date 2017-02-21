@@ -29,6 +29,7 @@ using I16_t = BitField<9, 25, BitFieldType::Signed>;
 union SPUForm {
     BitField<0, 4> OP4;
     BitField<0, 7> OP7;
+    BitField<0, 6> OP6;
     BitField<0, 8> OP8;
     BitField<0, 9> OP9;
     BitField<0, 10> OP10;
@@ -72,15 +73,33 @@ union SPUForm {
         }
 #endif
 
+#ifdef EMU_REWRITER
+    #define SPU_SET_NIP_INDIRECT(x) th->setNip(x & ~3ul); return;
+    #define SPU_SET_NIP(x) goto _##x
+#else
+    #define SPU_SET_NIP(x) th->setNip(x)
+    #define SPU_SET_NIP_INDIRECT(x) SPU_SET_NIP(x)
+#endif
+
+PRINT(bbcall) {
+    auto bbform = (BBCallForm*)i;
+    *result = format_nn("bbcall", bbform->Segment, bbform->Label);
+}
+
+#define _bbcall(_) { \
+    assert(false); \
+}
+EMU_REWRITE(bbcall, 0);
+
 PRINT(lqd) {
     *result = format_br_nnn("lqd", i->RT, i->I10, i->RA);
 }
 
-#define _lqd(_i10, _ra, _rt) { \
-    auto lsa = (th->r(_ra).w<0>() + (_i10 << 4)) & LSLR & 0xfffffff0; \
+#define _lqd(_i10_4, _ra, _rt) { \
+    auto lsa = (th->r(_ra).w<0>() + _i10_4) & LSLR & 0xfffffff0; \
     th->r(_rt).load(th->ptr(lsa)); \
 }
-EMU_REWRITE(lqd, i->I10, i->RA.u(), i->RT.u())
+EMU_REWRITE(lqd, (i->I10 << 4), i->RA.u(), i->RT.u())
 
 
 PRINT(lqx) {
@@ -106,33 +125,33 @@ PRINT(lqa) {
     *result = format_nu("lqa", i->RT, abs_lsa(i->I16));
 }
 
-#define _lqa(_i16, _rt) { \
-    auto lsa = abs_lsa(_i16); \
+#define _lqa(_abs_lsa, _rt) { \
+    auto lsa = _abs_lsa; \
     th->r(_rt).load(th->ptr(lsa)); \
 }
-EMU_REWRITE(lqa, i->I16, i->RT.u())
+EMU_REWRITE(lqa, abs_lsa(i->I16), i->RT.u())
 
 
 PRINT(lqr) {
     *result = format_nu("lqr", i->RT, cia_lsa(i->I16, cia));
 }
 
-#define _lqr(_i16, _rt) { \
-    auto lsa = cia_lsa(_i16, cia); \
+#define _lqr(_cia_lsa, _rt) { \
+    auto lsa = _cia_lsa; \
     th->r(_rt).load(th->ptr(lsa)); \
 }
-EMU_REWRITE(lqr, i->I16, i->RT.u())
+EMU_REWRITE(lqr, cia_lsa(i->I16, cia), i->RT.u())
 
 
 PRINT(stqd) {
     *result = format_br_nnn("stqd", i->RT, i->I10, i->RA);
 }
 
-#define _stqd(_i10, _ra, _rt) { \
-    auto lsa = (th->r(_ra).w<0>() + (_i10 << 4)) & LSLR & 0xfffffff0; \
+#define _stqd(_i10_4, _ra, _rt) { \
+    auto lsa = (th->r(_ra).w<0>() + _i10_4) & LSLR & 0xfffffff0; \
     th->r(_rt).store(th->ptr(lsa)); \
 }
-EMU_REWRITE(stqd, i->I10, i->RA.u(), i->RT.u())
+EMU_REWRITE(stqd, (i->I10 << 4), i->RA.u(), i->RT.u())
 
 
 PRINT(stqx) {
@@ -150,22 +169,22 @@ PRINT(stqa) {
     *result = format_nu("stqa", i->RT, abs_lsa(i->I16));
 }
 
-#define _stqa(_i16, _rt) { \
-    auto lsa = abs_lsa(_i16); \
+#define _stqa(_abs_lsa, _rt) { \
+    auto lsa = _abs_lsa; \
     th->r(_rt).store(th->ptr(lsa)); \
 }
-EMU_REWRITE(stqa, i->I16, i->RT.u())
+EMU_REWRITE(stqa, abs_lsa(i->I16), i->RT.u())
 
 
 PRINT(stqr) {
     *result = format_nu("stqr", i->RT, cia_lsa(i->I16, cia));
 }
 
-#define _stqr(_i16, _rt) { \
-    auto lsa = cia_lsa(_i16, cia); \
+#define _stqr(_cia_lsa, _rt) { \
+    auto lsa = _cia_lsa; \
     th->r(_rt).store(th->ptr(lsa)); \
 }
-EMU_REWRITE(stqr, i->I16, i->RT.u())
+EMU_REWRITE(stqr, cia_lsa(i->I16, cia), i->RT.u())
 
 
 PRINT(cbd) {
@@ -298,14 +317,14 @@ PRINT(ilhu) {
     *result = format_nn("ilhu", i->RT, i->I16);
 }
 
-#define _ilhu(_rt, _i16) { \
+#define _ilhu(_rt, _i16_16) { \
     auto& rt = th->r(_rt); \
-    auto val = _i16 << 16; \
+    auto val = _i16_16; \
     for (int i = 0; i < 4; ++i) { \
         rt.w(i) = val; \
     } \
 }
-EMU_REWRITE(ilhu, i->RT.u(), i->I16)
+EMU_REWRITE(ilhu, i->RT.u(), (i->I16 << 16))
 
 
 PRINT(il) {
@@ -2141,14 +2160,14 @@ PRINT(br) {
     *result = format_u("br", (cia + offset) & LSLR);
 }
 
-#define _br(_i16) { \
+#define _br(_i16, _cia, _dest) { \
     int32_t offset = signed_lshift32(_i16, 2); \
     if (offset == 0) { \
         throw InfiniteLoopException(); \
     } \
-    th->setNip((cia + offset) & LSLR); \
+    SPU_SET_NIP(_dest); \
 }
-EMU_REWRITE(br, i->I16.s())
+EMU_REWRITE(br, i->I16.s(), cia, (cia + signed_lshift32(i->I16.s(), 2)) & LSLR)
 
 
 PRINT(bra) {
@@ -2156,11 +2175,10 @@ PRINT(bra) {
     *result = format_u("bra", address & LSLR);
 }
 
-#define _bra(_i16) { \
-    int32_t address = signed_lshift32(_i16, 2); \
-    th->setNip(address & LSLR); \
+#define _bra(_dest) { \
+    SPU_SET_NIP(_dest); \
 }
-EMU_REWRITE(bra, i->I16.s())
+EMU_REWRITE(bra, signed_lshift32(i->I16.s(), 2) & LSLR)
 
 
 PRINT(brsl) {
@@ -2168,15 +2186,14 @@ PRINT(brsl) {
     *result = format_u("brsl", (cia + offset) & LSLR);
 }
 
-#define _brsl(_i16, _rt) { \
-    int32_t offset = signed_lshift32(_i16, 2); \
-    th->setNip((cia + offset) & LSLR); \
+#define _brsl(_i16, _rt, _cia, _dest) { \
     auto& rt = th->r(_rt); \
-    rt.w<0>() = (cia + 4) & LSLR; \
+    rt.w<0>() = (_cia + 4) & LSLR; \
     rt.w<1>() = 0; \
     rt.dw<1>() = 0; \
+    SPU_SET_NIP(_dest); \
 }
-EMU_REWRITE(brsl, i->I16.s(), i->RT.u())
+EMU_REWRITE(brsl, i->I16.s(), i->RT.u(), cia, (signed_lshift32(i->I16.s(), 2) + cia) & LSLR)
 
 
 PRINT(brasl) {
@@ -2184,15 +2201,14 @@ PRINT(brasl) {
     *result = format_u("brasl", address & LSLR);
 }
 
-#define _brasl(_i16, _rt) { \
-    int32_t address = signed_lshift32(_i16, 2); \
-    th->setNip(address & LSLR); \
+#define _brasl(_i16, _rt, cia, _dest) { \
     auto& rt = th->r(_rt); \
     rt.w<0>() = (cia + 4) & LSLR; \
     rt.w<1>() = 0; \
     rt.dw<1>() = 0; \
+    SPU_SET_NIP(_dest); \
 }
-EMU_REWRITE(brasl, i->I16.s(), i->RT.u())
+EMU_REWRITE(brasl, i->I16.s(), i->RT.u(), cia, (signed_lshift32(i->I16.s(), 2) + cia) & LSLR)
 
 
 PRINT(bi) {
@@ -2200,7 +2216,7 @@ PRINT(bi) {
 }
 
 #define _bi(_ra) { \
-    th->setNip(th->r(_ra).w<0>() & LSLR & 0xfffffffc); \
+    SPU_SET_NIP_INDIRECT(th->r(_ra).w<0>() & LSLR & 0xfffffffc); \
 }
 EMU_REWRITE(bi, i->RA.u())
 
@@ -2210,7 +2226,8 @@ PRINT(iret) {
 }
 
 #define _iret(_) { \
-    th->setNip(th->getSrr0()); \
+    SPU_SET_NIP_INDIRECT(th->getSrr0()); \
+    assert(false); \
 }
 EMU_REWRITE(iret, 0)
 
@@ -2219,14 +2236,14 @@ PRINT(bisl) {
     *result = format_nn("bisl", i->RT, i->RA);
 }
 
-#define _bisl(_ra, _rt) { \
-    th->setNip(th->r(_ra).w<0>() & LSLR & 0xfffffffc); \
+#define _bisl(_ra, _rt, cia) { \
     auto& rt = th->r(_rt); \
     rt.w<0>() = LSLR & (cia + 4); \
     rt.w<1>() = 0; \
     rt.dw<1>() = 0; \
+    SPU_SET_NIP_INDIRECT(th->r(_ra).w<0>() & LSLR & 0xfffffffc); \
 }
-EMU_REWRITE(bisl, i->RA.u(), i->RT.u())
+EMU_REWRITE(bisl, i->RA.u(), i->RT.u(), cia)
 
 
 inline uint32_t br_cia_lsa(I16_t i16, uint32_t cia) {
@@ -2237,52 +2254,48 @@ PRINT(brnz) {
     *result = format_nu("brnz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
-#define _brnz(_rt, _i16) { \
+#define _brnz(_rt, _br_cia_lsa) { \
     if (th->r(_rt).w<0>() != 0) { \
-        auto address = br_cia_lsa(_i16, cia); \
-        th->setNip(address); \
+        SPU_SET_NIP(_br_cia_lsa); \
     } \
 }
-EMU_REWRITE(brnz, i->RT.u(), i->I16)
+EMU_REWRITE(brnz, i->RT.u(), br_cia_lsa(i->I16, cia))
 
 
 PRINT(brz) {
     *result = format_nu("brz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
-#define _brz(_rt, _i16) { \
+#define _brz(_rt, _br_cia_lsa) { \
     if (th->r(_rt).w<0>() == 0) { \
-        auto address = br_cia_lsa(_i16, cia); \
-        th->setNip(address); \
+        SPU_SET_NIP(_br_cia_lsa); \
     } \
 }
-EMU_REWRITE(brz, i->RT.u(), i->I16)
+EMU_REWRITE(brz, i->RT.u(), br_cia_lsa(i->I16, cia))
 
 
 PRINT(brhnz) {
     *result = format_nu("brhnz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
-#define _brhnz(_rt, _i16) { \
+#define _brhnz(_rt, _br_cia_lsa) { \
     if (th->r(_rt).hw_pref() != 0) { \
-        auto address = br_cia_lsa(_i16, cia); \
-        th->setNip(address); \
+        SPU_SET_NIP(_br_cia_lsa); \
     } \
 }
-EMU_REWRITE(brhnz, i->RT.u(), i->I16)
+EMU_REWRITE(brhnz, i->RT.u(), br_cia_lsa(i->I16, cia))
 
 
 PRINT(brhz) {
     *result = format_nu("brhz", i->RT, br_cia_lsa(i->I16, cia));
 }
 
-#define _brhz(_rt, _i16) { \
+#define _brhz(_rt, _br_cia_lsa) { \
     if (th->r(_rt).hw_pref() == 0) { \
-        auto address = br_cia_lsa(_i16, cia); \
-        th->setNip(address); \
+        SPU_SET_NIP(_br_cia_lsa); \
     } \
 }
-EMU_REWRITE(brhz, i->RT.u(), i->I16)
+EMU_REWRITE(brhz, i->RT.u(), br_cia_lsa(i->I16, cia))
 
 
 PRINT(biz) {
@@ -2292,7 +2305,7 @@ PRINT(biz) {
 #define _biz(_rt, _ra) { \
     if (th->r(_rt).w<0>() == 0) { \
         auto address = th->r(_ra).w<0>() & LSLR & 0xfffffffc; \
-        th->setNip(address); \
+        SPU_SET_NIP_INDIRECT(address); \
     } \
 }
 EMU_REWRITE(biz, i->RT.u(), i->RA.u())
@@ -2305,7 +2318,7 @@ PRINT(binz) {
 #define _binz(_rt, _ra) { \
     if (th->r(_rt).w<0>() != 0) { \
         auto address = th->r(_ra).w<0>() & LSLR & 0xfffffffc; \
-        th->setNip(address); \
+        SPU_SET_NIP_INDIRECT(address); \
     } \
 }
 EMU_REWRITE(binz, i->RT.u(), i->RA.u())
@@ -2318,7 +2331,7 @@ PRINT(bihz) {
 #define _bihz(_rt, _ra) { \
     if (th->r(_rt).hw_pref() == 0) { \
         auto address = th->r(_ra).w<0>() & LSLR & 0xfffffffc; \
-        th->setNip(address); \
+        SPU_SET_NIP_INDIRECT(address); \
     } \
 }
 EMU_REWRITE(bihz, i->RT.u(), i->RA.u())
@@ -2331,7 +2344,7 @@ PRINT(bihnz) {
 #define _bihnz(_rt, _ra) { \
     if (th->r(_rt).hw_pref() != 0) { \
         auto address = th->r(_ra).w<0>() & LSLR & 0xfffffffc; \
-        th->setNip(address); \
+        SPU_SET_NIP_INDIRECT(address); \
     } \
 }
 EMU_REWRITE(bihnz, i->RT.u(), i->RA.u())
@@ -3164,6 +3177,9 @@ void SPUDasm(void* instr, uint32_t cia, S* state) {
         case 0b0100001: INVOKE(ila);
         case 0b0001000: INVOKE(hbra);
         case 0b0001001: INVOKE(hbrr);
+    }
+    switch (i->OP6.u()) {
+        case BB_CALL_OPCODE: INVOKE(bbcall);
     }
     switch (i->OP4.u()) {
         case 0b1100: INVOKE(mpya);

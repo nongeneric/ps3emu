@@ -11,6 +11,7 @@
 #include "ps3emu/log.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwmutex.h"
+#include "ps3tool-core/Rewriter.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
@@ -326,16 +327,43 @@ class DasmModel : public MonospaceGridModel {
     PPUThread* _thread;
     SPUThread* _spuThread;
     ELFLoader* _elf;
+    std::vector<EmbeddedElfInfo> _spuElfs;
+    
+    bool isSpuElfAddress(uint32_t va) {
+        for (auto& elf : _spuElfs) {
+            if (elf.startOffset <= va && va < elf.startOffset + elf.size)
+                return true;
+        }
+        return false;
+    }
+    
 public:
-    DasmModel() : _thread(nullptr), _spuThread(nullptr), _elf(nullptr) { }
+    DasmModel() : _thread(nullptr), _spuThread(nullptr), _elf(nullptr) {
+    }
+    
+    void updateSpuElfs() {
+        _spuElfs.clear();
+        for (auto& segment : g_state.proc->getSegments()) {
+            std::vector<uint8_t> dump(segment.size);
+            g_state.mm->readMemory(segment.va, &dump[0], dump.size());
+            for (auto& elf : discoverEmbeddedSpuElfs(dump)) {
+                elf.startOffset += segment.va;
+                elf.size = 500;
+                elf.header = nullptr;
+                _spuElfs.push_back(elf);
+            }
+        }
+    }
     
     void setThread(PPUThread* thread) {
+        updateSpuElfs();
         _thread = thread;
         _spuThread = nullptr;
         _elf = g_state.proc->elfLoader();
     }
     
     void setThread(SPUThread* thread) {
+        updateSpuElfs();
         _thread = nullptr;
         _spuThread = thread;
         _elf = nullptr;
@@ -371,10 +399,14 @@ public:
         if (col == 3) {
             std::string str;
             try {
-                if (ppu) {
+                auto isSpuElf = isSpuElfAddress(row);
+                if (ppu && !isSpuElf) {
                     ppu_dasm<DasmMode::Print>(&instr, row, &str);
                 } else {
                     SPUDasm<DasmMode::Print>(&instr, row, &str);
+                }
+                if (ppu && isSpuElf) {
+                    str = "<spu>. " + str;
                 }
                 return QString::fromStdString(str);
             } catch(...) {

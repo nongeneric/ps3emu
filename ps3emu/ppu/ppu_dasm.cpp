@@ -1638,13 +1638,13 @@ PRINT(NCALL, NCallForm) {
 EMU_REWRITE(NCALL, NCallForm, i->idx.u())
 
 PRINT(BBCALL, BBCallForm) {
-    *result = format_nn("bbcall", i->So, i->Label);
+    *result = format_nn("bbcall", i->Segment, i->Label);
 }
 
 #define _BBCALL(_so, _label) { \
     assert(false); \
 }
-EMU_REWRITE(BBCALL, BBCallForm, i->So.u(), i->Label.u());
+EMU_REWRITE(BBCALL, BBCallForm, i->Segment.u(), i->Label.u());
 
 inline int64_t get_cmp_ab(unsigned l, uint64_t value) {
     return l == 0 ? (int64_t)static_cast<int32_t>(value) : value;
@@ -3897,7 +3897,7 @@ void ppu_dasm(void* instr, uint64_t cia, S* state) {
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
         case 1: invoke(NCALL);
-        case 2: invoke(BBCALL);
+        case BB_CALL_OPCODE: invoke(BBCALL);
         case 4: {
             auto simd = reinterpret_cast<SIMDForm*>(&x);
             switch (simd->VA_XO.u()) {

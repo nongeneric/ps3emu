@@ -72,9 +72,9 @@ void PPUThread::innerLoop() {
         try {
             cia = getNIP();
             auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
-            BBCallForm bbcall { instr };
-            if (bbcall.OPCD.u() == 2) {
-                g_state.proc->bbcall(bbcall.So.u(), bbcall.Label.u());
+            uint32_t segment, label;
+            if (dasm_bb_call(instr, segment, label)) {
+                g_state.proc->bbcall(segment, label);
             } else {
                 setNIP(cia + sizeof instr);
                 ppu_dasm<DasmMode::Emulate>(&instr, cia, this);

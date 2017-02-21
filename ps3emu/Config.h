@@ -18,7 +18,7 @@ class Config {
     
 public:
     Config();
-    std::string x86Path;
+    std::vector<std::string> x86Paths;
     std::string prxStorePath;
     std::string configDirPath;
     std::vector<SysPrxInfo> sysPrxInfos;

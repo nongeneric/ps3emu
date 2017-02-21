@@ -201,6 +201,10 @@ public:
     inline void bbcall(unsigned index, unsigned label) {
         _rewriterStore.invokePPU(index, label);
     }
+    
+    inline void bbcallSpu(unsigned index, unsigned label) {
+        _rewriterStore.invokeSPU(index, label);
+    }
 };
 
 int32_t executeExportedFunction(uint32_t imageBase,
