@@ -11,6 +11,7 @@ set(SRC
     ps3tool.h
     ps3tool.cpp
     rsx_dasm.cpp
+    find_spu_elfs.cpp
 )
 add_executable(ps3tool ${SRC})
 target_link_libraries(ps3tool ps3emu ps3tool-core ${Boost_LIBRARIES} z)

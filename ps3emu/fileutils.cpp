@@ -15,3 +15,13 @@ std::vector<uint8_t> read_all_bytes(std::experimental::string_view path) {
     fclose(f);
     return res;
 }
+
+void write_all_bytes(void* ptr, uint32_t size, std::experimental::string_view path) {
+    auto f = fopen(begin(path), "w");
+    if (!f)
+        throw std::runtime_error("can't open file");
+    auto res = fwrite(ptr, 1, size, f);
+    if (res != size)
+        throw std::runtime_error("incomplete write");
+    fclose(f);
+}

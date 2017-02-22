@@ -15,7 +15,8 @@ typedef boost::variant<ShaderDasmCommand,
                        ParseSpursTraceCommand,
                        RewriteCommand,
                        PrxStoreCommand,
-                       RsxDasmCommand>
+                       RsxDasmCommand,
+                       FindSpuElfsCommand>
     Command;
 
 Command ParseOptions(int argc, const char *argv[]) {
@@ -159,6 +160,7 @@ Command ParseOptions(int argc, const char *argv[]) {
             ("map", bool_switch()->default_value(false), "update prx segment bases in ps3 config")
             ("rewrite", bool_switch()->default_value(false), "rewrite prx binaries")
             ("compile", bool_switch()->default_value(false), "compile rewritten binaries")
+            ("verbose", bool_switch()->default_value(false), "verbose")
             ;
         
         auto opts = collect_unrecognized(parsed.options, include_positional);
@@ -169,16 +171,29 @@ Command ParseOptions(int argc, const char *argv[]) {
         command.map = vm["map"].as<bool>();
         command.rewrite = vm["rewrite"].as<bool>();
         command.compile = vm["compile"].as<bool>();
+        command.verbose = vm["verbose"].as<bool>();
         
         return command;
     } else if (commandName == "rsx-dasm") {
         RsxDasmCommand command;
         options_description desc("rsx-dasm");
-
-        std::string binFile;
         
         desc.add_options()
             ("bin", value<std::string>(&command.bin)->required(), "bin file")
+            ;
+        
+        auto opts = collect_unrecognized(parsed.options, include_positional);
+        opts.erase(opts.begin());
+        store(command_line_parser(opts).options(desc).run(), vm);
+        notify(vm);
+        
+        return command;
+    } else if (commandName == "find-spu-elfs") {
+        FindSpuElfsCommand command;
+        options_description desc("find-spu-elfs");
+        
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
             ;
         
         auto opts = collect_unrecognized(parsed.options, include_positional);
@@ -224,6 +239,10 @@ public:
     
     void operator()(RsxDasmCommand& command) const {
         HandleRsxDasm(command);
+    }
+    
+    void operator()(FindSpuElfsCommand& command) const {
+        HandleFindSpuElfs(command);
     }
 };
 

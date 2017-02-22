@@ -9,5 +9,6 @@ struct CompileInfo {
     bool trace;
 };
 
-bool rewrite(std::string elf, std::string cpp, std::string args, std::string& output);
-bool compile(CompileInfo const& info);
+std::string rewrite(std::string elf, std::string cpp, std::string args);
+std::string compile(CompileInfo const& info);
+bool exec(std::string line, std::string& output);

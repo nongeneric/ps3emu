@@ -16,6 +16,15 @@ std::vector<BasicBlock> discoverBasicBlocks(
     std::set<uint32_t> allLeads;
     std::set<uint32_t> breaks;
 
+    auto leadsCopy = leads;
+    while (!leadsCopy.empty()) {
+        auto lead = leadsCopy.top();
+        leadsCopy.pop();
+        if (!subset(lead, 4u, start, length))
+            throw std::runtime_error("a lead is outside the segment");
+    }
+    
+    
     while (!leads.empty()) {
         auto cia = leads.top();
         leads.pop();
@@ -25,6 +34,9 @@ std::vector<BasicBlock> discoverBasicBlocks(
         allLeads.insert(cia);
         
         for (;;) {
+            if (!subset(cia, 4u, start, length))
+                break;
+            
             auto info = analyze(cia);
             auto logLead = [&] (uint32_t target) {
                 log << ssnprintf("new lead %x(%x) -> %x(%x)\n",
@@ -89,10 +101,22 @@ std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const&
         auto header = (const Elf32_be_Ehdr*)&*elfit;
         if (header->e_ident[EI_CLASS] != ELFCLASS32)
             continue;
+        if (sizeof(Elf32_be_Ehdr) != header->e_ehsize)
+            continue;
+        if (sizeof(Elf32_be_Phdr) != header->e_phentsize)
+            continue;
+        if (sizeof(Elf32_be_Shdr) != header->e_shentsize)
+            continue;
         uint32_t end = 0;
         auto phs = (Elf32_be_Phdr*)((char*)header + header->e_phoff);
         for (auto i = 0; i < header->e_phnum; ++i) {
             end = std::max(end, phs[i].p_offset + phs[i].p_filesz);
+        }
+        if (header->e_shnum) {
+            auto shs = (Elf32_be_Shdr*)((char*)header + header->e_shoff);
+            for (auto i = 0; i < header->e_shnum; ++i) {
+                end = std::max(end, shs[i].sh_addr + shs[i].sh_size);
+            }
         }
         elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), end, header});
     }

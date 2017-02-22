@@ -112,7 +112,7 @@ SegmentInfo rewritePPU(RewriteCommand const& command, std::ofstream& log) {
     }, command.imageBase, {}, &rewriterStore);
     
     std::stack<uint32_t> leads;
-    if (command.imageBase) {
+    if (!command.imageBase) {
         fdescr epDescr;
         g_state.mm->readMemory(elf.entryPoint(), &epDescr, sizeof(fdescr));
         leads.push(epDescr.va);
@@ -196,16 +196,6 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
     std::vector<SegmentInfo> infos;
     
     for (auto& elf : elfs) {
-        auto elfSegment = (Elf32_be_Phdr*)&body[elf.startOffset + elf.header->e_phoff];
-        auto copyCount = 0;
-        for (auto i = 0u; i < elf.header->e_phnum; ++i) {
-            if (elfSegment[i].p_type != SYS_SPU_SEGMENT_TYPE_COPY)
-                continue;
-            copyCount++;
-        }
-        assert(copyCount == 2);
-        auto copySegment = &elfSegment[0];
-        
         std::stack<uint32_t> leads;
         leads.push(elf.header->e_entry);
         
@@ -213,41 +203,111 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
             return vaBase + elf.startOffset + vaToOffset(elf.header, va);
         };
         
-        auto blocks = discoverBasicBlocks(
-            copySegment->p_vaddr,
-            copySegment->p_filesz,
-            0,
-            leads,
-            log,
-            [&](uint32_t cia) {
-                auto parentElfVa = elfVaToParentVa(cia);
-                return analyzeSpu(g_state.mm->load32(parentElfVa), cia);
+        std::vector<Elf32_be_Phdr> copySegments;
+        
+        auto elfSegment = (Elf32_be_Phdr*)&body[elf.startOffset + elf.header->e_phoff];
+        for (auto i = 0u; i < elf.header->e_phnum; ++i) {
+            if (elfSegment[i].p_type != SYS_SPU_SEGMENT_TYPE_COPY)
+                continue;
+            copySegments.push_back(elfSegment[i]);
+        }
+        std::sort(begin(copySegments), end(copySegments), [&](auto& l, auto& r) {
+            return l.p_vaddr < r.p_vaddr;
+        });
+        
+        auto analyze = [&](uint32_t cia) {
+            auto parentElfVa = elfVaToParentVa(cia);
+            return analyzeSpu(g_state.mm->load32(parentElfVa), cia);
+        };
+        
+        auto allBlocks =
+            discoverBasicBlocks(copySegments.front().p_vaddr,
+                                copySegments.back().p_vaddr + copySegments.back().p_memsz,
+                                0,
+                                leads,
+                                log,
+                                analyze);
+            
+        std::vector<uint32_t> allLeads;
+        std::transform(begin(allBlocks), end(allBlocks), std::back_inserter(allLeads), [&](auto& block) {
+            return block.start;
+        });
+        
+        std::vector<std::vector<uint32_t>> leadsBySegment;
+        for (auto& segment : copySegments) {
+            std::vector<uint32_t> segmentLeads;
+            std::copy_if(begin(allLeads), end(allLeads), std::back_inserter(segmentLeads), [&](auto lead) {
+                return subset<uint32_t>(lead, 4, segment.p_vaddr, segment.p_filesz);
             });
-        
-        SegmentInfo info;
-        
-        for (auto& block : blocks) {
-            for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
-                std::string rewritten, printed;
-                big_uint32_t instr = g_state.mm->load32(elfVaToParentVa(cia));
-                try {
-                    SPUDasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
-                    SPUDasm<DasmMode::Print>(&instr, cia, &printed);
-                } catch (...) {
-                    rewritten = "throw std::runtime_error(\"dasm error\")";
-                    printed = "error";
-                    auto file = path(command.elf).filename().string();
-                    auto rva = cia - command.imageBase;
-                    std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
-                }
-                block.body.push_back(ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;", cia, printed, cia, rewritten));
-            }
-            info.blocks.push_back({elfVaToParentVa(block.start), block.len, block.body, block.start});
+            leadsBySegment.push_back(segmentLeads);
         }
         
-        info.isSpu = true;
-        info.suffix = ssnprintf("spu_%x", elf.startOffset);
-        infos.push_back(info);
+        assert(leadsBySegment.size() == copySegments.size());
+        
+        for (auto i = 0u; i < leadsBySegment.size(); ++i) {
+            auto& segmentLeads = leadsBySegment[i];
+            auto& segment = copySegments[i];
+            
+            if (segmentLeads.empty())
+                continue;
+            
+            std::stack<uint32_t> leadsStack;
+            for (auto lead : segmentLeads)
+                leadsStack.push(lead);
+            
+            auto spuElfVaToParentVaInCurrentSegment = [&](uint32_t va) {
+                assert(subset<uint32_t>(va, 4, segment.p_vaddr, segment.p_filesz));
+                auto spuElfOffset = va - segment.p_vaddr + segment.p_offset;
+                return vaBase + elf.startOffset + spuElfOffset;
+            };
+            
+            auto blocks = discoverBasicBlocks(
+                segment.p_vaddr, segment.p_filesz, 0, leadsStack, log, [&](uint32_t cia) {
+                    auto elfVa = spuElfVaToParentVaInCurrentSegment(cia);
+                    return analyzeSpu(g_state.mm->load32(elfVa), cia);
+                });
+            
+            SegmentInfo info;
+            for (auto& block : blocks) {
+                for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
+                    std::string rewritten, printed;
+                    big_uint32_t instr = g_state.mm->load32(spuElfVaToParentVaInCurrentSegment(cia));
+                    try {
+                        SPUDasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
+                        SPUDasm<DasmMode::Print>(&instr, cia, &printed);
+                    } catch (...) {
+                        rewritten = "throw std::runtime_error(\"dasm error\")";
+                        printed = "error";
+                        auto file = path(command.elf).filename().string();
+                        auto rva = cia - command.imageBase;
+                        std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
+                    }
+                    
+                    auto info = analyzeSpu(instr, cia);
+                    auto outOfSegmentBr = info.flow && info.target != 0 &&
+                                          !subset<uint32_t>(info.target, 4, segment.p_vaddr, segment.p_filesz);
+                    
+                    auto line = ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;", cia, printed, cia, rewritten);
+                    if (outOfSegmentBr) {
+                        block.body.push_back("#undef SPU_SET_NIP");
+                        block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INDIRECT");
+                    }
+                    block.body.push_back(line);
+                    if (outOfSegmentBr) {
+                        block.body.push_back("#undef SPU_SET_NIP");
+                        block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
+                    }
+                }
+                info.blocks.push_back({spuElfVaToParentVaInCurrentSegment(block.start), block.len, block.body, block.start});
+            }
+            
+            info.isSpu = true;
+            info.suffix = ssnprintf("spu_%x_%x_%x",
+                                    elf.startOffset,
+                                    segment.p_vaddr,
+                                    segment.p_vaddr + segment.p_filesz);
+            infos.push_back(info);
+        }
     }
     
     return infos;
@@ -290,17 +350,15 @@ void HandleRewrite(RewriteCommand const& command) {
     
     for (auto& segment : segmentInfos) {
         f << ssnprintf("RewrittenSegment segment_%s {\n", segment.suffix);
-        for (auto& segment : segmentInfos) {
-            auto entryName = ssnprintf("entryPoint_%s", segment.suffix);
-            auto ppuEntry = segment.isSpu ? "nullptr" : entryName;
-            auto spuEntry = segment.isSpu ? entryName : "nullptr";
-            auto blocks = ssnprintf("&segment_%s_blocks", segment.suffix);
-            f << ssnprintf("    %s, %s, \"%s\", %s,\n",
-                           ppuEntry,
-                           spuEntry,
-                           segment.suffix,
-                           blocks);
-        }
+        auto entryName = ssnprintf("entryPoint_%s", segment.suffix);
+        auto ppuEntry = segment.isSpu ? "nullptr" : entryName;
+        auto spuEntry = segment.isSpu ? entryName : "nullptr";
+        auto blocks = ssnprintf("&segment_%s_blocks", segment.suffix);
+        f << ssnprintf("    %s, %s, \"%s\", %s,\n",
+                        ppuEntry,
+                        spuEntry,
+                        segment.suffix,
+                        blocks);
         f << "};\n";
     }
     

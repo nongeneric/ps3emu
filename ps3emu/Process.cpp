@@ -210,8 +210,13 @@ uint32_t Process::loadPrx(std::string path) {
         imageBase = ::align(available, 1 << 10);
     }
     std::vector<std::string> x86paths;
-    if (prxInfo && prxInfo->loadx86) {
-        x86paths.push_back(path + ".x86.so");
+    if (prxInfo) {
+        if (prxInfo->loadx86) {
+            x86paths.push_back(path + ".x86.so");
+        }
+        if (prxInfo->loadx86spu) {
+            x86paths.push_back(path + ".x86spu.so");
+        }
     }
     auto stolen = prx->map([&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});

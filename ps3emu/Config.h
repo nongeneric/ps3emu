@@ -6,8 +6,8 @@
 
 struct SysPrxInfo {
     std::string name;
-    std::string x86name;
     bool loadx86;
+    bool loadx86spu;
     uint32_t imageBase;
     uint32_t size;
     bool x86trace;

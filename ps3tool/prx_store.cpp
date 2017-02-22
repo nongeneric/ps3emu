@@ -87,7 +87,7 @@ void mapPrxStore() {
     g_state.config->save();
 }
 
-void rewritePrxStore() {
+void rewritePrxStore(bool verbose) {
     path prxStorePath = g_state.config->prxStorePath;
     auto& prxInfos = g_state.config->sysPrxInfos;
     for (auto& prxInfo : prxInfos) {
@@ -131,12 +131,32 @@ void rewritePrxStore() {
         
         rewrite.elf = prxPath.string();
         rewrite.cpp = prxPath.string() + ".cpp";
+        rewrite.isSpu = false;
         rewrite.imageBase = prxInfo.imageBase;        
+        
+        if (verbose) {
+            std::cout << ssnprintf("rewriting %s -> %s\n", rewrite.elf, rewrite.cpp);
+        }
+        
+        HandleRewrite(rewrite);
+        
+        if (!prxInfo.loadx86spu)
+            continue;
+        
+        rewrite.cpp = prxPath.string() + ".spu.cpp";
+        rewrite.isSpu = true;
+        rewrite.entryPoints.clear();
+        rewrite.ignoredEntryPoints.clear();
+        
+        if (verbose) {
+            std::cout << ssnprintf("rewriting [SPU] %s -> %s\n", rewrite.elf, rewrite.cpp);
+        }
+        
         HandleRewrite(rewrite);
     }
 }
 
-void compilePrxStore() {
+void compilePrxStore(bool verbose) {
     for (auto& prxInfo : g_state.config->sysPrxInfos) {
         if (!prxInfo.loadx86)
             continue;
@@ -148,7 +168,32 @@ void compilePrxStore() {
         info.debug = prxInfo.x86trace;
         info.trace = prxInfo.x86trace;
         std::cout << ssnprintf("compiling %s", prxInfo.name) << std::endl;
-        compile(info);
+        auto line = compile(info);
+        
+        if (verbose) {
+            std::cout << line << std::endl;
+        }
+        
+        std::string output;
+        auto res = exec(line, output);
+        if (!res)
+            std::cout << "compilation failed" << std::endl;
+        
+        if (!prxInfo.loadx86spu)
+            continue;
+        
+        info.so = prxPath.string() + ".x86spu.so";
+        info.cpp = prxPath.string() + ".spu.cpp";
+        std::cout << ssnprintf("compiling spu %s", prxInfo.name) << std::endl;
+        line = compile(info);
+        
+        if (verbose) {
+            std::cout << line << std::endl;
+        }
+        
+        res = exec(line, output);
+        if (!res)
+            std::cout << "compilation failed\n";
     }
 }
 
@@ -166,10 +211,10 @@ void HandlePrxStore(PrxStoreCommand const& command) {
     }
     
     if (command.rewrite) {
-        rewritePrxStore();
+        rewritePrxStore(command.verbose);
     }
     
     if (command.compile) {
-        compilePrxStore();
+        compilePrxStore(command.verbose);
     }
 }

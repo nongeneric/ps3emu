@@ -14,14 +14,15 @@
 
 TEST_CASE("rewriter_simple") {
     std::string output;
-    auto res = rewrite(
+    auto line = rewrite(
         "./binaries/rewriter_simple/a.elf",
         "/tmp/x86.cpp",
         "--entries 1022c 10314 1039c 10418 10484 10518 1053c 105ac 10654"
-        "--ignored 1045c 104c8",
-        output);
+        "--ignored 1045c 104c8");
+    auto res = exec(line, output);
     REQUIRE(res);
-    res = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    line = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    res = exec(line, output);
     REQUIRE(res);
     
     output = startWaitGetOutput({"./binaries/rewriter_simple/a.elf"}, {"--x86", "/tmp/x86.so"});
@@ -225,13 +226,14 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
 
 TEST_CASE("spu_rewriter_simple") {
     std::string output;
-    auto res = rewrite(
+    auto line = rewrite(
         "./binaries/spurs_task_hello/a.elf",
         "/tmp/x86spu.cpp",
-        "--spu",
-        output);
+        "--spu");
+    auto res = exec(line, output);
     REQUIRE(res);
-    res = compile({"/tmp/x86spu.cpp", "/tmp/x86spu.so", false, false});
+    line = compile({"/tmp/x86spu.cpp", "/tmp/x86spu.so", false, false});
+    res = exec(line, output);
     REQUIRE(res);
     
     output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"}, {"--x86", "/tmp/x86spu.so"});

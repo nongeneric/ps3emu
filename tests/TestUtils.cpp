@@ -29,9 +29,11 @@ std::string startWaitGetOutput(std::vector<std::string> args,
 }
 
 bool rewrite_and_compile(std::string elf) {
+    auto line = rewrite(elf, "/tmp/x86.cpp", "");
     std::string output;
-    auto res = rewrite(elf, "/tmp/x86.cpp", "", output);
+    auto res = exec(line, output);
     if (!res)
         return false;
-    return compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    line = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    return exec(line, output);
 }

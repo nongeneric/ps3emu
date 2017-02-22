@@ -3,16 +3,16 @@
 #include <stdint.h>
 #include <assert.h>
 
-inline int64_t getSValue(int64_t u) { return u; }
+constexpr int64_t getSValue(int64_t u) { return u; }
 template <typename BF, int = BF::P>
-inline int64_t getSValue(BF bf) { return bf.s(); }
+constexpr int64_t getSValue(BF bf) { return bf.s(); }
 
-inline uint64_t getUValue(uint64_t u) { return u; }
+constexpr uint64_t getUValue(uint64_t u) { return u; }
 template <typename BF, int = BF::P>
-inline uint64_t getUValue(BF bf) { return bf.u(); }
+constexpr uint64_t getUValue(BF bf) { return bf.u(); }
 
 template <int Width, typename T>
-inline T mask(int x, int y) {
+constexpr T mask(int x, int y) {
     static_assert(Width <= sizeof(T) * 8, "");
     assert(x < Width && y < Width);
     assert(x >= 0 && y >= 0);
@@ -32,7 +32,7 @@ inline T mask(int x, int y) {
 }
 
 template <int Width>
-inline uint64_t mask(int x, int y) {
+constexpr uint64_t mask(int x, int y) {
     return mask<Width, uint64_t>(x, y);
 }
 
@@ -53,11 +53,11 @@ public:
     static constexpr int P = Pos;
     static constexpr int W = Next - Pos;
     
-    inline uint32_t u() const {
+    constexpr uint32_t u() const {
         return v();
     }
     
-    inline int32_t s() const {
+    constexpr int32_t s() const {
         auto r = v();
         if (r & (1 << (Next - Pos - 1))) {
             return r | (~0ull << (Next - Pos));
@@ -65,12 +65,12 @@ public:
         return r;
     }
     
-    inline int32_t native() const {
+    constexpr int32_t native() const {
         return T == BitFieldType::Signed ?
             (*this << Shift) : (u() << Shift);
     }
     
-    inline const char* prefix() const {
+    constexpr const char* prefix() const {
         return T == BitFieldType::CR ? "cr"
              : T == BitFieldType::GPR ? "r"
              : T == BitFieldType::Channel ? "ch"
@@ -79,30 +79,30 @@ public:
              : "";
     }
     
-    inline int32_t operator<<(unsigned shift) const {
+    constexpr int32_t operator<<(unsigned shift) const {
         return static_cast<uint32_t>(s()) << shift;
     }
     
-    inline void set(uint32_t u) {
+    constexpr void set(uint32_t u) {
         uint32_t field = (u & ((1 << W) - 1)) << (32 - W - P);
         _v = (_v & ~mask<32>(P, P + W - 1)) | field;
     }
 };
 
 template <typename N>
-inline uint8_t bit_test(uint64_t number, int width, N pos) {
+constexpr uint8_t bit_test(uint64_t number, int width, N pos) {
     auto n = getUValue(pos);
     auto sh = width - n - 1;
     return (number & (1ull << sh)) >> sh;
 }
 
 template <typename T, int Pos, int Next>
-T bit_test(T number, BitField<Pos, Next> bf) {
+constexpr T bit_test(T number, BitField<Pos, Next> bf) {
     return bit_test(number, sizeof(T) * 8, bf);
 }
 
 template <typename N>
-uint64_t bit_set(uint64_t number, int width, N pos, int val) {
+constexpr uint64_t bit_set(uint64_t number, int width, N pos, int val) {
     auto n = getUValue(pos);
     auto sh = width - n - 1;
     auto mask = ~(1u << sh);
@@ -110,34 +110,34 @@ uint64_t bit_set(uint64_t number, int width, N pos, int val) {
 }
 
 template <typename T>
-T bit_set(T number, int pos, int val) {
+constexpr T bit_set(T number, int pos, int val) {
     return bit_set(number, sizeof(T) * 8, pos, val);
 }
 
 // left shift on a negative value is undefined
-inline int32_t signed_lshift32(int32_t v, int n) {
+constexpr int32_t signed_lshift32(int32_t v, int n) {
     return (uint32_t)v << n;
 }
 
-inline int32_t signed_rshift32(int32_t v, int n) {
+constexpr int32_t signed_rshift32(int32_t v, int n) {
     static_assert(-1 >> 1 == -1,
         "implementation defined right shift on a negative "
         "value should replicate the left most bit");
     return v >> n;
 }
 
-inline unsigned count_ones32(uint32_t x) {
+constexpr unsigned count_ones32(uint32_t x) {
     return __builtin_popcount(x);
 }
 
 template <typename T>
-inline T rol(T x, unsigned n) {
-    if (n == 0 || n == sizeof(T) * 8)
-        return x;
-    return (x << n) | (x >> (sizeof(T) * 8 - n));
+constexpr T rol(T value, unsigned count) {
+    const unsigned int mask = (8 * sizeof(value) - 1);
+    count &= mask;
+    return (value << count) | (value >> ((-count) & mask));
 }
 
 template <typename T>
-inline T ror(T x, unsigned n) {
+constexpr T ror(T x, unsigned n) {
     return rol<T>(x, sizeof(T) * 8 - n);
 }

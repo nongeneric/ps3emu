@@ -24,6 +24,8 @@ Config::Config() {
             info.name = it.key();
             auto& jloadx86 = j["sysPrxInfos"][info.name]["loadx86"];
             info.loadx86 = !jloadx86.is_null() ? jloadx86.get<bool>() : false;
+            auto& jloadx86spu = j["sysPrxInfos"][info.name]["loadx86spu"];
+            info.loadx86spu = !jloadx86spu.is_null() ? jloadx86spu.get<bool>() : false;
             info.imageBase =
                 std::stoi(j["sysPrxInfos"][info.name]["imageBase"].get<std::string>(), 0, 16);
             auto jsize = j["sysPrxInfos"][info.name]["size"];
@@ -42,6 +44,7 @@ void Config::save() {
         j["sysPrxInfos"][info.name]["imageBase"] = ssnprintf("%x", info.imageBase);
         j["sysPrxInfos"][info.name]["size"] = ssnprintf("%x", info.size);
         j["sysPrxInfos"][info.name]["loadx86"] = info.loadx86;
+        j["sysPrxInfos"][info.name]["loadx86spu"] = info.loadx86spu;
         j["sysPrxInfos"][info.name]["x86trace"] = info.x86trace;
     }
     std::ofstream f(_configPath);

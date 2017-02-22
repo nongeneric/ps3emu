@@ -14,6 +14,10 @@ struct BasicBlock {
     std::vector<std::string> body;
 };
 
+inline bool operator<(BasicBlock const& left, BasicBlock const& right) {
+    return std::tie(left.start, left.len) < std::tie(right.start, right.len);
+}
+
 struct EmbeddedElfInfo {
     uint32_t startOffset;
     uint32_t size;

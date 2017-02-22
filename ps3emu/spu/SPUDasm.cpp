@@ -75,7 +75,8 @@ union SPUForm {
 
 #ifdef EMU_REWRITER
     #define SPU_SET_NIP_INDIRECT(x) th->setNip(x & ~3ul); return;
-    #define SPU_SET_NIP(x) goto _##x
+    #define SPU_SET_NIP_INITIAL(x) goto _##x
+    #define SPU_SET_NIP SPU_SET_NIP_INITIAL
 #else
     #define SPU_SET_NIP(x) th->setNip(x)
     #define SPU_SET_NIP_INDIRECT(x) SPU_SET_NIP(x)
