@@ -4,6 +4,7 @@
 #include "ps3emu/Config.h"
 #include "ps3emu/ELFLoader.h"
 #include "ps3emu/utils.h"
+#include "ps3emu/fileutils.h"
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/InternalMemoryManager.h"
@@ -17,6 +18,43 @@
 using namespace boost::filesystem;
 using namespace boost::endian;
 using namespace boost::algorithm;
+
+class NinjaScript {
+    std::vector<std::string> _script;
+    
+public:
+    void rule(std::string name, std::string command) {
+        _script.push_back("rule " + name);
+        _script.push_back("  command = " + command);
+        _script.push_back("");
+    }
+    
+    void statement(std::string rule,
+                   std::string in,
+                   std::string out,
+                   std::vector<std::tuple<std::string, std::string>> variables) {
+        _script.push_back(ssnprintf("build %s: %s %s", out, rule, in));
+        for (auto var : variables) {
+            _script.push_back(
+                ssnprintf("  %s = %s", std::get<0>(var), std::get<1>(var)));
+        }
+        _script.push_back("");
+    }
+    
+    void variable(std::string name, std::string value) {
+        _script.push_back(ssnprintf("%s = %s", name, value));
+        _script.push_back("");
+    }
+    
+    std::string dump() {
+        assert(!_script.empty());
+        std::string res = _script[0];
+        for (auto i = 1u; i < _script.size(); ++i) {
+            res += "\n" + _script[i];
+        }
+        return res;
+    }
+};
 
 void mapPrxStore() {
     path prxStorePath = g_state.config->prxStorePath;
@@ -87,14 +125,24 @@ void mapPrxStore() {
     g_state.config->save();
 }
 
-void rewritePrxStore(bool verbose) {
+void rewritePrxStore() {
     path prxStorePath = g_state.config->prxStorePath;
     auto& prxInfos = g_state.config->sysPrxInfos;
+    
+    NinjaScript script;
+    script.variable("opt", "-O2 -DNDEBUG");
+    script.variable("trace", "");
+    script.variable("entries", "");
+    auto ps3tool = ps3toolPath();
+    script.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $out --image-base $imagebase $entries");
+    script.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $out --image-base $imagebase $entries");
+    script.rule("compile", compileRule());
+    
     for (auto& prxInfo : prxInfos) {
-        auto prxPath = prxStorePath / "sys" / "external" / prxInfo.name;
+        auto prxPath = (prxStorePath / "sys" / "external" / prxInfo.name).string();
         assert(exists(prxPath));
         
-        std::ifstream f(prxPath.string());
+        std::ifstream f(prxPath);
         assert(f.is_open());
         std::vector<char> elf(file_size(prxPath));
         f.read(elf.data(), elf.size());
@@ -105,96 +153,55 @@ void rewritePrxStore(bool verbose) {
         auto exports = reinterpret_cast<prx_export_t*>(&elf[pheader->p_offset + module->exports_start]);
         auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
         
-        RewriteCommand rewrite;
+        std::vector<uint32_t> entries;
         for (auto i = 0u; i < nexports; ++i) {
             auto& e = exports[i];
             auto stubs = reinterpret_cast<big_uint32_t*>(
                 &elf[pheader->p_offset + e.stub_table]);
             for (auto i = 0; i < e.functions; ++i) {
                 auto descr = reinterpret_cast<fdescr*>(&elf[pheader->p_offset + stubs[i]]);
-                rewrite.entryPoints.push_back(descr->va);
+                entries.push_back(descr->va);
             }
         }
         
-        auto funcList = prxPath.string() + ".entries";
+        auto funcList = prxPath + ".entries";
         if (exists(funcList)) {
             std::ifstream f(funcList);
             assert(f.is_open());
             std::string line;
             while (std::getline(f, line)) {
-                rewrite.entryPoints.push_back(std::stoi(line, 0, 16));
+                entries.push_back(std::stoi(line, 0, 16));
             }
         }
         
-//         if (basename(prxPath) != "liblv2.sprx")
-//             continue;
-        
-        rewrite.elf = prxPath.string();
-        rewrite.cpp = prxPath.string() + ".cpp";
-        rewrite.isSpu = false;
-        rewrite.imageBase = prxInfo.imageBase;        
-        
-        if (verbose) {
-            std::cout << ssnprintf("rewriting %s -> %s\n", rewrite.elf, rewrite.cpp);
+        std::vector<std::tuple<std::string, std::string>> compileVars;
+        if (prxInfo.x86trace) {
+            compileVars.push_back(std::make_tuple("opt", "-O0 -ggdb"));
+            compileVars.push_back(std::make_tuple("trace", "-DTRACE"));
         }
         
-        HandleRewrite(rewrite);
+        auto imagebaseVar = std::make_tuple("imagebase", ssnprintf("%x", prxInfo.imageBase));
         
-        if (!prxInfo.loadx86spu)
-            continue;
-        
-        rewrite.cpp = prxPath.string() + ".spu.cpp";
-        rewrite.isSpu = true;
-        rewrite.entryPoints.clear();
-        rewrite.ignoredEntryPoints.clear();
-        
-        if (verbose) {
-            std::cout << ssnprintf("rewriting [SPU] %s -> %s\n", rewrite.elf, rewrite.cpp);
+        if (prxInfo.loadx86) {
+            assert(!entries.empty());
+            std::string entriesString = "--entries";
+            for (auto entry : entries) {
+                entriesString += ssnprintf(" %x", entry);
+            }
+            auto rewriteVar = std::make_tuple("entries", entriesString);
+            auto cpp = prxPath + ".cpp";
+            script.statement("rewrite-ppu", prxPath, cpp, {rewriteVar, imagebaseVar});
+            script.statement("compile", cpp, prxPath + ".x86.so", compileVars);
         }
         
-        HandleRewrite(rewrite);
+        if (prxInfo.loadx86spu) {
+            auto cpp = prxPath + ".spu.cpp";
+            script.statement("rewrite-spu", prxPath, prxPath + ".spu.cpp", {imagebaseVar});
+            script.statement("compile", cpp, prxPath + ".x86spu.so", compileVars);
+        }
     }
-}
-
-void compilePrxStore(bool verbose) {
-    for (auto& prxInfo : g_state.config->sysPrxInfos) {
-        if (!prxInfo.loadx86)
-            continue;
-        path prxStorePath = g_state.config->prxStorePath;
-        auto prxPath = prxStorePath / "sys" / "external" / prxInfo.name;
-        CompileInfo info;
-        info.so = prxPath.string() + ".x86.so";
-        info.cpp = prxPath.string() + ".cpp";
-        info.debug = prxInfo.x86trace;
-        info.trace = prxInfo.x86trace;
-        std::cout << ssnprintf("compiling %s", prxInfo.name) << std::endl;
-        auto line = compile(info);
-        
-        if (verbose) {
-            std::cout << line << std::endl;
-        }
-        
-        std::string output;
-        auto res = exec(line, output);
-        if (!res)
-            std::cout << "compilation failed" << std::endl;
-        
-        if (!prxInfo.loadx86spu)
-            continue;
-        
-        info.so = prxPath.string() + ".x86spu.so";
-        info.cpp = prxPath.string() + ".spu.cpp";
-        std::cout << ssnprintf("compiling spu %s", prxInfo.name) << std::endl;
-        line = compile(info);
-        
-        if (verbose) {
-            std::cout << line << std::endl;
-        }
-        
-        res = exec(line, output);
-        if (!res)
-            std::cout << "compilation failed\n";
-    }
+    
+    write_all_text(script.dump(), (prxStorePath / "sys" / "external" / "build.ninja").string());
 }
 
 void HandlePrxStore(PrxStoreCommand const& command) {
@@ -211,10 +218,6 @@ void HandlePrxStore(PrxStoreCommand const& command) {
     }
     
     if (command.rewrite) {
-        rewritePrxStore(command.verbose);
-    }
-    
-    if (command.compile) {
-        compilePrxStore(command.verbose);
+        rewritePrxStore();
     }
 }

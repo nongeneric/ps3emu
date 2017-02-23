@@ -41,7 +41,6 @@ struct RewriteCommand {
 struct PrxStoreCommand {
     bool map;
     bool rewrite;
-    bool compile;
     bool verbose;
 };
 

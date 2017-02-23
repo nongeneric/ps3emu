@@ -1908,7 +1908,7 @@ PRINT(ceqbi) {
 #define _ceqbi(_ra, _rt, _i10) { \
     auto ra = th->r(_ra); \
     auto& rt = th->r(_rt); \
-    uint8_t imm = _i10; \
+    auto imm = (uint8_t)_i10; \
     for (int i = 0; i < 16; ++i) { \
         rt.b(i) = ra.b(i) == imm ? 0xff : 0; \
     } \

@@ -86,6 +86,11 @@ std::vector<BasicBlock> discoverBasicBlocks(
             block->len += 4;
         }
     }
+    
+    if (block) {
+        blocks.push_back(*block);
+    }
+    
     return blocks;
 }
 

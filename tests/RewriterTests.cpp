@@ -68,7 +68,7 @@ TEST_CASE("rewriter_block_discovery_1") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x22ac4, 0x22ae4, 0, std::stack<uint32_t>({0x22ac4u}), log, make_analyze(instrs));
+        0x22ac4, 0x22ae4 - 0x22ac4, 0, std::stack<uint32_t>({0x22ac4u}), log, make_analyze(instrs));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks.front();
@@ -114,7 +114,7 @@ TEST_CASE("rewriter_block_discovery_2") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x10B14, 0x1DCE0, 0, std::stack<uint32_t>({0x10B14}), log, make_analyze(instrs));
+        0x10B14, 0x1DCE0 - 0x10B14, 0, std::stack<uint32_t>({0x10B14}), log, make_analyze(instrs));
     
     REQUIRE(blocks.size() == 3);
     auto block = blocks[0];
@@ -137,7 +137,7 @@ TEST_CASE("rewriter_block_discovery_3") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x7034, 0x7040, 0, std::stack<uint32_t>({0x7034}), log, make_analyze(instrs));
+        0x7034, 0x7040 - 0x7034, 0, std::stack<uint32_t>({0x7034}), log, make_analyze(instrs));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks[0];
@@ -204,7 +204,7 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x0340, 0x03c4, 0, std::stack<uint32_t>({0x0340}), log, make_analyze(instrs, false));
+        0x0340, 0x03c4 - 0x0340, 0, std::stack<uint32_t>({0x0340}), log, make_analyze(instrs, false));
     
     REQUIRE(blocks.size() == 5);
     auto block = blocks[0];
@@ -240,4 +240,22 @@ TEST_CASE("spu_rewriter_simple") {
     REQUIRE( output ==
         "SPU: Hello world!\n"
     );
+}
+
+TEST_CASE("spu_rewriter_block_discovery_2") {
+    std::vector<std::pair<uint32_t, uint32_t>> instrs {
+        { 0x0340, 0x24004080 }, /* stqd           lr, arg_10(sp)      */
+        { 0x0344, 0x24FFC0D0 }, /* stqd           r80, var_10(sp)     */
+        { 0x0348, 0x4020007F }, /* nop            r127                */
+        { 0x034C, 0x24FF80D1 }, /* stqd           r81, var_20(sp)     */
+    };
+    std::stringstream log;
+    
+    auto blocks = discoverBasicBlocks(
+        0x0340, 12, 0, std::stack<uint32_t>({0x0344}), log, make_analyze(instrs, false));
+    
+    REQUIRE(blocks.size() == 1);
+    auto block = blocks[0];
+    REQUIRE(block.start == 0x0344);
+    REQUIRE(block.len == 8);
 }

@@ -159,7 +159,6 @@ Command ParseOptions(int argc, const char *argv[]) {
         desc.add_options()
             ("map", bool_switch()->default_value(false), "update prx segment bases in ps3 config")
             ("rewrite", bool_switch()->default_value(false), "rewrite prx binaries")
-            ("compile", bool_switch()->default_value(false), "compile rewritten binaries")
             ("verbose", bool_switch()->default_value(false), "verbose")
             ;
         
@@ -170,7 +169,6 @@ Command ParseOptions(int argc, const char *argv[]) {
         
         command.map = vm["map"].as<bool>();
         command.rewrite = vm["rewrite"].as<bool>();
-        command.compile = vm["compile"].as<bool>();
         command.verbose = vm["verbose"].as<bool>();
         
         return command;
