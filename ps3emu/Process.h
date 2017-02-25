@@ -202,8 +202,8 @@ public:
         _rewriterStore.invokePPU(index, label);
     }
     
-    inline void bbcallSpu(unsigned index, unsigned label) {
-        _rewriterStore.invokeSPU(index, label);
+    inline void bbcallSpu(unsigned index, unsigned label, uint32_t cia) {
+        _rewriterStore.invokeSPU(index, label, cia);
     }
 };
 

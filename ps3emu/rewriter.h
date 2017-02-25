@@ -14,7 +14,7 @@ struct RewrittenBlock {
 
 struct RewrittenSegment {
     void (*ppuEntryPoint)(PPUThread*, int);
-    void (*spuEntryPoint)(SPUThread*, int);
+    void (*spuEntryPoint)(SPUThread*, int, uint32_t);
     const char* description;
     const std::vector<RewrittenBlock>* blocks;
 };

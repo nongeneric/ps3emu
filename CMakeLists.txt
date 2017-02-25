@@ -35,23 +35,30 @@ set(CMAKE_CXX_FLAGS "-Wno-format-security ${CMAKE_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wno-unused-const-variable ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-missing-braces ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
-
 set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native ${CMAKE_CXX_FLAGS}")
 
-# detect accesses to unallocated memory (massive performance hit)
-add_definitions(-DMEMORY_PROTECTION)
+# debug, release
+set(EMU_CONFIGURATION debug)
 
-# enable code required for running tests (small performance hit)
-add_definitions(-DTESTS)
+if(${EMU_CONFIGURATION} STREQUAL debug)
+    # detect accesses to unallocated memory (massive performance hit)
+    add_definitions(-DMEMORY_PROTECTION)
+    
+    # enable code required for running tests (small performance hit)
+    add_definitions(-DTESTS)
+    
+    # enable thread pausing, required for the dbg-gui (moderate performance hit)
+    add_definitions(-DDEBUGPAUSE)
+    
+    set(CMAKE_CXX_FLAGS "-ggdb3 -O0 ${CMAKE_CXX_FLAGS}")
+endif()
 
-# enable thread pausing, required for the dbg-gui (moderate performance hit)
-add_definitions(-DDEBUGPAUSE)
-
-# disable all asserts (moderate performance hit)
-#add_definitions(-DNDEBUG)
-
-set(CMAKE_CXX_FLAGS "-ggdb3 -O0 ${CMAKE_CXX_FLAGS}")
-#set(CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS}")
+if(${EMU_CONFIGURATION} STREQUAL release)
+    # disable all asserts (moderate performance hit)
+    add_definitions(-DNDEBUG)
+    
+    set(CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS}")
+endif()
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
@@ -61,8 +68,11 @@ include_directories(SYSTEM ${FREETYPE2_INCLUDE_DIRS})
 
 add_subdirectory(ps3emu)
 add_subdirectory(ps3tool-core)
-add_subdirectory(dbg-gui)
 add_subdirectory(ps3run)
 add_subdirectory(ps3tool)
-add_subdirectory(tests)
-add_subdirectory(gcmviz)
+
+if(${EMU_CONFIGURATION} STREQUAL debug)
+    add_subdirectory(tests)
+    add_subdirectory(gcmviz)
+    add_subdirectory(dbg-gui)
+endif()

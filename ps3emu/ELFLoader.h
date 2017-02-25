@@ -180,8 +180,8 @@ public:
         _modules[index].ppuEntryPoint(g_state.th, label);
     }
     
-    inline void invokeSPU(unsigned index, unsigned label) {
-        _modules[index].spuEntryPoint(g_state.sth, label);
+    inline void invokeSPU(unsigned index, unsigned label, uint32_t cia) {
+        _modules[index].spuEntryPoint(g_state.sth, label, cia);
     }
 };
 

@@ -4,25 +4,13 @@
 #include <vector>
 
 TEST_CASE("simple_printf") {
-    auto output = startWaitGetOutput({"./binaries/simple_printf/a.elf"});
-    REQUIRE( output == "some output\n" );
-    
-    REQUIRE( rewrite_and_compile("./binaries/simple_printf/a.elf") );
-    output = startWaitGetOutput({"./binaries/simple_printf/a.elf"}, {"--x86", "/tmp/x86.so"});
-    REQUIRE( output == "some output\n" );
+    test_interpreter_and_rewriter({"./binaries/simple_printf/a.elf"}, "some output\n");
 }
 
 TEST_CASE("bubblesort") {
-    auto output = startWaitGetOutput({"./binaries/bubblesort/a.elf",
-                                      "5",
-                                      "17",
-                                      "30",
-                                      "-1",
-                                      "20",
-                                      "12",
-                                      "100",
-                                      "0"});
-    REQUIRE( output == "args: 5 17 30 -1 20 12 100 0 \nsorted: -1 0 5 12 17 20 30 100 \n" );
+    test_interpreter_and_rewriter(
+        {"./binaries/bubblesort/a.elf", "5", "17", "30", "-1", "20", "12", "100", "0"},
+        "args: 5 17 30 -1 20 12 100 0 \nsorted: -1 0 5 12 17 20 30 100 \n");
 }
 
 TEST_CASE("md5") {
@@ -533,28 +521,24 @@ TEST_CASE("ppu_simd_math") {
 }
 
 TEST_CASE("spu_getting_argp") {
-    auto output = startWaitGetOutput({"./binaries/spu_getting_argp/a.elf"});
-    REQUIRE( output == 
-        "Creating an SPU thread group.\n"
-        "Initializing SPU thread 0\n"
-        "All SPU threads have been successfully initialized.\n"
-        "Starting the SPU thread group.\n"
-        "All SPU threads exited by sys_spu_thread_exit().\n"
-        "SPU thread 0's exit status = 0\n"
-        "SUCCESS: fromSpu is the same as toSpu\n"
-        "## libdma : sample_dma_getting_argp SUCCEEDED ##\n"
-    );
+    test_interpreter_and_rewriter({"./binaries/spu_getting_argp/a.elf"},
+                                  "Creating an SPU thread group.\n"
+                                  "Initializing SPU thread 0\n"
+                                  "All SPU threads have been successfully initialized.\n"
+                                  "Starting the SPU thread group.\n"
+                                  "All SPU threads exited by sys_spu_thread_exit().\n"
+                                  "SPU thread 0's exit status = 0\n"
+                                  "SUCCESS: fromSpu is the same as toSpu\n"
+                                  "## libdma : sample_dma_getting_argp SUCCEEDED ##\n");
 }
 
 TEST_CASE("raw_spu_printf") {
-    auto output = startWaitGetOutput({"./binaries/raw_spu_printf/a.elf"});
-    REQUIRE( output == 
-        "Initializing SPUs\n"
-        "sys_raw_spu_create succeeded. raw_spu number is 0\n"
-        "Hello, World 1\n"
-        "Hello, World 2\n"
-        "a, 12, 20, 0x1e, 0X28,   50, \"test\"\n"
-    );
+    test_interpreter_and_rewriter({"./binaries/raw_spu_printf/a.elf"},
+                                  "Initializing SPUs\n"
+                                  "sys_raw_spu_create succeeded. raw_spu number is 0\n"
+                                  "Hello, World 1\n"
+                                  "Hello, World 2\n"
+                                  "a, 12, 20, 0x1e, 0X28,   50, \"test\"\n");
 }
 
 TEST_CASE("gcm_memory") {
@@ -688,8 +672,7 @@ TEST_CASE("opengl_hash") {
 }
 
 TEST_CASE("raw_spu_opengl_dma") {
-    auto output = startWaitGetOutput({"./binaries/raw_spu_opengl_dma/a.elf"});
-    REQUIRE( output == 
+    test_interpreter_and_rewriter({"./binaries/raw_spu_opengl_dma/a.elf"},
         "Initializing SPUs\n"
         "sys_raw_spu_create succeeded. raw_spu number is 0\n"
         "waiting for _jsAsyncCopyQ\n"
@@ -884,8 +867,7 @@ TEST_CASE("pngdec_ppu") {
 }
 
 TEST_CASE("spurs_task_hello") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"});
-    REQUIRE( output == 
+    test_interpreter_and_rewriter({"./binaries/spurs_task_hello/a.elf"},
         "SPU: Hello world!\n"
     );
 }
@@ -1291,8 +1273,7 @@ TEST_CASE("spu_generic_test") {
 }
 
 TEST_CASE("spu_sync_mutex") {
-    auto output = startWaitGetOutput({"./binaries/spu_sync_mutex/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spu_sync_mutex/a.elf"},
          "Creating an SPU thread group.\n"
          "Initializing SPU thread 0\n"
          "Initializing SPU thread 1\n"
@@ -1381,8 +1362,7 @@ TEST_CASE("spu_image") {
 }
 
 TEST_CASE("fiber_hello") {
-    auto output = startWaitGetOutput({"./binaries/fiber_hello/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/fiber_hello/a.elf"},
         "Hello, fiber!\n"
         "## libfiber : sample_fiber_hello SUCCEEDED ##\n"
     );
@@ -1407,8 +1387,7 @@ TEST_CASE("ppu_threads_event_flag") {
 }
 
 TEST_CASE("spurs_task_signal") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_signal/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_task_signal/a.elf"},
         "SPU: Signal task start!\n"
         "SPU: Waiting for a signal....\n"
         "SPU: Receiving a signal succeeded.\n"
@@ -1417,8 +1396,7 @@ TEST_CASE("spurs_task_signal") {
 }
 
 TEST_CASE("spurs_task_yield") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_yield/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_task_yield/a.elf"},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
         "Task#1 exited with code 0\n"
@@ -1431,8 +1409,7 @@ TEST_CASE("spurs_task_yield") {
 }
 
 TEST_CASE("spurs_task_semaphore") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_semaphore/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_task_semaphore/a.elf"},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
         "Task#1 exited with code 0\n"
@@ -1442,8 +1419,7 @@ TEST_CASE("spurs_task_semaphore") {
 }
 
 TEST_CASE("spurs_task_event_flag") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_event_flag/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_task_event_flag/a.elf"},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
         "Task#1 exited with code 0\n"
@@ -1549,8 +1525,7 @@ TEST_CASE("sample_sync_barrier") {
 }
 
 TEST_CASE("sample_sheap_allocate") {
-    auto output = startWaitGetOutput({"./binaries/sample_sheap_allocate/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sheap_allocate/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1565,8 +1540,7 @@ TEST_CASE("sample_sheap_allocate") {
 }
 
 TEST_CASE("sample_sheap_key_buffer") {
-    auto output = startWaitGetOutput({"./binaries/sample_sheap_key_buffer/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sheap_key_buffer/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1644,8 +1618,7 @@ TEST_CASE("sample_sheap_key_buffer") {
 }
 
 TEST_CASE("sample_sheap_key_mutex") {
-    auto output = startWaitGetOutput({"./binaries/sample_sheap_key_mutex/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sheap_key_mutex/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1664,8 +1637,7 @@ TEST_CASE("sample_sheap_key_mutex") {
 }
 
 TEST_CASE("libatomic_xor64") {
-    auto output = startWaitGetOutput({"./binaries/libatomic_xor64/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/libatomic_xor64/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1688,8 +1660,7 @@ TEST_CASE("libatomic_xor64") {
 }
 
 TEST_CASE("libatomic_semaphore") {
-    auto output = startWaitGetOutput({"./binaries/libatomic_semaphore/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/libatomic_semaphore/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1706,8 +1677,7 @@ TEST_CASE("libatomic_semaphore") {
 }
 
 TEST_CASE("sample_ovis_auto") {
-    auto output = startWaitGetOutput({"./binaries/sample_ovis_auto/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_ovis_auto/a.elf"},
         "spu_initialize\n"
         "elf=20d00\n"
         "Creating an SPU thread group.\n"
@@ -1743,8 +1713,7 @@ TEST_CASE("sample_ovis_auto") {
 }
 
 TEST_CASE("sample_ovis_manual") {
-    auto output = startWaitGetOutput({"./binaries/sample_ovis_manual/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_ovis_manual/a.elf"},
         "spu_initialize\n"
         "elf=20d00\n"
         "Creating an SPU thread group.\n"
@@ -1780,8 +1749,7 @@ TEST_CASE("sample_ovis_manual") {
 }
 
 TEST_CASE("sample_ovis_manual_function") {
-    auto output = startWaitGetOutput({"./binaries/sample_ovis_manual_function/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_ovis_manual_function/a.elf"},
         "spu_initialize\n"
         "elf=20d00\n"
         "Creating an SPU thread group.\n"
@@ -1817,8 +1785,7 @@ TEST_CASE("sample_ovis_manual_function") {
 }
 
 TEST_CASE("sample_ovis_on_spurs") {
-    auto output = startWaitGetOutput({"./binaries/sample_ovis_on_spurs/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_ovis_on_spurs/a.elf"},
         "spu_initialize\n"
         "elf=1f900\n"
         "Addresses are:\n"
@@ -1848,8 +1815,7 @@ TEST_CASE("sample_ovis_on_spurs") {
 }
 
 TEST_CASE("spu_thr_mmio") {
-    auto output = startWaitGetOutput({"./binaries/spu_thr_mmio/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spu_thr_mmio/a.elf"},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -1876,8 +1842,7 @@ TEST_CASE("spu_thr_mmio") {
 }
 
 TEST_CASE("spu_thr_recv_event") {
-    auto output = startWaitGetOutput({"./binaries/spu_thr_recv_event/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spu_thr_recv_event/a.elf"},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an event port.\n"
@@ -1910,8 +1875,7 @@ TEST_CASE("spu_thr_recv_event") {
 }
 
 TEST_CASE("spu_thr_send_event") {
-    auto output = startWaitGetOutput({"./binaries/spu_thr_send_event/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spu_thr_send_event/a.elf"},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -1958,8 +1922,7 @@ TEST_CASE("spu_thr_send_event") {
 }
 
 TEST_CASE("spu_thr_dma_sync") {
-    auto output = startWaitGetOutput({"./binaries/spu_thr_dma_sync/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spu_thr_dma_sync/a.elf"},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -2233,8 +2196,7 @@ TEST_CASE("ppu_spu_round_trip_spu_side_spu_thread") {
 }
 
 TEST_CASE("spurs_iwl_communication1_event_flag") {
-    auto output = startWaitGetOutput({"./binaries/spurs_iwl_communication1_event_flag/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_iwl_communication1_event_flag/a.elf"},
         "PPU: wait until all task becomes ready\n"
         "PPU: wake up setter tasks\n"
         "PPU: joining all tasks\n"
@@ -2271,8 +2233,7 @@ TEST_CASE("l10n_convert_str") {
 }
 
 TEST_CASE("spu_dma_polling") {
-    auto output = startWaitGetOutput({"./binaries/spu_dma_polling/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spu_dma_polling/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -2348,8 +2309,7 @@ TEST_CASE("spurs_task_barrier") {
 }
 
 TEST_CASE("spurs_task_create_on_task") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_create_on_task/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_task_create_on_task/a.elf"},
         "PPU: wait for completion of the task\n"
         "SPU: Task create task start!\n"
         "Task#0 exited with code 0\n"
@@ -2359,8 +2319,7 @@ TEST_CASE("spurs_task_create_on_task") {
 }
 
 TEST_CASE("spurs_job_inout_dma") {
-    auto output = startWaitGetOutput({"./binaries/spurs_job_inout_dma/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_job_inout_dma/a.elf"},
         "00031700 dstBuffer[0]=1\n"
         "00031710 dstBuffer[1]=2\n"
         "00031720 dstBuffer[2]=3\n"
@@ -2511,8 +2470,7 @@ TEST_CASE("libswcache_linked_list_sort") {
 }
 
 TEST_CASE("spurs_task_hello3_exit_if_no_work") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_hello3_exit_if_no_work/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/spurs_task_hello3_exit_if_no_work/a.elf"},
         "PPU: wait for completion of the task\n"
         "res = 80\n"
         "PPU: taskset completed\n"

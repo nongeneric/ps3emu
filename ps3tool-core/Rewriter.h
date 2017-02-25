@@ -19,9 +19,10 @@ inline bool operator<(BasicBlock const& left, BasicBlock const& right) {
 }
 
 struct EmbeddedElfInfo {
-    uint32_t startOffset;
-    uint32_t size;
-    const Elf32_be_Ehdr* header;
+    uint32_t startOffset = 0;
+    uint32_t size = 0;
+    bool isJob = false;
+    const Elf32_be_Ehdr* header = nullptr;
 };
 
 std::vector<BasicBlock> discoverBasicBlocks(
@@ -33,3 +34,4 @@ std::vector<BasicBlock> discoverBasicBlocks(
     std::function<InstructionInfo(uint32_t)> analyze);
 
 std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const& elf);
+uint32_t vaToOffset(const Elf32_be_Ehdr* header, uint32_t va);

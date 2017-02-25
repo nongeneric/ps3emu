@@ -2,6 +2,14 @@
 
 #include <string>
 
+constexpr bool static_debug =
+#ifndef NDEBUG
+    true
+#else
+    false
+#endif
+    ;
+
 struct CompileInfo {
     std::string cpp;
     std::string so;

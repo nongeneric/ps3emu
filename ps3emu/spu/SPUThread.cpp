@@ -45,7 +45,8 @@ void SPUThread::loop() {
 
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
     
-    //f = fopen(ssnprintf("/tmp/spu_%d_trace", _id).c_str(), "w");
+//     f = fopen(ssnprintf("/tmp/spu_%d_trace", _id).c_str(), "w");
+//     bool trace = false;
     
     for (;;) {
         if (_singleStep) {
@@ -60,28 +61,36 @@ void SPUThread::loop() {
         try {
             cia = getNip();
 
-//             std::string str;
-//             auto instr = ptr(cia);
-//             SPUDasm<DasmMode::Print>(instr, cia, &str);
-//             std::string name;
-//             SPUDasm<DasmMode::Name>(instr, cia, &name);
-//             
-//             fprintf(f, "pc:%08x;", cia);
-//             for (auto i = 0u; i < 128; ++i) {
-//                 auto v = r(i);
-//                 fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
-//                         v.w<0>(),
-//                         v.w<1>(),
-//                         v.w<2>(),
-//                         v.w<3>());
+//             if (cia == 0x5c10)
+//                 trace = true;
+//             if (cia == 0x8384)
+//                 trace = false;
+//            
+//             if (trace)
+//             {
+//                 std::string str;
+//                 auto instr = ptr(cia);
+//                 SPUDasm<DasmMode::Print>(instr, cia, &str);
+//                 std::string name;
+//                 SPUDasm<DasmMode::Name>(instr, cia, &name);
+//                 
+//                 fprintf(f, "pc:%08x;", cia);
+//                 for (auto i = 0u; i < 128; ++i) {
+//                     auto v = r(i);
+//                     fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
+//                             v.w<0>(),
+//                             v.w<1>(),
+//                             v.w<2>(),
+//                             v.w<3>());
+//                 }
+//                 fprintf(f, " #%s\n", str.c_str());
+//                 fflush(f);
 //             }
-//             fprintf(f, " #%s\n", str.c_str());
-//             fflush(f);
 
             auto instr = *(big_uint32_t*)ptr(cia);
             uint32_t segment, label;
             if (dasm_bb_call(instr, segment, label)) {
-                g_state.proc->bbcallSpu(segment, label);
+                g_state.proc->bbcallSpu(segment, label, cia);
             } else {
                 setNip(cia + 4);
                 SPUDasm<DasmMode::Emulate>(&instr, cia, this);

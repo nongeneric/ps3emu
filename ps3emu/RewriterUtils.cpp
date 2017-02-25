@@ -35,7 +35,7 @@ std::string compileRule() {
 }
 
 std::string compile(CompileInfo const& info) {
-    auto optimization = info.debug ? "-O0 -ggdb" : "-O3 -DNDEBUG"; // -flto
+    auto optimization = info.debug || static_debug ? "-O0 -ggdb" : "-O3 -DNDEBUG"; // -flto
     auto trace = info.trace ? "-DTRACE" : "";
     auto rule = compileRule();
     boost::replace_first(rule, "$opt", optimization);

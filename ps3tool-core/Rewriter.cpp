@@ -94,6 +94,20 @@ std::vector<BasicBlock> discoverBasicBlocks(
     return blocks;
 }
 
+uint32_t vaToOffset(const Elf32_be_Ehdr* header, uint32_t va) {
+    auto phs = (Elf32_be_Phdr*)((char*)header + header->e_phoff);
+    for (auto i = 0; i < header->e_phnum; ++i) {
+        auto vaStart = phs[i].p_vaddr; 
+        auto vaEnd = vaStart + phs[i].p_memsz;
+        if (vaStart <= va && va < vaEnd) {
+            if (va - vaStart > phs[i].p_filesz)
+                throw std::runtime_error("out of range");
+            return va - vaStart + phs[i].p_offset;
+        }
+    }
+    throw std::runtime_error("out of range");
+}
+
 std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const& elf) {
     std::vector<uint8_t> magic { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3 };
     std::vector<EmbeddedElfInfo> elfs;
@@ -123,7 +137,13 @@ std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const&
                 end = std::max(end, shs[i].sh_addr + shs[i].sh_size);
             }
         }
-        elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), end, header});
+        bool isJob = false;
+        if (header->e_entry == 0x10) {
+            auto ep = (big_uint32_t*)((char*)header + vaToOffset(header, header->e_entry));
+            isJob = ep[0] == 0x44012850 && ep[1] == 0x32000080 && ep[2] == 0x44012850 &&
+                    ep[3] == 0x32000280 && ep[4] == 0x62696E32 && ep[5] == 0x00000000;
+        }
+        elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), end, isJob, header});
     }
     return elfs;
 }

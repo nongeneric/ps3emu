@@ -48,7 +48,7 @@ union SPUForm {
     BitField<18, 32> StopAndSignalType;
 };
 
-#define EMU(name) inline void emulate##name(SPUForm* i, uint32_t cia, SPUThread* th)
+#define EMU(name) inline void emulate##name(SPUForm* i, uint32_t cia, SPUThread* thread)
 #define INVOKE(name) invoke_impl<M>(#name, print##name, emulate##name, rewrite##name, &x, cia, state); return
 #define PRINT(name) inline void print##name(SPUForm* i, uint32_t cia, std::string* result)
 
@@ -65,7 +65,7 @@ union SPUForm {
             ); \
         } \
     inline void BOOST_PP_CAT(emulate, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)) \
-        (SPUForm* i, uint64_t cia, SPUThread* th) { \
+        (SPUForm* i, uint64_t cia, SPUThread* thread) { \
             BOOST_PP_EXPAND(BOOST_PP_CAT(_, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)) BOOST_PP_LPAREN() \
                 BOOST_PP_LIST_ENUM( \
                     BOOST_PP_LIST_REST_N(1, BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__)))) \
@@ -74,13 +74,19 @@ union SPUForm {
 #endif
 
 #ifdef EMU_REWRITER
-    #define SPU_SET_NIP_INDIRECT(x) th->setNip(x & ~3ul); return;
+    #define SPU_SET_NIP_INDIRECT(x) { thread->setNip(x & ~3ul); return; }
     #define SPU_SET_NIP_INITIAL(x) goto _##x
     #define SPU_SET_NIP SPU_SET_NIP_INITIAL
+    #define SPU_RESTORE_NIP(cia) thread->setNip(cia + 4 + pic_offset)
+    #define SPU_ADJUST_LINK(x) ((x) + pic_offset)
 #else
-    #define SPU_SET_NIP(x) th->setNip(x)
+    #define SPU_SET_NIP(x) thread->setNip(x)
     #define SPU_SET_NIP_INDIRECT(x) SPU_SET_NIP(x)
+    #define SPU_ADJUST_LINK(x) x
+    #define SPU_RESTORE_NIP(cia)
 #endif
+
+#define th thread
 
 PRINT(bbcall) {
     auto bbform = (BBCallForm*)i;
@@ -1815,75 +1821,87 @@ PRINT(heq) {
     *result = format_nnn("heq", i->RT, i->RA, i->RB);
 }
 
-#define _heq(_ra, _rb) { \
+#define _heq(_ra, _rb, _cia) { \
     auto ra = th->r(_ra); \
     auto rb = th->r(_rb); \
-    if (ra.w<0>() == rb.w<0>()) \
+    if (ra.w<0>() == rb.w<0>()) {\
+        SPU_RESTORE_NIP(_cia); \
         throw BreakpointException(); \
+    } \
 }
-EMU_REWRITE(heq, i->RA.u(), i->RB.u())
+EMU_REWRITE(heq, i->RA.u(), i->RB.u(), cia)
 
 
 PRINT(heqi) {
     *result = format_nnn("heqi", i->RT, i->RA, i->I10);
 }
 
-#define _heqi(_ra, _i10) { \
+#define _heqi(_ra, _i10, _cia) { \
     auto ra = th->r(_ra); \
-    if (ra.w<0>() == _i10) \
+    if (ra.w<0>() == _i10) { \
+        SPU_RESTORE_NIP(_cia); \
         throw BreakpointException(); \
+    } \
 }
-EMU_REWRITE(heqi, i->RA.u(), i->I10.s())
+EMU_REWRITE(heqi, i->RA.u(), i->I10.s(), cia)
 
 
 PRINT(hgt) {
     *result = format_nnn("hgt", i->RT, i->RA, i->RB);
 }
 
-#define _hgt(_ra, _rb) { \
+#define _hgt(_ra, _rb, _cia) { \
     auto ra = th->r(_ra); \
     auto rb = th->r(_rb); \
-    if (ra.w<0>() > rb.w<0>()) \
+    if (ra.w<0>() > rb.w<0>()) { \
+        SPU_RESTORE_NIP(_cia); \
         throw BreakpointException(); \
+    } \
 }
-EMU_REWRITE(hgt, i->RA.u(), i->RB.u())
+EMU_REWRITE(hgt, i->RA.u(), i->RB.u(), cia)
 
 
 PRINT(hgti) {
     *result = format_nnn("hgti", i->RT, i->RA, i->I10);
 }
 
-#define _hgti(_ra, _i10) { \
+#define _hgti(_ra, _i10, _cia) { \
     auto ra = th->r(_ra); \
-    if (ra.w<0>() > _i10) \
+    if (ra.w<0>() > _i10) { \
+        SPU_RESTORE_NIP(_cia); \
         throw BreakpointException(); \
+    } \
 }
-EMU_REWRITE(hgti, i->RA.u(), i->I10.s())
+EMU_REWRITE(hgti, i->RA.u(), i->I10.s(), cia)
 
 
 PRINT(hlgt) {
     *result = format_nnn("hlgt", i->RT, i->RA, i->RB);
 }
 
-#define _hlgt(_ra, _rb) { \
+#define _hlgt(_ra, _rb, _cia) { \
     auto ra = th->r(_ra); \
     auto rb = th->r(_rb); \
-    if ((uint32_t)ra.w<0>() > (uint32_t)rb.w<0>()) \
+    if ((uint32_t)ra.w<0>() > (uint32_t)rb.w<0>()) { \
+        SPU_RESTORE_NIP(_cia); \
         throw BreakpointException(); \
+    } \
 }
-EMU_REWRITE(hlgt, i->RA.u(), i->RB.u())
+EMU_REWRITE(hlgt, i->RA.u(), i->RB.u(), cia)
 
 
 PRINT(hlgti) {
     *result = format_nnn("hlgti", i->RT, i->RA, i->I10);
 }
 
-#define _hlgti(_ra, _i10) { \
+#define _hlgti(_ra, _i10, _cia) { \
     auto ra = th->r(_ra); \
-    if ((uint32_t)ra.w<0>() > (uint32_t)_i10) \
+    if ((uint32_t)ra.w<0>() > (uint32_t)_i10) { \
+        SPU_RESTORE_NIP(_cia); \
         throw BreakpointException(); \
+    } \
 }
-EMU_REWRITE(hlgti, i->RA.u(), i->I10.s())
+EMU_REWRITE(hlgti, i->RA.u(), i->I10.s(), cia)
 
 
 PRINT(ceqb) {
@@ -2088,7 +2106,7 @@ PRINT(clgtbi) {
 #define _clgtbi(_ra, _rt, _i10) { \
     auto ra = th->r(_ra); \
     auto& rt = th->r(_rt); \
-    uint8_t imm = _i10; \
+    auto imm = (uint8_t)_i10; \
     for (int i = 0; i < 16; ++i) { \
         rt.b(i) = ra.b(i) > imm ? 0xff : 0; \
     } \
@@ -2164,6 +2182,7 @@ PRINT(br) {
 #define _br(_i16, _cia, _dest) { \
     int32_t offset = signed_lshift32(_i16, 2); \
     if (offset == 0) { \
+        SPU_RESTORE_NIP(_cia); \
         throw InfiniteLoopException(); \
     } \
     SPU_SET_NIP(_dest); \
@@ -2184,12 +2203,12 @@ EMU_REWRITE(bra, signed_lshift32(i->I16.s(), 2) & LSLR)
 
 PRINT(brsl) {
     int32_t offset = signed_lshift32(i->I16.s(), 2);
-    *result = format_u("brsl", (cia + offset) & LSLR);
+    *result = format_nu("brsl", i->RT, (cia + offset) & LSLR);
 }
 
 #define _brsl(_i16, _rt, _cia, _dest) { \
     auto& rt = th->r(_rt); \
-    rt.w<0>() = (_cia + 4) & LSLR; \
+    rt.w<0>() = SPU_ADJUST_LINK((_cia + 4) & LSLR); \
     rt.w<1>() = 0; \
     rt.dw<1>() = 0; \
     SPU_SET_NIP(_dest); \
@@ -2204,7 +2223,7 @@ PRINT(brasl) {
 
 #define _brasl(_i16, _rt, cia, _dest) { \
     auto& rt = th->r(_rt); \
-    rt.w<0>() = (cia + 4) & LSLR; \
+    rt.w<0>() = SPU_ADJUST_LINK((cia + 4) & LSLR); \
     rt.w<1>() = 0; \
     rt.dw<1>() = 0; \
     SPU_SET_NIP(_dest); \
@@ -2239,7 +2258,7 @@ PRINT(bisl) {
 
 #define _bisl(_ra, _rt, cia) { \
     auto& rt = th->r(_rt); \
-    rt.w<0>() = LSLR & (cia + 4); \
+    rt.w<0>() = SPU_ADJUST_LINK(LSLR & (cia + 4)); \
     rt.w<1>() = 0; \
     rt.dw<1>() = 0; \
     SPU_SET_NIP_INDIRECT(th->r(_ra).w<0>() & LSLR & 0xfffffffc); \
@@ -2881,20 +2900,22 @@ PRINT(stop) {
     *result = format_n("stop", i->StopAndSignalType);
 }
 
-#define _stop(_sast) { \
+#define _stop(_sast, _cia) { \
+    SPU_RESTORE_NIP(_cia); \
     throw StopSignalException(_sast); \
 }
-EMU_REWRITE(stop, i->StopAndSignalType.u())
+EMU_REWRITE(stop, i->StopAndSignalType.u(), cia)
 
 
 PRINT(stopd) {
     *result = "stopd";
 }
 
-#define _stopd(_) { \
+#define _stopd(_cia) { \
+    SPU_RESTORE_NIP(_cia); \
     throw BreakpointException(); \
 }
-EMU_REWRITE(stopd, 0)
+EMU_REWRITE(stopd, cia)
 
 
 PRINT(lnop) {
@@ -2967,12 +2988,13 @@ PRINT(wrch) {
     *result = format_nn("wrch", i->CA, i->RT);
 }
 
-#define _wrch(_ca, _rt) { \
+#define _wrch(_ca, _rt, _cia) { \
     auto ch = _ca; \
     auto& rt = th->r(_rt); \
+    SPU_RESTORE_NIP(_cia); \
     th->channels()->write(ch, rt.w_pref()); \
 }
-EMU_REWRITE(wrch, i->CA.u(), i->RT.u())
+EMU_REWRITE(wrch, i->CA.u(), i->RT.u(), cia)
 
 #if !defined(EMU_REWRITER)
 template <DasmMode M, typename S>

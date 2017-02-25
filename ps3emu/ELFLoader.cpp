@@ -187,23 +187,25 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
     }
     
     for (auto& x86path : x86paths) {
-        if (boost::filesystem::exists(x86path)) {
-            auto handle = dlopen(x86path.c_str(), RTLD_NOW);
-            if (handle) {
-                auto info = (RewrittenSegmentsInfo*)dlsym(handle, "info");
-                for (auto& segment : info->segments) {
-                    auto index = store->add(&segment);
-                    INFO(libs) << ssnprintf("loading %s with %d blocks", x86path, segment.blocks->size());
-                    info->init();
-                    auto blocks = segment.blocks;
-                    for (auto i = 0u; i < segment.blocks->size(); ++i) {
-                        auto instr = asm_bb_call(index, i);
-                        g_state.mm->store32((*blocks)[i].va, instr);
-                    }
+        if (!boost::filesystem::exists(x86path))
+            throw std::runtime_error("x86 doesn't exist");
+        auto handle = dlopen(x86path.c_str(), RTLD_NOW);
+        if (handle) {
+            auto info = (RewrittenSegmentsInfo*)dlsym(handle, "info");
+            info->init();
+            for (auto& segment : info->segments) {
+                auto index = store->add(&segment);
+                INFO(libs) << ssnprintf("loading %s:%s with %d blocks",
+                                        x86path,
+                                        segment.description,
+                                        segment.blocks->size());
+                for (auto i = 0u; i < segment.blocks->size(); ++i) {
+                    auto instr = asm_bb_call(index, i);
+                    g_state.mm->store32((*segment.blocks)[i].va, instr);
                 }
-            } else {
-                WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());
             }
+        } else {
+            WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());
         }
     }
     

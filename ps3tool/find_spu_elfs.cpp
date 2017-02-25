@@ -18,11 +18,12 @@ void HandleFindSpuElfs(FindSpuElfsCommand const& command) {
     for (auto& elf : elfs) {
         auto tmppath = ssnprintf("/tmp/%s_%x_spu", filename, elf.startOffset);
         write_all_bytes(&body[elf.startOffset], elf.size, tmppath);
-        std::cout << ssnprintf("    at 0x%x of size 0x%x (%d segments, %d sections, %s)\n",
+        std::cout << ssnprintf("    at 0x%x of size 0x%x (%d segments, %d sections, %s, %s)\n",
                                elf.startOffset,
                                elf.size,
                                elf.header->e_phnum,
                                elf.header->e_shnum,
+                               elf.isJob ? "JOB" : "REGULAR",
                                tmppath);
     }
 }
