@@ -31,7 +31,8 @@ std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t imageBase,
     std::stack<uint32_t> leads,
     std::ostream& log,
-    std::function<InstructionInfo(uint32_t)> analyze);
+    std::function<InstructionInfo(uint32_t)> analyze,
+    std::vector<uint32_t>* branches = nullptr);
 
 std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const& elf);
 uint32_t vaToOffset(const Elf32_be_Ehdr* header, uint32_t va);

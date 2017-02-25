@@ -11,7 +11,8 @@ std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t imageBase,
     std::stack<uint32_t> leads,
     std::ostream& log,
-    std::function<InstructionInfo(uint32_t)> analyze)
+    std::function<InstructionInfo(uint32_t)> analyze,
+    std::vector<uint32_t>* branches)
 {
     std::set<uint32_t> allLeads;
     std::set<uint32_t> breaks;
@@ -34,8 +35,12 @@ std::vector<BasicBlock> discoverBasicBlocks(
         allLeads.insert(cia);
         
         for (;;) {
-            if (!subset(cia, 4u, start, length))
+            if (!subset(cia, 4u, start, length)) {
+                if (branches) {
+                    branches->push_back(cia);
+                }
                 break;
+            }
             
             auto info = analyze(cia);
             auto logLead = [&] (uint32_t target) {

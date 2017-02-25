@@ -173,6 +173,31 @@ SegmentInfo rewritePPU(RewriteCommand const& command, std::ofstream& log) {
     return info;
 }
 
+std::vector<uint32_t> selectStart(std::vector<BasicBlock> blocks) {
+    std::vector<uint32_t> leads;
+    std::transform(begin(blocks), end(blocks), std::back_inserter(leads), [&](auto& block) {
+        return block.start;
+    });
+    return leads;
+}
+
+std::vector<uint32_t> selectSubset(std::vector<uint32_t> leads, uint32_t start, uint32_t len) {
+    std::vector<uint32_t> res;
+    std::copy_if(begin(leads), end(leads), std::back_inserter(res), [&](auto lead) {
+        return subset<uint32_t>(lead, 4, start, len);
+    });
+    return res;
+}
+
+template <typename T>
+std::stack<T> toStack(std::vector<T> container) {
+    std::stack<T> stack;
+    for (auto& e : container) {
+        stack.push(e);
+    }
+    return stack;
+}
+
 std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream& log) {
     auto body = read_all_bytes(command.elf);
     auto elfs = discoverEmbeddedSpuElfs(body);
@@ -202,13 +227,6 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
     std::vector<SegmentInfo> infos;
     
     for (auto& elf : elfs) {
-        std::stack<uint32_t> leads;
-        leads.push(elf.header->e_entry);
-        
-        auto elfVaToParentVa = [&](uint32_t va) {
-            return vaBase + elf.startOffset + vaToOffset(elf.header, va);
-        };
-        
         std::vector<Elf32_be_Phdr> copySegments;
         
         auto elfSegment = (Elf32_be_Phdr*)&body[elf.startOffset + elf.header->e_phoff];
@@ -217,59 +235,41 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 continue;
             copySegments.push_back(elfSegment[i]);
         }
-        std::sort(begin(copySegments), end(copySegments), [&](auto& l, auto& r) {
-            return l.p_vaddr < r.p_vaddr;
-        });
         
-        auto analyze = [&](uint32_t cia) {
-            auto parentElfVa = elfVaToParentVa(cia);
-            return analyzeSpu(g_state.mm->load32(parentElfVa), cia);
+        auto spuElfVaToParentVaInCurrentSegment = [&](uint32_t va, Elf32_be_Phdr& segment) {
+            assert(subset<uint32_t>(va, 4, segment.p_vaddr, segment.p_filesz));
+            auto spuElfOffset = va - segment.p_vaddr + segment.p_offset;
+            return vaBase + elf.startOffset + spuElfOffset;
         };
         
-        auto allBlocks =
-            discoverBasicBlocks(copySegments.front().p_vaddr,
-                                copySegments.back().p_vaddr + copySegments.back().p_memsz,
-                                0,
-                                leads,
-                                log,
-                                analyze);
+        auto leads = command.entryPoints;
+        leads.push_back(elf.header->e_entry);
             
-        std::vector<uint32_t> allLeads;
-        std::transform(begin(allBlocks), end(allBlocks), std::back_inserter(allLeads), [&](auto& block) {
-            return block.start;
-        });
-        
-        std::vector<std::vector<uint32_t>> leadsBySegment;
-        for (auto& segment : copySegments) {
-            std::vector<uint32_t> segmentLeads;
-            std::copy_if(begin(allLeads), end(allLeads), std::back_inserter(segmentLeads), [&](auto lead) {
-                return subset<uint32_t>(lead, 4, segment.p_vaddr, segment.p_filesz);
-            });
-            leadsBySegment.push_back(segmentLeads);
+        uint32_t oldSize = 0;
+        while (oldSize != leads.size()) {
+            oldSize = leads.size();
+            for (auto& segment : copySegments) {
+                auto segmentLeads = selectSubset(leads, segment.p_vaddr, segment.p_filesz);
+                if (segmentLeads.empty())
+                    continue;
+                auto blocks = discoverBasicBlocks(
+                    segment.p_vaddr, segment.p_filesz, 0, toStack(segmentLeads), log, [&](uint32_t cia) {
+                        auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);
+                        return analyzeSpu(g_state.mm->load32(elfVa), cia);
+                    }, &leads);
+            }
+            std::sort(begin(leads), end(leads));
+            leads.erase(std::unique(begin(leads), end(leads)), end(leads));
         }
-        
-        assert(leadsBySegment.size() == copySegments.size());
-        
-        for (auto i = 0u; i < leadsBySegment.size(); ++i) {
-            auto& segmentLeads = leadsBySegment[i];
-            auto& segment = copySegments[i];
-            
+                
+        for (auto& segment : copySegments) {
+            auto segmentLeads = selectSubset(leads, segment.p_vaddr, segment.p_filesz);
             if (segmentLeads.empty())
                 continue;
             
-            std::stack<uint32_t> leadsStack;
-            for (auto lead : segmentLeads)
-                leadsStack.push(lead);
-            
-            auto spuElfVaToParentVaInCurrentSegment = [&](uint32_t va) {
-                assert(subset<uint32_t>(va, 4, segment.p_vaddr, segment.p_filesz));
-                auto spuElfOffset = va - segment.p_vaddr + segment.p_offset;
-                return vaBase + elf.startOffset + spuElfOffset;
-            };
-            
             auto blocks = discoverBasicBlocks(
-                segment.p_vaddr, segment.p_filesz, 0, leadsStack, log, [&](uint32_t cia) {
-                    auto elfVa = spuElfVaToParentVaInCurrentSegment(cia);
+                segment.p_vaddr, segment.p_filesz, 0, toStack(segmentLeads), log, [&](uint32_t cia) {
+                    auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);
                     return analyzeSpu(g_state.mm->load32(elfVa), cia);
                 });
             
@@ -294,7 +294,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 }
                 for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
                     std::string rewritten, printed;
-                    big_uint32_t instr = g_state.mm->load32(spuElfVaToParentVaInCurrentSegment(cia));
+                    big_uint32_t instr = g_state.mm->load32(spuElfVaToParentVaInCurrentSegment(cia, segment));
                     try {
                         SPUDasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
                         SPUDasm<DasmMode::Print>(&instr, cia, &printed);
@@ -321,7 +321,10 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                         block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
                     }
                 }
-                info.blocks.push_back({spuElfVaToParentVaInCurrentSegment(block.start), block.len, block.body, block.start});
+                info.blocks.push_back({spuElfVaToParentVaInCurrentSegment(block.start, segment),
+                                       block.len,
+                                       block.body,
+                                       block.start});
             }
             
             info.isSpu = true;

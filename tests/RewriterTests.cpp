@@ -259,3 +259,27 @@ TEST_CASE("spu_rewriter_block_discovery_2") {
     REQUIRE(block.start == 0x0344);
     REQUIRE(block.len == 8);
 }
+
+TEST_CASE("spu_rewriter_block_discovery_out_of_segment_branches") {
+    std::vector<std::pair<uint32_t, uint32_t>> instrs {
+        { 0x035C, 0x1CEC0081 }, /* ai             sp, sp, -0x50       */
+        { 0x0360, 0x22000902 }, /* brhz           r2, loc_3A8         */
+        
+        { 0x0364, 0x4202E050 }, /* ila            r80, 0x5C0          */
+    };
+    std::stringstream log;
+    
+    std::vector<uint32_t> branches;
+    auto blocks = discoverBasicBlocks(0x035C,
+                                      0x0368 - 0x035C,
+                                      0,
+                                      std::stack<uint32_t>({0x035C}),
+                                      log,
+                                      make_analyze(instrs, false),
+                                      &branches);
+    REQUIRE(blocks.size() == 2);
+    REQUIRE(branches.size() == 2);
+    std::sort(begin(branches), end(branches));
+    REQUIRE(branches[0] == 0x0368);
+    REQUIRE(branches[1] == 0x03a8);
+}
