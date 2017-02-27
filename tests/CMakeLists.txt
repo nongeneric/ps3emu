@@ -17,6 +17,7 @@ set(SRC
     TextureCacheTests.cpp
     RewriterTests.cpp
     TestUtils.cpp
+    SPUDasmTests.cpp
 )
 
 add_executable(tests ${SRC})

@@ -455,7 +455,7 @@ public:
                           uint32_t pitch,
                           uint32_t width,
                           uint32_t height);
-    void init(Process* proc);
+    void init();
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
     void setFlipHandler(uint32_t descrEa);

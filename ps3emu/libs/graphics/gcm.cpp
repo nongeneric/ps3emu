@@ -161,7 +161,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
             &emuGcmState.zcullInfosOffset);
     
     g_state.rsx->setGcmContext(ioSize, ioAddress);
-    g_state.rsx->init(proc);
+    g_state.rsx->init();
     
     emuGcmState.defaultContext =
         g_state.memalloc->internalAlloc<128, TargetCellGcmContextData>(

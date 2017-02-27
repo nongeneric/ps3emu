@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
             ("verbosity,v", value<std::string>(&verbosity)->default_value("warning"),
                 "logging verbosity: info, warning, error")
             ("filter,f", value<std::string>(&filter)->default_value(""),
-                "logging filter: spu, libs, ppu, debugger [e.g. spu,libs]")
+                "logging filter: spu, libs, ppu, debugger, perf [e.g. spu,libs]")
             ("sinks,s", value<std::string>(&sinks)->default_value(""),
                 "logging sinks: file, console [e.g. file,console]")
             ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),

@@ -343,3 +343,7 @@ void SPUThread::setGroup(std::function<std::vector<uint32_t>()> getThreads) {
     boost::unique_lock<boost::mutex> lock(_groupExitMutex);
     _getGroupThreads = getThreads;
 }
+
+#if TESTS
+SPUThread::SPUThread() : _channels(g_state.mm, this) {}
+#endif

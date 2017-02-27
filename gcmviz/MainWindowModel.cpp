@@ -763,7 +763,7 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
     if (!_proc) {
         _proc.reset(new Process());
         _rsx.reset(new Rsx());
-        _rsx->init(_proc.get());
+        _rsx->init();
         _rsx->resetContext();
         uint32_t last = gcmInitCommandsSize - 4; // except the reset call
         auto read = [&](uint32_t get) {

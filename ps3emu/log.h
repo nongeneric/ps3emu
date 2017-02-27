@@ -3,7 +3,7 @@
 #include <string>
 
 enum log_severity_t { log_info, log_warning, log_error };
-enum log_type_t { log_spu = 1, log_rsx = 2, log_libs = 4, log_debugger = 8 };
+enum log_type_t { log_spu = 1, log_rsx = 2, log_libs = 4, log_debugger = 8, log_perf = 16 };
 enum log_sink_t { log_file = 1, log_console = 2 };
 
 void log_init(int sinks, log_severity_t severity, int types, bool date);

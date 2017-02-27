@@ -55,7 +55,8 @@ void log_unconditional(log_severity_t severity, log_type_t type, const char* mes
                                       type == log_spu ? "SPU" :
                                       type == log_libs ? "LIB" :
                                       type == log_debugger ? "DBG" :
-                                      type == log_rsx ? "RSX"
+                                      type == log_rsx ? "RSX" :
+                                      type == log_perf ? "PERF"
                                       : "?",
                                       thread_name,
                                       nip,
@@ -98,6 +99,7 @@ log_type_t log_parse_filter(std::string const& str) {
         PARSE(s, res, rsx)
         PARSE(s, res, libs)
         PARSE(s, res, debugger)
+        PARSE(s, res, perf)
         throw std::runtime_error("unknown logging filter");
     }
     return static_cast<log_type_t>(res);

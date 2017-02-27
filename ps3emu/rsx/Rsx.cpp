@@ -676,6 +676,14 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
     
     resetContext();
+    
+    _context->framePerfCounter++;
+    auto now = boost::chrono::steady_clock::now();
+    if (now - _context->fpsReportPoint > boost::chrono::seconds(1)) {
+        INFO(perf) << ssnprintf("FPS: %d", _context->framePerfCounter);
+        _context->fpsReportPoint = now;
+        _context->framePerfCounter = 0;
+    }
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count) {
@@ -1086,7 +1094,7 @@ void Rsx::updateTextures() {
     }
 }
 
-void Rsx::init(Process* proc) {
+void Rsx::init() {
     INFO(rsx) << "waiting for rsx loop to initialize";
     
     boost::unique_lock<boost::mutex> lock(_initMutex);

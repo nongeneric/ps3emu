@@ -18,6 +18,7 @@
 #include <vector>
 #include <experimental/optional>
 #include "ps3emu/enum.h"
+#include <x86intrin.h>
 
 static constexpr uint32_t LSLR = 0x3ffff;
 static constexpr uint32_t LocalStorageSize = 256 * 1024;
@@ -71,6 +72,14 @@ public:
         memcpy(_bs, r._bs, sizeof(_bs));
     }
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+    inline __m128i xmm() {
+        return _mm_lddqu_si128((__m128i*)_bs);
+    }
+    
+    inline void set_xmm(__m128i xmm) {
+        _mm_store_si128((__m128i*)_bs, xmm);
+    }
+
     template <int N>
     uint8_t& b() {
         static_assert(0 <= N && N < 16, "");
@@ -212,6 +221,9 @@ public:
     SPUThread(Process* proc,
               std::string name,
               std::function<void(SPUThread*, SPUThreadEvent)> eventHandler);
+#if TESTS
+    SPUThread();
+#endif
     
     template <typename V>
     inline R128& r(V i) {

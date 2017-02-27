@@ -9,6 +9,7 @@
 #include "Cache.h"
 #include "Rsx.h"
 #include "../shaders/ShaderGenerator.h"
+#include <boost/chrono.hpp>
 
 struct TextureSamplerInfo {
     bool enable = false;
@@ -202,6 +203,8 @@ struct RsxContext {
     uint32_t feedbackCount = 0;
     uint32_t feedbackMode;
     uint32_t frame = 0;
+    uint32_t framePerfCounter = 0;
+    boost::chrono::steady_clock::time_point fpsReportPoint; 
     uint32_t commandNum = 0;
     SurfaceInfo surface;
     ViewPortInfo viewPort;
