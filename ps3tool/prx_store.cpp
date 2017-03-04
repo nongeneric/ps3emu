@@ -130,7 +130,7 @@ void rewritePrxStore() {
     auto& prxInfos = g_state.config->sysPrxInfos;
     
     NinjaScript script;
-    script.variable("opt", static_debug ? "-O0 -ggdb -DNDEBUG" : "-O2 -DNDEBUG");
+    script.variable("opt", static_debug ? "-O0 -ggdb -DNDEBUG" : "-O2 -ggdb -DNDEBUG");
     script.variable("trace", "");
     script.variable("entries", "");
     auto ps3tool = ps3toolPath();

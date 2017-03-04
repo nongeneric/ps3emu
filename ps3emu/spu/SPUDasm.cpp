@@ -224,9 +224,11 @@ PRINT(cbd) {
 
 #define _cbd(_i7, _ra, _rt) { \
     auto t = _i7 + th->r(_ra).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).b(t & 0xf) = 0x03; \
 }
 EMU_REWRITE(cbd, i->I7.s(), i->RA.u(), i->RT.u())
@@ -238,9 +240,11 @@ PRINT(cbx) {
 
 #define _cbx(_rb, _ra, _rt) { \
     auto t = (uint32_t)th->r(_ra).w<0>() + (uint32_t)th->r(_rb).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).b(t & 0xf) = 0x03; \
 }
 EMU_REWRITE(cbx, i->RB.u(), i->RA.u(), i->RT.u())
@@ -252,9 +256,11 @@ PRINT(chd) {
 
 #define _chd(_i7, _ra, _rt) { \
     auto t = _i7 + th->r(_ra).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).hw((t & 0xe) >> 1) = 0x0203; \
 }
 EMU_REWRITE(chd, i->I7.s(), i->RA.u(), i->RT.u())
@@ -266,9 +272,11 @@ PRINT(chx) {
 
 #define _chx(_rb, _ra, _rt) { \
     auto t = (uint32_t)th->r(_ra).w<0>() + (uint32_t)th->r(_rb).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).hw((t & 0xe) >> 1) = 0x0203; \
 }
 EMU_REWRITE(chx, i->RB.u(), i->RA.u(), i->RT.u())
@@ -280,9 +288,11 @@ PRINT(cwd) {
 
 #define _cwd(_i7, _ra, _rt) { \
     auto t = _i7 + th->r(_ra).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).w((t & 0xc) >> 2) = 0x00010203; \
 }
 EMU_REWRITE(cwd, i->I7.s(), i->RA.u(), i->RT.u())
@@ -294,9 +304,11 @@ PRINT(cwx) {
 
 #define _cwx(_rb, _ra, _rt) { \
     auto t = th->r(_ra).w<0>() + th->r(_rb).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).w((t & 0xc) >> 2) = 0x10203; \
 }
 EMU_REWRITE(cwx, i->RB.u(), i->RA.u(), i->RT.u())
@@ -308,9 +320,11 @@ PRINT(cdd) {
 
 #define _cdd(_i7, _ra, _rt) { \
     auto t = _i7 + th->r(_ra).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).dw((t & 0x8) >> 3) = 0x0001020304050607ll; \
 }
 EMU_REWRITE(cdd, i->I7.s(), i->RA.u(), i->RT.u())
@@ -322,9 +336,11 @@ PRINT(cdx) {
 
 #define _cdx(_rb, _ra, _rt) { \
     auto t = th->r(_ra).w<0>() + th->r(_rb).w<0>(); \
-    const uint8_t mask[] { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
-                           0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F }; \
-    th->r(_rt).load(mask); \
+    __m128i mask = _mm_set_epi8( \
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F  \
+    ); \
+    th->r(_rt).set_xmm(mask); \
     th->r(_rt).dw((t & 0x8) >> 3) = 0x0001020304050607ll; \
 }
 EMU_REWRITE(cdx, i->RB.u(), i->RA.u(), i->RT.u())
@@ -368,11 +384,8 @@ PRINT(ila) {
 }
 
 #define _ila(_rt, _i18) { \
-    auto& rt = th->r(_rt); \
-    auto val = _i18; \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = val; \
-    } \
+    auto t = _mm_set1_epi32(_i18); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(ila, i->RT.u(), i->I18.u())
 
@@ -382,11 +395,9 @@ PRINT(iohl) {
 }
 
 #define _iohl(_rt, _i16) { \
-    auto& rt = th->r(_rt); \
-    auto val = _i16; \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) |= val; \
-    } \
+    auto t = _mm_set1_epi32(_i16); \
+    auto rt = th->r(_rt).xmm(); \
+    th->r(_rt).set_xmm(rt | t); \
 }
 EMU_REWRITE(iohl, i->RT.u(), i->I16.u())
 
@@ -396,11 +407,11 @@ PRINT(fsmbi) {
 }
 
 #define _fsmbi(_rt, _i16) { \
-    auto& rt = th->r(_rt); \
-    std::bitset<16> bits(_i16); \
-    for (int i = 0; i < 16; ++i) { \
-        rt.b(i) = bits[15 - i] ? 0xff : 0; \
-    } \
+    auto right = _pdep_u64(_i16, 0x8080808080808080ull); \
+    auto left = _pdep_u64(_i16 >> 8, 0x8080808080808080ull); \
+    __m128i lr = _mm_set_epi64x(left, right); \
+    auto t = _mm_cmplt_epi8(lr, _mm_setzero_si128()); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(fsmbi, i->RT.u(), i->I16.u())
 
@@ -462,12 +473,10 @@ PRINT(sfh) {
 }
 
 #define _sfh(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 8; ++i) { \
-        rt.hw(i) = rb.hw(i) - ra.hw(i); \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    auto t = _mm_sub_epi16(b, a); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(sfh, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -477,12 +486,10 @@ PRINT(sfhi) {
 }
 
 #define _sfhi(_ra, _rt, _i10) { \
-    auto ra = th->r(_ra); \
-    auto& rt = th->r(_rt); \
-    auto s = _i10; \
-    for (int i = 0; i < 8; ++i) { \
-        rt.hw(i) = s - ra.hw(i); \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = _mm_set1_epi16(_i10); \
+    auto t = _mm_sub_epi16(b, a); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(sfhi, i->RA.u(), i->RT.u(), i->I10.s())
 
@@ -492,12 +499,10 @@ PRINT(sf) {
 }
 
 #define _sf(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = (uint32_t)rb.w(i) - (uint32_t)ra.w(i); \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    auto t = _mm_sub_epi32(b, a); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(sf, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -507,12 +512,10 @@ PRINT(sfi) {
 }
 
 #define _sfi(_ra, _rt, _i10) { \
-    auto ra = th->r(_ra); \
-    auto& rt = th->r(_rt); \
-    auto s = _i10; \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = s - ra.w(i); \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = _mm_set1_epi32(_i10); \
+    auto t = _mm_sub_epi32(b, a); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(sfi, i->RA.u(), i->RT.u(), i->I10.s())
 
@@ -522,12 +525,14 @@ PRINT(addx) {
 }
 
 #define _addx(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = rb.w(i) + ra.w(i) + (rt.w(i) & 1); \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    auto t = th->r(_rt).xmm(); \
+    auto mask = _mm_set1_epi32(1); \
+    auto ab = _mm_add_epi32(a, b); \
+    t = _mm_and_si128(t, mask); \
+    t = _mm_add_epi32(ab, t); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(addx, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -537,13 +542,15 @@ PRINT(cg) {
 }
 
 #define _cg(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 4; ++i) { \
-        uint64_t t = (uint64_t)(uint32_t)rb.w(i) + (uint64_t)(uint32_t)ra.w(i); \
-        rt.w(i) = (t >> 32) & 1; \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    auto ab = _mm_add_epi32(a, b); \
+    auto val = _mm_set1_epi32(0x80000000); \
+    a = _mm_sub_epi32(a, val); \
+    ab = _mm_sub_epi32(ab, val); \
+    auto t = _mm_cmplt_epi32(ab, a); \
+    t = _mm_srli_epi32(t, 31); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(cg, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -586,12 +593,14 @@ PRINT(bg) {
 }
 
 #define _bg(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = (uint32_t)ra.w(i) <= (uint32_t)rb.w(i); \
-    } \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    auto val = _mm_set1_epi32(0x80000000); \
+    a = _mm_sub_epi32(a, val); \
+    b = _mm_sub_epi32(b, val); \
+    auto t = _mm_cmplt_epi32(a, b); \
+    t = _mm_srli_epi32(t, 31); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(bg, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -2113,12 +2122,13 @@ PRINT(clgtb) {
 }
 
 #define _clgtb(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 16; ++i) { \
-        rt.b(i) = ra.b(i) > rb.b(i) ? 0xff : 0; \
-    } \
+    auto val = _mm_set1_epi8(0x80); \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    a = _mm_sub_epi8(a, val); \
+    b = _mm_sub_epi8(b, val); \
+    auto t = _mm_cmpgt_epi8(a, b); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(clgtb, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -2128,12 +2138,12 @@ PRINT(clgtbi) {
 }
 
 #define _clgtbi(_ra, _rt, _i10) { \
-    auto ra = th->r(_ra); \
-    auto& rt = th->r(_rt); \
-    auto imm = (uint8_t)_i10; \
-    for (int i = 0; i < 16; ++i) { \
-        rt.b(i) = ra.b(i) > imm ? 0xff : 0; \
-    } \
+    auto val = _mm_set1_epi8(0x80); \
+    auto a = th->r(_ra).xmm(); \
+    auto b = _mm_set1_epi8(char(_i10 - 0x80u)); \
+    a = _mm_sub_epi8(a, val); \
+    auto t = _mm_cmpgt_epi8(a, b); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(clgtbi, i->RA.u(), i->RT.u(), i->I10.u())
 
@@ -2143,12 +2153,13 @@ PRINT(clgth) {
 }
 
 #define _clgth(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 8; ++i) { \
-        rt.hw(i) = (uint16_t)ra.hw(i) > (uint16_t)rb.hw(i) ? 0xffff : 0; \
-    } \
+    auto val = _mm_set1_epi16(0x8000); \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    a = _mm_sub_epi16(a, val); \
+    b = _mm_sub_epi16(b, val); \
+    auto t = _mm_cmpgt_epi16(a, b); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(clgth, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -2158,12 +2169,12 @@ PRINT(clgthi) {
 }
 
 #define _clgthi(_ra, _rt, _i10) { \
-    auto ra = th->r(_ra); \
-    auto& rt = th->r(_rt); \
-    uint16_t imm = _i10; \
-    for (int i = 0; i < 8; ++i) { \
-        rt.hw(i) = (uint16_t)ra.hw(i) > imm ? 0xffff : 0; \
-    } \
+    auto val = _mm_set1_epi16(0x8000); \
+    auto a = th->r(_ra).xmm(); \
+    auto b = _mm_set1_epi16((uint16_t)_i10 - (uint16_t)0x8000); \
+    a = _mm_sub_epi16(a, val); \
+    auto t = _mm_cmpgt_epi16(a, b); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(clgthi, i->RA.u(), i->RT.u(), i->I10.u())
 
@@ -2173,12 +2184,13 @@ PRINT(clgt) {
 }
 
 #define _clgt(_ra, _rb, _rt) { \
-    auto ra = th->r(_ra); \
-    auto rb = th->r(_rb); \
-    auto& rt = th->r(_rt); \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = (uint32_t)ra.w(i) > (uint32_t)rb.w(i) ? 0xffffffff : 0; \
-    } \
+    auto val = _mm_set1_epi32(0x80000000); \
+    auto a = th->r(_ra).xmm(); \
+    auto b = th->r(_rb).xmm(); \
+    a = _mm_sub_epi32(a, val); \
+    b = _mm_sub_epi32(b, val); \
+    auto t = _mm_cmpgt_epi32(a, b); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(clgt, i->RA.u(), i->RB.u(), i->RT.u())
 
@@ -2188,12 +2200,12 @@ PRINT(clgti) {
 }
 
 #define _clgti(_ra, _rt, _i10) { \
-    auto ra = th->r(_ra); \
-    auto& rt = th->r(_rt); \
-    uint32_t imm = _i10; \
-    for (int i = 0; i < 4; ++i) { \
-        rt.w(i) = (uint32_t)ra.w(i) > imm ? 0xffffffff : 0; \
-    } \
+    auto val = _mm_set1_epi32(0x80000000); \
+    auto a = th->r(_ra).xmm(); \
+    auto b = _mm_set1_epi32(_i10 - 0x80000000); \
+    a = _mm_sub_epi32(a, val); \
+    auto t = _mm_cmpgt_epi32(a, b); \
+    th->r(_rt).set_xmm(t); \
 }
 EMU_REWRITE(clgti, i->RA.u(), i->RT.u(), i->I10.u())
 

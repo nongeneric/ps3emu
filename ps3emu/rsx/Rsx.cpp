@@ -34,6 +34,7 @@
 #include <GLFW/glfw3.h>
 
 using namespace boost::algorithm;
+using namespace boost::chrono;
 namespace br = boost::range;
 
 typedef std::array<float, 4> glvec4_t;
@@ -631,7 +632,12 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
     _context->frame++;
     _context->commandNum = 0;
-    
+/*    
+    static int framenum = 0;
+    framenum++;
+    if (framenum == 1500)
+        exit(0);
+    */
 #if TESTS
     static int framenum = 0;
     if (framenum < 22 && _mode != RsxOperationMode::Replay && tex) {
@@ -680,9 +686,12 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _context->framePerfCounter++;
     auto now = boost::chrono::steady_clock::now();
     if (now - _context->fpsReportPoint > boost::chrono::seconds(1)) {
-        INFO(perf) << ssnprintf("FPS: %d", _context->framePerfCounter);
+        INFO(perf) << ssnprintf("FPS: %d, texture update time: %lld",
+                                _context->framePerfCounter,
+                                _context->uTextureUpdateDuration / 1000);
         _context->fpsReportPoint = now;
         _context->framePerfCounter = 0;
+        _context->uTextureUpdateDuration = 0;
     }
 }
 
@@ -951,9 +960,12 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     auto updater = new SimpleCacheItemUpdater<GLTexture> {
         va, size,
         [=](auto t) {
+            auto past = steady_clock::now();
             std::vector<uint8_t> buf(size);
             g_state.mm->readMemory(va, &buf[0], size);
             t->update(buf);
+            this->_context->uTextureUpdateDuration +=
+                duration_cast<microseconds>(steady_clock::now() - past).count();
         }
     };
     auto texture = new GLTexture(info);

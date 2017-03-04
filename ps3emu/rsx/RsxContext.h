@@ -205,6 +205,7 @@ struct RsxContext {
     uint32_t frame = 0;
     uint32_t framePerfCounter = 0;
     boost::chrono::steady_clock::time_point fpsReportPoint; 
+    uint64_t uTextureUpdateDuration = 0;
     uint32_t commandNum = 0;
     SurfaceInfo surface;
     ViewPortInfo viewPort;
