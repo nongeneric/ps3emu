@@ -54,6 +54,8 @@ set(SRC
     rsx/Tracer.cpp
     rsx/TextureRenderer.cpp
     rsx/DXT.cpp
+    rsx/RsxTextureReader.cpp
+    rsx/GLShader.cpp
     gcmviz/GcmDatabase.cpp
     
     libs/sys.cpp

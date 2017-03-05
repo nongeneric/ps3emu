@@ -6,6 +6,7 @@ ENUMF(TestEnum2, (A, 0), (B, 1))
 ENUM(TestEnum3, (A, 0), (B, 1))
 
 TEST_CASE("enum_test") {
+    REQUIRE( enum_traits<TestEnum2>::name() == std::string("TestEnum2") );
     REQUIRE( to_string(TestEnum2::A) == "" );
     REQUIRE( to_string(TestEnum3::A) == "A" );
     

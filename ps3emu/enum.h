@@ -80,39 +80,39 @@ void enum_validate(T val) {
     BOOST_PP_TUPLE_ELEM(1, elem) \
     BOOST_PP_COMMA()
 
-#define ENUM_IMPL(name, isFlags, ...) \
-    enum class name : unsigned long long { \
+#define ENUM_IMPL(enum_name, isFlags, ...) \
+    enum class enum_name : unsigned long long { \
         BOOST_PP_LIST_FOR_EACH(ENUMF_NAME_VALUE_PAIR_LIST, _, \
             BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__) ) \
     }; \
-    inline name operator|(name left, name right) { \
-        return (name)((unsigned)left | (unsigned)right); \
+    inline enum_name operator|(enum_name left, enum_name right) { \
+        return (enum_name)((unsigned)left | (unsigned)right); \
     } \
-    inline name operator~(name e) { \
-        return (name)~(unsigned)e; \
+    inline enum_name operator~(enum_name e) { \
+        return (enum_name)~(unsigned)e; \
     } \
-    inline name operator&(name left, name right) { \
-        return (name)((unsigned)left & (unsigned)right); \
+    inline enum_name operator&(enum_name left, enum_name right) { \
+        return (enum_name)((unsigned)left & (unsigned)right); \
     } \
-    inline bool operator!(name e) { \
+    inline bool operator!(enum_name e) { \
         return !(unsigned)e; \
     } \
-    inline void operator&=(name& left, name right) { \
+    inline void operator&=(enum_name& left, enum_name right) { \
         left = left & right; \
     } \
-    inline void operator|=(name& left, name right) { \
+    inline void operator|=(enum_name& left, enum_name right) { \
         left = left | right; \
     } \
     template<> \
-    inline name enum_cast<name>(unsigned value) { \
-        enum_validate<name>((name)value); \
-        return (name)value; \
+    inline enum_name enum_cast<enum_name>(unsigned value) { \
+        enum_validate<enum_name>((enum_name)value); \
+        return (enum_name)value; \
     } \
     template<> \
-    struct enum_traits<name> { \
+    struct enum_traits<enum_name> { \
         constexpr static auto values() { \
-            return std::array<name, BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)> { \
-                BOOST_PP_LIST_FOR_EACH(ENUMF_VALUE_LIST, name, \
+            return std::array<enum_name, BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)> { \
+                BOOST_PP_LIST_FOR_EACH(ENUMF_VALUE_LIST, enum_name, \
                     BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__) ) \
             }; \
         } \
@@ -121,6 +121,9 @@ void enum_validate(T val) {
                 BOOST_PP_LIST_FOR_EACH(ENUMF_NAME_LIST, _, \
                     BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__) ) \
             }; \
+        } \
+        constexpr static auto name() { \
+            return #enum_name; \
         } \
         constexpr static unsigned size() { return BOOST_PP_VARIADIC_SIZE(__VA_ARGS__); } \
         constexpr static bool is_flags() { return isFlags; } \

@@ -42,7 +42,20 @@ ENUM(GcmTextureFormat,
 ENUMF(GcmTextureLnUn,
     (LN, 0x20),
     (UN, 0x40)
-)    
+)
+
+ENUMF(TextureRemapInput,
+    (FromA, 0),
+    (FromR, 1),
+    (FromG, 2),
+    (FromB, 3)
+)
+
+ENUMF(TextureRemapOutput,
+    (Zero, 0),
+    (One, 1),
+    (Remap, 2)
+)
 
 struct RsxTextureInfo {
     uint32_t pitch;
