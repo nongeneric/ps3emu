@@ -26,3 +26,52 @@ TEST_CASE("spudasm_shufb") {
     REQUIRE( th.r(16).dw<0>() == 0x1133444444444444 );
     REQUIRE( th.r(16).dw<1>() == 0x1020304000ff8011 );
 }
+
+TEST_CASE("spudasm_bg") {
+/*
+    bg r20,r19,r18
+*/
+    MainMemory mm;
+    g_state.mm = &mm;
+    SPUThread th;
+    
+    uint8_t instr[] { 0x08, 0x44, 0x89, 0x94 };
+    
+    th.r(19).w<0>() = 0x00000000;
+    th.r(18).w<0>() = 0x00000000;
+    
+    th.r(19).w<1>() = 0x00000001;
+    th.r(18).w<1>() = 0x00000000;
+    
+    th.r(19).w<2>() = 0x00000000;
+    th.r(18).w<2>() = 0x00000001;
+    
+    th.r(19).w<3>() = 0xffffffff;
+    th.r(18).w<3>() = 0xffffffff;
+    
+    SPUDasm<DasmMode::Emulate>(instr, 0, &th);
+    
+    REQUIRE( th.r(20).w<0>() == 1 );
+    REQUIRE( th.r(20).w<1>() == 0 );
+    REQUIRE( th.r(20).w<2>() == 1 );
+    REQUIRE( th.r(20).w<3>() == 1 );
+    
+    th.r(19).w<0>() = 0xff000000;
+    th.r(18).w<0>() = 0x000000ff;
+    
+    th.r(19).w<1>() = 0x000000ff;
+    th.r(18).w<1>() = 0xff000000;
+    
+    th.r(19).w<2>() = 0x80000000;
+    th.r(18).w<2>() = 0x80000000;
+    
+    th.r(19).w<3>() = 0x80000001;
+    th.r(18).w<3>() = 0x80000000;
+    
+    SPUDasm<DasmMode::Emulate>(instr, 0, &th);
+    
+    REQUIRE( th.r(20).w<0>() == 0 );
+    REQUIRE( th.r(20).w<1>() == 1 );
+    REQUIRE( th.r(20).w<2>() == 1 );
+    REQUIRE( th.r(20).w<3>() == 0 );
+}

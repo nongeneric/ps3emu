@@ -598,7 +598,7 @@ PRINT(bg) {
     auto val = _mm_set1_epi32(0x80000000); \
     a = _mm_sub_epi32(a, val); \
     b = _mm_sub_epi32(b, val); \
-    auto t = _mm_cmplt_epi32(a, b); \
+    auto t = ~_mm_cmpgt_epi32(a, b); \
     t = _mm_srli_epi32(t, 31); \
     th->r(_rt).set_xmm(t); \
 }
