@@ -11,21 +11,25 @@
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 TEST_CASE("rewriter_simple") {
+    auto id = getpid();
+    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.so", id);
+    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d.cpp", id);
     std::string output;
     auto line = rewrite(
         "./binaries/rewriter_simple/a.elf",
-        "/tmp/x86.cpp",
+        cppPath,
         "--entries 1022c 10314 1039c 10418 10484 10518 1053c 105ac 10654"
         "--ignored 1045c 104c8");
     auto res = exec(line, output);
     REQUIRE(res);
-    line = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    line = compile({cppPath, soPath, false, false});
     res = exec(line, output);
     REQUIRE(res);
     
-    output = startWaitGetOutput({"./binaries/rewriter_simple/a.elf"}, {"--x86", "/tmp/x86.so"});
+    output = startWaitGetOutput({"./binaries/rewriter_simple/a.elf"}, {"--x86", soPath});
     REQUIRE( output ==
         "test1 ep: 1022c\n"
         "test1 res: 1416\n"
@@ -225,18 +229,21 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
 }
 
 TEST_CASE("spu_rewriter_simple") {
+    auto id = getpid();
+    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.so", id);
+    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d.cpp", id);
     std::string output;
     auto line = rewrite(
         "./binaries/spurs_task_hello/a.elf",
-        "/tmp/x86spu.cpp",
+        cppPath,
         "--spu");
     auto res = exec(line, output);
     REQUIRE(res);
-    line = compile({"/tmp/x86spu.cpp", "/tmp/x86spu.so", false, false});
+    line = compile({cppPath, soPath, false, false});
     res = exec(line, output);
     REQUIRE(res);
     
-    output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"}, {"--x86", "/tmp/x86spu.so"});
+    output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"}, {"--x86", soPath});
     REQUIRE( output ==
         "SPU: Hello world!\n"
     );

@@ -7,26 +7,31 @@
 static const char* runnerPath = "../ps3run/ps3run";
 
 int comparisonNum = 0;
+int lastProcId = 0;
 
 void compareLastFrame(const char* expected, int n = 0, int tolerance = 5, int safePixels = 0) {
     comparisonNum++;
     QProcess proc;
-    auto args = QStringList() << "-metric"
-                              << "AE"
-                              << "-fuzz" << QString("%1%%").arg(tolerance)
-                              << QString("/tmp/ps3frame%1.png").arg(n) << expected
-                              << QString("/tmp/ps3frame-diff%1.png").arg(n);
+    auto id = lastProcId;
+    auto args = QStringList() 
+        << "-metric"
+        << "AE"
+        << "-fuzz" << QString("%1%%").arg(tolerance)
+        << QString::fromStdString(ssnprintf("/tmp/ps3frame_%d_%d.png", id, n)) << expected
+        << QString::fromStdString(ssnprintf("/tmp/ps3frame-diff_%d_%d.png", id, n));
     proc.start("compare", args);
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() != 2 );
     auto output = QString(proc.readAllStandardError()).toInt();
     if (output > safePixels) {
-        args = QStringList() << QString("/tmp/ps3frame-diff%1.png").arg(n)
-                             << QString("/tmp/ps3frame-diff%1_bad%2.png").arg(n).arg(comparisonNum);
+        args = QStringList() 
+            << QString::fromStdString(ssnprintf("/tmp/ps3frame-diff_%d_%d.png", id, n))
+            << QString::fromStdString(ssnprintf("/tmp/ps3frame-diff_%d_%d_bad%d.png", id, n, comparisonNum));
         proc.start("cp", args);
         proc.waitForFinished(-1);
-        args = QStringList() << QString("/tmp/ps3frame%1.png").arg(n)
-                             << QString("/tmp/ps3frame%1_bad%2.png").arg(n).arg(comparisonNum);
+        args = QStringList() 
+            << QString::fromStdString(ssnprintf("/tmp/ps3frame_%d_%d.png", id, n))
+            << QString::fromStdString(ssnprintf("/tmp/ps3frame_%d_%d_bad%d.png", id, n, comparisonNum));
         proc.start("cp", args);
         proc.waitForFinished(-1);
         REQUIRE( proc.exitCode() == 0 );
@@ -37,6 +42,7 @@ void compareLastFrame(const char* expected, int n = 0, int tolerance = 5, int sa
 void runAndWait(QString path) {
     QProcess proc;
     proc.start(runnerPath, QStringList() << "--elf" << path);
+    lastProcId = proc.processId();
     proc.waitForFinished(-1);
     if (proc.exitCode() != 0) {
         WARN(path.toStdString());
@@ -86,12 +92,6 @@ TEST_CASE("gcm_cube_mrt") {
 
 TEST_CASE("gcm_human") {
     runAndWait("./binaries/gcm_human/a.elf");
-    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0);
-    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
-    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);
-    
-    REQUIRE( rewrite_and_compile("./binaries/gcm_human/a.elf") );
-    auto output = startWaitGetOutput({"./binaries/gcm_human/a.elf"}, {"--x86", "/tmp/x86.so"});
     compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0);
     compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
     compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);

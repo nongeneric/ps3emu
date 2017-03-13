@@ -56,13 +56,13 @@ TEST_CASE("spuchannels_mailbox_two_threads_blocking") {
     });
     
     boost::thread ppu([&] {
-        while (channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff == 0) ;
+        while ((channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff) == 0) ;
         REQUIRE(channels.mmio_read(TagClassId::SPU_Out_MBox) == 1);
-        while (channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff == 0) ;
+        while ((channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff) == 0) ;
         REQUIRE(channels.mmio_read(TagClassId::SPU_Out_MBox) == 2);
-        while (channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff == 0) ;
+        while ((channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff) == 0) ;
         REQUIRE(channels.mmio_read(TagClassId::SPU_Out_MBox) == 3);
-        while (channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff == 0) ;
+        while ((channels.mmio_read(TagClassId::SPU_MBox_Status) & 0xff) == 0) ;
         REQUIRE(channels.mmio_read(TagClassId::SPU_Out_MBox) == 4);
     });
     

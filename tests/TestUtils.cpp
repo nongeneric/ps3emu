@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <catch/catch.hpp>
+#include <unistd.h>
 
 static const char* runnerPath = "../ps3run/ps3run";
 using namespace boost;
@@ -25,36 +26,41 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     proc.start(runnerPath, list);
     if (!proc.waitForStarted())
         throw std::runtime_error("can't start process");
-    if (!proc.waitForFinished())
+    if (!proc.waitForFinished(120 * 1000))
         throw std::runtime_error("process timed out");
     return QString(proc.readAll()).toStdString();
 }
 
-bool rewrite_and_compile(std::string elf) {
-    auto line = rewrite(elf, "/tmp/x86.cpp", "");
+bool rewrite_and_compile(std::string elf, std::string cppPath, std::string soPath) {
+    auto line = rewrite(elf, cppPath, "");
     std::string output;
     auto res = exec(line, output);
     if (!res)
         return false;
-    line = compile({"/tmp/x86.cpp", "/tmp/x86.so", false, false});
+    line = compile({cppPath, soPath, false, false});
     return exec(line, output);
 }
 
-bool rewrite_and_compile_spu(std::string elf) {
-    auto line = rewrite(elf, "/tmp/x86.spu.cpp", "--spu");
+bool rewrite_and_compile_spu(std::string elf, std::string cppPath, std::string soPath) {
+    auto line = rewrite(elf, cppPath, "--spu");
     std::string output;
     auto res = exec(line, output);
     if (!res)
         return false;
-    line = compile({"/tmp/x86.spu.cpp", "/tmp/x86spu.so", false, false});
+    line = compile({cppPath, soPath, false, false});
     return exec(line, output);
 }
 
 void test_interpreter_and_rewriter(std::vector<std::string> args, std::string expected) {
+    auto id = getpid();
+    auto spuSoPath = ssnprintf("/tmp/ps3_x86spu_%d_spu.so", id);
+    auto spuCppPath = ssnprintf("/tmp/ps3_x86spu_%d_spu.cpp", id);
+    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.so", id);
+    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d.cpp", id);
     auto output = startWaitGetOutput(args);
     REQUIRE( output == expected );
-    REQUIRE( rewrite_and_compile(args[0]) );
-    REQUIRE( rewrite_and_compile_spu(args[0]) );
-    output = startWaitGetOutput(args, {"--x86", "/tmp/x86.so", "--x86", "/tmp/x86spu.so"});
+    REQUIRE( rewrite_and_compile(args[0], cppPath, soPath) );
+    REQUIRE( rewrite_and_compile_spu(args[0], spuCppPath, spuSoPath) );
+    output = startWaitGetOutput(args, {"--x86", soPath, "--x86", spuSoPath});
     REQUIRE( output == expected );
 }

@@ -34,6 +34,7 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <unistd.h>
 
 using namespace boost::algorithm;
 using namespace boost::chrono;
@@ -644,8 +645,9 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     */
 #if TESTS
     static int framenum = 0;
+    auto id = getpid();
     if (framenum < 22 && _mode != RsxOperationMode::Replay && tex) {
-        auto filename = ssnprintf("/tmp/ps3frame%d.png", framenum);
+        auto filename = ssnprintf("/tmp/ps3frame_%d_%d.png", id, framenum);
         dumpOpenGLTexture(tex->handle(), false, 0, filename, true, true);
         framenum++;
     }
