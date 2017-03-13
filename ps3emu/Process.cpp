@@ -257,11 +257,11 @@ Event Process::run() {
                 // there might be a dangling spu_printf thread or similar
                 bool dangling = false;
                 for (auto& t : _threads) {
-                    INFO(libs) << ssnprintf("a dangling thread at ProcessFinished %s", t->getName());
+                    WARNING(libs) << ssnprintf("a dangling thread at ProcessFinished %s", t->getName());
                     dangling = true;
                 }
                 if (dangling) {
-                    INFO(libs) << "terminating process with dangling threads";
+                    WARNING(libs) << "terminating process with dangling threads";
                     exit(0);
                 }
                 INFO(libs) << "process finishes cleanly, without dangling threads";
@@ -297,7 +297,8 @@ Event Process::run() {
                         boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
                         for (auto& t : _spuThreads) {
                             if (t->tryJoin(500).cause == SPUThreadExitCause::StillRunning) {
-                                t->cancel();
+                                WARNING(spu) << ssnprintf("a dangling SPU thread at ProcessFinished %s", t->getName());
+                                exit(0);
                             }
                         }
                     }

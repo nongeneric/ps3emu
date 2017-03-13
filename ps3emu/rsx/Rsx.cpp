@@ -11,12 +11,14 @@
 #include "../shaders/ShaderGenerator.h"
 #include "../shaders/shader_dasm.h"
 #include "../utils.h"
+#include "ps3emu/ImageUtils.h"
 #include "ps3emu/state.h"
 #include <atomic>
 #include <vector>
 #include <fstream>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/thread.hpp>
 #include <boost/range/numeric.hpp>
 #include "ps3emu/libs/graphics/graphics.h"
 #include "ps3emu/libs/message.h"
@@ -468,12 +470,13 @@ GLuint primitiveTypeToFeedbackPrimitiveType(GLuint type) {
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
-    updateVertexDataArrays(first, count);
     updateTextures();
     updateShaders();
-    watchCaches();
+    watchTextureCache();
+    watchShaderCache();
     linkShaderProgram();
     updateScissor();
+    updateVertexDataArrays(first, count);
     
     GLQuery query(0);
     if (_mode == RsxOperationMode::Replay) {
@@ -629,6 +632,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _isFlipInProgress = true;
     
     _window.swapBuffers();
+    
     _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
     _context->frame++;
     _context->commandNum = 0;
@@ -641,13 +645,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
 #if TESTS
     static int framenum = 0;
     if (framenum < 22 && _mode != RsxOperationMode::Replay && tex) {
-        auto& vec = _context->lastFrame;
-        vec.resize(_window.width() * _window.height() * 3);
-        glGetTextureImage(
-            tex->handle(), 0, GL_RGB, GL_UNSIGNED_BYTE, vec.size(), &vec[0]);
-        std::ofstream f(ssnprintf("/tmp/ps3frame%d.rgb", framenum));
-        assert(f.is_open());
-        f.write((const char*)vec.data(), vec.size());
+        auto filename = ssnprintf("/tmp/ps3frame%d.png", framenum);
+        dumpOpenGLTexture(tex->handle(), false, 0, filename, true, true);
         framenum++;
     }
 #endif
@@ -775,6 +774,7 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
 
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     assert(first == 0);
+    
     auto destBuffer = &_context->elementArrayIndexBuffer;
     auto sourceBuffer = getBuffer(_context->indexArray.location);
     auto byteSize = _context->indexArray.glType == GL_UNSIGNED_SHORT ? 2 : 4;
@@ -798,18 +798,19 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
                           _context->indexArray.offset + first * byteSize,
                           count * byteSize);
     }
-
-    updateVertexDataArrays(first, count);
+    
     updateTextures();
     updateShaders();
-    watchCaches();
+    watchTextureCache();
+    watchShaderCache();
     linkShaderProgram();
     updateScissor();
+    updateVertexDataArrays(first, count);
     
-    glcall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, destBuffer->handle()));
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, destBuffer->handle());
     
     auto offset = (void*)(uintptr_t)(first * byteSize);
-    glcall(glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset));
+    glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset);
     
     // see DrawArrays for rationale
     waitForIdle();
@@ -961,9 +962,11 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
         va, size,
         [=](auto t) {
             auto past = steady_clock::now();
-            std::vector<uint8_t> buf(size);
-            g_state.mm->readMemory(va, &buf[0], size);
-            t->update(buf);
+//             std::vector<uint8_t> buf(size);
+//             g_state.mm->readMemory(va, &buf[0], size);
+//             t->update(buf);
+            auto buffer = this->getBuffer(info.location);
+            _textureReader->loadTexture(info, buffer->handle(), t->handle(), t->levelHandles());
             this->_context->uTextureUpdateDuration +=
                 duration_cast<microseconds>(steady_clock::now() - past).count();
         }
@@ -976,7 +979,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
 GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
     auto& info = isFragment ? _context->fragmentTextureSamplers[samplerId].texture
                             : _context->vertexTextureSamplers[samplerId].texture;
-    TextureCacheKey key { 
+    TextureCacheKey key {
         info.offset,
         (uint32_t)info.location,
         info.width,
@@ -1422,13 +1425,14 @@ void Rsx::initGcm() {
     glDebugMessageCallback(&glDebugCallbackFunction, nullptr);
     
     _context.reset(new RsxContext());
+    _context->pipeline.bind();
+    _context->pipeline.useDefaultShaders();
     
     if (_mode == RsxOperationMode::RunCapture) {
         _context->tracer.enable(true);
     }
     
     g_state.mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
-    _context->pipeline.bind();
     
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
     _context->vertexConstBuffer = GLPersistentCpuBuffer(constBufferSize);
@@ -1455,6 +1459,8 @@ void Rsx::initGcm() {
         
     _context->framebuffer.reset(new GLFramebuffer());
     _context->textureRenderer.reset(new TextureRenderer());
+    _textureReader = new RsxTextureReader();
+    _textureReader->init();
     
     resetContext();
     
@@ -1583,10 +1589,14 @@ uint32_t Rsx::getPut() {
     return _put;
 }
 
-void Rsx::watchCaches() {
+void Rsx::watchTextureCache() {
     auto setMemoryBreak = [=](uint32_t va, uint32_t size) { g_state.mm->memoryBreak(va, size); };
     _context->textureCache.syncAll();
     _context->textureCache.watch(setMemoryBreak);
+}
+
+void Rsx::watchShaderCache() {
+    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { g_state.mm->memoryBreak(va, size); };
     _context->fragmentShaderCache.syncAll();
     _context->fragmentShaderCache.watch(setMemoryBreak);
 }

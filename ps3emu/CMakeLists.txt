@@ -22,6 +22,7 @@ set(SRC
     Config.cpp
     RewriterUtils.cpp
     fileutils.cpp
+    ImageUtils.cpp
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
     spu/SPUChannels.cpp

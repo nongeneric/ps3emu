@@ -7,6 +7,7 @@
 #include "ps3emu/gcmviz/GcmDatabase.h"
 #include "ps3emu/BitField.h"
 #include "GLFramebuffer.h"
+#include "RsxTextureReader.h"
 #include "ps3emu/enum.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>
@@ -180,8 +181,10 @@ class Rsx {
     std::vector<uint8_t> _currentReplayBlob;
     bool _frameCapturePending = false;
     bool _shortTrace = false;
+    RsxTextureReader* _textureReader;
     
-    void watchCaches();
+    void watchTextureCache();
+    void watchShaderCache();
     void memoryBreakHandler(uint32_t va, uint32_t size);
     void waitForIdle();
     void loop();

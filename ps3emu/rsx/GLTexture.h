@@ -44,14 +44,14 @@ ENUMF(GcmTextureLnUn,
     (UN, 0x40)
 )
 
-ENUMF(TextureRemapInput,
+ENUM(TextureRemapInput,
     (FromA, 0),
     (FromR, 1),
     (FromG, 2),
     (FromB, 3)
 )
 
-ENUMF(TextureRemapOutput,
+ENUM(TextureRemapOutput,
     (Zero, 0),
     (One, 1),
     (Remap, 2)
@@ -84,6 +84,7 @@ class PPU;
 class GLTexture {
     RsxTextureInfo _info;
     GLuint _handle;
+    std::vector<uint64_t> _levelHandles;
     GLTexture(GLTexture const&) = delete;
     void operator=(GLTexture const&) = delete;
 public:
@@ -96,6 +97,7 @@ public:
         std::function<void(unsigned, unsigned, unsigned, glm::vec4*)> handler);
     void bind(GLuint samplerIndex);
     GLuint handle();
+    std::vector<uint64_t>& levelHandles();
 };
 
 class TextureReader {
@@ -145,7 +147,7 @@ public:
 
 template <typename BF>
 uint8_t ext8(BF bf) {
-    static_assert(BF::W < 8, "");
+    static_assert(4 <= BF::W && BF::W < 8, "");
     uint8_t val = bf.u();
     return (val << (8 - BF::W)) | (val >> (2 * BF::W - 8));
 }

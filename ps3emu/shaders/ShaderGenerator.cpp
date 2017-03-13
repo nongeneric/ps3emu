@@ -313,7 +313,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         }
         line(");");
         auto sw = size == 1 ? "x" : size == 2 ? "xy" : "xyz";
-        line(ssnprintf("    vec4 texel = reverse4f(texture(s%d, (iuv.%s + 0.5) / size, uv.w));", s, sw));
+        line(ssnprintf("    vec4 texel = texture(s%d, (iuv.%s + 0.5) / size, uv.w);", s, sw));
         line(ssnprintf("    if (iuv.x == -1 || iuv.y == -1 || iuv.z == -1)"));
         line(ssnprintf("        texel = samplersInfo.borderColor[%d].abgr;", s));
         line(ssnprintf("    return texel;"));

@@ -11,10 +11,10 @@ std::string Shader::source() {
 
 std::string Shader::log() {
     GLint len;
-    glcall(glGetProgramiv(_program.handle(), GL_INFO_LOG_LENGTH, &len));
+    glGetProgramiv(_program.handle(), GL_INFO_LOG_LENGTH, &len);
     std::string str;
     str.resize(len);
-    glcall(glGetProgramInfoLog(_program.handle(), len, nullptr, &str[0]));
+    glGetProgramInfoLog(_program.handle(), len, nullptr, &str[0]);
     return str;   
 }
 

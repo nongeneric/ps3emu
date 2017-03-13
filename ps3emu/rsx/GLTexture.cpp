@@ -127,7 +127,7 @@ struct FormatInfo {
     std::function<void(const uint8_t*, u8vec4&)> u8read;
 };
 
-unsigned getTexelSize(GcmTextureFormat format) {
+unsigned getTexelSize2(GcmTextureFormat format) {
     switch (format) {
         case GcmTextureFormat::A8R8G8B8:
         case GcmTextureFormat::D8R8G8B8:
@@ -248,41 +248,6 @@ float select(float f, uint32_t output) {
     }
 }
 
-class SurfaceWriter {
-    std::function<void(uint8_t*, vec4 const&)> _write;
-public:
-    SurfaceWriter(uint32_t format) : _write(make_write(format)) { }
-    
-    std::function<void(uint8_t*, vec4 const&)> make_write(uint32_t texelFormat) {
-        switch (texelFormat) {
-            case 0: return [](uint8_t* ptr, vec4 const& v) { };
-            case CELL_GCM_SURFACE_A8B8G8R8: return [](uint8_t* ptr, vec4 const& v) {
-                auto typed = (uint32_t*)ptr;
-                union {
-                    uint32_t val;
-                    BitField<0, 8> a;
-                    BitField<8, 16> r;
-                    BitField<16, 24> g;
-                    BitField<24, 32> b;
-                } t = { *typed };
-                t.a.set(v[3] * 255);
-                t.r.set(v[0] * 255);
-                t.g.set(v[1] * 255);
-                t.b.set(v[2] * 255);
-                *typed = t.val;
-            };
-            case CELL_GCM_SURFACE_F_W32Z32Y32X32: return [](uint8_t* ptr, vec4 const& v) {
-                auto f = (float*)ptr;
-                f[0] = v[3];
-                f[1] = v[2];
-                f[2] = v[1];
-                f[3] = v[0];
-            };
-            default: throw std::runtime_error("unknown format");
-        }
-    }
-};
-
 GLenum gcmTextureFormatToOpengl(uint32_t dimension, bool cube) {
     if (dimension == 2) {
         if (cube)
@@ -295,8 +260,23 @@ GLenum gcmTextureFormatToOpengl(uint32_t dimension, bool cube) {
 GLTexture::GLTexture(const RsxTextureInfo& info): _info(info) {
     // TODO: make sure cube is only checked for fragment textures
     auto target = gcmTextureFormatToOpengl(info.dimension, info.fragmentCubemap);
-    glcall(glCreateTextures(target, 1, &_handle));
-    glcall(glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height));
+    glCreateTextures(target, 1, &_handle);
+    glTextureStorage2D(_handle, info.mipmap, GL_RGBA32F, info.width, info.height);
+    if (info.fragmentCubemap) {
+        for (auto layer = 0; layer < 6; ++layer) {
+            for (auto i = 0; i < info.mipmap; ++i) {
+                auto handle = glGetImageHandleARB(_handle, i, false, layer, GL_RGBA32F);
+                _levelHandles.push_back(handle);
+                glMakeImageHandleResidentARB(handle, GL_WRITE_ONLY);
+            }
+        }
+    } else {
+        for (auto i = 0; i < info.mipmap; ++i) {
+            auto handle = glGetImageHandleARB(_handle, i, false, 0, GL_RGBA32F);
+            _levelHandles.push_back(handle);
+            glMakeImageHandleResidentARB(handle, GL_WRITE_ONLY);
+        }
+    }
 }
 
 class LinearTextureIterator {
@@ -382,7 +362,7 @@ uint32_t GLTexture::read2d(
             size = src.size();
         } else {
             TextureReader reader(_info.format, _info);
-            auto texelSize = getTexelSize(_info.format);
+            auto texelSize = getTexelSize2(_info.format);
             if (!!(_info.lnUn & GcmTextureLnUn::LN)) {
                 LinearTextureIterator it(
                     raw, _info.pitch, _info.width, _info.height, texelSize, level);
@@ -567,6 +547,10 @@ GLuint GLSimpleTexture::format() {
 
 GLuint GLTexture::handle() {
     return _handle;
+}
+
+std::vector<uint64_t>& GLTexture::levelHandles() {
+    return _levelHandles;
 }
 
 SwizzledTextureIterator::SwizzledTextureIterator(uint8_t* buf,

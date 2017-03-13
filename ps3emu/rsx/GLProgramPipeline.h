@@ -40,6 +40,18 @@ public:
             log.resize(len);
             glGetProgramPipelineInfoLog(handle(), log.size(), nullptr, &log[0]);
             ERROR(rsx) << ssnprintf("pipeline validation failed\n%s", log);
+            exit(1);
         }
+    }
+    inline void useDefaultShaders() {
+        auto code = R""(
+            #version 450 core
+            void main(void) { }
+        )"";
+        auto fs = FragmentShader(code);
+        auto vs = VertexShader(code);
+        useShader(fs);
+        useShader(vs);
+        validate();
     }
 };

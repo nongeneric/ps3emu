@@ -41,6 +41,8 @@ set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native ${CMAKE_CXX_FLAGS}")
 set(EMU_CONFIGURATION debug)
 
 if(${EMU_CONFIGURATION} STREQUAL debug)
+    add_definitions(-DDEBUG)
+
     # detect accesses to unallocated memory (massive performance hit)
     add_definitions(-DMEMORY_PROTECTION)
     
