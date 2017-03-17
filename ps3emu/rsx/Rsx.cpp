@@ -684,14 +684,11 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     
     resetContext();
     
-    _context->framePerfCounter++;
-    auto now = boost::chrono::steady_clock::now();
-    if (now - _context->fpsReportPoint > boost::chrono::seconds(1)) {
+    _context->fpsCounter.report();
+    if (_context->fpsCounter.hasWrapped()) {
         INFO(perf) << ssnprintf("FPS: %d, texture update time: %lld",
-                                _context->framePerfCounter,
+                                _context->fpsCounter.elapsed(),
                                 _context->uTextureUpdateDuration / 1000);
-        _context->fpsReportPoint = now;
-        _context->framePerfCounter = 0;
         _context->uTextureUpdateDuration = 0;
     }
 }

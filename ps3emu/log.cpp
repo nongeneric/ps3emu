@@ -7,6 +7,7 @@
 #include "ps3emu/ppu/PPUThread.h"
 #include "ps3emu/spu/SPUThread.h"
 #include "ps3emu/state.h"
+#include <execinfo.h>
 
 namespace {
     thread_local std::string thread_name;
@@ -51,7 +52,11 @@ void log_unconditional(log_severity_t severity, log_type_t type, const char* mes
     } else if (g_state.sth) {
         nip = ssnprintf("%08x ", g_state.sth->getNip());
     }
-    auto const& formatted = ssnprintf("%s %s%s%s: %s",
+    std::string backtrace;
+    if (severity == log_error) {
+        backtrace = print_backtrace();
+    }
+    auto const& formatted = ssnprintf("%s %s%s%s: %s%s",
                                       type == log_spu ? "SPU" :
                                       type == log_libs ? "LIB" :
                                       type == log_debugger ? "DBG" :
@@ -64,7 +69,8 @@ void log_unconditional(log_severity_t severity, log_type_t type, const char* mes
                                       severity == log_warning ? "WARNING" :
                                       severity == log_error ? "ERROR"
                                       : "?",
-                                      message);
+                                      message,
+                                      backtrace);
     logger->info(formatted);
 }
 
@@ -115,3 +121,16 @@ log_severity_t log_parse_verbosity(std::string const& str) {
 }
 
 #undef PARSE
+
+std::string print_backtrace() {
+    void* array[40];
+    auto size = backtrace(array, 40);
+    auto frames = backtrace_symbols(array, size);
+    std::string message;
+    for (auto i = 0; i < size; ++i) {
+        message += "  ";
+        message += frames[i];
+        message += "\n";
+    }
+    return message;
+}

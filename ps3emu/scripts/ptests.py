@@ -7,7 +7,7 @@ import sys
 import subprocess
 import concurrent.futures as cf
 
-NJobs = 8
+NJobs = 4
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str)
@@ -21,33 +21,65 @@ async def read_output(tests_args):
     return output, proc.returncode
     
 def parse_test_list(text):
-    return [x[2:] for x in text.split('\n') if x.startswith('  ')]
+    lines = text.split('\n')
+    serial = []
+    parallel = []
+    i = 0
+    while i < len(lines):
+        try:
+            if not lines[i].startswith('  '):
+                continue
+            name = lines[i][2:]
+            if '[serial]' in lines[i + 1]:
+                serial.append(name)
+                i += 1
+            else:
+                parallel.append(name)
+        finally:
+            i += 1
+    return serial, parallel
+
+def report_test(exception, result):
+    print('.', end='')
+    sys.stdout.flush()
+    if exception != None:
+        print(future.exception())
+        return False
+    output, exitcode = result
+    if exitcode != 0:
+        print('')
+        print(output)
+        return False
+    return True
+
+def run_test(name):
+    return read_output(['-d', 'yes', '"' + name + '"'])
 
 async def speak_async():
     output, code = await read_output(['--list-tests'])
-    names = parse_test_list(output)
-    print(len(names), 'tests found')
+    serial, parallel = parse_test_list(output)
+    print(len(serial), 'serial tests found')
+    print(len(parallel), 'parallel tests found')
     futures = set()
     completed = 0
     failed = 0
+    for name in serial:
+        completed += 1
+        if not report_test(None, await run_test(name)):
+            failed += 1
     while True:
-        while len(names) > 0 and len(futures) < NJobs:
-            name = names[0]
-            names = names[1:]
-            futures.add(read_output(['-d', 'yes', '"' + name + '"']))
+        while len(parallel) > 0 and len(futures) < NJobs:
+            name = parallel[0]
+            parallel = parallel[1:]
+            futures.add(run_test(name))
         if len(futures) == 0:
             break;
         done, futures = await asyncio.wait(futures, return_when=cf.FIRST_COMPLETED)
         for future in done:
             completed += 1
-            print('.', end='')
-            sys.stdout.flush()
-            if future.exception() != None:
-                print(future.exception())
-            output, exitcode = future.result()
-            if exitcode != 0:
-                print(exitcode, output)
+            if not report_test(future.exception(), future.result()):
                 failed += 1
+    print('')
     print(completed, 'tests completed;', failed, 'tests failed')
 
 loop = asyncio.get_event_loop()  

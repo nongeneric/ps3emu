@@ -3,6 +3,7 @@
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/log.h"
 #include "ps3emu/Process.h"
+#include "ps3emu/TimedCounter.h"
 #include <SDL2/SDL.h>
 #include <fstream>
 
@@ -58,6 +59,7 @@ namespace {
         std::vector<uint64_t> port0stamps;
         SDL_AudioDeviceID device;
         std::ofstream pcmFile;
+        TimedCounter counter;
     } context;
     
 }
@@ -74,28 +76,44 @@ uint32_t calcBlockSize() {
     return context.nChannel * sizeof(float) * CELL_AUDIO_BLOCK_SAMPLES;
 }
 
-void sdlAudioCallback(void* udata, Uint8* stream, int len) {
+void sdlAudioCallback(void*, Uint8* stream, int len2ch) {
     if (context.portStatus != CELL_AUDIO_STATUS_RUN)
         return;
     
     auto blockSize = calcBlockSize();
     auto nextBlockPosition = (*context.readIndexAddr + 1) * blockSize;
-    auto toWrite = std::min<uint32_t>(nextBlockPosition - context.position, len);
-    memcpy(stream, context.portAddr + context.position, toWrite);
+    auto toRead = std::min<uint32_t>(nextBlockPosition - context.position,
+                                     context.nChannel == 8 ? len2ch * 4 : len2ch);
+    
+    auto src = (big_uint64_t*)(context.portAddr + context.position);
+    auto dest = (big_uint64_t*)stream;
+    if (context.nChannel == 8) {
+        auto samples = toRead / 32;
+        for (auto i = 0u; i < samples; ++i) {
+            dest[i] = src[4*i];
+        }
+    } else {
+        memcpy(stream, src, toRead);
+    }
 #if TESTS
-    context.pcmFile.write((char*)(context.portAddr + context.position), toWrite);
+    context.pcmFile.write((char*)stream, context.nChannel == 8 ? toRead / 4 : toRead);
     context.pcmFile.flush();
 #endif
-    memset(context.portAddr + context.position, 0, toWrite);
-    context.position = (context.position + toWrite) % (blockSize * context.nBlock);
+    memset(src, 0, toRead);
+    context.position = (context.position + toRead) % (blockSize * context.nBlock);
     if (context.position % blockSize == 0) {
         auto prevBlock = *context.readIndexAddr;
         auto curBlock = context.position / blockSize;
+        assert((prevBlock == context.nBlock - 1 && curBlock == 0) || prevBlock + 1 == curBlock);
         *context.readIndexAddr = curBlock;
         if (prevBlock != curBlock) {
             context.port0tags[curBlock] = context.port0tags[prevBlock] + 2;
             context.port0stamps[prevBlock] = g_state.proc->getTimeBaseMicroseconds().count();
             sys_event_port_send(context.notifyQueuePort, 0, 0, 0);
+            context.counter.report();
+            if (context.counter.hasWrapped()) {
+                INFO(perf) << ssnprintf("libaduio notify ms average %g", 1000.f / context.counter.elapsed());
+            }
         }
     }
 }

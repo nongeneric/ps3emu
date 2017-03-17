@@ -8,6 +8,7 @@
 #include "GLFramebuffer.h"
 #include "Cache.h"
 #include "Rsx.h"
+#include "ps3emu/TimedCounter.h"
 #include "../shaders/ShaderGenerator.h"
 #include <boost/chrono.hpp>
 
@@ -203,8 +204,7 @@ struct RsxContext {
     uint32_t feedbackCount = 0;
     uint32_t feedbackMode;
     uint32_t frame = 0;
-    uint32_t framePerfCounter = 0;
-    boost::chrono::steady_clock::time_point fpsReportPoint; 
+    TimedCounter fpsCounter;
     uint64_t uTextureUpdateDuration = 0;
     uint32_t commandNum = 0;
     SurfaceInfo surface;

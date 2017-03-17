@@ -6,6 +6,7 @@
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 #include "stdio.h"
+#include <signal.h>
 
 using namespace boost::program_options;
 
@@ -21,6 +22,11 @@ void emulate(std::string path, std::vector<std::string> args) {
             return;
         }
     }
+}
+
+void sigsegv_handler(int sig) {
+    ERROR(libs) << ssnprintf("crash (signal %d):\n%s", sig, print_backtrace());
+    exit(1);
 }
 
 int main(int argc, char* argv[]) {
@@ -59,6 +65,8 @@ int main(int argc, char* argv[]) {
              log_parse_filter(filter),
              false);
 
+    signal(SIGSEGV, sigsegv_handler);
+    
     try {
         std::vector<std::string> argvec;
         boost::split(argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);

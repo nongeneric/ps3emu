@@ -58,6 +58,7 @@ set(SRC
     rsx/RsxTextureReader.cpp
     rsx/GLShader.cpp
     gcmviz/GcmDatabase.cpp
+    TimedCounter.cpp
     
     libs/sys.cpp
     libs/fs.cpp

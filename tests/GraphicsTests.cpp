@@ -156,52 +156,52 @@ TEST_CASE("gcm_render_to_texture") {
     compareLastFrame("./binaries/gcm_render_to_texture/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_1_basiccg") {
+TEST_CASE("opengl_1_basiccg", TAG_SERIAL) {
     runAndWait("./binaries/opengl_1_basiccg/a.elf");
     compareLastFrame("./binaries/opengl_1_basiccg/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_2_basic_vertex_lighting") {
+TEST_CASE("opengl_2_basic_vertex_lighting", TAG_SERIAL) {
     runAndWait("./binaries/opengl_2_basic_vertex_lighting/a.elf");
     compareLastFrame("./binaries/opengl_2_basic_vertex_lighting/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_3_basic_fragment_lighting") {
+TEST_CASE("opengl_3_basic_fragment_lighting", TAG_SERIAL) {
     runAndWait("./binaries/opengl_3_basic_fragment_lighting/a.elf");
     compareLastFrame("./binaries/opengl_3_basic_fragment_lighting/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_4_proc_anim") {
+TEST_CASE("opengl_4_proc_anim", TAG_SERIAL) {
     runAndWait("./binaries/opengl_4_proc_anim/a.elf");
     compareLastFrame("./binaries/opengl_4_proc_anim/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_5_mipmap") {
+TEST_CASE("opengl_5_mipmap", TAG_SERIAL) {
     runAndWait("./binaries/opengl_5_mipmap/a.elf");
     compareLastFrame("./binaries/opengl_5_mipmap/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_6_gloss_map") {
+TEST_CASE("opengl_6_gloss_map", TAG_SERIAL) {
     runAndWait("./binaries/opengl_6_gloss_map/a.elf");
     compareLastFrame("./binaries/opengl_6_gloss_map/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_7_environment_map") {
+TEST_CASE("opengl_7_environment_map", TAG_SERIAL) {
     runAndWait("./binaries/opengl_7_environment_map/a.elf");
     compareLastFrame("./binaries/opengl_7_environment_map/ps3frame1.png", 1);
 }
 
-TEST_CASE("opengl_8_irradiance_map") {
+TEST_CASE("opengl_8_irradiance_map", TAG_SERIAL) {
     runAndWait("./binaries/opengl_8_irradiance_map/a.elf");
     compareLastFrame("./binaries/opengl_8_irradiance_map/ps3frame1.png", 1);
 }
 
-TEST_CASE("pngdec_ppu_graphics") {
+TEST_CASE("pngdec_ppu_graphics", TAG_SERIAL) {
     runAndWait("./binaries/pngdec_ppu/a.elf");
     compareLastFrame("./binaries/pngdec_ppu/ps3frame0.png", 0);
 }
 
-TEST_CASE("gcm_strip_branch") {
+TEST_CASE("gcm_strip_branch", TAG_SERIAL) {
     runAndWait("./binaries/gcm_strip_branch/a.elf");
     for (int i = 0; i <= 18; ++i) {
         compareLastFrame(

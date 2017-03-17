@@ -1347,7 +1347,7 @@ TEST_CASE("fiber_hello") {
     );
 }
 
-TEST_CASE("ppu_threads_event_flag") {
+TEST_CASE("ppu_threads_event_flag", TAG_SERIAL) {
     auto output = startWaitGetOutput({"./binaries/ppu_threads_event_flag/a.elf"});
     REQUIRE( output ==
         "p = 8008, flag = 8005\n"
@@ -1365,7 +1365,7 @@ TEST_CASE("ppu_threads_event_flag") {
     );
 }
 
-TEST_CASE("spurs_task_signal") {
+TEST_CASE("spurs_task_signal", TAG_SERIAL) {
     test_interpreter_and_rewriter({"./binaries/spurs_task_signal/a.elf"},
         "SPU: Signal task start!\n"
         "SPU: Waiting for a signal....\n"
@@ -1374,7 +1374,7 @@ TEST_CASE("spurs_task_signal") {
     );
 }
 
-TEST_CASE("spurs_task_yield") {
+TEST_CASE("spurs_task_yield", TAG_SERIAL) {
     test_interpreter_and_rewriter({"./binaries/spurs_task_yield/a.elf"},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
@@ -1387,7 +1387,7 @@ TEST_CASE("spurs_task_yield") {
     );
 }
 
-TEST_CASE("spurs_task_semaphore") {
+TEST_CASE("spurs_task_semaphore", TAG_SERIAL) {
     test_interpreter_and_rewriter({"./binaries/spurs_task_semaphore/a.elf"},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
@@ -1397,7 +1397,7 @@ TEST_CASE("spurs_task_semaphore") {
     );
 }
 
-TEST_CASE("spurs_task_event_flag") {
+TEST_CASE("spurs_task_event_flag", TAG_SERIAL) {
     test_interpreter_and_rewriter({"./binaries/spurs_task_event_flag/a.elf"},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
@@ -1421,7 +1421,7 @@ TEST_CASE("spurs_task_event_flag") {
     );
 }
 
-TEST_CASE("sample_sync_queue") {
+TEST_CASE("sample_sync_queue", TAG_SERIAL) {
     auto output = startWaitGetOutput({"./binaries/sample_sync_queue/a.elf"});
     REQUIRE( output ==
         "Creating an SPU thread group.\n"
@@ -1447,7 +1447,7 @@ TEST_CASE("sample_sync_queue") {
     );
 }
 
-TEST_CASE("sample_sync_mutex") {
+TEST_CASE("sample_sync_mutex", TAG_SERIAL) {
     auto output = startWaitGetOutput({"./binaries/sample_sync_mutex/a.elf"});
     REQUIRE( output ==
         "Creating an SPU thread group.\n"
@@ -1464,7 +1464,7 @@ TEST_CASE("sample_sync_mutex") {
     );
 }
 
-TEST_CASE("sample_sync_lfqueue") {
+TEST_CASE("sample_sync_lfqueue", TAG_SERIAL) {
     auto output = startWaitGetOutput({"./binaries/sample_sync_lfqueue/a.elf"});
     REQUIRE( output ==
         "Creating an SPU thread group.\n"
@@ -1480,7 +1480,7 @@ TEST_CASE("sample_sync_lfqueue") {
     );
 }
 
-TEST_CASE("sample_sync_barrier") {
+TEST_CASE("sample_sync_barrier", TAG_SERIAL) {
     auto output = startWaitGetOutput({"./binaries/sample_sync_barrier/a.elf"});
     REQUIRE( output ==
         "Creating an SPU thread group.\n"
@@ -1596,7 +1596,7 @@ TEST_CASE("sample_sheap_key_buffer") {
     );
 }
 
-TEST_CASE("sample_sheap_key_mutex") {
+TEST_CASE("sample_sheap_key_mutex", TAG_SERIAL) {
     test_interpreter_and_rewriter({"./binaries/sample_sheap_key_mutex/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"

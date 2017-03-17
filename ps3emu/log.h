@@ -44,3 +44,4 @@ public:
 log_sink_t log_parse_sinks(std::string const& str);
 log_type_t log_parse_filter(std::string const& str);
 log_severity_t log_parse_verbosity(std::string const& str);
+std::string print_backtrace();
