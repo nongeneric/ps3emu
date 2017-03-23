@@ -533,6 +533,8 @@ void Rsx::InlineArray(uint32_t offset, unsigned count) {
             stride += format.size * vertexDataArrayTypeSize(format.type);
         }
     }
+    if (_mode == RsxOperationMode::Replay)
+        return;
     DrawArrays(0, count * 4 / stride);
 }
 

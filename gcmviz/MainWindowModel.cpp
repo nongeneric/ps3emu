@@ -19,6 +19,7 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/shaders/ShaderGenerator.h"
 #include "ps3emu/state.h"
+#include "ps3emu/MainMemory.h"
 #include "ps3emu/shaders/shader_dasm.h"
 #include "ps3emu/libs/graphics/gcm.h"
 #include "OpenGLPreview.h"
@@ -765,6 +766,8 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         _rsx.reset(new Rsx());
         _rsx->init();
         _rsx->resetContext();
+        g_state.mm->mark(RsxFbBaseAddr, GcmLocalMemorySize, false, "gcmviz");
+        g_state.mm->mark(HeapArea, 256u << 20, false, "gcmviz");
         uint32_t last = gcmInitCommandsSize - 4; // except the reset call
         auto read = [&](uint32_t get) {
             auto ptr = &gcmInitCommands[get];
