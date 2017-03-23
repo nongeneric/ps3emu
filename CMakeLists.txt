@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.8)
 
 project(root)
 include_directories(${root_SOURCE_DIR})
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 add_definitions(-DBOOST_ALL_DYN_LINK)
 set(Boost_USE_STATIC_LIBS       OFF)
@@ -38,7 +38,7 @@ set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native -rdynamic ${CMAKE_CXX_FLAGS}")
 
 # debug, release
-set(EMU_CONFIGURATION release)
+set(EMU_CONFIGURATION debug)
 
 if(${EMU_CONFIGURATION} STREQUAL debug)
     add_definitions(-DDEBUG)

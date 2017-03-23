@@ -180,7 +180,7 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
             auto trophyconf = file.child("trophyconf");
             strncpy(context.gameDetails.title,
                     trophyconf.child("title-name").text().get(),
-                    SCE_NP_TROPHY_DESCR_MAX_SIZE);
+                    SCE_NP_TROPHY_NAME_MAX_SIZE);
             strncpy(context.gameDetails.description,
                     trophyconf.child("title-detail").text().get(),
                     SCE_NP_TROPHY_DESCR_MAX_SIZE);

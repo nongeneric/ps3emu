@@ -1,6 +1,7 @@
 #include "ps3tool.h"
 #include "ps3emu/ELFLoader.h"
 #include "ps3emu/utils.h"
+#include <openssl/evp.h>
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 #include <zlib.h>
@@ -357,16 +358,16 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
         << ssnprintf("  key  %s\n", print_hex(metadata_info->key, 16))
         << ssnprintf("  iv   %s\n", print_hex(metadata_info->iv, 16));
     
-    AES_set_encrypt_key(metadata_info->key, 128, &aes_key);
-    uint8_t ecount_buf[16] = {0};
-    unsigned int num = 0;
-    AES_ctr128_encrypt(reinterpret_cast<unsigned char*>(metadata_header),
-                       reinterpret_cast<unsigned char*>(metadata_header),
-                       sizeof(metadata_header_t),
-                       &aes_key,
-                       metadata_info->iv,
-                       ecount_buf,
-                       &num);
+    int outl;
+    std::vector<uint8_t> tmp(sizeof(metadata_header_t) + 15);
+    auto ctx = EVP_CIPHER_CTX_new();
+    EVP_EncryptInit_ex(ctx, EVP_aes_128_ctr(), NULL, metadata_info->key, metadata_info->iv);
+    EVP_EncryptUpdate(ctx,
+                      &tmp[0],
+                      &outl,
+                      reinterpret_cast<unsigned char*>(metadata_header),
+                      sizeof(metadata_header_t));
+    memcpy(metadata_header, &tmp[0], sizeof(metadata_header_t));
     
     std::cout << "metadata header\n"
         << ssnprintf("  section_count  %d\n", metadata_header->section_count)
@@ -374,13 +375,15 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
     
     auto metadata_size = sizeof(metadata_section_header_t) * metadata_header->section_count +
                          16 * metadata_header->key_count;
-    AES_ctr128_encrypt(reinterpret_cast<unsigned char*>(metadata_section_headers),
-                       reinterpret_cast<unsigned char*>(metadata_section_headers),
-                       metadata_size,
-                       &aes_key,
-                       metadata_info->iv,
-                       ecount_buf,
-                       &num);
+    tmp.resize(metadata_size + 15);
+    EVP_EncryptUpdate(ctx,
+                      &tmp[0],
+                      &outl,
+                      reinterpret_cast<unsigned char*>(metadata_section_headers),
+                      metadata_size);
+    EVP_EncryptFinal_ex(ctx, &tmp[outl], &outl);
+    EVP_CIPHER_CTX_free(ctx);
+    memcpy(metadata_section_headers, &tmp[0], metadata_size);
     
     std::cout << "metadata section headers\n"
         << "  Idx Offset   Size     Type Index Hashed SHA1 Encrypted Key IV Compressed\n";
@@ -427,9 +430,7 @@ bool decrypt_sections(sce_header_t* sce_header,
             std::cout << "a section marked encrypted references a non existent key";
             continue;
         }
-        AES_KEY aes_key;
-        uint8_t ecount_buf[16] = { 0 };
-        unsigned int num = 0;
+        
         auto key_ptr = &keys[sh->key_index][0];
         auto iv_ptr = &keys[sh->iv_index][0];
         
@@ -439,10 +440,15 @@ bool decrypt_sections(sce_header_t* sce_header,
             << ssnprintf("  key     %s\n", print_hex(key_ptr, 16))
             << ssnprintf("  iv      %s\n", print_hex(iv_ptr, 16));
         
-        AES_set_encrypt_key(key_ptr, 128, &aes_key);
         auto data = reinterpret_cast<uint8_t*>(sce_header) + sh->data_offset;
-        AES_ctr128_encrypt(data, data, sh->data_size, &aes_key,
-                           iv_ptr, ecount_buf, &num);
+        
+        int outl;
+        auto ctx = EVP_CIPHER_CTX_new();
+        std::vector<uint8_t> tmp(sh->data_size + 15);
+        EVP_EncryptInit_ex(ctx, EVP_aes_128_ctr(), NULL, key_ptr, iv_ptr);
+        EVP_EncryptUpdate(ctx, &tmp[0], &outl, data, sh->data_size);
+        EVP_EncryptFinal_ex(ctx, &tmp[outl], &outl);
+        memcpy(data, &tmp[0], sh->data_size);
     }
     return true;
 }

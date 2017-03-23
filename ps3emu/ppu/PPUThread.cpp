@@ -42,13 +42,15 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
 
 void PPUThread::vmenter(uint32_t to) {
     for (;;) {
-        uint32_t instr;
         auto cia = getNIP();
-        if (cia == to)
-            return;
-        g_state.mm->readMemory(cia, &instr, sizeof instr);
-        setNIP(cia + sizeof instr);
-        ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
+        auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
+        uint32_t segment, label;
+        if (dasm_bb_call(instr, segment, label)) {
+            g_state.proc->bbcall(segment, label);
+        } else {
+            setNIP(cia + sizeof instr);
+            ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
+        }
     }
 }
 
