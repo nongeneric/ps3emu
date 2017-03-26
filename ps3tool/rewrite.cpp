@@ -7,6 +7,7 @@
 #include "ps3tool-core/Rewriter.h"
 #include "ps3emu/rewriter.h"
 #include "ps3emu/fileutils.h"
+#include "ps3emu/InternalMemoryManager.h"
 
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
@@ -344,6 +345,10 @@ void HandleRewrite(RewriteCommand const& command) {
     MainMemory mm;
     if (!g_state.mm) {
         g_state.mm = &mm;
+    }
+    InternalMemoryManager memalloc(EmuInternalArea, EmuInternalAreaSize, "internal alloc");
+    if (!g_state.memalloc) {
+        g_state.memalloc = &memalloc;
     }
     
     std::ofstream log("/tmp/" + path(command.elf).filename().string() + "_rewriter_log");

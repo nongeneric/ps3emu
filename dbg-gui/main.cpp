@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
              log_info,
              (g_config.config().LogSpu ? log_spu : 0) |
                  (g_config.config().LogRsx ? log_rsx : 0) | log_libs | log_debugger,
-             g_config.config().LogDates);
+             g_config.config().LogDates ? log_date : log_simple);
     log_set_thread_name("dbg_main");
     if (g_config.config().EnableSpursTrace) {
         enableSpursTrace();

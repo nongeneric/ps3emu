@@ -65,10 +65,6 @@ namespace {
 }
 
 int32_t cellAudioInit() {
-    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-        ERROR(libs) << ssnprintf("SDL initialization failed: %s", SDL_GetError());
-        exit(1);
-    }
     return CELL_OK;
 }
 
@@ -84,6 +80,9 @@ void sdlAudioCallback(void*, Uint8* stream, int len2ch) {
     auto nextBlockPosition = (*context.readIndexAddr + 1) * blockSize;
     auto toRead = std::min<uint32_t>(nextBlockPosition - context.position,
                                      context.nChannel == 8 ? len2ch * 4 : len2ch);
+    
+    assert(*context.readIndexAddr == context.position / blockSize);
+    //INFO(perf) << ssnprintf("sdl callback (cur block %d)", *context.readIndexAddr);
     
     auto src = (big_uint64_t*)(context.portAddr + context.position);
     auto dest = (big_uint64_t*)stream;
@@ -109,7 +108,9 @@ void sdlAudioCallback(void*, Uint8* stream, int len2ch) {
         if (prevBlock != curBlock) {
             context.port0tags[curBlock] = context.port0tags[prevBlock] + 2;
             context.port0stamps[prevBlock] = g_state.proc->getTimeBaseMicroseconds().count();
+            //INFO(perf) << ssnprintf("notify of new block %d - %d", prevBlock, curBlock);
             sys_event_port_send(context.notifyQueuePort, 0, 0, 0);
+            //INFO(perf) << ssnprintf("notification handled");
             context.counter.report();
             if (context.counter.hasWrapped()) {
                 INFO(perf) << ssnprintf("libaduio notify ms average %g", 1000.f / context.counter.elapsed());

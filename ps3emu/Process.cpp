@@ -10,6 +10,7 @@
 #include "Config.h"
 #include "ps3emu/libs/sync/queue.h"
 
+#include <SDL2/SDL.h>
 #include "ppu/InterruptPPUThread.h"
 #include <GLFW/glfw3.h>
 #include <boost/thread/locks.hpp>
@@ -132,6 +133,11 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
 void Process::init(std::string elfPath, std::vector<std::string> args) {
     if (!glfwInit()) {
         throw std::runtime_error("glfw initialization failed");
+    }
+    
+    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
+        ERROR(libs) << ssnprintf("SDL initialization failed: %s", SDL_GetError());
+        exit(1);
     }
     
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,

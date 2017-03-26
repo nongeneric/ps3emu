@@ -16,7 +16,7 @@ namespace {
     std::shared_ptr<spdlog::logger> logger;
 }
 
-void log_init(int sink_flags, log_severity_t severity, int types, bool date) {
+void log_init(int sink_flags, log_severity_t severity, int types, log_format_t format) {
     active_severity = severity;
     active_types = types;
 
@@ -33,7 +33,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, bool date) {
     }
     logger = std::make_shared<spdlog::logger>("name", begin(sinks), end(sinks));
     spdlog::register_logger(logger);
-    if (date) {
+    if (format == log_date) {
         spdlog::set_pattern("%M:%S.%f %v");
     } else {
         spdlog::set_pattern("%v");
@@ -89,7 +89,7 @@ log_sink_t log_parse_sinks(std::string const& str) {
             continue;
         PARSE(s, res, file)
         PARSE(s, res, console)
-        throw std::runtime_error("unknown logging sink");
+        throw std::runtime_error("unknown log sink");
     }
     return static_cast<log_sink_t>(res);
 }
@@ -106,7 +106,7 @@ log_type_t log_parse_filter(std::string const& str) {
         PARSE(s, res, libs)
         PARSE(s, res, debugger)
         PARSE(s, res, perf)
-        throw std::runtime_error("unknown logging filter");
+        throw std::runtime_error("unknown log filter");
     }
     return static_cast<log_type_t>(res);
 }
@@ -116,8 +116,16 @@ log_severity_t log_parse_verbosity(std::string const& str) {
     PARSE(str, res, info)
     PARSE(str, res, warning)
     PARSE(str, res, error)
-    throw std::runtime_error("unknown logging verbosity");
+    throw std::runtime_error("unknown log verbosity");
     return static_cast<log_severity_t>(res);
+}
+
+log_format_t log_parse_format(std::string const& str) {
+    int res = 0;
+    PARSE(str, res, date)
+    PARSE(str, res, simple)
+    throw std::runtime_error("unknown log format");
+    return static_cast<log_format_t>(res);
 }
 
 #undef PARSE

@@ -143,8 +143,12 @@ int32_t cellMsgDialogOpen2(uint32_t type,
     g_u8message = msgString.str;
     g_callback = func;
     g_userData = userData;
-    for (int i = 0; i < GLFW_JOYSTICK_LAST; ++i) {
-        if (glfwJoystickPresent(i)) {
+    
+    CellPadInfo2 info;
+    cellPadGetInfo2(&info);
+    
+    for (int i = 0; i < CELL_PAD_MAX_PORT_NUM; ++i) {
+        if (info.port_status[i] == CELL_PAD_STATUS_CONNECTED) {
             g_controller = i;
             break;
         }
@@ -204,11 +208,10 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
     if (!g_shown)
         return;
     
-    int buttonCount;
-    auto buttons = glfwGetJoystickButtons(g_controller, &buttonCount);
-    assert(buttonCount > GLFW_DS4_BUTTON_TOUCHPAD);
-    bool isCross = buttons[GLFW_DS4_BUTTON_CROSS];
-    bool isCircle = buttons[GLFW_DS4_BUTTON_CIRCLE];
+    CellPadData data;
+    cellPadGetData(g_controller, &data);
+    bool isCross = data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CROSS;
+    bool isCircle = data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CIRCLE;
     if (g_type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) {
         if (isCross || isCircle) {
             g_shown = false;

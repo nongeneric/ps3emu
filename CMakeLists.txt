@@ -59,7 +59,7 @@ if(${EMU_CONFIGURATION} STREQUAL release)
     # disable all asserts (moderate performance hit)
     add_definitions(-DNDEBUG)
     
-    set(CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-ggdb3 -O3 ${CMAKE_CXX_FLAGS}")
 endif()
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})

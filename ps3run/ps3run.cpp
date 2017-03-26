@@ -30,7 +30,7 @@ void sigsegv_handler(int sig) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string elfPath, elfArgs, verbosity, filter, sinks;
+    std::string elfPath, elfArgs, verbosity, filter, sinks, format;
     options_description consoleDescr("Allowed options");
     try {
         consoleDescr.add_options()
@@ -43,6 +43,8 @@ int main(int argc, char* argv[]) {
                 "logging filter: spu, libs, ppu, debugger, perf [e.g. spu,libs]")
             ("sinks,s", value<std::string>(&sinks)->default_value(""),
                 "logging sinks: file, console [e.g. file,console]")
+            ("format", value<std::string>(&format)->default_value("simple"),
+                "logging format: date, simple")
             ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),
                 "rewritten and compiled x86 so file")
             ;
@@ -63,7 +65,7 @@ int main(int argc, char* argv[]) {
     log_init(log_parse_sinks(sinks),
              log_parse_verbosity(verbosity),
              log_parse_filter(filter),
-             false);
+             log_parse_format(format));
 
     signal(SIGSEGV, sigsegv_handler);
     

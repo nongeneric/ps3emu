@@ -10,7 +10,7 @@
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    log_init(log_console, log_info, log_rsx | log_libs | log_debugger, false);    
+    log_init(log_console, log_info, log_rsx | log_libs | log_debugger, log_simple);    
     std::string tracePath;
     options_description consoleDescr("Allowed options");
     try {

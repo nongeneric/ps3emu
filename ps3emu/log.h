@@ -5,8 +5,9 @@
 enum log_severity_t { log_info, log_warning, log_error };
 enum log_type_t { log_spu = 1, log_rsx = 2, log_libs = 4, log_debugger = 8, log_perf = 16 };
 enum log_sink_t { log_file = 1, log_console = 2 };
+enum log_format_t { log_date, log_simple };
 
-void log_init(int sinks, log_severity_t severity, int types, bool date);
+void log_init(int sinks, log_severity_t severity, int types, log_format_t format);
 void log_set_thread_name(std::string name);
 void log_unconditional(log_severity_t severity,
                        log_type_t type,
@@ -44,4 +45,5 @@ public:
 log_sink_t log_parse_sinks(std::string const& str);
 log_type_t log_parse_filter(std::string const& str);
 log_severity_t log_parse_verbosity(std::string const& str);
+log_format_t log_parse_format(std::string const& str);
 std::string print_backtrace();
