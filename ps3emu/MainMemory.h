@@ -1,9 +1,11 @@
 #pragma once
 
+#include "int.h"
 #include "BitField.h"
 #include "constants.h"
 #include "utils.h"
-#include <boost/endian/arithmetic.hpp>
+#include "ReservationMap.h"
+#include "state.h"
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <functional>
@@ -35,30 +37,10 @@ union VirtualAddress {
 };
 
 struct MemoryPage {
-    std::atomic<uintptr_t> ptr;
+    std::atomic<uintptr_t> ptr = 0;
     void alloc();
     void dealloc();
     inline MemoryPage() { ptr = 0; }
-};
-
-struct Reservation {
-    uint32_t va;
-    uint32_t size;
-    boost::thread::id thread;
-    std::function<void(boost::thread::id)> notify;
-};
-
-class SpinLock {
-    std::atomic_flag flag = ATOMIC_FLAG_INIT;
-
-public:
-    void lock() {
-        while (flag.test_and_set(std::memory_order_acquire)) ;
-    }
-    
-    void unlock() {
-        flag.clear(std::memory_order_release);
-    }
 };
 
 struct ProtectionRange {
@@ -72,10 +54,8 @@ class MainMemory {
     std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;    
     std::unique_ptr<MemoryPage[]> _pages;
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
-    Process* _proc;
     boost::mutex _pageMutex;
-    SpinLock _storeLock;
-    std::vector<Reservation> _reservations;
+    ReservationMap _rmap;
     
 #ifdef MEMORY_PROTECTION
     struct ProtectionInfo {
@@ -89,23 +69,9 @@ class MainMemory {
     std::bitset<0xffffffffu / (1u << 10)> writeMap;
 #endif
     
-    template <bool Read>
-    void copy(ps3_uintptr_t va, 
-        const void* buf, 
-        uint len, 
-        bool allocate,
-        bool locked);
-    bool storeMemoryWithReservation(void* dest,
-                                    const void* buf, 
-                                    uint len,
-                                    uint32_t va,
-                                    bool cond);
     void writeRawSpuVa(ps3_uintptr_t va, const void* val, uint32_t len);
     void writeSpuThreadVa(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readRawSpuVa(ps3_uintptr_t va);
-    void destroyReservationWithoutLocking(uint32_t va, uint32_t size);
-    void destroyReservationOfCurrentThread();
-    bool isReservedByCurrentThread(uint32_t va, uint32_t size);
     bool writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len);
     bool readSpecialMemory(ps3_uintptr_t va, void* buf, uint len);
     void dealloc();
@@ -113,14 +79,12 @@ class MainMemory {
 public:
     MainMemory();
     ~MainMemory();
-    void writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate = false);
+    void writeMemory(ps3_uintptr_t va, const void* buf, uint len);
     void readMemory(ps3_uintptr_t va,
                     void* buf,
                     uint len,
-                    bool allocate = false,
-                    bool locked = true,
                     bool validate = true);
-    void setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate = false);
+    void setMemory(ps3_uintptr_t va, uint8_t value, uint len);
     void reset();
     int allocatedPages();
     bool isAllocated(ps3_uintptr_t va);
@@ -129,15 +93,45 @@ public:
     void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
     void memoryBreak(uint32_t va, uint32_t size);
     
-    uint8_t load8(ps3_uintptr_t va);
-    uint16_t load16(ps3_uintptr_t va);
-    uint32_t load32(ps3_uintptr_t va);
-    uint64_t load64(ps3_uintptr_t va);
+    uint8_t load8(ps3_uintptr_t va, bool validate = true);
+    uint16_t load16(ps3_uintptr_t va, bool validate = true);
+    uint32_t load32(ps3_uintptr_t va, bool validate = true);
+    uint64_t load64(ps3_uintptr_t va, bool validate = true);
+    uint128_t load128(ps3_uintptr_t va, bool validate = true);
     
     void store8(ps3_uintptr_t va, uint8_t val);
     void store16(ps3_uintptr_t va, uint16_t val);
     void store32(ps3_uintptr_t va, uint32_t val);
     void store64(ps3_uintptr_t va, uint64_t val);
+    void store128(ps3_uintptr_t va, uint128_t val);
+    
+    template <auto Len>
+    typename IntTraits<Len>::Type load(ps3_uintptr_t va) {
+        if constexpr(Len == 1)
+            return load8(va);
+        if constexpr(Len == 2)
+            return load16(va);
+        if constexpr(Len == 4)
+            return load32(va);
+        if constexpr(Len == 8)
+            return load64(va);
+        if constexpr(Len == 16)
+            return load128(va);
+    }
+    
+    template <auto Len>
+    void store(ps3_uintptr_t va, typename IntTraits<Len>::Type val) {
+        if constexpr(Len == 1)
+            store8(va, val);
+        if constexpr(Len == 2)
+            store16(va, val);
+        if constexpr(Len == 4)
+            store32(va, val);
+        if constexpr(Len == 8)
+            store64(va, val);
+        if constexpr(Len == 16)
+            store128(va, val);
+    }
     
     inline void storef(ps3_uintptr_t va, float value) {
         store32(va, union_cast<float, uint32_t>(value));
@@ -156,33 +150,59 @@ public:
          auto f = load64(va);
          return union_cast<uint64_t, double>(f);
     }
-    
-    inline unsigned __int128 load128(uint64_t va) {
-        unsigned __int128 i = load64(va);
-        i <<= 64;
-        i |= load64(va + 8);
-        return i;
-    }
-    
-    inline void store128(uint64_t va, unsigned __int128 value) {
-        uint8_t *bytes = (uint8_t*)&value;
-        std::reverse(bytes, bytes + 16);
-        writeMemory(va, bytes, 16);
-    }
 
+    template <auto Len>
     inline void loadReserve(ps3_uintptr_t va,
-                     void* buf,
-                     uint len,
-                     std::function<void(boost::thread::id)> notify = {}) {
-        boost::unique_lock<SpinLock> lock(_storeLock);
-        destroyReservationOfCurrentThread();
-        _reservations.push_back({va, len, boost::this_thread::get_id(), notify});
-        readMemory(va, buf, len, false, false);
+                            void* buf,
+                            lost_notify_t notify = {}) {
+        static_assert(Len == 4 || Len == 8 || Len == 128);
+        if constexpr(Len == 4)
+            assert((va & 0b11) == 0);
+        if constexpr(Len == 8)
+            assert((va & 0b111) == 0);
+        if constexpr(Len == 128)
+            assert((va & 0b1111111) == 0);
+        
+        auto granule = g_state.granule;
+        assert(granule);
+        auto granuleLine = granule->line;
+        if (granuleLine) {
+            granuleLine->lock.lock();
+            if (granule->line) {
+                _rmap.destroySingleReservation(granule);
+            }
+            granuleLine->lock.unlock();
+        }
+        
+        auto line = _rmap.lock<Len>(va);
+        assert(!line.nextLine && "only a single line can be reserved");
+        assert(((va & 0x7f) + Len) <= 128);
+        auto ptr = getMemoryPointer(va, Len);
+        memcpy(buf, ptr, Len);
+        granule->line = line.line;
+        granule->notify = notify;
+        line.line->granules.push_back(granule);
+        _rmap.unlock(line);
     }
 
-    inline bool writeCond(ps3_uintptr_t va, const void* buf, uint len) {
-        auto dest = getMemoryPointer(va, len);
-        return storeMemoryWithReservation(dest, buf, len, va, true);
+    template <auto Len, bool Unconditional = false>
+    bool writeCond(ps3_uintptr_t va, void* buf) {
+        static_assert(Len == 4 || Len == 8 || Len == 128);
+        auto line = _rmap.lock<Len>(va);
+        assert(!line.nextLine && "only a single line can be reserved");
+        if constexpr(!Unconditional)
+            assert(g_state.granule);
+        if (Unconditional ||
+            std::find(begin(line.line->granules), end(line.line->granules), g_state.granule) !=
+                end(line.line->granules)) {
+            auto ptr = getMemoryPointer(va, Len);
+            memcpy(ptr, buf, Len);
+            _rmap.destroySingleLine(line.line);
+            _rmap.unlock(line);
+            return true;
+        }
+        _rmap.unlock(line);
+        return false;
     }
     
 #ifdef MEMORY_PROTECTION

@@ -23,8 +23,8 @@ SYS_PROCESS_PARAM(1001, 0x10000)
 #define MAX_PHYSICAL_SPU      5 
 #define MAX_RAW_SPU           0
 
-#define NUM_SPU_THREADS 2
-#define SPU_THREAD_GROUP_PRIORITY 100
+#define NUM_SPU_THREADS 4
+#define SPU_THREAD_GROUP_PRIORITY 200
 
 int count;
 CellSyncMutex mutex;

@@ -178,8 +178,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                          ssnprintf("%s segment", shortName()));
         
         assert(ph->p_memsz >= ph->p_filesz);
-        g_state.mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz, true);
-        g_state.mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz, true);
+        g_state.mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz);
+        g_state.mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
         
         if (ph->p_type != PT_TLS) {
             makeSegment(va, ph->p_memsz, index);
@@ -386,7 +386,7 @@ uint32_t findExportedEmuFunction(uint32_t id) {
     }
     LOG << ssnprintf("    %s (ncall %x)", name, index);
     
-    g_state.mm->setMemory(ncallDescrVa, 0, 8, true);
+    g_state.mm->setMemory(ncallDescrVa, 0, 8);
     g_state.mm->store32(ncallDescrVa, ncallDescrVa + 4);
     encodeNCall(g_state.mm, ncallDescrVa + 4, index);
     ncallDescrVa += 8;

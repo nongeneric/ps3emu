@@ -1,9 +1,11 @@
 #pragma once
 
-#include "../libs/ConcurrentQueue.h"
-#include "../libs/sync/queue.h"
-#include "../constants.h"
-#include "../BitField.h"
+#include "ps3emu/libs/ConcurrentQueue.h"
+#include "ps3emu/libs/sync/queue.h"
+#include "ps3emu/constants.h"
+#include "ps3emu/BitField.h"
+#include "ps3emu/ReservationMap.h"
+#include "ps3emu/enum.h"
 #include "SPUChannels.h"
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -17,7 +19,6 @@
 #include <functional>
 #include <vector>
 #include <experimental/optional>
-#include "ps3emu/enum.h"
 #include <x86intrin.h>
 
 static constexpr uint32_t LSLR = 0x3ffff;
@@ -168,8 +169,6 @@ public:
 #pragma GCC diagnostic pop
 };
 
-class Process;
-
 struct SPUThreadExitInfo {
     SPUThreadExitCause cause;
     int32_t status;
@@ -194,11 +193,10 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     uint32_t _spu;
     std::string _name;
     boost::thread _thread;
-    Process* _proc;
     SPUChannels _channels;
     std::function<void(SPUThread*, SPUThreadEvent)> _eventHandler;
-    std::atomic<bool> _dbgPaused;
-    std::atomic<bool> _singleStep;
+    std::atomic<bool> _dbgPaused = false;
+    std::atomic<bool> _singleStep = false;
     int32_t _exitCode;
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
@@ -216,10 +214,10 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     boost::condition_variable _groupExitCv;
     bool _groupExitPending = false;
     std::function<std::vector<uint32_t>()> _getGroupThreads;
+    ReservationGranule _granule;
 
 public:
-    SPUThread(Process* proc,
-              std::string name,
+    SPUThread(std::string name,
               std::function<void(SPUThread*, SPUThreadEvent)> eventHandler);
 #if TESTS
     SPUThread();
@@ -265,10 +263,6 @@ public:
     
     inline uint32_t getSpu() {
         return _spu;
-    }
-    
-    inline Process* proc() {
-        return _proc;
     }
     
     void singleStepBreakpoint();

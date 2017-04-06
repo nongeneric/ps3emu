@@ -1422,8 +1422,7 @@ TEST_CASE("spurs_task_event_flag", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sync_queue", TAG_SERIAL) {
-    auto output = startWaitGetOutput({"./binaries/sample_sync_queue/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sync_queue/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1448,25 +1447,27 @@ TEST_CASE("sample_sync_queue", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sync_mutex", TAG_SERIAL) {
-    auto output = startWaitGetOutput({"./binaries/sample_sync_mutex/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sync_mutex/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
+        "Initializing SPU thread 2\n"
+        "Initializing SPU thread 3\n"
         "All SPU threads have been successfully initialized.\n"
         "Starting the SPU thread group.\n"
         "All SPU threads exited by sys_spu_thread_exit().\n"
         "SPU thread 0's exit status = 0\n"
         "SPU thread 1's exit status = 0\n"
-        "count = 200\n"
+        "SPU thread 2's exit status = 0\n"
+        "SPU thread 3's exit status = 0\n"
+        "count = 12000\n"
         "message : \n"
         "## libsync : sample_sync_mutex_ppu SUCCEEDED ##\n"
     );
 }
 
 TEST_CASE("sample_sync_lfqueue", TAG_SERIAL) {
-    auto output = startWaitGetOutput({"./binaries/sample_sync_lfqueue/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sync_lfqueue/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1481,8 +1482,7 @@ TEST_CASE("sample_sync_lfqueue", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sync_barrier", TAG_SERIAL) {
-    auto output = startWaitGetOutput({"./binaries/sample_sync_barrier/a.elf"});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({"./binaries/sample_sync_barrier/a.elf"},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -2594,4 +2594,18 @@ TEST_CASE("ppu_threads_mutex_errors") {
     );
 }
 
+TEST_CASE("lwarx_stwcx") {
+    test_interpreter_and_rewriter({"./binaries/lwarx_stwcx/a.elf"},
+        "loc address 20c00\n"
+        "cache line 20c00\n"
+        "simple incrementing\n"
+        "loc = {1, 0}\n"
+        "incrementing with modification of unrelated location on the same granule\n"
+        "loc = {2, undefined} is b > 0: 1\n"
+        "creating reservation for a, but storing to b\n"
+        "loc = {0, 7}\n"
+        "creating reservation for a, then doing regular store to a\n"
+        "loc = {10, 7}\n"
+    );
+}
 

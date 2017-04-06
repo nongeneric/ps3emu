@@ -29,6 +29,10 @@ void sigsegv_handler(int sig) {
     exit(1);
 }
 
+void sigint_handler(int sig) {
+    exit(0);
+}
+
 int main(int argc, char* argv[]) {
     std::string elfPath, elfArgs, verbosity, filter, sinks, format;
     options_description consoleDescr("Allowed options");
@@ -68,6 +72,7 @@ int main(int argc, char* argv[]) {
              log_parse_format(format));
 
     signal(SIGSEGV, sigsegv_handler);
+    signal(SIGINT, sigint_handler);
     
     try {
         std::vector<std::string> argvec;

@@ -88,7 +88,7 @@ public:
         } else {
             uint8_t buf[16];
             if (ppu) {
-                g_state.mm->readMemory(row, buf, sizeof buf, false, true, false);
+                g_state.mm->readMemory(row, buf, sizeof buf, false);
             } else if (spu) {
                 memcpy(buf, _spuThread->ptr(row), 16);
             }

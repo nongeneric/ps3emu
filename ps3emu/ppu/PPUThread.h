@@ -2,6 +2,7 @@
 
 #include "../utils.h"
 #include "../BitField.h"
+#include "ps3emu/ReservationMap.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread.hpp>
@@ -132,8 +133,8 @@ class PPUThread {
     boost::thread _thread;
     bool _init;
 #ifdef DEBUGPAUSE
-    std::atomic<bool> _dbgPaused;
-    std::atomic<bool> _singleStep;
+    std::atomic<bool> _dbgPaused = false;
+    std::atomic<bool> _singleStep = false;
 #endif
     bool _isStackInfoSet;
     uint32_t _stackBase;
@@ -141,12 +142,13 @@ class PPUThread {
     uint64_t _exitCode;
     bool _threadFinishedGracefully;
     int _priority;
-    std::atomic<unsigned> _id;
+    std::atomic<unsigned> _id = 0;
     bool _running;
     boost::condition_variable _cvRunning;
     boost::mutex _mutexRunning;
     std::string _name;
     unsigned _tid;
+    ReservationGranule _granule;
     
     uint32_t _NIP;
     uint64_t _LR = 0;

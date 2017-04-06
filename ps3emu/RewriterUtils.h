@@ -3,7 +3,7 @@
 #include <string>
 
 constexpr bool static_debug =
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(TESTS)
     true
 #else
     false

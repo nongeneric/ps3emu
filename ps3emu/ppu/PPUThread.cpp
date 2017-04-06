@@ -56,8 +56,6 @@ void PPUThread::vmenter(uint32_t to) {
 
 void PPUThread::innerLoop() {
     assert(getNIP());
-    g_state.th = this;
-    _tid = syscall(__NR_gettid);;
 
     for (;;) {
 #ifdef DEBUGPAUSE
@@ -111,7 +109,11 @@ void PPUThread::innerLoop() {
 }
 
 void PPUThread::loop() {
-    log_set_thread_name(ssnprintf("ppu_%s_%d", _name, (unsigned)_id));
+    g_state.th = this;
+    g_state.granule = &_granule;
+    _granule.dbgName = ssnprintf("ppu_%s_%d", _name, (unsigned)_id);
+    _tid = syscall(__NR_gettid);
+    log_set_thread_name(_granule.dbgName);
     LOG << ssnprintf("thread loop started");
     
     {

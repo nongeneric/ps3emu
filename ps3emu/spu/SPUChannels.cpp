@@ -5,6 +5,7 @@
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/state.h"
 #include "ps3emu/Process.h"
+#include "ps3emu/int.h"
 #include <stdexcept>
 #include <algorithm>
 
@@ -144,9 +145,10 @@ void SPUChannels::command(uint32_t word) {
     };
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
-            auto hostThreadId = boost::this_thread::get_id();
-            _mm->loadReserve(eal, lsa, size, [=](auto id) {
-                if (hostThreadId != id) {
+            assert(size == 0x80);
+            auto granule = g_state.granule;
+            _mm->loadReserve<128>(eal, lsa, [=] {
+                if (granule != g_state.granule) {
                     _event.set_or((unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
                 }
             });
@@ -166,13 +168,20 @@ void SPUChannels::command(uint32_t word) {
             log();
             break;
         }
-        case MFC_PUTLLC_CMD:
-        case MFC_PUTQLLUC_CMD: {
-            assert(opcode != MFC_PUTQLLUC_CMD);
+        case MFC_PUTLLC_CMD: {
             assert(size == 0x80);
-            auto stored = _mm->writeCond(eal, lsa, size);
+            auto stored = _mm->writeCond<128>(eal, lsa);
             _channels[MFC_RdAtomicStat] |= !stored; // S
             logAtomic(stored);
+            break;
+        }
+        case MFC_PUTLLUC_CMD:
+        case MFC_PUTQLLUC_CMD: {
+            assert(opcode != MFC_PUTQLLUC_CMD);
+            assert(size == 0x80); // cache line
+            _channels[MFC_RdAtomicStat] |= 0b010; // U
+            _mm->writeCond<128, true>(eal, lsa);
+            log();
             break;
         }
         case MFC_PUT_CMD:
@@ -183,12 +192,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTFS_CMD:
         case MFC_PUTBS_CMD:
         case MFC_PUTRF_CMD:
-        case MFC_PUTLLUC_CMD:
         case MFC_PUTRB_CMD: {
-            if (opcode == MFC_PUTLLUC_CMD) {
-                assert(size == 0x80); // cache line
-                _channels[MFC_RdAtomicStat] |= 0b010; // U
-            }
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
             log();
@@ -205,6 +209,7 @@ void SPUChannels::command(uint32_t word) {
                 _mm->readMemory(LEAL(list[i]), lsa, cursize);
                 lsa += std::max(8ul, cursize);
             }
+            log();
             break;
         }
         case MFC_PUTL_CMD:
@@ -221,6 +226,7 @@ void SPUChannels::command(uint32_t word) {
                 _mm->writeMemory(LEAL(list[i]), lsa, cursize);
                 lsa += std::max(8ul, cursize);
             }
+            log();
             break;
         }   
         default: assert(false); throw std::runtime_error("not implemented");

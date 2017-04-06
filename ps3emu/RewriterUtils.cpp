@@ -28,7 +28,7 @@ std::string compileRule() {
         ""
 #endif
     ;
-    auto line = ssnprintf("g++ -shared -fPIC -std=c++14 %s $opt $trace -march=native -isystem%s -L%s $in -lps3emu -o $out",
+    auto line = ssnprintf("g++ -shared -fPIC -std=c++17 %s $opt $trace -march=native -isystem%s -L%s $in -lps3emu -o $out",
         memoryProtection, include, lib
     );
     return line;

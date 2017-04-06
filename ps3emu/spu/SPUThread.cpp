@@ -1,8 +1,8 @@
 #include "SPUThread.h"
 
-#include "../Process.h"
-#include "../MainMemory.h"
-#include "../log.h"
+#include "ps3emu/Process.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/log.h"
 #include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/state.h"
 #include "SPUDasm.h"
@@ -31,8 +31,10 @@ void SPUThread::run() {
 #define STOP_TYPE_RESERVE 0x2000
 
 void SPUThread::loop() {
-    log_set_thread_name(ssnprintf("spu_%d", _id));
     g_state.sth = this;
+    g_state.granule = &_granule;
+    _granule.dbgName = ssnprintf("spu_%d", _id);
+    log_set_thread_name(_granule.dbgName);
     INFO(spu) << ssnprintf("spu thread loop started");
     _eventHandler(this, SPUThreadEvent::Started);
     
@@ -171,11 +173,9 @@ bool SPUThread::dbgIsPaused() {
     return _dbgPaused;
 }
 
-SPUThread::SPUThread(Process* proc,
-                     std::string name,
+SPUThread::SPUThread(std::string name,
                      std::function<void(SPUThread*, SPUThreadEvent)> eventHandler)
     : _name(name),
-      _proc(proc),
       _channels(g_state.mm, this),
       _eventHandler(eventHandler),
       _dbgPaused(false),

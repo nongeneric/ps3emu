@@ -161,8 +161,8 @@ class Rsx {
     uint32_t _put = 0;
     uint32_t _ref = 0;
     uint32_t _ret = 0;
-    std::atomic<bool> _isFlipInProgress;
-    std::atomic<uint32_t> _lastFlipTime;
+    std::atomic<bool> _isFlipInProgress = false;
+    std::atomic<uint32_t> _lastFlipTime = 0;
     bool _shutdown = false;
     bool _initialized = false;
     mutable boost::mutex _mutex;

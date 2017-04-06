@@ -7,107 +7,10 @@
 #include "utils.h"
 #include <stdlib.h>
 
-using namespace boost::endian;
+#define PagePtrMask (~uintptr_t() - 1)
 
 inline bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
     return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
-}
-
-#define PagePtrMask (~uintptr_t() - 1)
-
-bool MainMemory::isReservedByCurrentThread(uint32_t va, uint32_t size) {
-    auto thread = boost::this_thread::get_id();
-    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
-        auto& r = _reservations[i];
-        if (intersects(r.va, r.size, va, size)) {
-            if ((r.va <= va && r.va + r.size >= va + size) && r.thread == thread)
-                return true;
-        }
-    }
-    return false;
-}
-
-void MainMemory::destroyReservationWithoutLocking(uint32_t va,
-                                                  uint32_t size) {
-    auto thread = boost::this_thread::get_id();
-    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
-        auto& r = _reservations[i];
-        if (intersects(r.va, r.size, va, size)) {
-            if (r.notify) {
-                // we are under a lock, notifying before the memory is actually
-                // stored is fine
-                r.notify(thread);
-            }
-            _reservations.erase(begin(_reservations) + i);
-        }
-    }
-}
-
-void MainMemory::destroyReservationOfCurrentThread() {
-    auto thread = boost::this_thread::get_id();
-    for (auto i = (int)_reservations.size() - 1; i >= 0; --i) {
-        auto& r = _reservations[i];
-        if (thread == r.thread) {
-            if (r.notify) {
-                // we are under a lock, notifying before the memory is actually
-                // stored is fine
-                r.notify(thread);
-            }
-            _reservations.erase(begin(_reservations) + i);
-        }
-    }
-}
-
-bool MainMemory::storeMemoryWithReservation(void* dest, 
-                                            const void* source, 
-                                            uint size,
-                                            uint32_t va,
-                                            bool cond) {
-    boost::unique_lock<SpinLock> lock(_storeLock);
-    if (!cond || isReservedByCurrentThread(va, size)) {
-        destroyReservationWithoutLocking(va, size);
-        memcpy(dest, source, size);
-        return true;
-    }
-    return false;
-}
-
-template <bool Read>
-void MainMemory::copy(ps3_uintptr_t va, 
-          const void* buf, 
-          uint len, 
-          bool allocate,
-          bool locked) {
-    assert(va != 0 || len == 0);
-    char* chars = (char*)buf;
-    for (auto curVa = va; curVa != va + len;) {
-        VirtualAddress split { curVa };
-        unsigned pageIndex = split.page.u();
-        ps3_uintptr_t pageEnd = (pageIndex + 1) * DefaultMainMemoryPageSize;
-        auto end = std::min(pageEnd, va + len);
-        auto& page = _pages[pageIndex];
-        if (!Read) {
-            auto ptr = page.ptr.fetch_and(PagePtrMask);
-            if (ptr & 1) {
-                _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize,
-                                    DefaultMainMemoryPageSize);
-            }
-        }        
-        auto offset = split.offset.u();
-        auto source = chars + (curVa - va);
-        auto dest = (uint8_t*)((page.ptr & PagePtrMask) + offset);
-        auto size = end - curVa;
-        if (Read) {
-            if (locked)
-                _storeLock.lock();
-            memcpy(source, dest, size);
-            if (locked)
-                _storeLock.unlock();
-        } else {
-            storeMemoryWithReservation(dest, source, size, curVa, false);
-        }
-        curVa = end;
-    }
 }
 
 bool MainMemory::writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len) {
@@ -167,11 +70,12 @@ bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
 }
 
 #define DEFINE_LOAD_X(x) \
-    uint##x##_t MainMemory::load##x(ps3_uintptr_t va) { \
+    uint##x##_t MainMemory::load##x(ps3_uintptr_t va, bool validate) { \
         uint##x##_t special; \
         if (readSpecialMemory(va, &special, x / 8)) \
             return endian_reverse(special); \
-        validate(va, x / 8, false); \
+        if (validate) \
+            this->validate(va, x / 8, false); \
         VirtualAddress split { va }; \
         auto& page = _pages[split.page.u()]; \
         auto offset = split.offset.u(); \
@@ -183,6 +87,7 @@ DEFINE_LOAD_X(8)
 DEFINE_LOAD_X(16)
 DEFINE_LOAD_X(32)
 DEFINE_LOAD_X(64)
+DEFINE_LOAD_X(128)
 
 #define DEFINE_STORE_X(x) \
     void MainMemory::store##x(ps3_uintptr_t va, uint##x##_t value) { \
@@ -200,55 +105,60 @@ DEFINE_LOAD_X(64)
                                 DefaultMainMemoryPageSize); \
         } \
         ptr = (ptr & PagePtrMask) + offset; \
-        boost::unique_lock<SpinLock> lock(_storeLock); \
+        auto line = _rmap.lock<x / 8>(va); \
         *(uint##x##_t*)ptr = reversed; \
-        destroyReservationWithoutLocking(va, x / 8); \
+        _rmap.destroyExcept(line, g_state.granule); \
+        _rmap.unlock(line); \
     }
 
 DEFINE_STORE_X(8)
 DEFINE_STORE_X(16)
 DEFINE_STORE_X(32)
 DEFINE_STORE_X(64)
+DEFINE_STORE_X(128)
 
-void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len, bool allocate) {
-    if ((va & SpuThreadBaseAddr) == SpuThreadBaseAddr) {
-        writeSpuThreadVa(va, buf, len);
+void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
+    if (writeSpecialMemory(va, buf, len))
         return;
-    }
-    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        writeRawSpuVa(va, buf, len);
-        return;
-    }
-    if (coversRsxRegsRange(va, len)) {
-        if (!g_state.rsx) {
-            throw std::runtime_error("rsx not set");
-        }
-        if (len == 4) {
-            uint32_t val = *(boost::endian::big_uint32_t*)buf;
-            if (va == GcmControlRegisters) {
-                g_state.rsx->setPut(val);
-            } else if (va == GcmControlRegisters + 4) {
-                g_state.rsx->setGet(val);
-            } else {
-                throw std::runtime_error("only put and get rsx registers are supported");
-            }
-        } else {
-            throw std::runtime_error("only one rsx register can be set at a time");
-        }
-        return;
-    }
     validate(va, len, true);
-    copy<false>(va, buf, len, allocate, true);
+    auto last = va + len;
+    auto src = (const char*)buf;
+    while (va != last) {
+        auto next = std::min(last, (va + 128) & 0xffffff80);
+        auto line = _rmap.lock<128>(va & 0xffffff80);
+        auto size = next - va;
+        auto dest = getMemoryPointer(va, size);
+        memcpy(dest, src, size);
+        _rmap.destroyExcept(line, g_state.granule);
+        _rmap.unlock(line);
+        src += size;
+        va = next;
+    }
 }
 
 MainMemory::~MainMemory() {
     dealloc();
 }
 
-void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len, bool allocate) {
+void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len) {
     std::unique_ptr<uint8_t[]> buf(new uint8_t[len]);
     memset(buf.get(), value, len);
-    writeMemory(va, buf.get(), len, allocate);
+    writeMemory(va, buf.get(), len);
+}
+
+void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool validate) {
+    if (readSpecialMemory(va, &buf, len))
+        return;
+    auto last = va + len;
+    auto dest = (char*)buf;
+    while (va != last) {
+        auto next = std::min(last, (va + 128) & 0xffffff80);
+        auto size = next - va;
+        auto src = getMemoryPointer(va, size);
+        memcpy(dest, src, size);
+        dest += size;
+        va = next;
+    }
 }
 
 struct IForm {
@@ -256,38 +166,8 @@ struct IForm {
     uint8_t _ : 2;
 };
 
-void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool allocate, bool locked, bool validate) {
-    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        assert(len == 4);
-        *(big_uint32_t*)buf = readRawSpuVa(va);
-        return;
-    }
-    
-    if (coversRsxRegsRange(va, len)) {
-        assert(len == 4);
-        if (va == GcmControlRegisters) {
-            *(big_uint32_t*)buf = g_state.rsx->getPut();
-            return;
-        } else if (va == GcmControlRegisters + 4) {
-            *(big_uint32_t*)buf = g_state.rsx->getGet();
-            return;
-        } else if (va == GcmControlRegisters + 8) {
-            *(big_uint32_t*)buf = g_state.rsx->getRef();
-            return;
-        }
-        throw std::runtime_error("unknown rsx register");
-    }
-
-    if (validate) {
-        this->validate(va, len, false);
-    }
-    
-    copy<true>(va, buf, len, allocate, locked);
-}
-
 bool MainMemory::isAllocated(ps3_uintptr_t va) {
-    VirtualAddress split { va };
-    return va && (bool)_pages[split.page.u()].ptr;
+    return true;
 }
 
 int MainMemory::allocatedPages() {

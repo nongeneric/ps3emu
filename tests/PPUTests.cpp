@@ -4,6 +4,7 @@
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/rsx/GLTexture.h"
 #include "ps3emu/state.h"
+#include "ps3emu/int.h"
 #include <vector>
 #include <atomic>
 #include <catch/catch.hpp>
@@ -46,7 +47,7 @@ TEST_CASE("read_write_memory") {
     MainMemory mm;
     mm.mark(0, 0x1000, false, "");
     uint32_t original = 0xA1B2C3D4, read;
-    mm.writeMemory(0x400, &original, 4, true);
+    mm.writeMemory(0x400, &original, 4);
     mm.readMemory(0x400, &read, 4);
     REQUIRE(original == read);
     
@@ -54,18 +55,18 @@ TEST_CASE("read_write_memory") {
     REQUIRE(mm.load32(0x400) == 0x55667788);
 }
 
-TEST_CASE("read memory 128") {
+TEST_CASE("read_memory_128") {
     MainMemory mm;
     mm.mark(0, 0x1000, false, "");
-    mm.setMemory(0x400, 0, 16, true);
-    unsigned __int128 i128 = 0;
+    mm.setMemory(0x400, 0, 16);
+    uint128_t i128 = 0;
     REQUIRE((mm.load128(0x400) == i128));
 }
 
 TEST_CASE("provide_memory") {
     MainMemory mm;
     mm.mark(0, DefaultMainMemoryPageSize * 10, false, "");
-    mm.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1, true);
+    mm.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1);
     mm.store32(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
     std::vector<uint8_t> vec(DefaultMainMemoryPageSize * 4);
     mm.provideMemory(DefaultMainMemoryPageSize * 2, DefaultMainMemoryPageSize * 4, vec.data());
@@ -152,8 +153,8 @@ TEST_CASE("fixed loads") {
     PPUThread th;
     mm.mark(0x300000, 0x1000, false, "");
     mm.mark(0, 0x1000, false, "");
-    mm.setMemory(0x300000, 0, 200, true);
-    mm.setMemory(32, 0, 16, true);
+    mm.setMemory(0x300000, 0, 200);
+    mm.setMemory(32, 0, 16);
     uint8_t instr[] = { 
           0x88, 0x60, 0x00, 0x20
         , 0x88, 0x81, 0xff, 0xe0
@@ -368,8 +369,8 @@ TEST_CASE("fixed_stores") {
     th.setGPR(3, 0x1122334455667788);
     auto i = 0u;
     auto next = [&] {
-        mm.setMemory(0x300010, 0, 100, true);
-        mm.setMemory(16, 0, 100, true);
+        mm.setMemory(0x300010, 0, 100);
+        mm.setMemory(16, 0, 100);
         th.setGPR(1, 0x300010);
         th.setGPR(2, 0x40);
         ppu_dasm<DasmMode::Emulate>(instr + 4*i, 0, &th);
@@ -463,7 +464,7 @@ TEST_CASE("fixed load store with reversal") {
         , 0x7c, 0xe1, 0x15, 0x2c
     };
     
-    mm.setMemory(0x300010, 0, 100, true);
+    mm.setMemory(0x300010, 0, 100);
     th.setGPR(1, 0x300010);
     th.setGPR(2, 0x40);
     mm.store64(0x300010, 0x1122334455667788);
@@ -480,16 +481,16 @@ TEST_CASE("fixed load store with reversal") {
     
     th.setGPR(7, 0x1122334455667788);
     
-    mm.setMemory(0x300010, 0, 100, true);
+    mm.setMemory(0x300010, 0, 100);
     ppu_dasm<DasmMode::Emulate>(instr + 4*4, 0, &th);
     REQUIRE( mm.load64(0x300010) == 0x2211000000000000 );
-    mm.setMemory(0x300010, 0, 100, true);
+    mm.setMemory(0x300010, 0, 100);
     ppu_dasm<DasmMode::Emulate>(instr + 5*4, 0, &th);
     REQUIRE( mm.load64(0x300050) == 0x2211000000000000 );
-    mm.setMemory(0x300010, 0, 100, true);
+    mm.setMemory(0x300010, 0, 100);
     ppu_dasm<DasmMode::Emulate>(instr + 6*4, 0, &th);
     REQUIRE( mm.load64(0x300010) == 0x4433221100000000 );
-    mm.setMemory(0x300010, 0, 100, true);
+    mm.setMemory(0x300010, 0, 100);
     ppu_dasm<DasmMode::Emulate>(instr + 7*4, 0, &th);
     REQUIRE( mm.load64(0x300050) == 0x4433221100000000 );
 }
@@ -615,7 +616,7 @@ TEST_CASE("emu stw") {
     mm.mark(0x400000, 0x1000, false, "");
     th.setGPR(29, 0x1122334455667788);
     th.setGPR(11, 0x400000);
-    mm.setMemory(0x400000, 0, 8, true);
+    mm.setMemory(0x400000, 0, 8);
     uint8_t instr[] = { 0x93, 0xab, 0x00, 0x00 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
     REQUIRE(mm.load32(0x400000) == 0x55667788); 
@@ -698,7 +699,7 @@ TEST_CASE("list3") {
     auto mem = 0x400000;
     th.setNIP(base);
     mm.mark(mem, 0x1000, false, "");
-    mm.setMemory(mem, 0, 4, true);
+    mm.setMemory(mem, 0, 4);
     th.setGPR(7, mem);
     uint8_t instr[] = {
           0x38, 0x60, 0x00, 0x00
@@ -831,7 +832,7 @@ TEST_CASE("strlen") {
     th.setLR(0);
     const char* str = "hello there";
     mm.mark(0x400000, 0x1000, false, "");
-    mm.writeMemory(0x400000, str, strlen(str) + 1, true);
+    mm.writeMemory(0x400000, str, strlen(str) + 1);
     th.setGPR(3, 0x400000);
     for (;;) {
         if (th.getNIP() == 0)
@@ -899,7 +900,7 @@ TEST_CASE("lwz r11,0(r10)") {
     mm.mark(0x400000, 0x1000, false, "");
     PPUThread th;
     uint32_t i = 0x66778899;
-    mm.writeMemory(0x400000, &i, 4, true);
+    mm.writeMemory(0x400000, &i, 4);
     th.setGPR(10, 0x400000);
     uint8_t instr[] = { 0x81, 0x6a, 0x00, 0x00 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1137,8 +1138,8 @@ TEST_CASE("memcpy") {
     th.setNIP(base);
     th.setLR(0);
     const char* str = "hello there";
-    mm.writeMemory(src, str, strlen(str) + 1, true);
-    mm.setMemory(dest, 0, 100, true);
+    mm.writeMemory(src, str, strlen(str) + 1);
+    mm.setMemory(dest, 0, 100);
     th.setGPR(3, dest);
     th.setGPR(4, src);
     th.setGPR(5, strlen(str) + 1);
@@ -1160,7 +1161,7 @@ TEST_CASE("lwz r27,112(r1)") {
     PPUThread th;
     auto mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
-    mm.setMemory(mem, 0, 8, true);
+    mm.setMemory(mem, 0, 8);
     mm.store64(mem, 0x11223344aabbccdd);
     th.setGPR(1, mem - 112);
     uint8_t instr[] = { 0x83, 0x61, 0x00, 0x70 };
@@ -1206,7 +1207,7 @@ TEST_CASE("float loads") {
     PPUThread th;
     auto mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
-    mm.setMemory(mem, 0, 16, true);
+    mm.setMemory(mem, 0, 16);
     mm.store64(mem,     0x3f92339c00000000); // float
     mm.store64(mem + 8, 0x3ff2467381d7dbf5); // double
     uint8_t instr[] = { 
@@ -1242,7 +1243,7 @@ TEST_CASE("float loads with update") {
     PPUThread th;
     auto mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
-    mm.setMemory(mem, 0, 16, true);
+    mm.setMemory(mem, 0, 16);
     uint8_t instr[] = { 
           0xc4, 0x61, 0x00, 0x70
         , 0x7c, 0x81, 0x04, 0x6e
@@ -1283,7 +1284,7 @@ TEST_CASE("float stores") {
     PPUThread th;
     auto mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
-    mm.setMemory(mem, 0, 100, true);
+    mm.setMemory(mem, 0, 100);
     th.setFPRd(1, 1.1);
     th.setGPR(0, 0);
     for (int i = 0; i < 9; ++i) {
@@ -1867,29 +1868,38 @@ TEST_CASE("addc r5,r4,r3") {
 TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     MainMemory mm;
     mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0x11, 1000, true);
+    mm.setMemory(0x10000, 0x11, 1000);
     
     boost::thread ppu([&] {
-        uint32_t buf = 0;
-        mm.loadReserve(0x10000, &buf, 4);
+        uint32_t buf;
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        mm.loadReserve<4>(0x10000, &buf);
         REQUIRE(buf == 0x11111111);
         buf = 0xaabbccdd;
-        REQUIRE(mm.writeCond(0x10000, &buf, 4) == true);
+        REQUIRE(mm.writeCond<4>(0x10000, &buf) == true);
         REQUIRE(mm.load32(0x10000) == 0xddccbbaa);
     });
     ppu.join();
     
-    std::atomic<bool> step1, step2;
+    std::atomic<bool> step1 = false, step2 = false;
     
     // th1 gets reservation
     boost::thread th1([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
         uint32_t buf = 0;
-        mm.loadReserve(0x10000, &buf, 4);
+        mm.loadReserve<4>(0x10000, &buf);
+        // same-thread store invalidates the reservation for a cond store of
+        // any other thread, but doesn't destroy the reservation
+        mm.store32(0x10000, 0xddccbbaa);
+        
         step1 = true;
         while (!step2) ;
+        
         // reservation still active, th2 didn't destroy it with writeCond
         buf = 0xffffffff;
-        REQUIRE(mm.writeCond(0x10000, &buf, 4) == true);
+        REQUIRE(mm.writeCond<4>(0x10000, &buf) == true);
         REQUIRE(mm.load32(0x10000) == 0xffffffff);
     });
     
@@ -1897,8 +1907,10 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     
     // th2 doesn't have reservation, makes a conditional store
     boost::thread th2([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
         auto buf = 0x12345678;
-        REQUIRE(mm.writeCond(0x10000, &buf, 4) == false);
+        REQUIRE(mm.writeCond<4>(0x10000, &buf) == false);
         REQUIRE(mm.load32(0x10000) == 0xddccbbaa);
     });
     th2.join();
@@ -1907,12 +1919,60 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     th1.join();
 }
 
+TEST_CASE("ppu_lwarx_should_not_destroy_reservations_of_other_threads") {
+    MainMemory mm;
+    mm.mark(0x10000, 0x1000, false, "");
+    mm.setMemory(0x10000, 0x11, 1000);
+    
+    std::atomic<bool> th1_step1 = false, th1_step2 = false;
+    std::atomic<bool> th2_step1 = false, th2_step2 = false;
+    
+    boost::thread th1([&] {
+        uint32_t buf;
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        
+        // th1 gets reservation
+        mm.loadReserve<4>(0x10000, &buf);
+        
+        th1_step1 = true;
+        while (!th2_step1) ;
+        
+        // th1 moves its reservation to another location
+        mm.loadReserve<4>(0x10200, &buf);
+        
+        th1_step2 = true;
+    });
+    
+    boost::thread th2([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        uint32_t buf = 0;
+        
+        while (!th1_step1) ;
+        
+        // th2 gets reservation at the same address
+        mm.loadReserve<4>(0x10000, &buf);
+
+        th2_step1 = true;
+        while (!th1_step2) ;
+        
+        // th2 still has reservation
+        buf = 0xffffffff;
+        REQUIRE(mm.writeCond<4>(0x10000, &buf) == true);
+        REQUIRE(mm.load32(0x10000) == 0xffffffff);
+    });
+    
+    th1.join();
+    th2.join();
+}
+
 TEST_CASE("ppu_memory_breakpoint") {
     MainMemory mm;
     g_state.mm = &mm;
     int called = 0;
     mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0x11, 1000, true);
+    mm.setMemory(0x10000, 0x11, 1000);
     mm.memoryBreakHandler([&](auto va, auto size) {
         called++;
     });

@@ -10,6 +10,7 @@ class PPUThread;
 class SPUThread;
 class EmuCallbacks;
 class Config;
+class ReservationGranule;
 
 struct g_state_t {
     g_state_t();
@@ -27,6 +28,7 @@ struct g_state_t {
     thread_local static PPUThread* th;
     thread_local static SPUThread* sth;
     thread_local static bool rewriter_ncall;
+    thread_local static ReservationGranule* granule;
 };
 
 extern g_state_t g_state;

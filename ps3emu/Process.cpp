@@ -217,11 +217,13 @@ uint32_t Process::loadPrx(std::string path) {
     }
     std::vector<std::string> x86paths;
     if (prxInfo) {
-        if (prxInfo->loadx86) {
-            x86paths.push_back(path + ".x86.so");
+        auto x86path = path + ".x86.so";
+        auto x86spuPath = path + ".x86spu.so";
+        if (prxInfo->loadx86 && exists(x86path)) {
+            x86paths.push_back(x86path);
         }
-        if (prxInfo->loadx86spu) {
-            x86paths.push_back(path + ".x86spu.so");
+        if (prxInfo->loadx86spu && exists(x86spuPath)) {
+            x86paths.push_back(x86spuPath);
         }
     }
     auto stolen = prx->map([&](auto va, auto size, auto index) {
@@ -464,11 +466,11 @@ ps3_uintptr_t Process::storeArgs(std::vector<std::string> const& args) {
     uint32_t vaArgs;
     _internalMemoryManager->allocInternalMemory(&vaArgs, 10 * 1024, 128);
     std::vector<big_uint64_t> arr;
-    _mainMemory->setMemory(vaArgs, 0, (args.size() + 1) * 8, true);
+    _mainMemory->setMemory(vaArgs, 0, (args.size() + 1) * 8);
     auto len = 0;
     for (auto arg : args) {
         auto vaPtr = vaArgs + (args.size() + 1) * 8 + len;
-        _mainMemory->writeMemory(vaPtr, arg.data(), arg.size() + 1, true);
+        _mainMemory->writeMemory(vaPtr, arg.data(), arg.size() + 1);
         arr.push_back(vaPtr);
         len += arg.size() + 1;
     }
@@ -485,7 +487,7 @@ PPUThread* Process::getThread(uint64_t id) {
 uint32_t Process::createSpuThread(std::string name) {
     boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
     _spuThreads.emplace_back(
-        std::make_shared<SPUThread>(this, name, [=](auto t, auto e) {
+        std::make_shared<SPUThread>(name, [=](auto t, auto e) {
             auto oneTime = std::make_shared<OneTimeEvent>();
             _eventQueue.enqueue(ThreadEvent{SPUThreadEventInfo{e, t}, oneTime});
             oneTime->wait();

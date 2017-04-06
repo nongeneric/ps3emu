@@ -12,7 +12,7 @@ PlayStation(R)3 Programmer Tool Runtime Library 360.001
 #include <string.h>
 #include <stdio.h>
 
-#define LOOP_COUNT 100
+#define LOOP_COUNT 3000
 
 uint32_t count_array[4] __attribute__ ((aligned (128)));
 char message_buffer[128] __attribute__ ((aligned (128)));

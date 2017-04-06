@@ -1,5 +1,6 @@
-#include <catch/catch.hpp>
 #include "ps3emu/MainMemory.h"
+#include "ps3emu/log.h"
+#include <catch/catch.hpp>
 #include "ps3emu/spu/SPUChannels.h"
 #include "ps3emu/spu/SPUThread.h"
 #include <boost/thread.hpp>
@@ -105,7 +106,10 @@ TEST_CASE("spuchannels_event_reservation") {
     SPUChannels channels(&mm, &thread);
     
     mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0, 1000, true);
+    mm.setMemory(0x10000, 0, 1000);
+    
+    ReservationGranule granule;
+    g_state.granule = &granule;
         
     channels.write(SPU_WrEventMask, 1u << 10);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
@@ -115,9 +119,10 @@ TEST_CASE("spuchannels_event_reservation") {
     channels.write(MFC_Size, 0x80);
     channels.write(MFC_Cmd, MFC_GETLLAR_CMD);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
- 
+    
     // the same thread destroys the reservation but doesn't raise the event
-    mm.store32(0x10000, 0);
+    uint32_t val = 0;
+    mm.writeCond<4>(0x10000, &val);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
     
     // there is no reservation, and therefore no event is raised
@@ -128,7 +133,7 @@ TEST_CASE("spuchannels_event_reservation") {
     
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
     
-    // setup a reservation
+    // create a reservation
     channels.write(MFC_EAH, 0);
     channels.write(MFC_EAL, 0x10000);
     channels.write(MFC_LSA, 0x300);
@@ -151,10 +156,13 @@ TEST_CASE("spuchannels_event_reservation_thread_can_only_have_one_reservation_at
     TestSPUChannelsThread thread;
     SPUChannels channels(&mm, &thread);
     
+    ReservationGranule granule;
+    g_state.granule = &granule;
+    
     mm.mark(0x10000, 0x1000, false, "");
     mm.mark(0x20000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0, 1000, true);
-    mm.setMemory(0x20000, 0, 1000, true);
+    mm.setMemory(0x10000, 0, 1000);
+    mm.setMemory(0x20000, 0, 1000);
         
     channels.write(SPU_WrEventMask, 1u << 10);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
@@ -200,14 +208,17 @@ TEST_CASE("spuchannels_event_reservation_2threads") {
     channels.write(SPU_WrEventMask, (unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
     
     mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0, 1000, true);
+    mm.setMemory(0x10000, 0, 1000);
 
-    std::atomic<bool> th1flag, th2flag;
+    std::atomic<bool> th1flag = false, th2flag = false;
     
     bool f1 = false, s1 = false, f2 = false, s2 = false;
     
     // th1 creates a reservation
     boost::thread th1([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        
         channels.write(MFC_EAH, 0);
         channels.write(MFC_EAL, 0x10000);
         channels.write(MFC_LSA, 0x300);
@@ -228,6 +239,9 @@ TEST_CASE("spuchannels_event_reservation_2threads") {
     
     // th2 creates its own reservation and this doesn't destroy the reservation of th1
     boost::thread th2([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        
         channels2.write(MFC_EAH, 0);
         channels2.write(MFC_EAL, 0x10000);
         channels2.write(MFC_LSA, 0x300);
@@ -263,7 +277,10 @@ TEST_CASE("spuchannels_event_reservation_putllc_should_not_raise_event") {
     SPUChannels channels(&mm, &thread);
     
     mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0, 1000, true);
+    mm.setMemory(0x10000, 0, 1000);
+    
+    ReservationGranule granule;
+    g_state.granule = &granule;
         
     channels.write(SPU_WrEventMask, 1u << 10);
     REQUIRE(channels.readCount(SPU_RdEventStat) == 0);
@@ -317,6 +334,100 @@ TEST_CASE("spuchannels_event_reservation_putllc_should_not_raise_event") {
     REQUIRE(channels.read(SPU_RdEventStat) == 1u << 10);
 }
 
+TEST_CASE("spuchannels_reservation_ticket_lock") {
+    MainMemory mm;
+    mm.mark(0x10000, 0x1000, false, "");
+    mm.setMemory(0x10000, 0, 1000);
+    
+    TestSPUChannelsThread tth1, tth2, tth3;
+    SPUChannels ch1(&mm, &tth1);
+    SPUChannels ch2(&mm, &tth2);
+    SPUChannels ch3(&mm, &tth3);
+    
+    auto atomic_increment = [&](SPUChannels* channels, TestSPUChannelsThread* th, int index) {
+        auto ptr = (big_uint16_t*)th->ls(0x300 + index * 2);
+        uint32_t val;
+        do {
+            channels->write(MFC_EAH, 0);
+            channels->write(MFC_EAL, 0x10000);
+            channels->write(MFC_LSA, 0x300);
+            channels->write(MFC_Size, 0x80);
+            channels->write(MFC_Cmd, MFC_GETLLAR_CMD);
+            
+            val = *ptr;
+            (*ptr)++;
+            
+            channels->write(MFC_EAH, 0);
+            channels->write(MFC_EAL, 0x10000);
+            channels->write(MFC_LSA, 0x300);
+            channels->write(MFC_Size, 0x80);
+            channels->write(MFC_Cmd, MFC_PUTLLC_CMD);
+        } while ((channels->read(MFC_RdAtomicStat) & 1) != 0);
+        return val;
+    };
+    
+    auto load_current = [&](SPUChannels* channels, TestSPUChannelsThread* th) {
+        channels->write(MFC_EAH, 0);
+        channels->write(MFC_EAL, 0x10000);
+        channels->write(MFC_LSA, 0x300);
+        channels->write(MFC_Size, 0x80);
+        channels->write(MFC_Cmd, MFC_GETLLAR_CMD);
+        return *(big_uint16_t*)th->ls(0x300);
+    };
+    
+    auto current = 0;
+    auto next = 1;
+    
+    auto acquire = [&](SPUChannels* channels, TestSPUChannelsThread* th) {
+        auto ticket = atomic_increment(channels, th, next);
+        while (load_current(channels, th) != ticket) ;
+    };
+    
+    auto release = [&](SPUChannels* channels, TestSPUChannelsThread* th) {
+        atomic_increment(channels, th, current);
+    };
+    
+    int count = 0;
+    
+    boost::thread th1([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        log_set_thread_name("th1");
+        for (int i = 0; i < 5000; ++i) {
+            acquire(&ch1, &tth1);
+            count++;
+            release(&ch1, &tth1);
+        }
+    });
+    
+    boost::thread th2([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        log_set_thread_name("th2");
+        for (int i = 0; i < 5000; ++i) {
+            acquire(&ch2, &tth2);
+            count++;
+            release(&ch2, &tth2);
+        }
+    });
+    
+    boost::thread th3([&] {
+        ReservationGranule granule;
+        g_state.granule = &granule;
+        for (int i = 0; i < 5000; ++i) {
+            acquire(&ch3, &tth3);
+            count++;
+            release(&ch3, &tth3);
+        }
+    });
+    
+    th1.join();
+    th2.join();
+    th3.join();
+    
+    REQUIRE(count == 15000);
+}
+
 TEST_CASE("spuchannels_signal_basic") {
     MainMemory mm;
     TestSPUChannelsThread thread;
@@ -359,7 +470,7 @@ TEST_CASE("spuchannels_dma_updates") {
     SPUChannels channels(&mm, &thread);
     
     mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0, 1000, true);
+    mm.setMemory(0x10000, 0, 1000);
     
     auto mask1 = 0x10u;
     auto mask2 = 0x01u;
