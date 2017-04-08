@@ -100,15 +100,12 @@ DEFINE_LOAD_X(128)
         auto& page = _pages[pageIndex]; \
         auto offset = split.offset.u(); \
         auto ptr = page.ptr.fetch_and(PagePtrMask); \
-        if (ptr & 1) { \
-            _memoryWriteHandler(pageIndex * DefaultMainMemoryPageSize, \
-                                DefaultMainMemoryPageSize); \
-        } \
         ptr = (ptr & PagePtrMask) + offset; \
         auto line = _rmap.lock<x / 8>(va); \
         *(uint##x##_t*)ptr = reversed; \
         _rmap.destroyExcept(line, g_state.granule); \
         _rmap.unlock(line); \
+        _mmap.mark<x / 8>(va); \
     }
 
 DEFINE_STORE_X(8)
@@ -123,6 +120,7 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
     validate(va, len, true);
     auto last = va + len;
     auto src = (const char*)buf;
+    _mmap.mark(va, len);
     while (va != last) {
         auto next = std::min(last, (va + 128) & 0xffffff80);
         auto line = _rmap.lock<128>(va & 0xffffff80);
@@ -253,20 +251,6 @@ void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
         page.ptr = (uintptr_t)memoryPtr;
         _providedMemoryPages.set(firstPage + i);
     }
-}
-
-void MainMemory::memoryBreak(uint32_t va, uint32_t size) {
-    VirtualAddress split { va };
-    auto* page = &_pages[split.page.u()];
-    for (auto i = 0u; i <= size / DefaultMainMemoryPageSize; ++i) {
-        auto ptr = page->ptr.fetch_or(1);
-        if (!ptr)
-            throw std::runtime_error("memory break on nonexisting page");
-    }
-}
-
-void MainMemory::memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler) {
-    _memoryWriteHandler = handler;
 }
 
 void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {

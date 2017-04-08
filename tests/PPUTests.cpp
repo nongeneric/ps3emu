@@ -5,9 +5,26 @@
 #include "ps3emu/rsx/GLTexture.h"
 #include "ps3emu/state.h"
 #include "ps3emu/int.h"
+#include "ps3emu/ModificationMap.h"
 #include <vector>
 #include <atomic>
 #include <catch/catch.hpp>
+
+TEST_CASE("modification_map_simple") {
+    ModificationMap<32, 1024> map;
+    map.mark<4>(64);
+    REQUIRE(map.marked(64, 1));
+    REQUIRE(map.marked(80, 32));
+    
+    map.reset(64, 32);
+    REQUIRE(!map.marked(64, 1));
+    
+    map.mark(128, 128);
+    REQUIRE(map.marked(128, 1));
+    REQUIRE(map.marked(255, 1));
+    REQUIRE(map.marked(0, 512));
+    REQUIRE(!map.marked(512, 1));
+}
 
 TEST_CASE("swizzle_coord_convert") {
     SwizzledTextureIterator it(nullptr, 3, 3, 0);
@@ -1965,22 +1982,4 @@ TEST_CASE("ppu_lwarx_should_not_destroy_reservations_of_other_threads") {
     
     th1.join();
     th2.join();
-}
-
-TEST_CASE("ppu_memory_breakpoint") {
-    MainMemory mm;
-    g_state.mm = &mm;
-    int called = 0;
-    mm.mark(0x10000, 0x1000, false, "");
-    mm.setMemory(0x10000, 0x11, 1000);
-    mm.memoryBreakHandler([&](auto va, auto size) {
-        called++;
-    });
-    mm.store8(0x10000, 0xff);
-    REQUIRE(called == 0);
-    mm.memoryBreak(0x10000, 100);
-    mm.store8(0x10000, 0xff);
-    REQUIRE(called == 1);
-    mm.store8(0x10000, 0xff);
-    REQUIRE(called == 1);
 }

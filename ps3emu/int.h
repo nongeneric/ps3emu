@@ -48,3 +48,8 @@ struct IntTraits<16> {
     using BigType = big_uint128_t;
     using Type = big_uint128_t;
 };
+
+template <typename T>
+constexpr T log2(T n) {
+    return n < 2 ? 1 : 1 + log2(n / 2);
+}

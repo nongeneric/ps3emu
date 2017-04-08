@@ -5,6 +5,7 @@
 #include "constants.h"
 #include "utils.h"
 #include "ReservationMap.h"
+#include "ModificationMap.h"
 #include "state.h"
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
@@ -51,11 +52,11 @@ struct ProtectionRange {
 };
 
 class MainMemory {
-    std::function<void(uint32_t, uint32_t)> _memoryWriteHandler;    
     std::unique_ptr<MemoryPage[]> _pages;
     std::bitset<DefaultMainMemoryPageCount> _providedMemoryPages;
     boost::mutex _pageMutex;
     ReservationMap _rmap;
+    ModificationMap<16u << 10u, 0xffffffffu> _mmap;
     
 #ifdef MEMORY_PROTECTION
     struct ProtectionInfo {
@@ -90,8 +91,6 @@ public:
     bool isAllocated(ps3_uintptr_t va);
     void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
-    void memoryBreakHandler(std::function<void(uint32_t, uint32_t)> handler);
-    void memoryBreak(uint32_t va, uint32_t size);
     
     uint8_t load8(ps3_uintptr_t va, bool validate = true);
     uint16_t load16(ps3_uintptr_t va, bool validate = true);
@@ -150,6 +149,10 @@ public:
          auto f = load64(va);
          return union_cast<uint64_t, double>(f);
     }
+    
+    inline auto modificationMap() {
+        return &_mmap;
+    }
 
     template <auto Len>
     inline void loadReserve(ps3_uintptr_t va,
@@ -199,6 +202,7 @@ public:
             memcpy(ptr, buf, Len);
             _rmap.destroySingleLine(line.line);
             _rmap.unlock(line);
+            _mmap.mark<Len>(va);
             return true;
         }
         _rmap.unlock(line);

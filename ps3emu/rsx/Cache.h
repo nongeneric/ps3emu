@@ -82,9 +82,11 @@ public:
     }
     
     template <typename F>
-    void watch(F setBreak) {
+    void watch(F action) {
         for (auto& p : _store) {
-            setBreak(p.second.updater->va, p.second.updater->size);
+            if (action(p.second.updater->va, p.second.updater->size)) {
+                _dirty.insert(p.first);
+            }
         }
     }
     

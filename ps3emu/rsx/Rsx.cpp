@@ -475,6 +475,7 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     updateShaders();
     watchTextureCache();
     watchShaderCache();
+    resetCacheWatch();
     linkShaderProgram();
     updateScissor();
     updateVertexDataArrays(first, count);
@@ -804,6 +805,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     updateShaders();
     watchTextureCache();
     watchShaderCache();
+    resetCacheWatch();
     linkShaderProgram();
     updateScissor();
     updateVertexDataArrays(first, count);
@@ -1433,8 +1435,6 @@ void Rsx::initGcm() {
         _context->tracer.enable(true);
     }
     
-    g_state.mm->memoryBreakHandler([=](uint32_t va, uint32_t size) { memoryBreakHandler(va, size); });
-    
     size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
     _context->vertexConstBuffer = GLPersistentCpuBuffer(constBufferSize);
     
@@ -1573,7 +1573,7 @@ void Rsx::SemaphoreOffset(uint32_t offset) {
     _context->semaphoreOffset = offset;
 }
 
-void Rsx::memoryBreakHandler(uint32_t va, uint32_t size) {
+void Rsx::invalidateCaches(uint32_t va, uint32_t size) {
     _context->textureCache.invalidate(va, size);
     _context->fragmentShaderCache.invalidate(va, size);
 }
@@ -1591,15 +1591,28 @@ uint32_t Rsx::getPut() {
 }
 
 void Rsx::watchTextureCache() {
-    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { g_state.mm->memoryBreak(va, size); };
+    _context->textureCache.watch([&](auto va, auto size) {
+        return g_state.mm->modificationMap()->marked(va, size);
+    });
     _context->textureCache.syncAll();
-    _context->textureCache.watch(setMemoryBreak);
 }
 
 void Rsx::watchShaderCache() {
-    auto setMemoryBreak = [=](uint32_t va, uint32_t size) { g_state.mm->memoryBreak(va, size); };
+    _context->fragmentShaderCache.watch([&](auto va, auto size) {
+        return g_state.mm->modificationMap()->marked(va, size);
+    });
     _context->fragmentShaderCache.syncAll();
-    _context->fragmentShaderCache.watch(setMemoryBreak);
+}
+
+void Rsx::resetCacheWatch() {
+    _context->textureCache.watch([&](auto va, auto size) {
+        g_state.mm->modificationMap()->reset(va, size);
+        return false;
+    });
+    _context->fragmentShaderCache.watch([&](auto va, auto size) {
+        g_state.mm->modificationMap()->reset(va, size);
+        return false;
+    });
 }
 
 void Rsx::setVBlankHandler(uint32_t descrEa) {
@@ -1681,7 +1694,7 @@ void Rsx::Color(uint32_t ptr, uint32_t count) {
     vec.resize(count * 4);
     g_state.mm->readMemory(ptr, &vec[0], count * 4);
     g_state.mm->writeMemory(dest, &vec[0], count * 4);
-    memoryBreakHandler(dest, count * 4);
+    invalidateCaches(dest, count * 4);
 }
 
 void Rsx::ContextDmaImageDestin(uint32_t location) {
@@ -1743,7 +1756,7 @@ void Rsx::startCopy2d() {
         }
         srcLine += c.srcPitch;
         destLine += c.destPitch;
-        memoryBreakHandler(destLine, c.lineLength);
+        invalidateCaches(destLine, c.lineLength);
     }
 }
 
@@ -1921,7 +1934,7 @@ void Rsx::transferImage() {
         }
     }
     
-    memoryBreakHandler(destEa, 1 << 20);
+    invalidateCaches(destEa, 1 << 20);
 }
 
 void Rsx::ImageInSize(uint16_t inW,

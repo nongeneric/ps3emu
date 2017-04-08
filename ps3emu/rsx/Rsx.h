@@ -185,7 +185,8 @@ class Rsx {
     
     void watchTextureCache();
     void watchShaderCache();
-    void memoryBreakHandler(uint32_t va, uint32_t size);
+    void resetCacheWatch();
+    void invalidateCaches(uint32_t va, uint32_t size);
     void waitForIdle();
     void loop();
     void runLoop();

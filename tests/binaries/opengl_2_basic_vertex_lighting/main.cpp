@@ -328,14 +328,14 @@ void sampleUpdateFPS()
   ++Frames;
   TimeElapsed+=fElapsedInFrame;
   // report fps at appropriate interval
-  if (TimeElapsed>=TimeReport)
+  /*if (TimeElapsed>=TimeReport)
   {
   	FPS = (Frames-FramesLastReport)*1.f/(float)(TimeElapsed-TimeLastReport);
 	printf("FPS: %.2f\n",FPS);
 	TimeReport+=REPORT_TIME;
 	TimeLastReport=TimeElapsed;
 	FramesLastReport=Frames;
-  }
+  }*/
 
   dbgFontPrintf(40,60,0.5f,"%s %.5f FPS", SAMPLE_NAME, FPS );
   if( VSYNC_ON )
