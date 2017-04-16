@@ -200,7 +200,7 @@ FormatInfo getFormat(GcmTextureFormat format) {
         case GcmTextureFormat::COMPRESSED_DXT1:
         case GcmTextureFormat::COMPRESSED_DXT23:
         case GcmTextureFormat::COMPRESSED_DXT45:
-        default: LOG << ssnprintf("unsupported texture format %d", format); assert(false);
+        default: INFO(libs) << ssnprintf("unsupported texture format %d", format); assert(false);
     }
     return {};
 }
@@ -420,7 +420,7 @@ void GLTexture::bind(GLuint textureUnit) {
 }
 
 void glcheck(int line, const char* call) {
-//     LOG << "glcall: " << call;
+//     INFO(libs) << "glcall: " << call;
 //     auto err = glGetError();
 //     if (err) {
 //         auto msg = err == GL_INVALID_ENUM ? "GL_INVALID_ENUM"

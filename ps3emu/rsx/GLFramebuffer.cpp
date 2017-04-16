@@ -79,7 +79,7 @@ void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned
     auto status = glCheckNamedFramebufferStatus(_id, GL_FRAMEBUFFER);
 #define X(x) status == x ? #x
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        LOG << ssnprintf("framebuffer incomplete %s %d",
+        INFO(libs) << ssnprintf("framebuffer incomplete %s %d",
             (status == 0x8cd9 ? "GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT" :
             X(GL_FRAMEBUFFER_UNDEFINED) :
             X(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT) :

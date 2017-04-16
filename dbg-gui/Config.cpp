@@ -10,7 +10,7 @@ namespace {
  
     boost::filesystem::path configPath() {
         boost::filesystem::path home = std::getenv("HOME");
-        return home / ".ps3emu-dbg";
+        return home / ".ps3emu/debug.json";
     }
 
 }

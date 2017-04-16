@@ -25,7 +25,7 @@ int32_t cellGamePatchCheck(CellGameContentSize *size, uint64_t reserved) {
 }
 
 int32_t cellGameContentPermit(cell_game_path_t* contentPath, cell_game_path_t* usrdirPath, Process* proc) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto usrDir = g_state.content->usrDir();
     auto contentDir = g_state.content->contentDir();
     std::copy(begin(usrDir), end(usrDir), begin(*usrdirPath));
@@ -34,7 +34,7 @@ int32_t cellGameContentPermit(cell_game_path_t* contentPath, cell_game_path_t* u
 }
 
 int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize, Process* proc) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto sfo = g_state.content->sfo();
     auto entry = std::find_if(begin(sfo), end(sfo), [=] (auto& entry) {
         return entry.id == id;
@@ -57,7 +57,7 @@ int32_t cellGameBootCheck(big_uint32_t* type,
                           cell_game_dirname_t* dirName,
                           Process* proc)
 {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     init(size, proc);
     *type = CELL_GAME_GAMETYPE_HDD;
     *attributes = 0;
@@ -73,7 +73,7 @@ int32_t cellGameDataCheck(uint32_t type,
                           CellGameContentSize* size,
                           Process* proc)
 {
-    LOG << ssnprintf("cellGameDataCheck(%d, %s, ...)", type, dirName);
+    INFO(libs) << ssnprintf("cellGameDataCheck(%d, %s, ...)", type, dirName);
     init(size, proc);
     return CELL_OK;
 }

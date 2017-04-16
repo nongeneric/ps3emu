@@ -43,6 +43,7 @@ public:
         auto it = _store.find(key);
         if (it == end(_store))
             return std::tuple<T*, U*>();
+        sync(key);
         return std::make_tuple(it->second.value.get(), it->second.updater.get());
     }
     
@@ -53,10 +54,12 @@ public:
     }
     
     void invalidate(uint32_t va, uint32_t size) {
-        INFO(rsx) << ssnprintf("invalidating cache %x, %x", va, size);
         for (auto& p : _store) {
             if (!intersects(p.second.updater->va, p.second.updater->size, va, size))
                 continue;
+            INFO(rsx, cache) << ssnprintf("invalidating cache entry %x, %x",
+                                     p.second.updater->va,
+                                     p.second.updater->size);
             _dirty.insert(p.first);
         }
     }
@@ -85,6 +88,9 @@ public:
     void watch(F action) {
         for (auto& p : _store) {
             if (action(p.second.updater->va, p.second.updater->size)) {
+                INFO(rsx, cache) << ssnprintf("invalidating cache entry (watch) %x, %x",
+                                         p.second.updater->va,
+                                         p.second.updater->size);
                 _dirty.insert(p.first);
             }
         }

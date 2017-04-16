@@ -13,12 +13,14 @@ namespace {
     thread_local std::string thread_name;
     log_severity_t active_severity;
     int active_types;
+    int active_areas;
     std::shared_ptr<spdlog::logger> logger;
 }
 
-void log_init(int sink_flags, log_severity_t severity, int types, log_format_t format) {
+void log_init(int sink_flags, log_severity_t severity, int types, int areas, log_format_t format) {
     active_severity = severity;
     active_types = types;
+    active_areas = areas;
 
     if (boost::filesystem::exists("/tmp/ps3.log"))
         boost::filesystem::remove("/tmp/ps3.log");
@@ -45,7 +47,7 @@ void log_set_thread_name(std::string name) {
     prctl(PR_SET_NAME, (unsigned long)name.c_str(), 0, 0, 0);
 }
 
-void log_unconditional(log_severity_t severity, log_type_t type, const char* message) {
+void log_unconditional(log_severity_t severity, log_type_t type, log_area_t area, const char* message) {
     std::string nip;
     if (g_state.th) {
         nip = ssnprintf("%08x ", g_state.th->getNIP());
@@ -60,8 +62,7 @@ void log_unconditional(log_severity_t severity, log_type_t type, const char* mes
                                       type == log_spu ? "SPU" :
                                       type == log_libs ? "LIB" :
                                       type == log_debugger ? "DBG" :
-                                      type == log_rsx ? "RSX" :
-                                      type == log_perf ? "PERF"
+                                      type == log_rsx ? "RSX"
                                       : "?",
                                       thread_name,
                                       nip,
@@ -74,8 +75,8 @@ void log_unconditional(log_severity_t severity, log_type_t type, const char* mes
     logger->info(formatted);
 }
 
-bool log_should(log_severity_t severity, log_type_t type) {
-    return severity >= active_severity && (type & active_types);
+bool log_should(log_severity_t severity, log_type_t type, log_area_t area) {
+    return severity >= active_severity && (type & active_types) && (area & active_areas);
 }
 
 #define PARSE(s, res, name) if (s == #name) { res |= log_##name; } else
@@ -106,6 +107,7 @@ log_type_t log_parse_filter(std::string const& str) {
         PARSE(s, res, libs)
         PARSE(s, res, debugger)
         PARSE(s, res, perf)
+        PARSE(s, res, cache)
         throw std::runtime_error("unknown log filter");
     }
     return static_cast<log_type_t>(res);
@@ -126,6 +128,15 @@ log_format_t log_parse_format(std::string const& str) {
     PARSE(str, res, simple)
     throw std::runtime_error("unknown log format");
     return static_cast<log_format_t>(res);
+}
+
+log_area_t log_parse_area(std::string const& str) {
+    int res = 0;
+    PARSE(str, res, trace)
+    PARSE(str, res, perf)
+    PARSE(str, res, cache)
+    throw std::runtime_error("unknown log area");
+    return static_cast<log_area_t>(res);
 }
 
 #undef PARSE

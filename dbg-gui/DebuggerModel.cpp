@@ -11,6 +11,8 @@
 #include "ps3emu/log.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwmutex.h"
+#include "ps3emu/ExecutionMap.h"
+#include "ps3emu/fileutils.h"
 #include "ps3tool-core/Rewriter.h"
 #include "Config.h"
 #include <QStringList>
@@ -18,6 +20,7 @@
 #include <boost/regex.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/thread/locks.hpp>
+#include <boost/filesystem.hpp>
 #include <set>
 
 class GridModelChangeTracker {
@@ -689,6 +692,9 @@ void DebuggerModel::execSingleCommand(QString command) {
             printBacktrace();
         }
         return;
+    } else if (name == "execmap") {
+        dumpExecutionMap();
+        return;
     }
     
     auto expr = command.section(':', 1, 1);
@@ -1186,6 +1192,29 @@ void DebuggerModel::printBacktrace() {
         for (auto frame : walkStack(_activeThread->getGPR(1))) {
             print(frame.lr);
         }
+    }
+}
+
+void DebuggerModel::dumpExecutionMap() {
+    bool isPrimary = true;
+    for (auto& s : _proc->getSegments()) {
+        if (s.index)
+            continue;
+        auto path = ssnprintf("%s.entries", s.elf->elfName());
+        std::vector<uint32_t> entries;
+        if (boost::filesystem::exists(path)) {
+            entries = deserializeEntries(read_all_text(path));
+        }
+        auto newEntries = g_state.executionMap->dump(s.va, s.size);
+        if (!isPrimary) {
+            for (auto& va : newEntries) {
+                va -= s.va;
+            }
+        }
+        std::copy(begin(newEntries), end(newEntries), std::back_inserter(entries));
+        messagef("dumping %d entries into %s", entries.size(), path);
+        write_all_text(serializeEntries(entries), path);
+        isPrimary = false;
     }
 }
 

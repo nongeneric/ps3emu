@@ -689,9 +689,9 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     
     _context->fpsCounter.report();
     if (_context->fpsCounter.hasWrapped()) {
-        INFO(perf) << ssnprintf("FPS: %d, texture update time: %lld",
-                                _context->fpsCounter.elapsed(),
-                                _context->uTextureUpdateDuration / 1000);
+        WARNING(rsx, perf) << ssnprintf("FPS: %d, texture update time: %lld",
+                                        _context->fpsCounter.elapsed(),
+                                        _context->uTextureUpdateDuration / 1000);
         _context->uTextureUpdateDuration = 0;
     }
 }
@@ -968,6 +968,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
 //             std::vector<uint8_t> buf(size);
 //             g_state.mm->readMemory(va, &buf[0], size);
 //             t->update(buf);
+            INFO(rsx, cache) << ssnprintf("updating texture %x, %x", va, size);
             auto buffer = this->getBuffer(info.location);
             _textureReader->loadTexture(info, buffer->handle(), t->handle(), t->levelHandles());
             this->_context->uTextureUpdateDuration +=
@@ -976,7 +977,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     };
     auto texture = new GLTexture(info);
     _context->textureCache.insert(key, texture, updater);
-    return texture;
+    return _context->textureCache.retrieve(key);
 }
 
 GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
@@ -1594,7 +1595,6 @@ void Rsx::watchTextureCache() {
     _context->textureCache.watch([&](auto va, auto size) {
         return g_state.mm->modificationMap()->marked(va, size);
     });
-    _context->textureCache.syncAll();
 }
 
 void Rsx::watchShaderCache() {
@@ -1607,6 +1607,7 @@ void Rsx::watchShaderCache() {
 void Rsx::resetCacheWatch() {
     _context->textureCache.watch([&](auto va, auto size) {
         g_state.mm->modificationMap()->reset(va, size);
+        //assert(!g_state.mm->modificationMap()->marked(va, size));
         return false;
     });
     _context->fragmentShaderCache.watch([&](auto va, auto size) {

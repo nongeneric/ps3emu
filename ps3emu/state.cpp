@@ -1,7 +1,8 @@
 #include "state.h"
 
-#include "EmuCallbacks.h"
-#include "Config.h"
+#include "ps3emu/EmuCallbacks.h"
+#include "ps3emu/Config.h"
+#include "ps3emu/ExecutionMap.h"
 
 g_state_t::g_state_t()
     : proc(nullptr),
@@ -12,7 +13,8 @@ g_state_t::g_state_t()
       rsx(nullptr),
       elf(nullptr),
       callbacks(new EmuCallbacks()),
-      config(new Config()) {}
+      config(new Config()),
+      executionMap(new ExecutionMap()) {}
 
 g_state_t g_state;
 thread_local PPUThread* g_state_t::th = nullptr;

@@ -85,6 +85,7 @@ class DebuggerModel : public QWidget {
     void runHandler(RunCommand command);
     void traceToHandler(TraceToCommand command);
     void printBacktrace();
+    void dumpExecutionMap();
     uint64_t evalExpr(std::string expr);
     bool _isRunning = false;
     bool _updateUIWhenRunning = true;

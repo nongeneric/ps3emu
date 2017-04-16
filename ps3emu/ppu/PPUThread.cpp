@@ -6,6 +6,7 @@
 #include "ppu_dasm_forms.h"
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
+#include "ps3emu/ExecutionMap.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -76,6 +77,7 @@ void PPUThread::innerLoop() {
             if (dasm_bb_call(instr, segment, label)) {
                 g_state.proc->bbcall(segment, label);
             } else {
+                g_state.executionMap->mark(cia);
                 setNIP(cia + sizeof instr);
                 ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
             }
@@ -114,7 +116,7 @@ void PPUThread::loop() {
     _granule.dbgName = ssnprintf("ppu_%s_%d", _name, (unsigned)_id);
     _tid = syscall(__NR_gettid);
     log_set_thread_name(_granule.dbgName);
-    LOG << ssnprintf("thread loop started");
+    INFO(libs) << ssnprintf("thread loop started");
     
     {
         boost::unique_lock<boost::mutex> lock(_mutexRunning);
@@ -126,7 +128,7 @@ void PPUThread::loop() {
     
     innerLoop();
     
-    LOG << ssnprintf("thread loop finished (%s)",
+    INFO(libs) << ssnprintf("thread loop finished (%s)",
         _threadFinishedGracefully ? "gracefully" : "with a failure"
     );
 }

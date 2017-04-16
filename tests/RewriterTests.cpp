@@ -267,7 +267,103 @@ TEST_CASE("spu_rewriter_block_discovery_2") {
     REQUIRE(block.len == 8);
 }
 
-TEST_CASE("spu_rewriter_block_discovery_out_of_segment_branches") {
+TEST_CASE("rewriter_block_discovery_optimize_leads_1") {
+    std::vector<std::pair<uint32_t, uint32_t>> instrs {
+        { 0x0340, 0x24004080 }, /* stqd           lr, arg_10(sp)      */
+        { 0x0344, 0x24FFC0D0 }, /* stqd           r80, var_10(sp)     */
+        { 0x0348, 0x4020007F }, /* nop            r127                */
+        { 0x034C, 0x24FF80D1 }, /* stqd           r81, var_20(sp)     */
+    };
+    std::stringstream log;
+    
+    auto blocks = discoverBasicBlocks(
+        0x0340, 16, 0, std::stack<uint32_t>({0x0344, 0x0348, 0x034c}), log, make_analyze(instrs, false));
+    
+    REQUIRE(blocks.size() == 1);
+    auto block = blocks[0];
+    REQUIRE(block.start == 0x0344);
+    REQUIRE(block.len == 12);
+}
+
+TEST_CASE("rewriter_block_discovery_optimize_leads_2") {
+    std::vector<std::pair<uint32_t, uint32_t>> instrs {
+        { 0x0340, 0x4C00012C }, /* isync                 */
+        { 0x0344, 0xEBDD0000 }, /* ld        r30, 0(r29) */
+        { 0x0348, 0x4E800020 }, /* blr                   */
+        { 0x034C, 0x4C00012C }, /* isync                 */
+    };
+    std::stringstream log;
+    
+    auto blocks = discoverBasicBlocks(
+        0x0340, 16, 0, std::stack<uint32_t>({0x0340, 0x0344, 0x0348}), log, make_analyze(instrs, true));
+    
+    REQUIRE(blocks.size() == 1);
+    auto block = blocks[0];
+    REQUIRE(block.start == 0x0340);
+    REQUIRE(block.len == 12);
+}
+
+TEST_CASE("rewriter_block_discovery_optimize_leads_dont_remove_targets") {
+    std::vector<std::pair<uint32_t, uint32_t>> instrs {
+        { 0x0838, 0x2F9F0000 }, /* cmpwi     cr7, r31, 0   */
+        { 0x083C, 0x38600001 }, /* li        r3, 1         */
+        { 0x0840, 0x419C0034 }, /* blt       cr7, loc_874  */
+
+        { 0x0844, 0x38600001 }, /* li        r3, 1         */
+        { 0x0848, 0x38600001 }, /* li        r3, 1         */
+        { 0x084c, 0x38600001 }, /* li        r3, 1         */
+        { 0x0850, 0x7FC4F378 }, /* mr        r4, r30       */
+        { 0x0854, 0x78630020 }, /* clrldi    r3, r3, 32    */
+        { 0x0858, 0x38600001 }, /* li        r3, 1         */
+        { 0x085C, 0x7C7F1B78 }, /* mr        r31, r3       */
+        { 0x0860, 0x38600001 }, /* li        r3, 1         */
+        { 0x0864, 0x38600001 }, /* li        r3, 1         */
+        { 0x0868, 0x38600001 }, /* li        r3, 1         */
+        { 0x086C, 0x38800127 }, /* li        r4, 0x127     */
+        { 0x0870, 0x38600001 }, /* li        r3, 1         */
+                            
+        { 0x0874, 0xE8010090 }, /* ld        r0, 0x90(r1)  */
+        { 0x0878, 0x7FE307B4 }, /* extsw     r3, r31       */
+        { 0x087C, 0xEBC10070 }, /* ld        r30, 0x70(r1) */
+        { 0x0880, 0xEBE10078 }, /* ld        r31, 0x78(r1) */
+    };
+    std::stringstream log;
+    
+    auto blocks = discoverBasicBlocks(
+        0x0838, 0x0884 - 0x0838, 0, std::stack<uint32_t>({0x0838}), log, make_analyze(instrs, true));
+    
+    REQUIRE(blocks.size() == 3);
+    auto block = blocks[0];
+    REQUIRE(block.start == 0x0838);
+    REQUIRE(block.len == 12);
+    block = blocks[1];
+    REQUIRE(block.start == 0x0844);
+    REQUIRE(block.len == 0x0874 - 0x0844);
+    block = blocks[2];
+    REQUIRE(block.start == 0x0874);
+    REQUIRE(block.len == 16);
+}
+
+TEST_CASE("rewriter_block_discovery_optimize_leads_dont_remove_bl_ret") {
+    std::vector<std::pair<uint32_t, uint32_t>> instrs {
+        { 0x022F24, 0x48005215 }, /* bl        ._Geterrno   */
+        { 0x022F28, 0x60000000 }, /* nop                    */
+    };
+    std::stringstream log;
+    
+    auto blocks = discoverBasicBlocks(
+        0x022F24, 8, 0, std::stack<uint32_t>({0x022F24}), log, make_analyze(instrs, true));
+    
+    REQUIRE(blocks.size() == 2);
+    auto block = blocks[0];
+    REQUIRE(block.start == 0x022F24);
+    REQUIRE(block.len == 4);
+    block = blocks[1];
+    REQUIRE(block.start == 0x022F28);
+    REQUIRE(block.len == 4);
+}
+
+TEST_CASE("rewriter_block_discovery_out_of_segment_branches") {
     std::vector<std::pair<uint32_t, uint32_t>> instrs {
         { 0x035C, 0x1CEC0081 }, /* ai             sp, sp, -0x50       */
         { 0x0360, 0x22000902 }, /* brhz           r2, loc_3A8         */

@@ -26,6 +26,11 @@ void write_all_bytes(const void* ptr, uint32_t size, std::experimental::string_v
     fclose(f);
 }
 
+std::string read_all_text(std::experimental::string_view path) {
+    auto vec = read_all_bytes(path);
+    return std::string((const char*)&vec[0], vec.size());
+}
+
 void write_all_text(std::experimental::string_view text, std::experimental::string_view path) {
     write_all_bytes(&text[0], text.size(), path);
 }

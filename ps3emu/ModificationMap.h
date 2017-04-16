@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ps3emu/int.h"
+#include "ps3emu/log.h"
 #include <memory>
 #include <atomic>
 #include <array>
@@ -9,7 +10,7 @@
 template <unsigned PageSize, unsigned MaxAddress>
 class ModificationMap {
     static constexpr uint32_t PageCount = MaxAddress / PageSize;
-    static constexpr uint32_t PageShift = log2(PageSize);
+    static constexpr uint32_t PageShift = constexpr_log2(PageSize);
     std::unique_ptr<std::array<std::atomic<bool>, PageCount>> _pages;
     
 public:
@@ -30,26 +31,30 @@ public:
     }
     
     inline void mark(uint32_t va, uint32_t size) {
-        for (auto i = va; i < va + size; ++i) {
-            mark<1>(i);
+        auto page = va >> PageShift;
+        auto lastPage = ((va + size) >> PageShift) + 1u;
+        assert(lastPage <= _pages->size());
+        for (; page < lastPage; page++) {
+            (*_pages)[page].store(true, std::memory_order_relaxed);
         }
     }
     
     inline bool marked(uint32_t va, uint32_t size) {
         auto page = va >> PageShift;
-        auto lastPage = page + ((va + size) >> PageShift) + 1;
-        assert(lastPage < _pages->size());
+        auto lastPage = ((va + size) >> PageShift) + 1u;
+        assert(lastPage <= _pages->size());
         for (; page < lastPage; page++) {
-            if ((*_pages)[page].load(std::memory_order_relaxed))
+            if ((*_pages)[page].load(std::memory_order_relaxed)) {
                 return true;
+            }
         }
         return false;
     }
     
     inline void reset(uint32_t va, uint32_t size) {
         auto page = va >> PageShift;
-        auto lastPage = page + ((va + size) >> PageShift) + 1;
-        assert(lastPage < _pages->size());
+        auto lastPage = ((va + size) >> PageShift) + 1u;
+        assert(lastPage <= _pages->size());
         for (; page < lastPage; page++) {
             (*_pages)[page].store(false, std::memory_order_relaxed);
         }

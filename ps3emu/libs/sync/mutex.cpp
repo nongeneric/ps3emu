@@ -44,12 +44,12 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     assert(ret == 0);
     
     *mutex_id = mutexes.create(info);
-    LOG << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
+    INFO(libs) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
     return CELL_OK;
 }
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
-    LOG << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
+    INFO(libs) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
     auto info = mutexes.try_get(mutex_id);
     if (!info) {
         return CELL_ESRCH;

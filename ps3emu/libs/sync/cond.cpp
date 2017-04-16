@@ -25,12 +25,12 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
     // TODO: error handling
     pthread_cond_init(&info->cv, NULL);
     *cond_id = cvs.create(std::move(info));
-    LOG << ssnprintf("sys_cond_create(%d, %x, %s)", *cond_id, mutex, attr->name);
+    INFO(libs) << ssnprintf("sys_cond_create(%d, %x, %s)", *cond_id, mutex, attr->name);
     return CELL_OK;
 }
 
 int32_t sys_cond_destroy(sys_cond_t cond) {
-    LOG << ssnprintf("sys_cond_destroy(%x)", cond);
+    INFO(libs) << ssnprintf("sys_cond_destroy(%x)", cond);
     // TODO: error handling
     auto info = cvs.get(cond);
     pthread_cond_destroy(&info->cv);

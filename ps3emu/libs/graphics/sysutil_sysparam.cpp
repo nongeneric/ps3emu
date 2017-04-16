@@ -3,7 +3,7 @@
 #include "assert.h"
 
 int cellVideoOutGetState(uint32_t videoOut, uint32_t deviceIndex, CellVideoOutState* state) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     assert(videoOut == CELL_VIDEO_OUT_PRIMARY);
     assert(deviceIndex == 0);
     state->colorSpace = CELL_VIDEO_OUT_COLOR_SPACE_RGB;
@@ -17,7 +17,7 @@ int cellVideoOutGetState(uint32_t videoOut, uint32_t deviceIndex, CellVideoOutSt
 }
 
 int cellVideoOutGetResolution(uint32_t resolutionId, CellVideoOutResolution* resolution) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     resolution->width = 1280;
     resolution->height = 720;
     return CELL_OK;
@@ -28,7 +28,7 @@ int cellVideoOutConfigure(uint32_t videoOut,
                           CellVideoOutOption* option, 
                           uint32_t waitForEvent) 
 {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     assert(videoOut == CELL_VIDEO_OUT_PRIMARY);
     assert(waitForEvent == 0);
     assert(option == NULL);

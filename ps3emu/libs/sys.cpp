@@ -20,29 +20,29 @@
 #include <map>
 
 void init_sys_lib() {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
 }
 
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     mem_info->total_user_memory = 221249536;
     mem_info->available_user_memory = 0.9 * mem_info->total_user_memory; // TODO: handle alloc/dealloc
     return CELL_OK;
 }
 
 cell_system_time_t sys_time_get_system_time(PPUThread* thread) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto sec = (float)g_state.proc->getTimeBase() / (float)g_state.proc->getFrequency();
     return sec * 1000000;
 }
 
 int _sys_process_atexitspawn() {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
 int _sys_process_at_Exitspawn() {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -122,12 +122,12 @@ int sys_tty_write(uint32_t ch,
 }
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
 int sys_prx_exitspawn_with_level(uint64_t level) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -169,7 +169,7 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc) {
     assert(flags == 0);
     assert(opt == 0);
-    LOG << ssnprintf("sys_prx_load_module(%s)", path.str);
+    INFO(libs) << ssnprintf("sys_prx_load_module(%s)", path.str);
     auto hostPath = g_state.content->toHost(path.str.c_str()) + ".elf";
     return proc->loadPrx(hostPath);
 }
@@ -225,7 +225,7 @@ constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
-    LOG << ssnprintf("sys_memory_allocate(%x,...)", size);
+    INFO(libs) << ssnprintf("sys_memory_allocate(%x,...)", size);
     (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
@@ -237,7 +237,7 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
 }
 
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
-    LOG << ssnprintf("sys_memory_free(%x)", start_addr);
+    INFO(libs) << ssnprintf("sys_memory_free(%x)", start_addr);
     g_state.heapalloc->free(start_addr);
     return CELL_OK;
 }
@@ -253,7 +253,7 @@ int sys_timer_sleep(second_t sleep_time) {
 }
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return g_state.proc->getFrequency();
 }
 
@@ -273,19 +273,19 @@ uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime) {
 }
 
 int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUThread* thread) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     info->pst_addr = thread->getStackBase();
     info->pst_size = thread->getStackSize();
     return CELL_OK;
 }
 
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
 uint32_t cellSysmoduleUnloadModule(uint16_t id) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 

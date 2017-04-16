@@ -4,76 +4,111 @@
 #include "ps3emu/ppu/ppu_dasm.h"
 #include <boost/optional.hpp>
 #include <set>
+#include <algorithm>
+
+struct BasicBlockContext {
+    uint32_t start;
+    uint32_t length;
+    uint32_t imageBase;
+    std::set<uint32_t> allLeads;
+    std::set<uint32_t> breaks;
+    std::set<uint32_t> visited;
+    std::ostream* log;
+    std::function<InstructionInfo(uint32_t)> analyze;
+    std::vector<uint32_t>* branches;
+    
+    void update(uint32_t newLead) {
+        std::stack<uint32_t> leads;
+        leads.push(newLead);
+    
+        while (!leads.empty()) {
+            auto cia = leads.top();
+            leads.pop();
+            INFO(libs) << ssnprintf("analyzing basic block %x(%x)\n", cia, cia - imageBase);
+            if (allLeads.find(cia) != end(allLeads))
+                continue;
+            allLeads.insert(cia);
+    
+            for (;;) {
+                if (!subset(cia, 4u, start, length)) {
+                    if (branches) {
+                        branches->push_back(cia);
+                    }
+                    break;
+                }
+    
+                visited.insert(cia);
+                auto info = analyze(cia);
+                auto logLead = [&](uint32_t target) {
+                    INFO(libs) << ssnprintf("new lead %x(%x) -> %x(%x)\n",
+                                      cia,
+                                      cia - imageBase,
+                                      target,
+                                      target - imageBase);
+                };
+                if (info.target) {
+                    leads.push(info.target);
+                    logLead(info.target);
+                }
+                if (info.flow) {
+                    if (info.passthrough) {
+                        leads.push(cia + 4);
+                        logLead(cia + 4);
+                    }
+                    breaks.insert(cia + 4);
+                    INFO(libs) << ssnprintf(
+                        "new break %x(%x)\n", cia + 4, cia + 4 - imageBase);
+                    break;
+                }
+                cia += 4;
+            }
+        }
+    }
+};
 
 std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t start,
     uint32_t length,
     uint32_t imageBase,
-    std::stack<uint32_t> leads,
+    std::stack<uint32_t> leadsStack,
     std::ostream& log,
     std::function<InstructionInfo(uint32_t)> analyze,
     std::vector<uint32_t>* branches)
 {
-    std::set<uint32_t> allLeads;
-    std::set<uint32_t> breaks;
+    BasicBlockContext context;
+    context.start = start;
+    context.length = length;
+    context.imageBase = imageBase;
+    context.log = &log;
+    context.analyze = analyze;
+    context.branches = branches;
 
-    auto leadsCopy = leads;
-    while (!leadsCopy.empty()) {
-        auto lead = leadsCopy.top();
-        leadsCopy.pop();
+    std::set<uint32_t> leads;
+    while (!leadsStack.empty()) {
+        auto lead = leadsStack.top();
+        leadsStack.pop();
+        leads.insert(lead);
         if (!subset(lead, 4u, start, length))
             throw std::runtime_error("a lead is outside the segment");
     }
     
-    
     while (!leads.empty()) {
-        auto cia = leads.top();
-        leads.pop();
-        log << ssnprintf("analyzing basic block %x(%x)\n", cia, cia - imageBase);
-        if (allLeads.find(cia) != end(allLeads))
-            continue;
-        allLeads.insert(cia);
-        
-        for (;;) {
-            if (!subset(cia, 4u, start, length)) {
-                if (branches) {
-                    branches->push_back(cia);
-                }
-                break;
-            }
-            
-            auto info = analyze(cia);
-            auto logLead = [&] (uint32_t target) {
-                log << ssnprintf("new lead %x(%x) -> %x(%x)\n",
-                                 cia,
-                                 cia - imageBase,
-                                 target,
-                                 target - imageBase);
-            };
-            if (info.target) {
-                leads.push(info.target);
-                logLead(info.target);
-            }
-            if (info.flow) {
-                if (info.passthrough) {
-                    leads.push(cia + 4);
-                    logLead(cia + 4);
-                }
-                breaks.insert(cia + 4);
-                log << ssnprintf("new break %x(%x)\n",
-                                 cia + 4,
-                                 cia + 4 - imageBase);
-                break;
-            }
-            cia += 4;
-        }
+        auto lead = *begin(leads);
+        context.update(lead);
+        std::set<uint32_t> remaining;
+        std::set_difference(begin(leads),
+                            end(leads),
+                            begin(context.visited),
+                            end(context.visited),
+                            std::inserter(remaining, begin(remaining)));
+        leads = remaining;
     }
    
     boost::optional<BasicBlock> block;
     std::vector<BasicBlock> blocks;
     for (auto cia = start; cia < start + length; cia += 4) {
-        bool isLead = allLeads.find(cia) != end(allLeads);
-        bool isBreak = breaks.find(cia) != end(breaks);
+        bool isLead = context.allLeads.find(cia) != end(context.allLeads);
+        bool isBreak = context.breaks.find(cia) != end(context.breaks);
         
         if (isLead || isBreak) {
             if (block) {

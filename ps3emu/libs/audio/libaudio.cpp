@@ -4,7 +4,11 @@
 #include "ps3emu/log.h"
 #include "ps3emu/Process.h"
 #include "ps3emu/TimedCounter.h"
-#include <SDL2/SDL.h>
+#include <boost/chrono.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
+#include <pulse/pulseaudio.h>
 #include <fstream>
 
 #define CELL_AUDIO_BLOCK_SAMPLES 256
@@ -42,6 +46,8 @@
 #define CELL_AUDIO_ERROR_AUDIOSYSTEM_NOT_FOUND  CELL_ERROR_CAST(0x8031070e) //
 #define CELL_AUDIO_ERROR_TAG_NOT_FOUND          CELL_ERROR_CAST(0x8031070f) //
 
+using namespace boost::chrono;
+
 namespace {
     
     struct {
@@ -52,71 +58,153 @@ namespace {
         big_uint64_t* readIndexAddr;
         uint8_t* portAddr;
         uint32_t portStatus = CELL_AUDIO_STATUS_CLOSE;
-        uint32_t position = 0;
         uint32_t nBlock = 0;
         uint32_t nChannel = 0;
         std::vector<uint64_t> port0tags;
         std::vector<uint64_t> port0stamps;
-        SDL_AudioDeviceID device;
+        pa_context* pulseContext = 0;
+        pa_threaded_mainloop* pulseMainLoop = 0;
+        pa_stream* pulseStream = 0;
+        pa_sample_spec pulseSpec;
+        boost::thread playbackThread;
+        boost::mutex streamStartedMutex;
+        boost::condition_variable streamStartedCv;
+        uint64_t samplesWritten = 0;
         std::ofstream pcmFile;
         TimedCounter counter;
     } context;
     
-}
-
-int32_t cellAudioInit() {
-    return CELL_OK;
+    struct pulseLock {
+        inline pulseLock() {
+            pa_threaded_mainloop_lock(context.pulseMainLoop);
+        }
+        inline ~pulseLock() {
+            pa_threaded_mainloop_unlock(context.pulseMainLoop);
+        }
+    };
 }
 
 uint32_t calcBlockSize() {
     return context.nChannel * sizeof(float) * CELL_AUDIO_BLOCK_SAMPLES;
 }
 
-void sdlAudioCallback(void*, Uint8* stream, int len2ch) {
-    if (context.portStatus != CELL_AUDIO_STATUS_RUN)
-        return;
+void noop(void* p) { }
+
+void playbackLoop() {
+    static std::vector<uint8_t> tempDest;
     
-    auto blockSize = calcBlockSize();
-    auto nextBlockPosition = (*context.readIndexAddr + 1) * blockSize;
-    auto toRead = std::min<uint32_t>(nextBlockPosition - context.position,
-                                     context.nChannel == 8 ? len2ch * 4 : len2ch);
-    
-    assert(*context.readIndexAddr == context.position / blockSize);
-    //INFO(perf) << ssnprintf("sdl callback (cur block %d)", *context.readIndexAddr);
-    
-    auto src = (big_uint64_t*)(context.portAddr + context.position);
-    auto dest = (big_uint64_t*)stream;
-    if (context.nChannel == 8) {
-        auto samples = toRead / 32;
-        for (auto i = 0u; i < samples; ++i) {
-            dest[i] = src[4*i];
+    for (;;) {
+        {
+            boost::unique_lock<boost::mutex> lock(context.streamStartedMutex);
+            context.streamStartedCv.wait(lock, [&] {
+                return context.portStatus == CELL_AUDIO_STATUS_RUN && context.notifyQueuePort;
+            });
         }
-    } else {
-        memcpy(stream, src, toRead);
-    }
-#if TESTS
-    context.pcmFile.write((char*)stream, context.nChannel == 8 ? toRead / 4 : toRead);
-    context.pcmFile.flush();
-#endif
-    memset(src, 0, toRead);
-    context.position = (context.position + toRead) % (blockSize * context.nBlock);
-    if (context.position % blockSize == 0) {
+        
         auto prevBlock = *context.readIndexAddr;
-        auto curBlock = context.position / blockSize;
-        assert((prevBlock == context.nBlock - 1 && curBlock == 0) || prevBlock + 1 == curBlock);
+        auto curBlock = (prevBlock + 1) % context.nBlock;
         *context.readIndexAddr = curBlock;
-        if (prevBlock != curBlock) {
-            context.port0tags[curBlock] = context.port0tags[prevBlock] + 2;
-            context.port0stamps[prevBlock] = g_state.proc->getTimeBaseMicroseconds().count();
-            //INFO(perf) << ssnprintf("notify of new block %d - %d", prevBlock, curBlock);
-            sys_event_port_send(context.notifyQueuePort, 0, 0, 0);
-            //INFO(perf) << ssnprintf("notification handled");
-            context.counter.report();
-            if (context.counter.hasWrapped()) {
-                INFO(perf) << ssnprintf("libaduio notify ms average %g", 1000.f / context.counter.elapsed());
+        context.port0tags[curBlock] = context.port0tags[prevBlock] + 2;
+        context.port0stamps[prevBlock] = g_state.proc->getTimeBaseMicroseconds().count();
+        sys_event_port_send(context.notifyQueuePort, 0, 0, 0);
+        
+        auto blockSize = calcBlockSize();
+        auto toWrite = CELL_AUDIO_BLOCK_SAMPLES * 2 * sizeof(float);
+        auto src = (big_uint64_t*)(context.portAddr + curBlock * blockSize);
+        tempDest.resize(toWrite);
+        auto dest = (big_uint64_t*)&tempDest[0];
+        if (context.nChannel == 8) {
+            for (auto i = 0u; i < CELL_AUDIO_BLOCK_SAMPLES; ++i) {
+                dest[i] = src[4*i];
             }
+        } else {
+            memcpy(dest, src, toWrite);
+        }
+        
+#if TESTS
+        context.pcmFile.write((char*)dest, tempDest.size());
+        context.pcmFile.flush();
+#endif
+        
+        microseconds wait(0);
+        const pa_timing_info* info = nullptr;
+        pa_operation* opInfo = nullptr;
+        {
+            pulseLock lock;
+            opInfo = pa_stream_update_timing_info(context.pulseStream, NULL, NULL);
+            info = pa_stream_get_timing_info(context.pulseStream);
+        }
+        
+        if (opInfo) {
+            while (pa_operation_get_state(opInfo) == PA_OPERATION_RUNNING) ;
+        }
+        
+        {
+            pulseLock lock;
+            info = pa_stream_get_timing_info(context.pulseStream);
+        }
+        
+        if (info) {
+            auto sampleSize = 2 * sizeof(float);
+            auto samplesPerMs = sampleSize * 48;
+            auto readElapsedMs = float(info->read_index) / samplesPerMs;
+            auto diffElapsedMs = float(info->write_index - info->read_index) / readElapsedMs;
+            INFO(libs, perf) << ssnprintf("w: %lld r: %lld re: %g diff %g",
+                                          info->write_index,
+                                          info->read_index,
+                                          readElapsedMs,
+                                          diffElapsedMs);
+                
+            assert(info->write_index >= 0);
+            assert(info->read_index >= 0);
+            
+            auto delayBytes = pa_usec_to_bytes(20000, &context.pulseSpec);
+            if (info->read_index < info->write_index) {
+                if ((uint32_t)info->read_index + delayBytes < (uint32_t)info->write_index) {
+                    wait = microseconds((uint32_t)info->write_index - ((uint32_t)info->read_index + delayBytes));
+                }
+            }
+            boost::this_thread::sleep_for(wait);
+        
+            INFO(libs, perf) << ssnprintf("wait %g ms",
+                                    float(duration_cast<microseconds>(wait).count()) / 1000);
+        }
+        
+        pulseLock lock;
+        pa_stream_write(context.pulseStream, dest, tempDest.size(), noop, 0, PA_SEEK_RELATIVE);
+    }
+}
+
+void waitContext() {
+    for (;;) {
+        pulseLock lock;
+        auto state = pa_context_get_state(context.pulseContext);
+        if (state == PA_CONTEXT_READY)
+            return;
+        if (state == PA_CONTEXT_FAILED || state == PA_CONTEXT_TERMINATED) {
+            ERROR(libs) << ssnprintf("context connection failed");
+            exit(1);
         }
     }
+}
+int32_t cellAudioInit() {
+    context.pulseMainLoop = pa_threaded_mainloop_new();
+    auto api = pa_threaded_mainloop_get_api(context.pulseMainLoop);
+    context.pulseContext = pa_context_new(api, "ps3emu");
+    context.playbackThread = boost::thread(playbackLoop);
+    auto res = pa_context_connect(context.pulseContext, NULL, PA_CONTEXT_NOFLAGS, NULL);
+    if (res != PA_OK) {
+        ERROR(libs) << ssnprintf("context connection failed %s", pa_strerror(res));
+        exit(1);
+    }
+    pa_threaded_mainloop_start(context.pulseMainLoop);
+    waitContext();
+    return CELL_OK;
+}
+
+void overflow_handler(pa_stream *p, void *userdata) {
+    ERROR(libs) << "overflow";
+    exit(1);
 }
 
 int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
@@ -141,19 +229,23 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     context.portAddr = (uint8_t*)g_state.heapalloc->allocInternalMemory(
         &context.eaPortAddr, calcBlockSize() * context.nBlock, 64u << 10);
     
-    SDL_AudioSpec wanted = {0};
-    wanted.freq = 48000;
-    wanted.format = AUDIO_F32MSB;
-    wanted.channels = 2;
-    wanted.samples = CELL_AUDIO_BLOCK_SAMPLES;
-    wanted.callback = sdlAudioCallback;
-    wanted.userdata = NULL;
-    
-    context.device = SDL_OpenAudioDevice(NULL, 0, &wanted, NULL, 0);
-    if (context.device == 0) {
-        ERROR(libs) << ssnprintf("Couldn't open audio: %s", SDL_GetError());
+    context.pulseSpec = { PA_SAMPLE_FLOAT32BE, 48000, 2 };    
+    pa_channel_map channels;
+    pa_channel_map_init_stereo(&channels);
+    context.pulseStream = pa_stream_new(context.pulseContext, "emu", &context.pulseSpec, &channels);
+    //2 * sizeof(float) * 512
+    pa_buffer_attr attr { -1u, (uint32_t)pa_usec_to_bytes(40000, &context.pulseSpec), -1u, -1u, -1u };
+    auto flags = pa_stream_flags_t(
+        /*PA_STREAM_AUTO_TIMING_UPDATE | 
+        PA_STREAM_INTERPOLATE_TIMING |*/
+        PA_STREAM_ADJUST_LATENCY);
+    auto res = pa_stream_connect_playback(context.pulseStream, NULL, &attr, flags, NULL, NULL);
+    if (res != PA_OK) {
+        ERROR(libs) << ssnprintf("can't connect playback stream: %s", pa_strerror(res));
         exit(1);
     }
+    
+    pa_stream_set_overflow_callback(context.pulseStream, overflow_handler, nullptr);
     
     if (portnums > 1) {
         ERROR(libs) << "too many audio ports have been opened";
@@ -180,8 +272,10 @@ int32_t cellAudioGetPortConfig(uint32_t portNum, CellAudioPortConfig* portConfig
 }
 
 int32_t cellAudioPortStart(uint32_t portNum) {
+    pa_stream_trigger(context.pulseStream, NULL, NULL);
+    boost::unique_lock<boost::mutex> lock(context.streamStartedMutex);
     context.portStatus = CELL_AUDIO_STATUS_RUN;
-    SDL_PauseAudioDevice(context.device, 0);
+    context.streamStartedCv.notify_all();
     return CELL_OK;
 }
 
@@ -192,13 +286,16 @@ int32_t cellAudioSetNotifyEventQueueEx(sys_ipc_key_t key, uint32_t iFlags) {
 
 int32_t cellAudioSetNotifyEventQueue(sys_ipc_key_t key) {
     INFO(libs) << ssnprintf("cellAudioSetNotifyEventQueue(%x)", key);
-    context.notifyQueue = getQueueByKey(key);
-    disableLogging(context.notifyQueue);
+    auto queue = getQueueByKey(key);
+    disableLogging(queue);
     auto res = sys_event_port_create(
         &context.notifyQueuePort, SYS_EVENT_PORT_LOCAL, 0x010003000e001c0aull);
     assert(!res); (void)res;
-    res = sys_event_port_connect_local(context.notifyQueuePort, context.notifyQueue);
+    res = sys_event_port_connect_local(context.notifyQueuePort, queue);
     assert(!res);
+    boost::unique_lock<boost::mutex> lock(context.streamStartedMutex);
+    context.notifyQueue = queue;
+    context.streamStartedCv.notify_all();
     return CELL_OK;
 }
 
@@ -237,14 +334,15 @@ int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint6
 
 int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume) {
     volume = g_state.th->getFPRd(0); // TODO: handle in exports.h
+    ERROR(libs) << "not impl";
     // TODO: make thread safe (readIndexAddr should be atomic)
-    assert(portNum == 0);
-    auto blockSize = calcBlockSize();
-    auto block = (*context.readIndexAddr + 1) % context.nBlock;
-    auto dest = (context.portAddr + blockSize * block);
-    auto samplesSize = context.nChannel * sizeof(float) * samples;
-    auto ptr = g_state.mm->getMemoryPointer(src, samplesSize);
-    assert(volume > 0.f && volume <= 1.f);
-    SDL_MixAudioFormat(dest, ptr, AUDIO_F32MSB, samplesSize, 128.f * volume);
+//     assert(portNum == 0);
+//     auto blockSize = calcBlockSize();
+//     auto block = (*context.readIndexAddr + 1) % context.nBlock;
+//     auto dest = (context.portAddr + blockSize * block);
+//     auto samplesSize = context.nChannel * sizeof(float) * samples;
+//     auto ptr = g_state.mm->getMemoryPointer(src, samplesSize);
+//     assert(volume > 0.f && volume <= 1.f);
+    //SDL_MixAudioFormat(dest, ptr, AUDIO_F32MSB, samplesSize, 128.f * volume);
     return CELL_OK;
 }

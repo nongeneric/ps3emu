@@ -22,6 +22,7 @@ pkg_search_module(CRYPTO REQUIRED libcrypto)
 pkg_search_module(PNG REQUIRED libpng)
 pkg_search_module(ZLIB REQUIRED zlib)
 pkg_search_module(FREETYPE2 REQUIRED freetype2)
+pkg_search_module(PULSEAUDIO REQUIRED libpulse)
 
 set(CMAKE_AR gcc-ar)
 set(CMAKE_RANLIB gcc-ranlib)
@@ -59,7 +60,7 @@ else()
     # disable all asserts (moderate performance hit)
     add_definitions(-DNDEBUG)
     
-    set(CMAKE_CXX_FLAGS "-ggdb3 -O3 ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-ggdb3 -O3 -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 endif()
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})

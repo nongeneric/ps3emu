@@ -7,8 +7,6 @@
 #include "utils.h"
 #include <stdlib.h>
 
-#define PagePtrMask (~uintptr_t() - 1)
-
 inline bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
     return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
 }
@@ -79,7 +77,7 @@ bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
         VirtualAddress split { va }; \
         auto& page = _pages[split.page.u()]; \
         auto offset = split.offset.u(); \
-        auto ptr = (page.ptr & PagePtrMask) + offset; \
+        auto ptr = page.ptr + offset; \
         return endian_reverse(*(uint##x##_t*)ptr); \
     }
 
@@ -99,8 +97,8 @@ DEFINE_LOAD_X(128)
         auto pageIndex = split.page.u(); \
         auto& page = _pages[pageIndex]; \
         auto offset = split.offset.u(); \
-        auto ptr = page.ptr.fetch_and(PagePtrMask); \
-        ptr = (ptr & PagePtrMask) + offset; \
+        auto ptr = page.ptr.load(); \
+        ptr = ptr + offset; \
         auto line = _rmap.lock<x / 8>(va); \
         *(uint##x##_t*)ptr = reversed; \
         _rmap.destroyExcept(line, g_state.granule); \
@@ -219,9 +217,9 @@ void MemoryPage::alloc() {
 }
 
 void MemoryPage::dealloc() {
-    auto mem = ptr.exchange(0);
+    auto mem = ptr.load();
     if (mem) {
-        free((void*)(mem & PagePtrMask));
+        free((void*)mem);
     }
 }
 
@@ -232,7 +230,7 @@ uint8_t* MainMemory::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
         throw std::runtime_error("getting memory pointer for not allocated memory");
     auto offset = split.offset.u();
     // TODO: check that the range is continuous
-    return (uint8_t*)((page.ptr & PagePtrMask) + offset);
+    return (uint8_t*)page.ptr.load() + offset;
 }
 
 void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
@@ -246,7 +244,7 @@ void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
         auto& page = _pages[firstPage + i];
         auto memoryPtr = (uint8_t*)memory + i * DefaultMainMemoryPageSize;
         if (page.ptr) {
-            memcpy(memoryPtr, (void*)(page.ptr & PagePtrMask), DefaultMainMemoryPageSize);
+            memcpy(memoryPtr, (void*)page.ptr.load(), DefaultMainMemoryPageSize);
         }
         page.ptr = (uintptr_t)memoryPtr;
         _providedMemoryPages.set(firstPage + i);

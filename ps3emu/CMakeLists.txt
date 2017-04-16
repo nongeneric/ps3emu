@@ -59,6 +59,7 @@ set(SRC
     rsx/GLShader.cpp
     gcmviz/GcmDatabase.cpp
     TimedCounter.cpp
+    ExecutionMap.cpp
     
     libs/sys.cpp
     libs/fs.cpp
@@ -97,6 +98,7 @@ target_link_libraries(ps3emu
     ${PNG_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${FREETYPE2_LIBRARIES}
+    ${PULSEAUDIO_LIBRARIES}
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvimage/libnvimage.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc7/libbc7.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc6h/libbc6h.a

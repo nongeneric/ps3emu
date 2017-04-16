@@ -248,7 +248,9 @@ int main(int argc, const char* argv[]) {
     try {
         auto command = ParseOptions(argc, argv);
         boost::apply_visitor(CommandVisitor(), command);
+        return 0;
     } catch (std::exception& e) {
         std::cout << "error occured: " << e.what() << std::endl;
+        return 1;
     }
 }

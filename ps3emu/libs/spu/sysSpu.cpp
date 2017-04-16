@@ -125,7 +125,7 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
                                uint32_t address,
                                uint64_t value,
                                size_t type) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto thread = g_state.proc->getSpuThread(id);
     big_uint64_t v = 0;
     memcpy((char*)&v + 8 - type, thread->ptr(address), type);
@@ -142,7 +142,7 @@ int32_t sys_spu_thread_write_snr(sys_spu_thread_t id, int32_t number, uint32_t v
 }
 
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     return CELL_OK;
 }
 
@@ -150,7 +150,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
                              uint32_t type,
                              PPUThread* th) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     
     assert(type == SYS_SPU_IMAGE_DIRECT);
     
@@ -168,7 +168,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
 }
 
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc) {
-    LOG << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
+    INFO(libs) << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
     auto hostPath = g_state.content->toHost(path.str.c_str());
     auto elfPath = hostPath;
     if (hostPath.substr(hostPath.size() - 4) != ".elf") {
@@ -177,7 +177,7 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* pr
     FILE* f = fopen(elfPath.c_str(), "r");
     if (!f) {
         auto message = ssnprintf("sys_spu_image_open: elf not found (\"%s\")", elfPath);
-        LOG << message;
+        INFO(libs) << message;
         throw std::runtime_error(message);
     }
     
@@ -224,7 +224,7 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     int32_t prio,
                                     sys_spu_thread_group_attribute_t* attr,
                                     MainMemory* mm) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     //assert(attr->type == SYS_SPU_THREAD_GROUP_TYPE_NORMAL);
     auto group = std::make_shared<ThreadGroup>();
     group->name.resize(attr->nsize);
@@ -252,7 +252,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
         spuImageInit(g_state.mm, g_state.memalloc, img, img->entry_point, true);
     }
     
-    LOG << ssnprintf("sys_spu_thread_initialize() source=%x", img->segs);
+    INFO(libs) << ssnprintf("sys_spu_thread_initialize() source=%x", img->segs);
     auto group = groups.get(group_id);
     std::string name;
     name.resize(attr->nsize);
@@ -388,7 +388,7 @@ int32_t sys_raw_spu_create_interrupt_tag(sys_raw_spu_t id,
                                          unsigned class_id,
                                          uint32_t unused,
                                          sys_interrupt_tag_t* intrtag) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto tag = std::make_shared<InterruptTag>();
     tag->classId = (TagClassId)class_id;
     tag->rawSpu = rawSpus.get(id);
@@ -401,7 +401,7 @@ int32_t sys_interrupt_thread_establish(sys_interrupt_thread_handle_t* ih,
                                        sys_interrupt_tag_t intrtag,
                                        uint32_t intrthread,
                                        uint64_t arg) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     auto th = dynamic_cast<InterruptPPUThread*>(g_state.proc->getThread(intrthread));
     auto tag = interruptTags.get(intrtag);
     tag->interruptThread = th;
@@ -423,7 +423,7 @@ int32_t sys_interrupt_tag_destroy(sys_interrupt_tag_t intrtag) {
 int32_t sys_raw_spu_set_int_mask(sys_raw_spu_t id,
                                  uint32_t class_id,
                                  uint64_t mask) {
-    LOG << __FUNCTION__;
+    INFO(libs) << __FUNCTION__;
     assert(class_id == 2);
     auto rawSpu = rawSpus.get(id);
     auto interruptThread = rawSpu->tag->interruptThread;

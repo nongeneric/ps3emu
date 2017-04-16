@@ -140,7 +140,7 @@ struct TextureCacheKey {
                         other.width,
                         other.height,
                         other.internalType,
-                        lnUn);
+                        other.lnUn);
     }
 };
 

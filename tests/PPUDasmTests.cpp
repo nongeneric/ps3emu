@@ -533,7 +533,7 @@ TEST_CASE("ppu_dasm_1") {
 }
 
 TEST_CASE("analyze_1") {
-    auto info = analyze(0x4e800020, 0x12e3c);
+    auto info = analyze(0x4e800020, 0x12e3c); // blr
     REQUIRE(!info.passthrough);
     REQUIRE(info.flow);
     REQUIRE(info.target == 0);

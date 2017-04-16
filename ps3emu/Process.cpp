@@ -135,7 +135,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
         throw std::runtime_error("glfw initialization failed");
     }
     
-    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
+    if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0) {
         ERROR(libs) << ssnprintf("SDL initialization failed: %s", SDL_GetError());
         exit(1);
     }
@@ -384,7 +384,7 @@ uint64_t Process::createThread(uint32_t stackSize,
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     t->setGPR(3, arg);
     auto id = _threadIds.create(std::move(t));
-    LOG << ssnprintf("thread %d created", id);
+    INFO(libs) << ssnprintf("thread %d created", id);
     t->setId(id, name);
     if (start)
         t->run();
@@ -404,7 +404,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
     t->setEntry(entryPointDescriptorVa);
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     auto id = _threadIds.create(std::move(t));
-    LOG << ssnprintf("interrupt thread %d created", id);
+    INFO(libs) << ssnprintf("interrupt thread %d created", id);
     if (start)
         t->run();
     _threads.emplace_back(std::unique_ptr<PPUThread>(t));
@@ -495,7 +495,7 @@ uint32_t Process::createSpuThread(std::string name) {
     auto t = _spuThreads.back();
     auto id = _spuThreadIds.create(std::move(t));
     _spuThreadIds.get(id)->setId(id);
-    LOG << ssnprintf("spu thread %d created", id);
+    INFO(libs) << ssnprintf("spu thread %d created", id);
     return id;
 }
 

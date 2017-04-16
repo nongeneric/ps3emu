@@ -6,6 +6,8 @@ struct DbgConfig {
     bool StopAtNewModule = false;
     bool LogSpu = true;
     bool LogRsx = true;
+    bool LogLibs = true;
+    bool LogCache = true;
     bool CaptureRsx = true;
     bool EnableSpursTrace = true;
     bool LogDates = false;
@@ -17,6 +19,8 @@ struct DbgConfig {
            StopAtNewModule,
            LogSpu,
            LogRsx,
+           LogLibs,
+           LogCache,
            CaptureRsx,
            EnableSpursTrace,
            LogDates);

@@ -16,7 +16,7 @@ void emulate(std::string path, std::vector<std::string> args) {
     for (;;) {
         auto untyped = proc.run();
         if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
-            LOG << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
+            INFO(libs) << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
             return;
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             return;
@@ -34,7 +34,7 @@ void sigint_handler(int sig) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string elfPath, elfArgs, verbosity, filter, sinks, format;
+    std::string elfPath, elfArgs, verbosity, filter, sinks, format, area;
     options_description consoleDescr("Allowed options");
     try {
         consoleDescr.add_options()
@@ -49,6 +49,8 @@ int main(int argc, char* argv[]) {
                 "logging sinks: file, console [e.g. file,console]")
             ("format", value<std::string>(&format)->default_value("simple"),
                 "logging format: date, simple")
+            ("area", value<std::string>(&area)->default_value("trace"),
+                "logging area: trace, perf")
             ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),
                 "rewritten and compiled x86 so file")
             ;
@@ -69,6 +71,7 @@ int main(int argc, char* argv[]) {
     log_init(log_parse_sinks(sinks),
              log_parse_verbosity(verbosity),
              log_parse_filter(filter),
+             log_parse_area(area),
              log_parse_format(format));
 
     signal(SIGSEGV, sigsegv_handler);

@@ -197,6 +197,26 @@ void MainWindow::setupMenu() {
         settings->addAction(action);
     }
     {
+        auto action = new QAction("Log libs", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().LogLibs);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().LogLibs = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
+        auto action = new QAction("Log cache", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().LogCache);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().LogCache = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
         auto action = new QAction("Capture RSX", this);
         action->setCheckable(true);
         action->setChecked(g_config.config().CaptureRsx);

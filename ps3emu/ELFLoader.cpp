@@ -169,7 +169,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
             prxPh1Va = va = ::align(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
         }
         
-        LOG << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
+        INFO(libs) << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
             (uint64_t)ph->p_filesz, va, va + ph->p_memsz, imageBase);
         
         g_state.mm->mark(va,
@@ -384,7 +384,7 @@ uint32_t findExportedEmuFunction(uint32_t id) {
     } else {
         name = ncallEntry->name;
     }
-    LOG << ssnprintf("    %s (ncall %x)", name, index);
+    INFO(libs) << ssnprintf("    %s (ncall %x)", name, index);
     
     g_state.mm->setMemory(ncallDescrVa, 0, 8);
     g_state.mm->store32(ncallDescrVa, ncallDescrVa + 4);

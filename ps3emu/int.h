@@ -6,13 +6,13 @@
 using uint128_t = __uint128_t;
 using int128_t = __int128_t;
 
-namespace boost::endian {
+namespace boost { namespace endian {
     typedef endian_arithmetic<order::big, __int128_t, 128> big_int128_t;
     typedef endian_arithmetic<order::big, __uint128_t, 128> big_uint128_t;
     inline uint128_t endian_reverse(uint128_t x) BOOST_NOEXCEPT {
         return *(big_uint128_t*)&x;
     }
-}
+}}
 
 using namespace boost::endian;
 
@@ -49,7 +49,6 @@ struct IntTraits<16> {
     using Type = big_uint128_t;
 };
 
-template <typename T>
-constexpr T log2(T n) {
-    return n < 2 ? 1 : 1 + log2(n / 2);
+constexpr uint32_t constexpr_log2(uint32_t n, uint32_t p = 0) {
+    return n <= 1 ? p : constexpr_log2(n / 2, p + 1);
 }

@@ -125,19 +125,6 @@ void mapPrxStore() {
     g_state.config->save();
 }
 
-std::vector<uint32_t> readFuncList(std::string path) {
-    std::vector<uint32_t> entries;
-    if (exists(path)) {
-        std::ifstream f(path);
-        assert(f.is_open());
-        std::string line;
-        while (std::getline(f, line)) {
-            entries.push_back(std::stoi(line, 0, 16));
-        }
-    }
-    return entries;
-}
-
 std::string printEntriesString(std::vector<uint32_t> const& entries) {
     if (entries.empty())
         return "";
@@ -156,9 +143,10 @@ void rewritePrxStore() {
     script.variable("opt", static_debug ? "-O0 -ggdb -DNDEBUG" : "-O2 -ggdb -DNDEBUG");
     script.variable("trace", "");
     script.variable("entries", "");
+    script.variable("entries-file", "");
     auto ps3tool = ps3toolPath();
-    script.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $out --image-base $imagebase $entries");
-    script.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $out --image-base $imagebase $entries");
+    script.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $out --image-base $imagebase $entries $entries-file");
+    script.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $out --image-base $imagebase $entries $entries-file");
     script.rule("compile", compileRule());
     
     for (auto& prxInfo : prxInfos) {
@@ -194,25 +182,21 @@ void rewritePrxStore() {
         }
         
         auto imagebaseVar = std::make_tuple("imagebase", ssnprintf("%x", prxInfo.imageBase));
+        auto entriesPath = prxPath + ".entries";
+        std::vector<std::tuple<std::string, std::string>> vars;
+        if (exists(entriesPath)) {
+            vars.push_back({"entries-file", "--entries-file " + entriesPath});
+        }
+        vars.push_back(imagebaseVar);
         
         if (prxInfo.loadx86) {
-            for (auto func : readFuncList(prxPath + ".entries"))
-                ppuEntries.push_back(func);
-            
-            auto rewriteVar = std::make_tuple("entries", printEntriesString(ppuEntries));
+            vars.push_back({"entries", printEntriesString(ppuEntries)});
             auto cpp = prxPath + ".cpp";
-            script.statement("rewrite-ppu", prxPath, cpp, {rewriteVar, imagebaseVar});
+            script.statement("rewrite-ppu", prxPath, cpp, vars);
             script.statement("compile", cpp, prxPath + ".x86.so", compileVars);
         }
         
         if (prxInfo.loadx86spu) {
-            auto entries = readFuncList(prxPath + ".spu.entries");
-            std::vector<std::tuple<std::string, std::string>> vars;
-            vars.push_back(imagebaseVar);
-            auto entriesString = printEntriesString(entries);
-            if (!entriesString.empty()) {
-                vars.push_back(std::make_tuple("entries", entriesString));
-            }
             auto cpp = prxPath + ".spu.cpp";
             script.statement("rewrite-spu", prxPath, prxPath + ".spu.cpp", vars);
             script.statement("compile", cpp, prxPath + ".x86spu.so", compileVars);

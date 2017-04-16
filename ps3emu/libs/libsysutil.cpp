@@ -101,7 +101,7 @@ int32_t cellSysutilGetSystemParamInt(int32_t id, big_int32_t* value) {
         case CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_AUTOOFF: *value = 0; break;
         case CELL_SYSUTIL_SYSTEMPARAM_ID_MAGNETOMETER: *value = 0; break;
         default: {
-            LOG << ssnprintf("cellSysutilGetSystemParamInt: unknown param requested %d", id);
+            INFO(libs) << ssnprintf("cellSysutilGetSystemParamInt: unknown param requested %d", id);
             throw std::runtime_error("unknown param");
         }
     }
@@ -118,7 +118,7 @@ int32_t cellSysutilGetSystemParamString(int32_t id, ps3_uintptr_t buf, uint32_t 
             mm->writeMemory(buf, nickname.c_str(), std::min<uint32_t>(nickname.size() + 1, bufsize));
             break;
         default: {
-            LOG << ssnprintf("cellSysutilGetSystemParamString: unknown param requested %d", id);
+            INFO(libs) << ssnprintf("cellSysutilGetSystemParamString: unknown param requested %d", id);
             throw std::runtime_error("unknown param");
         }
     }
@@ -129,7 +129,7 @@ int32_t cellSysutilGetSystemParamString(int32_t id, ps3_uintptr_t buf, uint32_t 
 #define CELL_SYSCACHE_RET_OK_RELAYED            (1)
 
 int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
-    LOG << ssnprintf("cellSysCacheMount(id = %s)", param->cacheId);
+    INFO(libs) << ssnprintf("cellSysCacheMount(id = %s)", param->cacheId);
     auto cacheDir = g_state.content->cacheDir();
     auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
     system(ssnprintf("mkdir -p \"%s\"", hostCacheDir).c_str());
@@ -139,7 +139,7 @@ int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
 }
 
 int32_t cellSysCacheClear(Process* proc) {
-    LOG << ssnprintf("cellSysCacheClear");
+    INFO(libs) << ssnprintf("cellSysCacheClear");
     auto cacheDir = g_state.content->cacheDir();
     auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
     system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());
@@ -147,7 +147,7 @@ int32_t cellSysCacheClear(Process* proc) {
 }
 
 emu_void_t sys_ppu_thread_once(big_int32_t* once_ctrl, const fdescr* init, PPUThread* th) {
-    LOG << ssnprintf("sys_ppu_thread_once(%d, %x)", *once_ctrl, init);
+    INFO(libs) << ssnprintf("sys_ppu_thread_once(%d, %x)", *once_ctrl, init);
     if (*once_ctrl == 0) {
         th->setNIP(init->va);
         th->setGPR(2, init->tocBase);

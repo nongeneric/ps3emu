@@ -24,6 +24,42 @@ TEST_CASE("modification_map_simple") {
     REQUIRE(map.marked(255, 1));
     REQUIRE(map.marked(0, 512));
     REQUIRE(!map.marked(512, 1));
+    
+    map.mark(0, 1024 - 32);
+    REQUIRE(map.marked(0, 1024 - 32));
+    map.reset(0, 1024 - 32);
+    REQUIRE(!map.marked(0, 1024 - 32));
+    
+    map.mark(64, 110);
+    REQUIRE(map.marked(64, 110));
+    map.reset(64, 110);
+    REQUIRE(!map.marked(64, 110));
+    
+    map.mark(60, 110);
+    REQUIRE(map.marked(60, 110));
+    map.reset(60, 110);
+    REQUIRE(!map.marked(60, 110));
+    
+    map.mark(60, 8);
+    REQUIRE(map.marked(60, 8));
+    map.reset(60, 8);
+    REQUIRE(!map.marked(60, 8));
+    
+    map.mark(60, 2);
+    REQUIRE(map.marked(60, 2));
+    map.reset(60, 2);
+    REQUIRE(!map.marked(60, 2));
+}
+
+TEST_CASE("constexpr_log_test") {
+    static_assert(constexpr_log2(1u << 20) == 20);
+    static_assert(constexpr_log2(1u) == 0);
+    static_assert(constexpr_log2(2) == 1);
+    static_assert(constexpr_log2(10) == 3);
+    REQUIRE(constexpr_log2(1u << 20) == 20);
+    REQUIRE(constexpr_log2(1u) == 0);
+    REQUIRE(constexpr_log2(2) == 1);
+    REQUIRE(constexpr_log2(10) == 3);
 }
 
 TEST_CASE("swizzle_coord_convert") {
