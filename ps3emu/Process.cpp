@@ -218,7 +218,7 @@ uint32_t Process::loadPrx(std::string path) {
     std::vector<std::string> x86paths;
     if (prxInfo) {
         auto x86path = path + ".x86.so";
-        auto x86spuPath = path + ".x86spu.so";
+        auto x86spuPath = path + ".spu.x86.so";
         if (prxInfo->loadx86 && exists(x86path)) {
             x86paths.push_back(x86path);
         }

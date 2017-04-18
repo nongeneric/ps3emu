@@ -31,36 +31,36 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     return QString(proc.readAll()).toStdString();
 }
 
-bool rewrite_and_compile(std::string elf, std::string cppPath, std::string soPath) {
+bool rewrite_and_compile(std::string elf, std::string cppPath) {
     auto line = rewrite(elf, cppPath, "");
     std::string output;
     auto res = exec(line, output);
     if (!res)
         return false;
-    line = compile({cppPath, soPath, false, false});
+    line = compile(cppPath + ".ninja");
     return exec(line, output);
 }
 
-bool rewrite_and_compile_spu(std::string elf, std::string cppPath, std::string soPath) {
+bool rewrite_and_compile_spu(std::string elf, std::string cppPath) {
     auto line = rewrite(elf, cppPath, "--spu");
     std::string output;
     auto res = exec(line, output);
     if (!res)
         return false;
-    line = compile({cppPath, soPath, false, false});
+    line = compile(cppPath + ".ninja");
     return exec(line, output);
 }
 
 void test_interpreter_and_rewriter(std::vector<std::string> args, std::string expected) {
     auto id = getpid();
-    auto spuSoPath = ssnprintf("/tmp/ps3_x86spu_%d_spu.so", id);
-    auto spuCppPath = ssnprintf("/tmp/ps3_x86spu_%d_spu.cpp", id);
-    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.so", id);
-    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d.cpp", id);
+    auto spuSoPath = ssnprintf("/tmp/ps3_spu_%d_spu.x86.so", id);
+    auto spuCppPath = ssnprintf("/tmp/ps3_spu_%d_spu", id);
+    auto soPath = ssnprintf("/tmp/ps3_%d.x86.so", id);
+    auto cppPath = ssnprintf("/tmp/ps3_%d", id);
     auto output = startWaitGetOutput(args);
     REQUIRE( output == expected );
-    REQUIRE( rewrite_and_compile(args[0], cppPath, soPath) );
-    REQUIRE( rewrite_and_compile_spu(args[0], spuCppPath, spuSoPath) );
+    REQUIRE( rewrite_and_compile(args[0], cppPath) );
+    REQUIRE( rewrite_and_compile_spu(args[0], spuCppPath) );
     output = startWaitGetOutput(args, {"--x86", soPath, "--x86", spuSoPath});
     REQUIRE( output == expected );
 }

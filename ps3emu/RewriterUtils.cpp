@@ -5,6 +5,8 @@
 #include <boost/algorithm/string.hpp>
 #include <stdlib.h>
 
+using namespace boost::filesystem;
+
 std::string ps3toolPath() {
     return ssnprintf("%s/ps3tool/ps3tool", getenv("PS3_BIN"));
 }
@@ -12,7 +14,7 @@ std::string ps3toolPath() {
 std::string rewrite(std::string elf, std::string cpp, std::string args) {
     auto line = ssnprintf("%s rewrite --elf %s --cpp %s %s",
                           ps3toolPath(),
-                          boost::filesystem::absolute(elf).string(),
+                          absolute(elf).string(),
                           cpp,
                           args);
     return line;
@@ -20,7 +22,6 @@ std::string rewrite(std::string elf, std::string cpp, std::string args) {
 
 std::string compileRule() {
     auto include = getenv("PS3_INCLUDE");
-    auto lib = std::string(getenv("PS3_BIN")) + "/ps3emu";
     auto memoryProtection =
 #ifdef MEMORY_PROTECTION
         "-DMEMORY_PROTECTION"
@@ -28,21 +29,20 @@ std::string compileRule() {
         ""
 #endif
     ;
-    auto line = ssnprintf("g++ -shared -fPIC -std=c++17 %s $opt $trace -march=native -isystem%s -L%s $in -lps3emu -o $out",
-        memoryProtection, include, lib
+    auto line = ssnprintf("g++ -c -fPIC -std=c++17 %s $opt $trace -march=native -isystem%s $in -o $out",
+        memoryProtection, include
     );
     return line;
 }
 
-std::string compile(CompileInfo const& info) {
-    auto optimization = info.debug || static_debug ? "-O0 -ggdb" : "-O3 -fno-strict-aliasing -DNDEBUG"; // -flto
-    auto trace = info.trace ? "-DTRACE" : "";
-    auto rule = compileRule();
-    boost::replace_first(rule, "$opt", optimization);
-    boost::replace_first(rule, "$trace", trace);
-    boost::replace_first(rule, "$in", info.cpp);
-    boost::replace_first(rule, "$out", info.so);
-    return rule;
+std::string linkRule() {
+    auto lib = std::string(getenv("PS3_BIN")) + "/ps3emu";
+    return ssnprintf("g++ -shared $in -L%s -lps3emu -o $out", lib);
+}
+
+std::string compile(std::string ninja) {
+    auto wd = path(ninja).parent_path().string();
+    return ssnprintf("ninja-build -C %s -f %s", wd, ninja);
 }
 
 bool exec(std::string line, std::string& output) {

@@ -70,9 +70,9 @@ std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t start,
     uint32_t length,
     uint32_t imageBase,
-    std::stack<uint32_t> leadsStack,
+    std::set<uint32_t> leads,
     std::ostream& log,
-    std::function<InstructionInfo(uint32_t)> analyze,
+    analyze_t analyze,
     std::vector<uint32_t>* branches)
 {
     BasicBlockContext context;
@@ -83,11 +83,7 @@ std::vector<BasicBlock> discoverBasicBlocks(
     context.analyze = analyze;
     context.branches = branches;
 
-    std::set<uint32_t> leads;
-    while (!leadsStack.empty()) {
-        auto lead = leadsStack.top();
-        leadsStack.pop();
-        leads.insert(lead);
+    for (auto& lead : leads) {
         if (!subset(lead, 4u, start, length))
             throw std::runtime_error("a lead is outside the segment");
     }

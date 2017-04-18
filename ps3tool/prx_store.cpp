@@ -8,6 +8,7 @@
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/InternalMemoryManager.h"
+#include "ps3tool-core/NinjaScript.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
@@ -18,43 +19,6 @@
 using namespace boost::filesystem;
 using namespace boost::endian;
 using namespace boost::algorithm;
-
-class NinjaScript {
-    std::vector<std::string> _script;
-    
-public:
-    void rule(std::string name, std::string command) {
-        _script.push_back("rule " + name);
-        _script.push_back("  command = " + command);
-        _script.push_back("");
-    }
-    
-    void statement(std::string rule,
-                   std::string in,
-                   std::string out,
-                   std::vector<std::tuple<std::string, std::string>> variables) {
-        _script.push_back(ssnprintf("build %s: %s %s", out, rule, in));
-        for (auto var : variables) {
-            _script.push_back(
-                ssnprintf("  %s = %s", std::get<0>(var), std::get<1>(var)));
-        }
-        _script.push_back("");
-    }
-    
-    void variable(std::string name, std::string value) {
-        _script.push_back(ssnprintf("%s = %s", name, value));
-        _script.push_back("");
-    }
-    
-    std::string dump() {
-        assert(!_script.empty());
-        std::string res = _script[0];
-        for (auto i = 1u; i < _script.size(); ++i) {
-            res += "\n" + _script[i];
-        }
-        return res;
-    }
-};
 
 void mapPrxStore() {
     path prxStorePath = g_state.config->prxStorePath;
@@ -139,15 +103,15 @@ void rewritePrxStore() {
     path prxStorePath = g_state.config->prxStorePath;
     auto& prxInfos = g_state.config->sysPrxInfos;
     
-    NinjaScript script;
-    script.variable("opt", static_debug ? "-O0 -ggdb -DNDEBUG" : "-O2 -ggdb -DNDEBUG");
-    script.variable("trace", "");
-    script.variable("entries", "");
-    script.variable("entries-file", "");
+    NinjaScript rewriteScript;
     auto ps3tool = ps3toolPath();
-    script.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $out --image-base $imagebase $entries $entries-file");
-    script.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $out --image-base $imagebase $entries $entries-file");
-    script.rule("compile", compileRule());
+    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $in --image-base $imagebase $entries $entries-file");
+    rewriteScript.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $in.spu --image-base $imagebase $entries $entries-file");
+    rewriteScript.variable("entries", "");
+    rewriteScript.variable("entries-file", "");
+    
+    NinjaScript buildScript;
+    buildScript.variable("trace", "");
     
     for (auto& prxInfo : prxInfos) {
         auto prxPath = (prxStorePath / "sys" / "external" / prxInfo.name).string();
@@ -175,35 +139,42 @@ void rewritePrxStore() {
             }
         }
         
-        std::vector<std::tuple<std::string, std::string>> compileVars;
-        if (prxInfo.x86trace) {
-            compileVars.push_back(std::make_tuple("opt", "-O0 -ggdb"));
-            compileVars.push_back(std::make_tuple("trace", "-DTRACE"));
-        }
-        
         auto imagebaseVar = std::make_tuple("imagebase", ssnprintf("%x", prxInfo.imageBase));
-        auto entriesPath = prxPath + ".entries";
-        std::vector<std::tuple<std::string, std::string>> vars;
-        if (exists(entriesPath)) {
-            vars.push_back({"entries-file", "--entries-file " + entriesPath});
-        }
-        vars.push_back(imagebaseVar);
         
         if (prxInfo.loadx86) {
+            std::vector<std::tuple<std::string, std::string>> vars;
+            vars.push_back(imagebaseVar);
+            auto entriesPath = prxPath + ".entries";
+            if (exists(entriesPath)) {
+                vars.push_back({"entries-file", "--entries-file " + entriesPath});
+            }
             vars.push_back({"entries", printEntriesString(ppuEntries)});
-            auto cpp = prxPath + ".cpp";
-            script.statement("rewrite-ppu", prxPath, cpp, vars);
-            script.statement("compile", cpp, prxPath + ".x86.so", compileVars);
+            auto out = prxPath + ".ninja";
+            rewriteScript.statement("rewrite-ppu", prxPath, out, vars);
+            buildScript.subninja(out);
+            buildScript.defaultStatement(prxInfo.name + ".x86.so");
         }
         
         if (prxInfo.loadx86spu) {
-            auto cpp = prxPath + ".spu.cpp";
-            script.statement("rewrite-spu", prxPath, prxPath + ".spu.cpp", vars);
-            script.statement("compile", cpp, prxPath + ".x86spu.so", compileVars);
+            auto out = prxPath + ".spu.ninja";
+            rewriteScript.statement("rewrite-spu", prxPath, out, {imagebaseVar});
+            buildScript.subninja(out);
+            buildScript.defaultStatement(prxInfo.name + ".spu.x86.so");
         }
     }
     
-    write_all_text(script.dump(), (prxStorePath / "sys" / "external" / "build.ninja").string());
+    auto relative = prxStorePath / "sys" / "external";
+    write_all_text(rewriteScript.dump(), (relative / "rewrite.ninja").string());
+    write_all_text(buildScript.dump(), (relative / "build.ninja").string());
+    
+    write_all_lines({
+        "#!/bin/bash",
+        "set -e",
+        "ninja-build -f rewrite.ninja -t clean",
+        "ninja-build -f rewrite.ninja -j 5",
+        "ninja-build -f build.ninja -t clean",
+        "ninja-build -f build.ninja"
+    }, (relative / "build.sh").string());
 }
 
 void HandlePrxStore(PrxStoreCommand const& command) {

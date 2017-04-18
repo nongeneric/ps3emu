@@ -40,6 +40,7 @@ set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native -rdynamic ${CMAKE_CXX_FLAGS}")
 
 set(EMU_CONFIGURATION_DEBUG 1)
 set(EMU_CONFIGURATION_TESTS 1)
+set(EMU_CONFIGURATION_PAUSE 1)
 
 if(${EMU_CONFIGURATION_TESTS})
     # enable code required for running tests (small performance hit)
@@ -52,15 +53,17 @@ if(${EMU_CONFIGURATION_DEBUG})
     # detect accesses to unallocated memory (massive performance hit)
     add_definitions(-DMEMORY_PROTECTION)
     
-    # enable thread pausing, required for the dbg-gui (moderate performance hit)
-    add_definitions(-DDEBUGPAUSE)
-    
     set(CMAKE_CXX_FLAGS "-ggdb3 -O0 ${CMAKE_CXX_FLAGS}")
 else()
     # disable all asserts (moderate performance hit)
     add_definitions(-DNDEBUG)
     
     set(CMAKE_CXX_FLAGS "-ggdb3 -O3 -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
+endif()
+
+if(${EMU_CONFIGURATION_PAUSE})
+    # enable thread pausing, required for the dbg-gui (moderate performance hit)
+    add_definitions(-DDEBUGPAUSE)
 endif()
 
 include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
@@ -76,6 +79,9 @@ add_subdirectory(ps3tool)
 
 if(${EMU_CONFIGURATION_DEBUG})
     add_subdirectory(gcmviz)
+endif()
+
+if(${EMU_CONFIGURATION_PAUSE})
     add_subdirectory(dbg-gui)
 endif()
 

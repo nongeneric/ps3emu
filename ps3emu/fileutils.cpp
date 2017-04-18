@@ -1,5 +1,6 @@
 #include "fileutils.h"
 
+#include <boost/algorithm/string.hpp>
 #include <stdio.h>
 #include <stdexcept>
 
@@ -33,4 +34,9 @@ std::string read_all_text(std::experimental::string_view path) {
 
 void write_all_text(std::experimental::string_view text, std::experimental::string_view path) {
     write_all_bytes(&text[0], text.size(), path);
+}
+
+void write_all_lines(std::vector<std::string> lines, std::experimental::string_view path) {
+    auto str = boost::algorithm::join(lines, "\n");
+    write_all_text(str, path);
 }

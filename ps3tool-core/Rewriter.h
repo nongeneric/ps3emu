@@ -8,10 +8,15 @@
 #include <ostream>
 #include <stack>
 
+using analyze_t = std::function<InstructionInfo(uint32_t)>;
+
 struct BasicBlock {
     uint32_t start = 0;
     uint32_t len = 0;
     std::vector<std::string> body;
+    bool operator<(BasicBlock const& other) {
+        return start < other.start;
+    }
 };
 
 inline bool operator<(BasicBlock const& left, BasicBlock const& right) {
@@ -29,9 +34,9 @@ std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t start,
     uint32_t length,
     uint32_t imageBase,
-    std::stack<uint32_t> leads,
+    std::set<uint32_t> leads,
     std::ostream& log,
-    std::function<InstructionInfo(uint32_t)> analyze,
+    analyze_t analyze,
     std::vector<uint32_t>* branches = nullptr);
 
 std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const& elf);

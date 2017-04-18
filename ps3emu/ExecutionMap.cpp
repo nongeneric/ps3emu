@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <algorithm>
+#include <set>
 #include "ps3emu/utils.h"
 #include <assert.h>
 
@@ -30,7 +31,8 @@ std::vector<uint32_t> ExecutionMap::dump(uint32_t start, uint32_t len) {
 
 std::string serializeEntries(std::vector<uint32_t> const& vec) {
     std::string res;
-    for (auto va : vec) {
+    std::set<uint32_t> set(begin(vec), end(vec));
+    for (auto va : set) {
         res += ssnprintf("%08x\n", va);
     }
     return res;

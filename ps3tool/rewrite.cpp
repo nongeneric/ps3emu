@@ -5,12 +5,17 @@
 #include "ps3emu/spu/SPUDasm.h"
 #include "ps3emu/utils.h"
 #include "ps3tool-core/Rewriter.h"
+#include "ps3tool-core/GraphTools.h"
+#include "ps3tool-core/SetTools.h"
+#include "ps3tool-core/NinjaScript.h"
+#include "ps3emu/RewriterUtils.h"
 #include "ps3emu/rewriter.h"
 #include "ps3emu/fileutils.h"
 #include "ps3emu/InternalMemoryManager.h"
 
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <stack>
 #include <set>
@@ -19,21 +24,12 @@
 #include <fstream>
 #include <assert.h>
 
+using namespace boost::algorithm;
 using namespace boost::endian;
 using namespace boost::filesystem;
 
-auto header =
-R"(#define EMU_REWRITER
-#include <ps3emu/ppu/PPUThread.h>
-#include <ps3emu/ppu/ppu_dasm.cpp>
-#include <ps3emu/spu/SPUDasm.cpp>
-#include <ps3emu/rewriter.h>
-#include <ps3emu/log.h>
-
-#include <stdio.h>
-#include <functional>
-#include <string>
-#include <vector>
+auto mainText =
+R"(#include "{headerName}.h"
 
 FILE *f, *spuf;
 void init() {
@@ -85,6 +81,27 @@ void logSPU(uint32_t nip, SPUThread* thread) {
     fprintf(spuf, "\n");
     fflush(spuf);
 }
+#endif
+)";
+
+auto header =
+R"(#define EMU_REWRITER
+#include <ps3emu/ppu/PPUThread.h>
+#include <ps3emu/ppu/ppu_dasm.cpp>
+#include <ps3emu/spu/SPUDasm.cpp>
+#include <ps3emu/rewriter.h>
+#include <ps3emu/log.h>
+
+#include <stdio.h>
+#include <functional>
+#include <string>
+#include <vector>
+
+void init();
+
+#ifdef TRACE
+void log(uint32_t nip, PPUThread* thread);
+void logSPU(uint32_t nip, SPUThread* thread);
 #else
 #define log(a, b)
 #define logSPU(a, b)
@@ -120,7 +137,29 @@ struct SegmentInfo {
     std::vector<BasicBlockInfo> blocks;
 };
 
-SegmentInfo rewritePPU(RewriteCommand const& command, std::ofstream& log) {
+std::tuple<uint32_t, uint32_t> outOfPartTargets(BasicBlock const& block, std::vector<BasicBlock> const& part, auto analyzeFunc) {
+    auto info = analyzeFunc(block.start + block.len - 4);
+    auto find = [&](uint32_t target) {
+        return part.end() != std::find_if(part.begin(), part.end(), [&](auto& block) {
+            return block.start == target;
+        });
+    };
+    uint32_t target = 0, fallthrough = block.start + block.len;
+    if (find(fallthrough)) {
+        fallthrough = 0;
+    }
+    if (info.flow && info.target) {
+        if (!find(info.target)) {
+            target = info.target;
+        }
+        if (!info.passthrough) {
+            fallthrough = 0;
+        }
+    }
+    return {target, fallthrough};
+}
+
+std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream& log) {
     ELFLoader elf;
     RewriterStore rewriterStore;
     elf.load(command.elf);
@@ -132,46 +171,67 @@ SegmentInfo rewritePPU(RewriteCommand const& command, std::ofstream& log) {
         }
     }, command.imageBase, {}, &rewriterStore);
     
-    std::stack<uint32_t> leads;
+    std::set<uint32_t> leads;
     if (!command.imageBase) {
         fdescr epDescr;
         g_state.mm->readMemory(elf.entryPoint(), &epDescr, sizeof(fdescr));
-        leads.push(epDescr.va);
+        leads.insert(epDescr.va);
     }
     
     for (auto ep : command.entryPoints) {
-        leads.push(ep + command.imageBase);
+        leads.insert(ep + command.imageBase);
     }
+    
+    auto analyzeFunc = [&](uint32_t cia) { return analyze(g_state.mm->load32(cia), cia); };
     
     auto blocks = discoverBasicBlocks(
-        vaBase, segmentSize, command.imageBase, leads, log, [&](uint32_t cia) {
-            return analyze(g_state.mm->load32(cia), cia);
-        });
+        vaBase, segmentSize, command.imageBase, leads, log, analyzeFunc);
+    auto parts = partitionBasicBlocks(blocks, analyzeFunc);
     
-    SegmentInfo info;
-    
-    for (auto& block : blocks) {
-        for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
-            std::string rewritten, printed;
-            big_uint32_t instr = g_state.mm->load32(cia);
-            try {
-                ppu_dasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
-                ppu_dasm<DasmMode::Print>(&instr, cia, &printed);
-            } catch (...) {
-                rewritten = "throw std::runtime_error(\"dasm error\")";
-                printed = "error";
-                auto file = path(command.elf).filename().string();
-                auto rva = cia - command.imageBase;
-                std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
+    for (auto& part : parts) {
+        for (auto& block : part) {
+            for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
+                std::string rewritten, printed;
+                big_uint32_t instr = g_state.mm->load32(cia);
+                try {
+                    ppu_dasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
+                    ppu_dasm<DasmMode::Print>(&instr, cia, &printed);
+                } catch (...) {
+                    rewritten = "throw std::runtime_error(\"dasm error\")";
+                    printed = "error";
+                    auto file = path(command.elf).filename().string();
+                    auto rva = cia - command.imageBase;
+                    std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
+                }
+                block.body.push_back(ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;", cia, printed, cia, rewritten));
             }
-            block.body.push_back(ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;", cia, printed, cia, rewritten));
+            auto [target, fallthrough] = outOfPartTargets(block, part, analyzeFunc);
+            if (target) {
+                block.body.insert(block.body.begin(), "#define SET_NIP SET_NIP_INDIRECT");
+                block.body.insert(block.body.begin(), "#undef SET_NIP");
+                block.body.insert(block.body.begin(), ssnprintf("// target %x leads out of part", target));
+                block.body.push_back("#undef SET_NIP");
+                block.body.push_back("#define SET_NIP SET_NIP_INITIAL");
+            }
+            if (fallthrough) {
+                block.body.insert(block.body.begin(), ssnprintf("// possible fallthrough %x leads out of part", fallthrough));
+                block.body.push_back(ssnprintf("SET_NIP_INDIRECT(0x%x);", fallthrough));
+            }
         }
-        info.blocks.push_back({block.start, block.len, block.body, block.start});
     }
     
-    info.isSpu = false;
-    info.suffix = "ppu";
-    return info;
+    std::vector<SegmentInfo> infos;
+    for (auto i = 0u; i < parts.size(); i++) {
+        SegmentInfo info;
+        info.isSpu = false;
+        info.suffix = ssnprintf("ppu_bin_%d", i);
+        for (auto& block : parts[i]) {
+            info.blocks.push_back({block.start, block.len, block.body, block.start});
+        }
+        infos.push_back(info);
+    }
+    
+    return infos;
 }
 
 std::vector<uint32_t> selectStart(std::vector<BasicBlock> blocks) {
@@ -188,15 +248,6 @@ std::vector<uint32_t> selectSubset(std::vector<uint32_t> leads, uint32_t start, 
         return subset<uint32_t>(lead, 4, start, len);
     });
     return res;
-}
-
-template <typename T>
-std::stack<T> toStack(std::vector<T> container) {
-    std::stack<T> stack;
-    for (auto& e : container) {
-        stack.push(e);
-    }
-    return stack;
 }
 
 std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream& log) {
@@ -254,7 +305,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 if (segmentLeads.empty())
                     continue;
                 auto blocks = discoverBasicBlocks(
-                    segment.p_vaddr, segment.p_filesz, 0, toStack(segmentLeads), log, [&](uint32_t cia) {
+                    segment.p_vaddr, segment.p_filesz, 0, toSet(segmentLeads), log, [&](uint32_t cia) {
                         auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);
                         return analyzeSpu(g_state.mm->load32(elfVa), cia);
                     }, &leads);
@@ -269,7 +320,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 continue;
             
             auto blocks = discoverBasicBlocks(
-                segment.p_vaddr, segment.p_filesz, 0, toStack(segmentLeads), log, [&](uint32_t cia) {
+                segment.p_vaddr, segment.p_filesz, 0, toSet(segmentLeads), log, [&](uint32_t cia) {
                     auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);
                     return analyzeSpu(g_state.mm->load32(elfVa), cia);
                 });
@@ -341,6 +392,121 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
     return infos;
 }
 
+std::string entrySignature(auto& segment) {
+    return ssnprintf("void entryPoint_%s(%sThread* thread, int label%s)",
+                     segment.suffix,
+                     segment.isSpu ? "SPU" : "PPU",
+                     segment.isSpu ? ", uint32_t bb_va" : "");
+}
+
+void printHeader(std::string name, std::vector<SegmentInfo> const& segments) {
+    std::ofstream f(name);
+    assert(f.is_open());
+    
+    f << header;
+    
+    for (auto& segment : segments) {
+        f << entrySignature(segment) << ";\n";
+    }
+    
+    for (auto& segment : segments) {
+        f << ssnprintf("extern std::vector<RewrittenBlock> segment_%s_blocks;\n", segment.suffix);
+    }
+    
+    for (auto& segment : segments) {
+        f << ssnprintf("extern RewrittenSegment segment_%s;\n", segment.suffix);
+    }
+}
+
+void printMain(std::string name, std::vector<SegmentInfo> const& segments) {
+    std::ofstream f(name);
+    assert(f.is_open());
+
+    std::string text = mainText;
+    replace_first(text, "{headerName}", basename(name));
+    f << text, 
+    
+    f << "extern \"C\" {\n";
+    f << "    RewrittenSegmentsInfo info {\n";
+    f << "        {\n";
+    for (auto& segment : segments) {
+        f << ssnprintf("            segment_%s,\n", segment.suffix);
+    }
+    f << "        }, \n";
+    f << "        init\n";
+    f << "    };\n";
+    f << "};\n";
+}
+
+void printSegment(std::string baseName, std::string name, SegmentInfo const& segment) {
+    std::ofstream f(name);
+    assert(f.is_open());
+    
+    f << ssnprintf("#include \"%s.h\"\n\n", baseName);
+    
+    f << ssnprintf("std::vector<RewrittenBlock> segment_%s_blocks {\n", segment.suffix);
+    for (auto& block : segment.blocks) {
+        f << ssnprintf("    { 0x%x, 0x%x },\n", block.start, block.len);
+    }
+    f << "};\n";
+    
+    f << ssnprintf("RewrittenSegment segment_%s {\n", segment.suffix);
+    auto entryName = ssnprintf("entryPoint_%s", segment.suffix);
+    auto ppuEntry = segment.isSpu ? "nullptr" : entryName;
+    auto spuEntry = segment.isSpu ? entryName : "nullptr";
+    auto blocks = ssnprintf("&segment_%s_blocks", segment.suffix);
+    f << ssnprintf("    %s, %s, \"%s\", %s,\n",
+                   ppuEntry,
+                   spuEntry,
+                   segment.suffix,
+                   blocks);
+    f << "};\n";
+    
+    f << entrySignature(segment) << " {\n";
+    f << "    static void* labels[] = {\n";
+    for (auto& block : segment.blocks) {
+        f << ssnprintf("        &&_0x%xu,\n", block.label);
+    }
+    f << "    };\n\n";
+    f << "    uint32_t pic_offset = 0;\n";
+    f << "    bool pic_offset_set = false;\n";
+    f << "    goto *labels[label];\n\n";
+    for (auto& block : segment.blocks) {
+        f << ssnprintf("    _0x%xu:\n", block.label);
+        for (auto& line : block.body) {
+            f << ssnprintf("        %s\n", line);
+        }
+    }
+    f << "}\n";
+}
+
+void printNinja(std::string name, std::vector<SegmentInfo> const& segments) {
+    NinjaScript script;
+    script.variable("opt", static_debug ? "-O0 -ggdb -DNDEBUG" : "-O3 -ggdb -DNDEBUG");
+    script.variable("trace", "");
+    script.rule("compile", compileRule());
+    script.rule("link", linkRule());
+    std::string objects;
+    auto baseName = basename(name);
+    for (auto i = 0u; i < segments.size(); ++i) {
+        auto in = ssnprintf("%s.segment_%d.cpp", baseName, i);
+        auto out = ssnprintf("%s.segment_%d.o", baseName, i);
+        script.statement("compile", in, out, {});
+        objects += out + " ";
+    }
+    auto inMain = ssnprintf("%s.cpp", baseName);
+    auto outMain = ssnprintf("%s.o", baseName);
+    script.statement("compile", inMain, outMain, {});
+    objects += outMain;
+    
+    auto out = ssnprintf("%s.x86.so", baseName);
+    script.statement("link", objects, out, {});
+    
+    std::ofstream f(name);
+    assert(f.is_open());
+    f << script.dump();
+}
+
 void HandleRewrite(RewriteCommand const& command) {
     MainMemory mm;
     if (!g_state.mm) {
@@ -358,74 +524,18 @@ void HandleRewrite(RewriteCommand const& command) {
     if (command.isSpu) {
         segmentInfos = rewriteSPU(command, log);
     } else {
-        segmentInfos.push_back(rewritePPU(command, log));
+        segmentInfos = rewritePPU(command, log);
     }
 
-    std::ofstream f(command.cpp.c_str());
-    assert(f.is_open());
+    auto headerName = command.cpp + ".h";
+    auto ninjaName = command.cpp + ".ninja";
+    auto mainName = command.cpp + ".cpp";
     
-    f << header;
-    
-    auto entrySignature = [&](auto& segment) {
-        return ssnprintf("void entryPoint_%s(%sThread* thread, int label%s)",
-                         segment.suffix,
-                         segment.isSpu ? "SPU" : "PPU",
-                         segment.isSpu ? ", uint32_t bb_va" : "");
-    };
-    
-    for (auto& segment : segmentInfos) {
-        f << entrySignature(segment) << ";\n";
-    }
-    
-    for (auto& segment : segmentInfos) {
-        f << ssnprintf("std::vector<RewrittenBlock> segment_%s_blocks {\n", segment.suffix);
-        for (auto& block : segment.blocks) {
-            f << ssnprintf("    { 0x%x, 0x%x },\n", block.start, block.len);
-        }
-        f << "};\n";
-    }
-    
-    for (auto& segment : segmentInfos) {
-        f << ssnprintf("RewrittenSegment segment_%s {\n", segment.suffix);
-        auto entryName = ssnprintf("entryPoint_%s", segment.suffix);
-        auto ppuEntry = segment.isSpu ? "nullptr" : entryName;
-        auto spuEntry = segment.isSpu ? entryName : "nullptr";
-        auto blocks = ssnprintf("&segment_%s_blocks", segment.suffix);
-        f << ssnprintf("    %s, %s, \"%s\", %s,\n",
-                        ppuEntry,
-                        spuEntry,
-                        segment.suffix,
-                        blocks);
-        f << "};\n";
-    }
-    
-    f << "extern \"C\" {\n";
-    f << "    RewrittenSegmentsInfo info {\n";
-    f << "        {\n";
-    for (auto& segment : segmentInfos) {
-        f << ssnprintf("            segment_%s,\n", segment.suffix);
-    }
-    f << "        }, \n";
-    f << "        init\n";
-    f << "    };\n";
-    f << "};\n";
-    
-    for (auto& segment : segmentInfos) {
-        f << entrySignature(segment) << " {\n";
-        f << "    static void* labels[] = {\n";
-        for (auto& block : segment.blocks) {
-            f << ssnprintf("        &&_0x%xu,\n", block.label);
-        }
-        f << "    };\n\n";
-        f << "    uint32_t pic_offset = 0;\n";
-        f << "    bool pic_offset_set = false;\n";
-        f << "    goto *labels[label];\n\n";
-        for (auto& block : segment.blocks) {
-            f << ssnprintf("    _0x%xu:\n", block.label);
-            for (auto& line : block.body) {
-                f << ssnprintf("        %s\n", line);
-            }
-        }
-        f << "}\n";
+    printHeader(headerName, segmentInfos);
+    printMain(mainName, segmentInfos);
+    printNinja(ninjaName, segmentInfos);
+    for (auto i = 0u; i < segmentInfos.size(); ++i) {
+        auto segmentName = ssnprintf("%s.segment_%d.cpp", command.cpp, i);
+        printSegment(basename(headerName), segmentName, segmentInfos[i]);
     }
 }

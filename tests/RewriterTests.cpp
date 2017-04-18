@@ -15,8 +15,8 @@
 
 TEST_CASE("rewriter_simple") {
     auto id = getpid();
-    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.so", id);
-    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d.cpp", id);
+    auto soPath = ssnprintf("/tmp/ps3_x86_%d.x86.so", id);
+    auto cppPath = ssnprintf("/tmp/ps3_x86_%d", id);
     std::string output;
     auto line = rewrite(
         "./binaries/rewriter_simple/a.elf",
@@ -25,7 +25,7 @@ TEST_CASE("rewriter_simple") {
         "--ignored 1045c 104c8");
     auto res = exec(line, output);
     REQUIRE(res);
-    line = compile({cppPath, soPath, false, false});
+    line = compile(cppPath + ".ninja");
     res = exec(line, output);
     REQUIRE(res);
     
@@ -72,7 +72,7 @@ TEST_CASE("rewriter_block_discovery_1") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x22ac4, 0x22ae4 - 0x22ac4, 0, std::stack<uint32_t>({0x22ac4u}), log, make_analyze(instrs));
+        0x22ac4, 0x22ae4 - 0x22ac4, 0, std::set<uint32_t>({0x22ac4u}), log, make_analyze(instrs));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks.front();
@@ -118,7 +118,7 @@ TEST_CASE("rewriter_block_discovery_2") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x10B14, 0x1DCE0 - 0x10B14, 0, std::stack<uint32_t>({0x10B14}), log, make_analyze(instrs));
+        0x10B14, 0x1DCE0 - 0x10B14, 0, std::set<uint32_t>({0x10B14}), log, make_analyze(instrs));
     
     REQUIRE(blocks.size() == 3);
     auto block = blocks[0];
@@ -141,7 +141,7 @@ TEST_CASE("rewriter_block_discovery_3") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x7034, 0x7040 - 0x7034, 0, std::stack<uint32_t>({0x7034}), log, make_analyze(instrs));
+        0x7034, 0x7040 - 0x7034, 0, std::set<uint32_t>({0x7034}), log, make_analyze(instrs));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks[0];
@@ -208,7 +208,7 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x0340, 0x03c4 - 0x0340, 0, std::stack<uint32_t>({0x0340}), log, make_analyze(instrs, false));
+        0x0340, 0x03c4 - 0x0340, 0, std::set<uint32_t>({0x0340}), log, make_analyze(instrs, false));
     
     REQUIRE(blocks.size() == 5);
     auto block = blocks[0];
@@ -230,8 +230,8 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
 
 TEST_CASE("spu_rewriter_simple") {
     auto id = getpid();
-    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.so", id);
-    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d.cpp", id);
+    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.x86.so", id);
+    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d", id);
     std::string output;
     auto line = rewrite(
         "./binaries/spurs_task_hello/a.elf",
@@ -239,7 +239,7 @@ TEST_CASE("spu_rewriter_simple") {
         "--spu");
     auto res = exec(line, output);
     REQUIRE(res);
-    line = compile({cppPath, soPath, false, false});
+    line = compile(cppPath + ".ninja");
     res = exec(line, output);
     REQUIRE(res);
     
@@ -259,7 +259,7 @@ TEST_CASE("spu_rewriter_block_discovery_2") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x0340, 12, 0, std::stack<uint32_t>({0x0344}), log, make_analyze(instrs, false));
+        0x0340, 12, 0, std::set<uint32_t>({0x0344}), log, make_analyze(instrs, false));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks[0];
@@ -277,7 +277,7 @@ TEST_CASE("rewriter_block_discovery_optimize_leads_1") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x0340, 16, 0, std::stack<uint32_t>({0x0344, 0x0348, 0x034c}), log, make_analyze(instrs, false));
+        0x0340, 16, 0, std::set<uint32_t>({0x0344, 0x0348, 0x034c}), log, make_analyze(instrs, false));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks[0];
@@ -295,7 +295,7 @@ TEST_CASE("rewriter_block_discovery_optimize_leads_2") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x0340, 16, 0, std::stack<uint32_t>({0x0340, 0x0344, 0x0348}), log, make_analyze(instrs, true));
+        0x0340, 16, 0, std::set<uint32_t>({0x0340, 0x0344, 0x0348}), log, make_analyze(instrs, true));
     
     REQUIRE(blocks.size() == 1);
     auto block = blocks[0];
@@ -330,7 +330,7 @@ TEST_CASE("rewriter_block_discovery_optimize_leads_dont_remove_targets") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x0838, 0x0884 - 0x0838, 0, std::stack<uint32_t>({0x0838}), log, make_analyze(instrs, true));
+        0x0838, 0x0884 - 0x0838, 0, std::set<uint32_t>({0x0838}), log, make_analyze(instrs, true));
     
     REQUIRE(blocks.size() == 3);
     auto block = blocks[0];
@@ -352,7 +352,7 @@ TEST_CASE("rewriter_block_discovery_optimize_leads_dont_remove_bl_ret") {
     std::stringstream log;
     
     auto blocks = discoverBasicBlocks(
-        0x022F24, 8, 0, std::stack<uint32_t>({0x022F24}), log, make_analyze(instrs, true));
+        0x022F24, 8, 0, std::set<uint32_t>({0x022F24}), log, make_analyze(instrs, true));
     
     REQUIRE(blocks.size() == 2);
     auto block = blocks[0];
@@ -376,7 +376,7 @@ TEST_CASE("rewriter_block_discovery_out_of_segment_branches") {
     auto blocks = discoverBasicBlocks(0x035C,
                                       0x0368 - 0x035C,
                                       0,
-                                      std::stack<uint32_t>({0x035C}),
+                                      std::set<uint32_t>({0x035C}),
                                       log,
                                       make_analyze(instrs, false),
                                       &branches);

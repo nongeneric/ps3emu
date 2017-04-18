@@ -39,16 +39,18 @@ using namespace boost::endian;
 #ifdef EMU_REWRITER
     #define RETURN_REWRITER_NCALL return
     #define SET_REWRITER_NCALL g_state.rewriter_ncall = true
-    #define SET_NIP_INDIRECT(x) TH->setNIP(x & ~3ul); return;
-    #define SET_NIP(x) goto _##x
+    #define SET_NIP_INDIRECT(x) {TH->setNIP(x & ~3ul); return;}
+    #define SET_NIP_INITIAL(x) goto _##x
     #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul); LOG_RET(lr); return;
 #else
     #define SET_REWRITER_NCALL g_state.rewriter_ncall = false
     #define RETURN_REWRITER_NCALL
-    #define SET_NIP(x) TH->setNIP(x)
+    #define SET_NIP_INITIAL(x) TH->setNIP(x)
     #define SET_NIP_INDIRECT(x) SET_NIP(x)
     #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul)
 #endif
+
+#define SET_NIP SET_NIP_INITIAL
 
 #define MM g_state.mm
 #define TH thread
