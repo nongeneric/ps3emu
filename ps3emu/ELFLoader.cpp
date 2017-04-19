@@ -151,7 +151,8 @@ uint64_t emuBranch() {
 std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                                            ps3_uintptr_t imageBase,
                                            std::vector<std::string> x86paths,
-                                           RewriterStore* store) {
+                                           RewriterStore* store,
+                                           bool rewriter) {
     uint32_t prxPh1Va = 0;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD && ph->p_type != PT_TLS)
@@ -186,6 +187,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         }
     }
     
+    std::map<uint32_t, uint32_t> bbBytes;
     for (auto& x86path : x86paths) {
         if (!boost::filesystem::exists(x86path))
             throw std::runtime_error("x86 doesn't exist");
@@ -201,7 +203,9 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                                         segment.blocks->size());
                 for (auto i = 0u; i < segment.blocks->size(); ++i) {
                     auto instr = asm_bb_call(index, i);
-                    g_state.mm->store32((*segment.blocks)[i].va, instr);
+                    auto va = (*segment.blocks)[i].va;
+                    bbBytes[va] = g_state.mm->load32(va);
+                    g_state.mm->store32(va, instr);
                 }
             }
         } else {
@@ -271,53 +275,62 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         auto stub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
         if (stub == 0)
             continue;
+        
         auto codeVa = g_state.mm->load32(stub);
+        auto it = bbBytes.find(codeVa);
+        if (it != end(bbBytes)) {
+            auto bytes = it->second;
+            g_state.mm->store32(codeVa, bytes);
+        }
+        
         uint32_t index;
         findNCallEntry(fnid, index, true);
         stolenInfos.push_back({codeVa, stub, g_state.mm->load32(codeVa), index});
         encodeNCall(g_state.mm, codeVa, index);
     }
     
-    std::vector<Replacement> proxies = {
-         { "cellSpurs", "_cellSpursTaskAttribute2Initialize", "_cellSpursTaskAttribute2Initialize_proxy" },
-         { "cellSpurs", "cellSpursCreateTaskset2", "cellSpursCreateTaskset2_proxy" },
-         { "cellSpurs", "cellSpursCreateTaskset", "cellSpursCreateTaskset2_proxy" },
-         { "cellSpurs", "cellSpursCreateTask2", "cellSpursCreateTask2_proxy" },
-         { "cellSpurs", "cellSpursCreateTask", "cellSpursCreateTask2_proxy" },
-         { "cellSpurs", "cellSpursCreateTaskWithAttribute", "cellSpursCreateTaskWithAttribute_proxy" },
-         { "cellSpurs", "cellSpursEventFlagAttachLv2EventQueue", "cellSpursEventFlagAttachLv2EventQueue_proxy" },
-         { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
-         { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
-         { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
-         { "cellSpurs", "_cellSpursAttributeInitialize", "_cellSpursAttributeInitialize_proxy" },
-         { "cellSpurs", "cellSpursAttributeSetSpuThreadGroupType", "cellSpursAttributeSetSpuThreadGroupType_proxy" },
-         { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
-    };
-    
-    for (auto&& repl : proxies) {
-        auto fnid = calcFnid(repl.name.c_str());
-        auto exportStub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
-        if (exportStub == 0)
-            continue;
-        auto codeVa = g_state.mm->load32(exportStub);
+    if (!rewriter) {
+        std::vector<Replacement> proxies = {
+            { "cellSpurs", "_cellSpursTaskAttribute2Initialize", "_cellSpursTaskAttribute2Initialize_proxy" },
+            { "cellSpurs", "cellSpursCreateTaskset2", "cellSpursCreateTaskset2_proxy" },
+            { "cellSpurs", "cellSpursCreateTaskset", "cellSpursCreateTaskset2_proxy" },
+            { "cellSpurs", "cellSpursCreateTask2", "cellSpursCreateTask2_proxy" },
+            { "cellSpurs", "cellSpursCreateTask", "cellSpursCreateTask2_proxy" },
+            { "cellSpurs", "cellSpursCreateTaskWithAttribute", "cellSpursCreateTaskWithAttribute_proxy" },
+            { "cellSpurs", "cellSpursEventFlagAttachLv2EventQueue", "cellSpursEventFlagAttachLv2EventQueue_proxy" },
+            { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
+            { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
+            { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
+            { "cellSpurs", "_cellSpursAttributeInitialize", "_cellSpursAttributeInitialize_proxy" },
+            { "cellSpurs", "cellSpursAttributeSetSpuThreadGroupType", "cellSpursAttributeSetSpuThreadGroupType_proxy" },
+            { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
+        };
         
-        uint32_t enterIndex, exitIndex, branchIndex, index;
-        findNCallEntry(calcFnid("emuProxyEnter"), enterIndex, true);
-        findNCallEntry(calcFnid("emuProxyExit"), exitIndex, true);
-        findNCallEntry(calcFnid("emuBranch"), branchIndex, true);
-        findNCallEntry(calcFnid(repl.proxy.c_str()), index, true);
-        
-        uint32_t stubVa;
-        g_state.memalloc->internalAlloc<4, ProxyStub>(&stubVa);
-        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
-        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall), index);
-        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
-        g_state.mm->store32(stubVa + offsetof(ProxyStub, stolen1), g_state.mm->load32(codeVa));
-        encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
-        branchMap[stubVa + offsetof(ProxyStub, ncall_abs_branch)] = codeVa + 4;
-        
-        encodeNCall(g_state.mm, codeVa, branchIndex);
-        branchMap[codeVa] = stubVa + offsetof(ProxyStub, ncall_proxy_enter);
+        for (auto&& repl : proxies) {
+            auto fnid = calcFnid(repl.name.c_str());
+            auto exportStub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
+            if (exportStub == 0)
+                continue;
+            auto codeVa = g_state.mm->load32(exportStub);
+            
+            uint32_t enterIndex, exitIndex, branchIndex, index;
+            findNCallEntry(calcFnid("emuProxyEnter"), enterIndex, true);
+            findNCallEntry(calcFnid("emuProxyExit"), exitIndex, true);
+            findNCallEntry(calcFnid("emuBranch"), branchIndex, true);
+            findNCallEntry(calcFnid(repl.proxy.c_str()), index, true);
+            
+            uint32_t stubVa;
+            g_state.memalloc->internalAlloc<4, ProxyStub>(&stubVa);
+            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
+            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall), index);
+            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
+            g_state.mm->store32(stubVa + offsetof(ProxyStub, stolen1), g_state.mm->load32(codeVa));
+            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
+            branchMap[stubVa + offsetof(ProxyStub, ncall_abs_branch)] = codeVa + 4;
+            
+            encodeNCall(g_state.mm, codeVa, branchIndex);
+            branchMap[codeVa] = stubVa + offsetof(ProxyStub, ncall_proxy_enter);
+        }
     }
     
     return stolenInfos;

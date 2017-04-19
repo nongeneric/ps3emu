@@ -134,6 +134,7 @@ struct InstructionInfo {
     bool flow = false;
     bool passthrough = false;
     uint32_t target = 0;
+    bool ncall = 0;
 };
 
 #define BB_CALL_OPCODE 0b111101

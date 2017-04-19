@@ -92,9 +92,9 @@ TEST_CASE("gcm_cube_mrt") {
 
 TEST_CASE("gcm_human") {
     runAndWait("./binaries/gcm_human/a.elf");
-    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0);
-    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1);
-    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2);
+    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0, 5, 5);
+    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1, 5, 5);
+    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2, 5, 5);
 }
 
 TEST_CASE("gcm_vertex_shader_branch") {

@@ -12,7 +12,9 @@ sys_rwlock_t lock;
 void test_rwlock_w_entry(uint64_t arg) {
 	int* i = (int*)arg;
 	for (int n = 0; n < 1000; ++n) {
-		sys_rwlock_wlock(lock, 10000);
+		while (sys_rwlock_wlock(lock, 5000) == ETIMEDOUT) {
+			sys_timer_usleep(10);
+		}
 		int tmp = *i;
 		sys_timer_usleep(10);
 		*i = tmp + 1;
@@ -23,8 +25,9 @@ void test_rwlock_w_entry(uint64_t arg) {
 void test_rwlock_w_entry2(uint64_t arg) {
 	int* i = (int*)arg;
 	for (int n = 0; n < 1000; ++n) {
-		while (sys_rwlock_trywlock(lock) != CELL_OK)
+		while (sys_rwlock_trywlock(lock) != CELL_OK) {
 			sys_timer_usleep(10);
+		}
 		(*i)++;
 		sys_rwlock_wunlock(lock);
 	}

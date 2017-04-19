@@ -159,7 +159,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf->load(elfPath);
     _elf->map([&](auto va, auto size, auto index) {
         _segments.push_back({_elf, index, va, size});
-    }, 0, g_state.config->x86Paths, &_rewriterStore);
+    }, 0, g_state.config->x86Paths, &_rewriterStore, false);
     if (!g_state.config->sysPrxInfos.empty()) {
         assert(_segments.back().va + _segments.back().size <
                g_state.config->sysPrxInfos.front().imageBase);
@@ -228,7 +228,7 @@ uint32_t Process::loadPrx(std::string path) {
     }
     auto stolen = prx->map([&](auto va, auto size, auto index) {
         _segments.push_back({prx, index, va, size});
-    }, imageBase, x86paths, &_rewriterStore);
+    }, imageBase, x86paths, &_rewriterStore, false);
     std::copy(begin(stolen), end(stolen), std::back_inserter(_stolenInfos));
     for (auto p : _prxs) {
         p->link(_mainMemory.get(), _prxs);

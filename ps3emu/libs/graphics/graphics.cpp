@@ -14,6 +14,7 @@ void Window::init() {
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         throw std::runtime_error("opengl function loading failed");
     }
+    glfwSwapInterval(-1);
 }
 
 void Window::shutdown() {

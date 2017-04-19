@@ -27,8 +27,14 @@ typedef big_uint64_t second_t;
 typedef big_uint32_t sys_adaptive_t;
 typedef big_uint64_t sys_ipc_key_t;
 
-static constexpr uint32_t CELL_EBUSY = 0x8001000A;
-static constexpr uint32_t CELL_ETIMEDOUT = 0x8001000B;
+#define CELL_ETIMEDOUT -2147418101 /* 0x8001000B */
+#define CELL_EFAULT -2147418099    /* 0x8001000D */
+#define CELL_EINVAL -2147418110    /* 0x80010002 */
+#define CELL_EAGAIN -2147418111    /* 0x80010001 */
+#define CELL_ESRCH -2147418107     /* 0x80010005 */
+#define CELL_EPERM -2147418103     /* 0x80010009 */
+#define CELL_EDEADLK -2147418104   /* 0x80010008 */
+#define CELL_EBUSY -2147418102     /* 0x8001000A */
 
 struct cstring_ptr_t {
     std::string str;

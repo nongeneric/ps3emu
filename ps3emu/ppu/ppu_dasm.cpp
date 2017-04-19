@@ -4357,6 +4357,7 @@ InstructionInfo analyze(uint32_t instr, uint32_t cia) {
     auto xlform2 = reinterpret_cast<XLForm_2*>(&instr);
     if (iform->OPCD.u() == 1) { // ncall
         info.flow = true;
+        info.ncall = true;
     }
     if (iform->OPCD.u() == 18) { // b
         info.flow = true;

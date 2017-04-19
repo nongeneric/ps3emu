@@ -385,7 +385,11 @@ public:
         
         uint32_t instr;
         if (ppu) {
-            g_state.mm->readMemory(row, &instr, sizeof instr);
+            try {
+                g_state.mm->readMemory(row, &instr, sizeof instr, false);
+            } catch (...) {
+                return "err";
+            }
         } else {
             memcpy(&instr, _spuThread->ptr(row), 4);
         }
@@ -446,12 +450,14 @@ public:
     virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) override {
         if (!_thread || !g_state.mm->isAllocated(row))
             return false;
-        uint32_t instr = g_state.mm->load32(row);
-        if (isAbsoluteBranch(instr)) {
-            to = getTargetAddress(instr, row);
-            highlighted = row == _thread->getNIP() && isTaken(instr, row, _thread);
-            return true;
-        }
+        try {
+            uint32_t instr = g_state.mm->load32(row);
+            if (isAbsoluteBranch(instr)) {
+                to = getTargetAddress(instr, row);
+                highlighted = row == _thread->getNIP() && isTaken(instr, row, _thread);
+                return true;
+            }
+        } catch (...) { }
         return false;
     }
 };
@@ -1212,8 +1218,13 @@ void DebuggerModel::dumpExecutionMap() {
             }
         }
         std::copy(begin(newEntries), end(newEntries), std::back_inserter(entries));
-        messagef("dumping %d entries into %s", entries.size(), path);
+        auto newEntriesPath = ssnprintf("/tmp/ps3-newentries-%s", s.elf->shortName());
+        messagef("dumping %d entries into %s (only new entries to %s)",
+                 newEntries.size(),
+                 path,
+                 newEntriesPath);
         write_all_text(serializeEntries(entries), path);
+        write_all_text(serializeEntries(newEntries), newEntriesPath);
         isPrimary = false;
     }
 }

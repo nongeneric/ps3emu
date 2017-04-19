@@ -169,7 +169,7 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
             vaBase = va;
             segmentSize = size;
         }
-    }, command.imageBase, {}, &rewriterStore);
+    }, command.imageBase, {}, &rewriterStore, true);
     
     std::set<uint32_t> leads;
     if (!command.imageBase) {
@@ -269,7 +269,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 vaBase = va;
             }
             mappedSize = va + size;
-        }, command.imageBase, {}, &rewriterStore);
+        }, command.imageBase, {}, &rewriterStore, true);
         body.resize(mappedSize);
         g_state.mm->mark(vaBase, mappedSize, false, "elf");
         g_state.mm->readMemory(vaBase, &body[0], body.size());
