@@ -26,7 +26,14 @@ inline void log_unconditional(log_severity_t severity,
                               std::string const& message) {
     log_unconditional(severity, type, area, message.c_str());
 }
+
+#if LOG_ENABLED
 bool log_should(log_severity_t severity, log_type_t type, log_area_t area);
+#else
+inline bool log_should(log_severity_t severity, log_type_t type, log_area_t area) {
+    return false;
+}
+#endif
 
 class log_sink {
     log_severity_t _severity;

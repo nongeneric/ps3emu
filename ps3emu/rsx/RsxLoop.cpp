@@ -7,8 +7,10 @@
 #include "Tracer.h"
 #include "../log.h"
 #include "ps3emu/state.h"
-
 #include <vector>
+#include <map>
+
+using namespace boost::chrono;
 
 bool isScale(uint32_t value, uint32_t base, uint32_t step, uint32_t maxIndex, uint32_t& index) {
     if (value < base)
@@ -58,6 +60,8 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         assert(n != 0);\
         return read(get + 4 * n);\
     })(x)
+    
+    auto past = high_resolution_clock::now();
     
     auto parseTextureAddress = [&](int argi, int index) {
         union {
@@ -1253,6 +1257,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT";
+                offset = 0x00001a18;
                 parseTextureImageRect(1, index);
                 break;
             }
@@ -1262,6 +1267,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR";
+                offset = 0x00001a1c;
                 parseTextureBorderColor(1, index);
                 break;
             }
@@ -1271,6 +1277,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL0";
+                offset = 0x00001a0c;
                 parseTextureControl0(1, index);
                 break;
             }
@@ -1280,6 +1287,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL1";
+                offset = 0x00001a10;
                 TextureControl1(index, readarg(1));
                 break;
             }
@@ -1289,6 +1297,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_FILTER";
+                offset = 0x00001a14;
                 parseTextureFilter(1, index);
                 break;
             }
@@ -1298,6 +1307,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_ADDRESS";
+                offset = 0x00001a08;
                 parseTextureAddress(1, index);
                 break;
             }
@@ -1307,6 +1317,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         16,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_OFFSET";
+                offset = 0x00001680;
                 union {
                     uint32_t val;
                     BitField<0, 1> location;
@@ -1325,6 +1336,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         16,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_FORMAT";
+                offset = 0x00001740;
                 union {
                     uint32_t val;
                     BitField<0, 16> frequency;
@@ -1347,6 +1359,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         4,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_ADDRESS";
+                offset = 0x00000908;
                 auto arg = readarg(1);
                 VertexTextureAddress(index, arg & 0xff, (arg >> 8) & 0xff);
                 break;
@@ -1357,6 +1370,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_BORDER_COLOR";
+                offset = 0x0000091c;
                 auto c = parseColor(readarg(1));
                 VertexTextureBorderColor(index, c[0], c[1], c[2], c[3]);
                 break;
@@ -1367,6 +1381,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL0";
+                offset = 0x0000090c;
                 union {
                     uint32_t val;
                     BitField<0, 1> enable;
@@ -1388,6 +1403,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FILTER";
+                offset = 0x00000914;
                 union {
                     uint32_t val;
                     BitField<19, 24> integer;
@@ -1402,6 +1418,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_OFFSET";
+                offset = 0x00001a00;
                 assert(count == 2 || count == 8);
                 union {
                     uint32_t val;
@@ -1441,6 +1458,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_TEXIMAGE_COUNT,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL3";
+                offset = 0x00001840;
                 union {
                     uint32_t val;
                     BitField<0, 12> depth;
@@ -1455,6 +1473,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_OFFSET";
+                offset = 0x00000900;
                 union {
                     uint32_t val;
                     BitField<8, 16> mipmap;
@@ -1481,6 +1500,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL3";
+                offset = 0x00000910;
                 VertexTextureControl3(index, readarg(1));
                 break;
             }
@@ -1490,6 +1510,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_IMAGE_RECT";
+                offset = 0x00000918;
                 auto arg = readarg(1);
                 VertexTextureImageRect(index, arg >> 16, arg & 0xffff);
                 break;
@@ -1499,7 +1520,8 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         4,
                         CELL_GCM_MAX_VERTEX_TEXTURE, // conf->texCoordsInputMask
                         index)) {
-                name = "CELL_GCM_NV4097_SET_TEX_COORD_CONTROL";
+                //name = "CELL_GCM_NV4097_SET_TEX_COORD_CONTROL";
+                offset = 0x00000b40;
                 TexCoordControl(index, readarg(1));
                 break;
             }
@@ -1509,6 +1531,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL2";
+                offset = 0x00000b00;
                 union {
                     uint32_t val;
                     BitField<24, 25> aniso;
@@ -1524,6 +1547,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         CELL_GCM_MAX_VERTEX_TEXTURE,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_ANISO_SPREAD";
+                offset = 0x000003c0;
                 union {
                     uint32_t val;
                     BitField<11, 12> vReduceSamplesEnable;
@@ -1550,6 +1574,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         1, // ?
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM";
+                offset = 0x00000b80;
                 assert(count <= 32);
                 TransformProgram(get + 4, count);
                 break;
@@ -1560,6 +1585,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         16,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_DATA4F_M";
+                offset = 0x00001c00;
                 VertexData4fM(
                     index,
                     union_cast<uint32_t, float>(readarg(1)),
@@ -1578,6 +1604,13 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
     }
     len = (header.count.u() + 1) * 4;
     assert(len != 0);
+    
+    if (log_should(log_warning, log_rsx, log_perf)) {
+        auto& entry = _perfMap[offset];
+        entry.count++;
+        entry.time += high_resolution_clock::now() - past;
+    }
+    
     return len;
 }
 

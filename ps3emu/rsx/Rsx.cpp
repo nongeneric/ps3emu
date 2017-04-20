@@ -687,12 +687,45 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     
     resetContext();
     
-    _context->fpsCounter.report();
-    if (_context->fpsCounter.hasWrapped()) {
-        WARNING(rsx, perf) << ssnprintf("FPS: %d, texture update time: %lld",
-                                        _context->fpsCounter.elapsed(),
-                                        _context->uTextureUpdateDuration / 1000);
-        _context->uTextureUpdateDuration = 0;
+    if (log_should(log_warning, log_rsx, log_perf)) {
+        _context->fpsCounter.report();
+        if (_context->fpsCounter.hasWrapped()) {
+            _context->uTextureUpdateDuration = 0;
+            
+            static std::vector<PerfMapEntry> vec;
+            vec.resize(0);
+            decltype(PerfMapEntry::time) total = {};
+            for (auto& [offset, entry] : _perfMap) {
+                entry.offset = offset;
+                vec.push_back(entry);
+                total += entry.time;
+                entry.time = {};
+                entry.count = 0;
+            }
+            
+            static std::string line;
+            line.resize(0);
+            line = ssnprintf("FPS: %d, texture update time: %lld, total = %d us\n",
+                             _context->fpsCounter.elapsed(),
+                             _context->uTextureUpdateDuration / 1000,
+                             duration_cast<microseconds>(total).count());
+            
+            std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
+                return a.time > b.time;
+            });
+            int i = 0;
+            for (auto& entry : vec) {
+                auto us = duration_cast<microseconds>(entry.time).count();
+                line += ssnprintf("%-8x %-4d %-8d %-1.4f\n",
+                                  entry.offset,
+                                  entry.count,
+                                  us,
+                                  (float)us / (float)duration_cast<microseconds>(total).count());
+                if (i++ == 10)
+                    break;
+            }
+            WARNING(rsx, perf) << line;
+        }
     }
 }
 

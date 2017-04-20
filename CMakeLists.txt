@@ -42,6 +42,11 @@ set(CMAKE_CXX_FLAGS "-fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 set(EMU_CONFIGURATION_DEBUG 1)
 set(EMU_CONFIGURATION_TESTS 1)
 set(EMU_CONFIGURATION_PAUSE 1)
+set(EMU_CONFIGURATION_LOG   1)
+
+if(${EMU_CONFIGURATION_LOG})
+    add_definitions(-DLOG_ENABLED)
+endif()
 
 if(${EMU_CONFIGURATION_TESTS})
     # enable code required for running tests (small performance hit)

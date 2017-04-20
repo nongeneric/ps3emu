@@ -11,6 +11,7 @@
 #include "ps3emu/enum.h"
 #include <boost/thread.hpp>
 #include <boost/endian/arithmetic.hpp>
+#include <boost/chrono.hpp>
 #include <memory>
 #include <map>
 #include <atomic>
@@ -145,6 +146,12 @@ struct GcmCommandReplayInfo {
     std::function<void()> action;
 };
 
+struct PerfMapEntry {
+    uint32_t offset = 0;;
+    uint32_t count = 0;
+    typename boost::chrono::high_resolution_clock::duration time = {};
+};
+
 struct RsxContext;
 class MainMemory;
 class Process;
@@ -182,6 +189,7 @@ class Rsx {
     bool _frameCapturePending = false;
     bool _shortTrace = false;
     RsxTextureReader* _textureReader;
+    std::map<uint32_t, PerfMapEntry> _perfMap;
     
     void watchTextureCache();
     void watchShaderCache();

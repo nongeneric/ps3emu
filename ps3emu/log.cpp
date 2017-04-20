@@ -75,9 +75,11 @@ void log_unconditional(log_severity_t severity, log_type_t type, log_area_t area
     logger->info(formatted);
 }
 
+#if LOG_ENABLED
 bool log_should(log_severity_t severity, log_type_t type, log_area_t area) {
     return severity >= active_severity && (type & active_types) && (area & active_areas);
 }
+#endif
 
 #define PARSE(s, res, name) if (s == #name) { res |= log_##name; } else
 
