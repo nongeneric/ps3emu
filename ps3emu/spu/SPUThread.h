@@ -65,108 +65,113 @@ enum class SPUThreadEvent {
     Failure
 };
 
-class alignas(16) R128 {
-    uint8_t _bs[16];
+struct alignas(16) R128 {
+    __m128i _xmm;
 public:
     R128() = default;
     inline R128(R128 const& r) {
-        memcpy(_bs, r._bs, sizeof(_bs));
+        _xmm = r._xmm;
     }
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+    
     inline __m128i xmm() {
-        return _mm_lddqu_si128((__m128i*)_bs);
+        return _xmm;
     }
     
     inline void set_xmm(__m128i xmm) {
-        _mm_store_si128((__m128i*)_bs, xmm);
-    }
-
-    template <int N>
-    uint8_t& b() {
-        static_assert(0 <= N && N < 16, "");
-        return _bs[15 - N];
+        _xmm = xmm;
     }
     
-    inline uint8_t& b(int n) {
-        assert(0 <= n && n < 16);
-        return _bs[15 - n];
+    inline uint8_t b(int n) {
+        uint8_t vec[16];
+        memcpy(vec, &_xmm, 16);
+        return vec[15 - n];
     }
     
-    inline uint8_t& b_pref() {
-        return b<3>();
+    inline void set_b(int n, uint8_t val) {
+        uint8_t vec[16];
+        memcpy(vec, &_xmm, 16);
+        vec[15 - n] = val;
+        memcpy(&_xmm, vec, 16);
     }
     
-    template <int N>
-    int16_t& hw() {
-        static_assert(0 <= N && N < 8, "");
-        return ((int16_t*)_bs)[7 - N];
+    inline int16_t hw(int n) {
+        int16_t vec[8];
+        memcpy(vec, &_xmm, 16);
+        return vec[7 - n];
     }
     
-    inline int16_t& hw(int n) {
-        assert(0 <= n && n < 8);
-        return ((int16_t*)_bs)[7 - n];
-    }
-    
-    inline int16_t& hw_pref() {
-        return hw<1>();
+    inline void set_hw(int n, uint16_t val) {
+        int16_t vec[8];
+        memcpy(vec, &_xmm, 16);
+        vec[7 - n] = val;
+        memcpy(&_xmm, vec, 16);
     }
     
     template <int N>
-    int32_t& w() {
-        static_assert(0 <= N && N < 4, "");
-        return ((int32_t*)_bs)[3 - N];
+    int32_t w() {
+        return (int32_t)_mm_extract_epi32(_xmm, 3 - N);
     }
     
-    inline int32_t& w(int n) {
-        assert(0 <= n && n < 4);
-        return ((int32_t*)_bs)[3 - n];
+    inline int32_t w(int n) {
+        int32_t vec[4];
+        memcpy(vec, &_xmm, 16);
+        return vec[3 - n];
     }
     
-    inline int32_t& w_pref() {
-        return w<0>();
-    }
-    
-    template <int N>
-    int64_t& dw() {
-        static_assert(0 <= N && N < 2, "");
-        return ((int64_t*)_bs)[1 - N];
-    }
-    
-    inline int64_t& dw(int n) {
-        assert(0 <= n && n < 2);
-        return ((int64_t*)_bs)[1 - n];
+    inline void set_w(int n, uint32_t val) {
+        int32_t vec[4];
+        memcpy(vec, &_xmm, 16);
+        vec[3 - n] = val;
+        memcpy(&_xmm, vec, 16);
     }
     
     template <int N>
-    float& fs() {
-        static_assert(0 <= N && N < 4, "");
-        return ((float*)_bs)[3 - N];
+    int64_t dw() {
+        return (int64_t)_mm_extract_epi64(_xmm, 1 - N);
     }
     
-    inline float& fs(int n) {
-        assert(0 <= n && n < 4);
-        return ((float*)_bs)[3 - n];
+    inline int64_t dw(int n) {
+        int64_t vec[2];
+        memcpy(vec, &_xmm, 16);
+        return vec[1 - n];
     }
     
-    template <int N>
-    double& fd() {
-        static_assert(0 <= N && N < 2, "");
-        return ((double*)_bs)[1 - N];
+    inline void set_dw(int n, int64_t val) {
+        int64_t vec[2];
+        memcpy(vec, &_xmm, 16);
+        vec[1 - n] = val;
+        memcpy(&_xmm, vec, 16);
     }
     
-    inline double& fd(int n) {
-        assert(0 <= n && n < 2);
-        return ((double*)_bs)[1 - n];
+    inline float fs(int n) {
+        float vec[4];
+        memcpy(vec, &_xmm, 16);
+        return vec[3 - n];
     }
     
-    inline void load(const uint8_t* ptr) {
-        std::reverse_copy(ptr, ptr + 16, _bs);
+    inline void set_fs(int n, float val) {
+        float vec[4];
+        memcpy(vec, &_xmm, 16);
+        vec[3 - n] = val;
+        memcpy(&_xmm, vec, 16);
     }
     
-    inline void store(uint8_t* ptr) {
-        std::reverse_copy(_bs, _bs + 16, ptr);
+    inline double fd(int n) {
+        double vec[2];
+        memcpy(vec, &_xmm, 16);
+        return vec[1 - n];
     }
-#pragma GCC diagnostic pop
+    
+    inline void set_fd(int n, double val) {
+        double vec[2];
+        memcpy(vec, &_xmm, 16);
+        vec[1 - n] = val;
+        memcpy(&_xmm, vec, 16);
+    }
+    
+    inline int16_t hw_pref() {
+        return hw(1);
+    }
 };
 
 struct SPUThreadExitInfo {

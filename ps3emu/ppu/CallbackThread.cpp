@@ -61,8 +61,12 @@ uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
     
     auto info = thread->_queue.dequeue();
     
-    if (info.terminate)
+    if (info.terminate) {
+        if (thread->_queue.size()) {
+            WARNING(libs) << ssnprintf("callback has pending events");
+        }
         throw ThreadFinishedException(0);
+    }
     
     ppuThread->setNIP(info.ea);
     ppuThread->setGPR(2, info.toc);

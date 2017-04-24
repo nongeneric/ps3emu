@@ -287,10 +287,10 @@ public:
                     "%08x %08x %08x %08x", r.w<0>(), r.w<1>(), r.w<2>(), r.w<3>()));
             } else {
                 return QString::fromStdString(ssnprintf("%g : %g : %g : %g",
-                                                        r.fs<0>(),
-                                                        r.fs<1>(),
-                                                        r.fs<2>(),
-                                                        r.fs<3>()));
+                                                        r.fs(0),
+                                                        r.fs(1),
+                                                        r.fs(2),
+                                                        r.fs(3)));
             }
         }
         return "";

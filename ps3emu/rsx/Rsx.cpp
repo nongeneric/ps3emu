@@ -640,12 +640,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
     _context->frame++;
     _context->commandNum = 0;
-/*    
-    static int framenum = 0;
-    framenum++;
-    if (framenum == 1500)
-        exit(0);
-    */
+
 #if TESTS
     static int framenum = 0;
     auto id = getpid();
@@ -1592,7 +1587,7 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
 
 void Rsx::waitForIdle() {
     TRACE(waitForIdle);
-    glcall(glFinish());
+    glFinish();
 }
 
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {

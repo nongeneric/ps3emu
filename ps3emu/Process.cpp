@@ -316,6 +316,10 @@ Event Process::run() {
                         assert(ev->thread == _threads[0].get());
                         removeThread(ev->thread);
                     }
+                    if (_threads.size() > 1) {
+                        WARNING(libs) << "dangling PPU threads at process finish";
+                        boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
+                    }
                     _rsx->shutdown();
                     _callbackThread->terminate();
                     _processFinished = true;

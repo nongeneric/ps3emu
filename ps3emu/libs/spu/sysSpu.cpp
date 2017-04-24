@@ -266,10 +266,10 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
         auto thread = proc->getSpuThread(id);
         thread->setSpu(spu_num);
         initThread(g_state.mm, thread.get(), &imgcopy);
-        thread->r(3).dw<0>() = argcopy.arg1;
-        thread->r(4).dw<0>() = argcopy.arg2;
-        thread->r(5).dw<0>() = argcopy.arg3;
-        thread->r(6).dw<0>() = argcopy.arg4;
+        thread->r(3).set_dw(0, argcopy.arg1);
+        thread->r(4).set_dw(0, argcopy.arg2);
+        thread->r(5).set_dw(0, argcopy.arg3);
+        thread->r(6).set_dw(0, argcopy.arg4);
         thread->setGroup([=] { return group->threads; });
     };
     return CELL_OK;

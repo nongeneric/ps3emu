@@ -184,8 +184,8 @@ SPUThread::SPUThread(std::string name,
       _cause(SPUThreadExitCause::StillRunning),
       _hasStarted(false) {
     for (auto& r : _rs) {
-        r.dw<0>() = 0;
-        r.dw<1>() = 0;
+        r.set_dw(0, 0);
+        r.set_dw(1, 0);
     }
     std::fill(std::begin(_ls), std::end(_ls), 0);
     _channels.interrupt() = INT_Mask_class2_B | INT_Mask_class2_T;

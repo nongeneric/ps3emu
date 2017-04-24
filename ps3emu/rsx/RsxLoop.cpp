@@ -1659,8 +1659,6 @@ void Rsx::runLoop() {
         return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get));
     };
     for (;;) {
-        _cv.wait(lock);
-        INFO(rsx) << "rsx loop update received";
         while (_get != _put || _ret) {
             _get += interpret(_get, read);
         }
@@ -1668,6 +1666,8 @@ void Rsx::runLoop() {
             waitForIdle();
             return;
         }
+        _cv.wait(lock);
+        INFO(rsx) << "rsx loop update received";
     }
 }
 
