@@ -6,7 +6,7 @@
 #include "ppu_dasm_forms.h"
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
-#include "ps3emu/ExecutionMap.h"
+#include "ps3emu/execmap/ExecutionMapCollection.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -24,6 +24,10 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
                      bool primaryThread)
     : _eventHandler(eventHandler),
       _init(false),
+#ifdef DEBUGPAUSE
+      _dbgPaused(false),
+      _singleStep(false),
+#endif
       _isStackInfoSet(false),
       _threadFinishedGracefully(primaryThread),
       _priority(1000),
@@ -49,6 +53,9 @@ void PPUThread::vmenter(uint32_t to) {
         if (dasm_bb_call(instr, segment, label)) {
             g_state.proc->bbcall(segment, label);
         } else {
+#ifdef EXECMAP_ENABLED
+            g_state.executionMaps->ppu.mark(cia);
+#endif
             setNIP(cia + sizeof instr);
             ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
         }
@@ -77,7 +84,9 @@ void PPUThread::innerLoop() {
             if (dasm_bb_call(instr, segment, label)) {
                 g_state.proc->bbcall(segment, label);
             } else {
-                g_state.executionMap->mark(cia);
+#ifdef EXECMAP_ENABLED
+                g_state.executionMaps->ppu.mark(cia);
+#endif
                 setNIP(cia + sizeof instr);
                 ppu_dasm<DasmMode::Emulate>(&instr, cia, this);
             }

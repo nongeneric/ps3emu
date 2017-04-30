@@ -8,6 +8,8 @@
 #include "log.h"
 #include "state.h"
 #include "Config.h"
+#include "ps3emu/execmap/ExecutionMapCollection.h"
+#include "ps3emu/execmap/InstrDb.h"
 #include "InternalMemoryManager.h"
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
@@ -187,6 +189,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         }
     }
     
+    InstrDb db;
+    db.open();
     std::map<uint32_t, uint32_t> bbBytes;
     for (auto& x86path : x86paths) {
         if (!boost::filesystem::exists(x86path))
@@ -195,6 +199,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         if (handle) {
             auto info = (RewrittenSegmentsInfo*)dlsym(handle, "info");
             info->init();
+            int segmentNumber = 0;
             for (auto& segment : info->segments) {
                 auto index = store->add(&segment);
                 INFO(libs) << ssnprintf("loading %s:%s with %d blocks",
@@ -206,6 +211,11 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                     auto va = (*segment.blocks)[i].va;
                     bbBytes[va] = g_state.mm->load32(va);
                     g_state.mm->store32(va, instr);
+                }
+                auto entry = db.findSpuEntry(_elfName, segmentNumber);
+                if (entry && segment.spuEntryPoint && x86path.find("libsre") == std::string::npos) {
+                    g_state.executionMaps->spu.emplace_back(*entry, ExecutionMap<LocalStorageSize>());
+                    segmentNumber++;
                 }
             }
         } else {

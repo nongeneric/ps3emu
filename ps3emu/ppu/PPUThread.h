@@ -133,8 +133,8 @@ class PPUThread {
     boost::thread _thread;
     bool _init;
 #ifdef DEBUGPAUSE
-    std::atomic<bool> _dbgPaused = false;
-    std::atomic<bool> _singleStep = false;
+    std::atomic<bool> _dbgPaused;
+    std::atomic<bool> _singleStep;
 #endif
     bool _isStackInfoSet;
     uint32_t _stackBase;
@@ -142,7 +142,7 @@ class PPUThread {
     uint64_t _exitCode;
     bool _threadFinishedGracefully;
     int _priority;
-    std::atomic<unsigned> _id = 0;
+    std::atomic<unsigned> _id;
     bool _running;
     boost::condition_variable _cvRunning;
     boost::mutex _mutexRunning;

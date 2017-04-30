@@ -41,7 +41,7 @@ int32_t sys_cond_destroy(sys_cond_t cond) {
 int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
     assert(timeout == 0);
     auto info = cvs.get(cond);
-    INFO(libs) << ssnprintf("sys_cond_wait(%x) c:%s m:%s",
+    INFO(libs, sync) << ssnprintf("sys_cond_wait(%x) c:%s m:%s",
                             cond,
                             info->name,
                             info->m->name);
@@ -54,7 +54,7 @@ int32_t sys_cond_signal(sys_cond_t cond) {
     auto info = cvs.try_get(cond);
     if (!info) // noop
         return CELL_OK;
-    INFO(libs) << ssnprintf("sys_cond_signal(%x) c:%s m:%s",
+    INFO(libs, sync) << ssnprintf("sys_cond_signal(%x) c:%s m:%s",
                             cond,
                             (*info)->name,
                             (*info)->m->name);
@@ -65,7 +65,7 @@ int32_t sys_cond_signal(sys_cond_t cond) {
 
 int32_t sys_cond_signal_all(sys_cond_t cond) {
     auto info = cvs.get(cond);
-    INFO(libs) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%s",
+    INFO(libs, sync) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%s",
                             cond,
                             info->name,
                             info->m->name);

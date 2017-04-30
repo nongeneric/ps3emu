@@ -237,15 +237,23 @@ namespace ShaderRewriter {
     
     class InfoCollectorVisitor : public DefaultVisitor {
         int _lastRegisterUsed = -1;
+        int _lastHRegisterUsed = -1;
         virtual void visit(Variable* ref) override {
             auto num = dynamic_cast<IntegerLiteral*>(ref->index());
             if (ref->name() == "r" && num) {
                 _lastRegisterUsed = std::max(_lastRegisterUsed, num->value());
             }
+            if (ref->name() == "h" && num) {
+                _lastHRegisterUsed = std::max(_lastHRegisterUsed, num->value());
+            }
         }
     public:
         int lastRegisterUsed() {
             return _lastRegisterUsed;
+        }
+        
+        int lastHRegisterUsed() {
+            return _lastHRegisterUsed;
         }
     };
     
@@ -590,11 +598,11 @@ namespace ShaderRewriter {
         
         return res;
     }
-
-    int GetLastRegisterNum(Expression* expr) {
+    
+    std::tuple<int, int> GetLastRegisterNum(Expression* expr) {
         InfoCollectorVisitor visitor;
         expr->accept(&visitor);
-        return visitor.lastRegisterUsed();
+        return { visitor.lastRegisterUsed(), visitor.lastHRegisterUsed() };
     }
 
     class VertexRefVisitor : public boost::static_visitor<Expression*> {

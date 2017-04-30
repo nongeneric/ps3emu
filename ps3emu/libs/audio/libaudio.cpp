@@ -45,6 +45,7 @@
 #define CELL_AUDIO_ERROR_EVENT_QUEUE        CELL_ERROR_CAST(0x8031070d) // error in event queue
 #define CELL_AUDIO_ERROR_AUDIOSYSTEM_NOT_FOUND  CELL_ERROR_CAST(0x8031070e) //
 #define CELL_AUDIO_ERROR_TAG_NOT_FOUND          CELL_ERROR_CAST(0x8031070f) //
+#define CELL_AUDIO_PORTATTR_INITLEVEL 0x1000ull
 
 using namespace boost::chrono;
 
@@ -119,6 +120,14 @@ void playbackLoop() {
             }
         } else {
             memcpy(dest, src, toWrite);
+        }
+        
+        for (auto i = 0u; i < CELL_AUDIO_BLOCK_SAMPLES * 2; ++i) {
+             auto wptr = (big_uint32_t*)&tempDest[i * 4];
+             auto f = union_cast<uint32_t, float>(*wptr);
+             if (std::abs(f) > 1.f) {
+                 *wptr = union_cast<float, uint32_t>(f / 32767.5f);
+             }
         }
         
 #if TESTS
@@ -215,7 +224,10 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
            audioParam->nBlock == CELL_AUDIO_BLOCK_16);
     static int portnums = 0;
     *portNum = portnums++;
-    //union_cast<uint32_t, float>(audioParam->float_level);
+    if (audioParam->attr & CELL_AUDIO_PORTATTR_INITLEVEL) {
+        auto volume = union_cast<big_uint32_t, float>(audioParam->float_level);
+        WARNING(libs) << ssnprintf("audio port volume %g (not implemented)", volume);
+    }
     
     context.portStatus = CELL_AUDIO_STATUS_READY;
     context.nChannel = audioParam->nChannel;
@@ -335,6 +347,7 @@ int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint6
 int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume) {
     volume = g_state.th->getFPRd(0); // TODO: handle in exports.h
     ERROR(libs) << "not impl";
+    exit(0);
     // TODO: make thread safe (readIndexAddr should be atomic)
 //     assert(portNum == 0);
 //     auto blockSize = calcBlockSize();

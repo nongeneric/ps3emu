@@ -108,7 +108,9 @@ SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread)
       _thread(thread),
       _outboundMailbox(1),
       _outboundInterruptMailbox(1),
-      _inboundMailbox(4) {
+      _inboundMailbox(4),
+      _spuStatus(0),
+      _interrupt2(0) {
     std::fill(begin(_channels), end(_channels), 0);
     _channels[MFC_WrTagMask] = -1;
 }

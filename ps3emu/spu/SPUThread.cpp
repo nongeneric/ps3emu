@@ -5,6 +5,8 @@
 #include "ps3emu/log.h"
 #include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/state.h"
+#include "ps3emu/execmap/ExecutionMapCollection.h"
+#include "ps3emu/RewriterUtils.h"
 #include "SPUDasm.h"
 #include <stdio.h>
 #include <signal.h>
@@ -94,6 +96,9 @@ void SPUThread::loop() {
             if (dasm_bb_call(instr, segment, label)) {
                 g_state.proc->bbcallSpu(segment, label, cia);
             } else {
+#ifdef EXECMAP_ENABLED
+                markExecMap(cia);
+#endif                
                 setNip(cia + 4);
                 SPUDasm<DasmMode::Emulate>(&instr, cia, this);
             }
@@ -347,3 +352,24 @@ void SPUThread::setGroup(std::function<std::vector<uint32_t>()> getThreads) {
 #if TESTS
 SPUThread::SPUThread() : _channels(g_state.mm, this) {}
 #endif
+
+void SPUThread::markExecMap(uint32_t va) {
+    if (!g_state.executionMaps->enabled)
+        return;
+    for (auto& [entry, map] : g_state.executionMaps->spu) {
+        bool match = true;
+        for (auto i = 0u; i < entry.offsets.size(); ++i) {
+            auto offset = entry.offsets[i];
+            auto bytes = entry.offsetBytes[i];
+            if (bytes != *(big_uint32_t*)ptr(offset)) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            map.mark(va);
+            return;
+        }
+    }
+    WARNING(spu, perf) << "unknown spu image executed";
+}

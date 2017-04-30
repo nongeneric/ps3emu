@@ -2,33 +2,39 @@
 
 #include "sqlitedb.h"
 
-BOOST_FUSION_ADAPT_STRUCT(
-    GcmCommandArg,
-    (unsigned, value)
-    (std::string, name)
-    (unsigned, type)
-)
+BOOST_HANA_ADAPT_STRUCT(GcmCommandArg, value, name, type);
 
-BOOST_FUSION_DEFINE_STRUCT(
-    (db), ScalarInt,
-    (unsigned, value)
-)
+using namespace sql;
 
-BOOST_FUSION_DEFINE_STRUCT(
-    (db), IntVector,
-    (std::vector<unsigned char>, value)
-)
+namespace {
+namespace db {
+
+struct ScalarInt {
+    BOOST_HANA_DEFINE_STRUCT(
+        ScalarInt,
+        (unsigned, value)
+    );
+};
+
+struct IntVector {
+    BOOST_HANA_DEFINE_STRUCT(
+        IntVector,
+        (std::vector<uint8_t>, value)
+    );
+};
+
+}}
 
 namespace {
 
 auto sqlCreate =
-    "CREATE TABLE GcmCommands("
+    "CREATE TABLE IF NOT EXISTS GcmCommands("
     "   Id           INTEGER,"
     "   Num          INTEGER,"
     "   Frame        INTEGER,"
     "   PRIMARY KEY(Frame, Num)"
     ");"
-    "CREATE TABLE Args("
+    "CREATE TABLE IF NOT EXISTS Args("
     "   CommandNum       INTEGER,"
     "   CommandFrame     INTEGER,"
     "   Num              INTEGER,"
@@ -37,7 +43,7 @@ auto sqlCreate =
     "   Value            INTEGER,"
     "   PRIMARY KEY(CommandNum, CommandFrame, Num)"
     ");"
-    "CREATE TABLE Blobs("
+    "CREATE TABLE IF NOT EXISTS Blobs("
     "   CommandNum       INTEGER,"
     "   CommandFrame     INTEGER,"
     "   Value            BLOB,"

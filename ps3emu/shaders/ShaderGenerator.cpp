@@ -35,13 +35,15 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     ASTContext context;
     std::vector<Statement*> sts;
     auto pos = 0u;
-    int lastReg = 0;
+    int lastRReg = 0, lastHReg = 0;
     unsigned constIndex = 0;
     while (pos < bytecode.size()) {
         FragmentInstr fi;
         auto len = fragment_dasm_instr(&bytecode[0] + pos, fi);
         for (auto& st : MakeStatement(context, fi, constIndex)) {
-            lastReg = std::max(lastReg, GetLastRegisterNum(st)); 
+            auto [r, h] = GetLastRegisterNum(st);
+            lastRReg = std::max(lastRReg, r); 
+            lastHReg = std::max(lastHReg, h); 
             st->address(pos);
             sts.emplace_back(std::move(st));
         }
@@ -109,12 +111,12 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("void main(void) {");
     line("    vec4 f_WPOS = gl_FragCoord;");
     line("    vec4 c[2];");
-    line(ssnprintf("    vec4 r[%d];", lastReg + 1));
-    line(ssnprintf("    vec4 h[%d];", 2 * (lastReg + 1)));
-    for (auto i = 0; i < lastReg + 1; ++i) {
+    line(ssnprintf("    vec4 r[%d];", lastRReg + 1));
+    line(ssnprintf("    vec4 h[%d];", lastHReg + 1));
+    for (auto i = 0; i < lastRReg + 1; ++i) {
         line(ssnprintf("    r[%d] = vec4(0, 0, 0, 0);", i));
     }
-    for (auto i = 0; i < 2 * (lastReg + 1); ++i) {
+    for (auto i = 0; i < lastHReg + 1; ++i) {
         line(ssnprintf("    h[%d] = vec4(0, 0, 0, 0);", i));
     }
     for (auto& st : sts) {
@@ -124,7 +126,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     
     if (isMrt) {
         int regs[] = { 0, 2, 3, 4 };
-        for (int i = 0; i < 4 && regs[i] <= lastReg; ++i) {
+        for (int i = 0; i < 4 && regs[i] <= lastRReg; ++i) {
             line(ssnprintf("    color[%d] = r[%d];", i, regs[i]));
         }
     } else {

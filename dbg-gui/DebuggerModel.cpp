@@ -11,7 +11,8 @@
 #include "ps3emu/log.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwmutex.h"
-#include "ps3emu/ExecutionMap.h"
+#include "ps3emu/execmap/ExecutionMapCollection.h"
+#include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/fileutils.h"
 #include "ps3tool-core/Rewriter.h"
 #include "Config.h"
@@ -698,6 +699,12 @@ void DebuggerModel::execSingleCommand(QString command) {
             printBacktrace();
         }
         return;
+    } else if (name == "execmap-toggle") {
+        g_state.executionMaps->enabled = !g_state.executionMaps->enabled;
+        return;
+    } else if (name == "spu-execmap") {
+        dumpSpuExecutionMaps();
+        return;
     } else if (name == "execmap") {
         dumpExecutionMap();
         return;
@@ -1202,30 +1209,48 @@ void DebuggerModel::printBacktrace() {
 }
 
 void DebuggerModel::dumpExecutionMap() {
+    InstrDb db;
+    db.open();
     bool isPrimary = true;
     for (auto& s : _proc->getSegments()) {
         if (s.index)
             continue;
-        auto path = ssnprintf("%s.entries", s.elf->elfName());
-        std::vector<uint32_t> entries;
-        if (boost::filesystem::exists(path)) {
-            entries = deserializeEntries(read_all_text(path));
-        }
-        auto newEntries = g_state.executionMap->dump(s.va, s.size);
+        auto entries = g_state.executionMaps->ppu.dump(s.va, s.size);
         if (!isPrimary) {
-            for (auto& va : newEntries) {
+            for (auto& va : entries) {
                 va -= s.va;
             }
         }
-        std::copy(begin(newEntries), end(newEntries), std::back_inserter(entries));
-        auto newEntriesPath = ssnprintf("/tmp/ps3-newentries-%s", s.elf->shortName());
-        messagef("dumping %d entries into %s (only new entries to %s)",
-                 newEntries.size(),
-                 path,
-                 newEntriesPath);
-        write_all_text(serializeEntries(entries), path);
-        write_all_text(serializeEntries(newEntries), newEntriesPath);
+        
+        auto entry = db.findPpuEntry(s.elf->elfName());
+        if (entry) {
+            std::copy(begin(entries), end(entries), std::back_inserter(entry->leads));
+            db.deleteEntry(entry->id);
+            db.insertEntry(*entry);
+        } else {
+            InstrDbEntry newEntry;
+            newEntry.elfPath = s.elf->elfName();
+            newEntry.leads = entries;
+            newEntry.isPPU = true;
+            db.insertEntry(newEntry);
+        }
+        
+        messagef("dumping %d entries into %s", entries.size(), s.elf->shortName());
         isPrimary = false;
+    }
+}
+
+void DebuggerModel::dumpSpuExecutionMaps() {
+    InstrDb db;
+    db.open();
+    for (auto& [entry, map] : g_state.executionMaps->spu) {
+        db.deleteEntry(entry.id);
+        auto leads = map.dump(0, LocalStorageSize);
+        std::copy(begin(leads), end(leads), std::back_inserter(entry.leads));
+        db.insertEntry(entry);
+        messagef("adding %d new leads to %s",
+                 leads.size(),
+                 entry.elfPath);
     }
 }
 

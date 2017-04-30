@@ -12,6 +12,7 @@
 #include "ps3emu/rewriter.h"
 #include "ps3emu/fileutils.h"
 #include "ps3emu/InternalMemoryManager.h"
+#include "ps3emu/execmap/InstrDb.h"
 
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
@@ -23,6 +24,8 @@
 #include <algorithm>
 #include <fstream>
 #include <assert.h>
+#include <functional>
+#include <random>
 
 using namespace boost::algorithm;
 using namespace boost::endian;
@@ -137,6 +140,23 @@ struct SegmentInfo {
     std::vector<BasicBlockInfo> blocks;
 };
 
+std::vector<uint32_t> updateSignatureOffsets(std::vector<BasicBlock>& blocks) {
+    assert(!blocks.empty());
+    std::vector<uint32_t> offsets;
+    if (offsets.empty()) {
+        std::default_random_engine random(13);
+        while (offsets.size() < 20) {
+            auto& block = blocks[random() % blocks.size()];
+            if (block.len < 8) // don't hash bbcalls
+                continue;
+            // first instruction is a bbcall, always skip it
+            auto offset = block.start + 4 + ((random() << 2) % (block.len - 4));
+            offsets.push_back(offset);
+        }
+    }
+    return offsets;
+}
+
 std::tuple<uint32_t, uint32_t> outOfPartTargets(BasicBlock const& block, std::vector<BasicBlock> const& part, auto analyzeFunc) {
     auto info = analyzeFunc(block.start + block.len - 4);
     auto find = [&](uint32_t target) {
@@ -159,6 +179,37 @@ std::tuple<uint32_t, uint32_t> outOfPartTargets(BasicBlock const& block, std::ve
     return {target, fallthrough};
 }
 
+std::set<uint32_t> collectInitialPPULeads(uint32_t vaBase, ELFLoader& elf, RewriteCommand const& command) {
+    std::set<uint32_t> leads;
+    if (!command.imageBase) {
+        fdescr epDescr;
+        g_state.mm->readMemory(elf.entryPoint(), &epDescr, sizeof(fdescr));
+        leads.insert(epDescr.va);
+    }
+    
+    InstrDb instrDb;
+    instrDb.open();
+    auto entry = instrDb.findPpuEntry(command.elf);
+    if (entry) {
+        for (auto ep : entry->leads) {
+            leads.insert(ep + command.imageBase);
+        }
+    }
+    
+    auto [exports, nexports] = elf.exports(g_state.mm);
+    for (auto i = 0; i < nexports; ++i) {
+        auto& e = exports[i];
+        auto stubs = reinterpret_cast<big_uint32_t*>(g_state.mm->getMemoryPointer(e.stub_table, 0));
+        for (auto i = 0; i < e.functions; ++i) {
+            fdescr descr;
+            g_state.mm->readMemory(stubs[i], &descr, sizeof(fdescr));
+            leads.insert(descr.va);
+        }
+    }
+    
+    return leads;
+}
+
 std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream& log) {
     ELFLoader elf;
     RewriterStore rewriterStore;
@@ -171,17 +222,7 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
         }
     }, command.imageBase, {}, &rewriterStore, true);
     
-    std::set<uint32_t> leads;
-    if (!command.imageBase) {
-        fdescr epDescr;
-        g_state.mm->readMemory(elf.entryPoint(), &epDescr, sizeof(fdescr));
-        leads.insert(epDescr.va);
-    }
-    
-    for (auto ep : command.entryPoints) {
-        leads.insert(ep + command.imageBase);
-    }
-    
+    auto leads = collectInitialPPULeads(vaBase, elf, command);
     auto analyzeFunc = [&](uint32_t cia) { return analyze(g_state.mm->load32(cia), cia); };
     
     auto blocks = discoverBasicBlocks(
@@ -250,8 +291,10 @@ std::vector<uint32_t> selectSubset(std::vector<uint32_t> leads, uint32_t start, 
     return res;
 }
 
-std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream& log) {
-    auto body = read_all_bytes(command.elf);
+std::tuple<uint32_t, std::vector<EmbeddedElfInfo>> mapEmbeddedElfs(
+    std::string elf, uint32_t imageBase, std::vector<uint8_t>& body)
+{
+    body = read_all_bytes(elf);
     auto elfs = discoverEmbeddedSpuElfs(body);
     uint32_t vaBase = 0x10000u;
     if (!elfs.empty() && elfs[0].header == 0) {
@@ -261,7 +304,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
         g_state.mm->writeMemory(vaBase, &body[0], body.size());
     } else {
         ELFLoader elfLoader;
-        elfLoader.load(command.elf);
+        elfLoader.load(elf);
         uint32_t mappedSize;
         RewriterStore rewriterStore;
         elfLoader.map([&](auto va, auto size, auto index) {
@@ -269,15 +312,79 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 vaBase = va;
             }
             mappedSize = va + size;
-        }, command.imageBase, {}, &rewriterStore, true);
+        }, imageBase, {}, &rewriterStore, true);
         body.resize(mappedSize);
         g_state.mm->mark(vaBase, mappedSize, false, "elf");
         g_state.mm->readMemory(vaBase, &body[0], body.size());
         elfs = discoverEmbeddedSpuElfs(body);
     }
+    return {vaBase, elfs};
+}
+
+void handleSpuSignature(std::vector<BasicBlock>& blocks,
+                        SegmentInfo& info,
+                        uint32_t segmentStartVa,
+                        int segmentNumber,
+                        std::string elfName,
+                        std::function<uint32_t(uint32_t)> spuElfVaToParentElfVa)
+{
+    auto offsets = updateSignatureOffsets(blocks);
+//     auto startVa = spuElfVaToParentElfVa(segmentStartVa);
+//     auto start = (big_uint32_t*)g_state.mm->getMemoryPointer(startVa, 0);
+//     if ((start[0] >> 24u) == 0x43 && (start[1] >> 24u) == 0x42 &&
+//         (start[2] >> 24u) == 0x43 && (start[3] >> 24u) == 0x42) {
+//         offsets.push_back(segmentStartVa);
+//         offsets.push_back(segmentStartVa + 4);
+//         offsets.push_back(segmentStartVa + 8);
+//         offsets.push_back(segmentStartVa + 12);
+//     }
+    std::vector<uint32_t> bytes;
+    for (auto offset : offsets) {
+        bytes.push_back(g_state.mm->load32(spuElfVaToParentElfVa(offset)));
+    }
+    
+    InstrDb db;
+    db.open();
+    auto entry = db.findSpuEntry(elfName, segmentNumber);
+    if (entry) {
+        db.deleteEntry(entry->id);
+        entry->offsets = offsets;
+        entry->offsetBytes = bytes;
+        assert(entry->segment == segmentNumber);
+        db.insertEntry(*entry);
+    } else {
+        InstrDbEntry entry;
+        entry.offsets = offsets;
+        entry.offsetBytes = bytes;
+        entry.elfPath = elfName;
+        entry.segment = segmentNumber;
+        entry.isPPU = false;
+        db.insertEntry(entry);
+    }
+}
+
+/*
+
+    ppu_elf:  spu_elf_1:   segment_1_1
+                           segment_1_2
+                           segment_1_3
+              spu_elf_2:   segment_2_1
+              spu_elf_3:   segment_3_1
+              
+    segments are elf sections, that can overlap
+    each segment has its own signature
+
+ */
+std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream& log) {
+    std::vector<uint8_t> body;
+    auto [vaBase, elfs] = mapEmbeddedElfs(command.elf, command.imageBase, body);
     
     std::vector<SegmentInfo> infos;
     
+    InstrDb db;
+    db.open();
+    
+    int totalSegmentNumber = 0;
     for (auto& elf : elfs) {
         std::vector<Elf32_be_Phdr> copySegments;
         
@@ -294,28 +401,16 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
             return vaBase + elf.startOffset + spuElfOffset;
         };
         
-        auto leads = command.entryPoints;
+        std::vector<uint32_t> leads;
         leads.push_back(elf.header->e_entry);
-            
-        uint32_t oldSize = 0;
-        while (oldSize != leads.size()) {
-            oldSize = leads.size();
-            for (auto& segment : copySegments) {
-                auto segmentLeads = selectSubset(leads, segment.p_vaddr, segment.p_filesz);
-                if (segmentLeads.empty())
-                    continue;
-                auto blocks = discoverBasicBlocks(
-                    segment.p_vaddr, segment.p_filesz, 0, toSet(segmentLeads), log, [&](uint32_t cia) {
-                        auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);
-                        return analyzeSpu(g_state.mm->load32(elfVa), cia);
-                    }, &leads);
-            }
-            std::sort(begin(leads), end(leads));
-            leads.erase(std::unique(begin(leads), end(leads)), end(leads));
-        }
                 
         for (auto& segment : copySegments) {
             auto segmentLeads = selectSubset(leads, segment.p_vaddr, segment.p_filesz);
+            auto entry = db.findSpuEntry(command.elf, totalSegmentNumber);
+            if (entry) {
+                auto dbLeads = selectSubset(entry->leads, segment.p_vaddr, segment.p_filesz);
+                std::copy(begin(dbLeads), end(dbLeads), std::back_inserter(segmentLeads));
+            }
             if (segmentLeads.empty())
                 continue;
             
@@ -337,6 +432,10 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
             }
             
             SegmentInfo info;
+            handleSpuSignature(blocks, info, segment.p_vaddr, totalSegmentNumber, command.elf, [&](auto va) {
+                return spuElfVaToParentVaInCurrentSegment(va, segment);
+            });
+                
             for (auto& block : blocks) {
                 if (elf.isJob) {
                     // jobs are position independent
@@ -386,6 +485,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                                     segment.p_vaddr + segment.p_filesz,
                                     elf.isJob ? "_SPURS_JOB" : "");
             infos.push_back(info);
+            totalSegmentNumber++;
         }
     }
     
@@ -435,7 +535,7 @@ void printMain(std::string name, std::vector<SegmentInfo> const& segments) {
     f << "        }, \n";
     f << "        init\n";
     f << "    };\n";
-    f << "};\n";
+    f << "};\n\n";
 }
 
 void printSegment(std::string baseName, std::string name, SegmentInfo const& segment) {
@@ -455,7 +555,7 @@ void printSegment(std::string baseName, std::string name, SegmentInfo const& seg
     auto ppuEntry = segment.isSpu ? "nullptr" : entryName;
     auto spuEntry = segment.isSpu ? entryName : "nullptr";
     auto blocks = ssnprintf("&segment_%s_blocks", segment.suffix);
-    f << ssnprintf("    %s, %s, \"%s\", %s,\n",
+    f << ssnprintf("    %s, %s, \"%s\", %s\n",
                    ppuEntry,
                    spuEntry,
                    segment.suffix,
@@ -526,7 +626,7 @@ void HandleRewrite(RewriteCommand const& command) {
     } else {
         segmentInfos = rewritePPU(command, log);
     }
-
+    
     auto headerName = command.cpp + ".h";
     auto ninjaName = command.cpp + ".ninja";
     auto mainName = command.cpp + ".cpp";

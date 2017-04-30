@@ -69,7 +69,7 @@ int sys_mutex_destroy(sys_mutex_t mutex_id) {
 
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(libs) << ssnprintf("locking %x %d %s",
+    INFO(libs, sync) << ssnprintf("locking %x %d %s",
                             mutex_id,
                             timeout,
                             info ? (*info)->name : "NULL");
@@ -97,7 +97,7 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
 
 int sys_mutex_trylock(sys_mutex_t mutex_id) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(libs) << ssnprintf(
+    INFO(libs, sync) << ssnprintf(
         "trying to lock %x %s", mutex_id, info ? (*info)->name : "NULL");
 
     if (!info)
@@ -118,7 +118,7 @@ int sys_mutex_trylock(sys_mutex_t mutex_id) {
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(libs) << ssnprintf("unlocking %x %s",
+    INFO(libs, sync) << ssnprintf("unlocking %x %s",
                             mutex_id,
                             info ? (*info)->name : "NULL");
     if (!info)

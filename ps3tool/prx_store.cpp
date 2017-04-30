@@ -105,10 +105,8 @@ void rewritePrxStore() {
     
     NinjaScript rewriteScript;
     auto ps3tool = ps3toolPath();
-    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $in --image-base $imagebase $entries $entries-file");
-    rewriteScript.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $in.spu --image-base $imagebase $entries $entries-file");
-    rewriteScript.variable("entries", "");
-    rewriteScript.variable("entries-file", "");
+    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $in --image-base $imagebase");
+    rewriteScript.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $in.spu --image-base $imagebase");
     
     NinjaScript buildScript;
     buildScript.variable("trace", "");
@@ -117,40 +115,11 @@ void rewritePrxStore() {
         auto prxPath = (prxStorePath / "sys" / "external" / prxInfo.name).string();
         assert(exists(prxPath));
         
-        std::ifstream f(prxPath);
-        assert(f.is_open());
-        std::vector<char> elf(file_size(prxPath));
-        f.read(elf.data(), elf.size());
-
-        auto header = reinterpret_cast<Elf64_be_Ehdr*>(&elf[0]);
-        auto pheader = reinterpret_cast<Elf64_be_Phdr*>(&elf[header->e_phoff]);
-        auto module = reinterpret_cast<module_info_t*>(&elf[pheader->p_paddr]);
-        auto exports = reinterpret_cast<prx_export_t*>(&elf[pheader->p_offset + module->exports_start]);
-        auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
-        
-        std::vector<uint32_t> ppuEntries;
-        for (auto i = 0u; i < nexports; ++i) {
-            auto& e = exports[i];
-            auto stubs = reinterpret_cast<big_uint32_t*>(
-                &elf[pheader->p_offset + e.stub_table]);
-            for (auto i = 0; i < e.functions; ++i) {
-                auto descr = reinterpret_cast<fdescr*>(&elf[pheader->p_offset + stubs[i]]);
-                ppuEntries.push_back(descr->va);
-            }
-        }
-        
         auto imagebaseVar = std::make_tuple("imagebase", ssnprintf("%x", prxInfo.imageBase));
         
         if (prxInfo.loadx86) {
-            std::vector<std::tuple<std::string, std::string>> vars;
-            vars.push_back(imagebaseVar);
-            auto entriesPath = prxPath + ".entries";
-            if (exists(entriesPath)) {
-                vars.push_back({"entries-file", "--entries-file " + entriesPath});
-            }
-            vars.push_back({"entries", printEntriesString(ppuEntries)});
             auto out = prxPath + ".ninja";
-            rewriteScript.statement("rewrite-ppu", prxPath, out, vars);
+            rewriteScript.statement("rewrite-ppu", prxPath, out, {imagebaseVar});
             buildScript.subninja(out);
             buildScript.defaultStatement(prxInfo.name + ".x86.so");
         }

@@ -48,6 +48,8 @@ static constexpr unsigned FragmentShaderConstantCount = 512 / 2;
 static constexpr unsigned VertexTextureUnit = 1;
 static constexpr unsigned FragmentTextureUnit = 5;
 
+static constexpr uint32_t LocalStorageSize = 256 * 1024;
+
 enum Bindings {
     VertexInputsBinding = 1,
     VertexShaderConstantBinding = 17,

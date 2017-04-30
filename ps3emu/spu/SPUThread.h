@@ -22,7 +22,6 @@
 #include <x86intrin.h>
 
 static constexpr uint32_t LSLR = 0x3ffff;
-static constexpr uint32_t LocalStorageSize = 256 * 1024;
 
 class StopSignalException : public virtual std::runtime_error {
     uint32_t _type;
@@ -79,6 +78,22 @@ public:
     
     inline void set_xmm(__m128i xmm) {
         _xmm = xmm;
+    }
+    
+    inline __m128 xmm_f() {
+        return _mm_castsi128_ps(_xmm);
+    }
+    
+    inline void set_xmm_f(__m128 xmm) {
+        _xmm = _mm_castps_si128(xmm);
+    }
+    
+    inline __m128d xmm_d() {
+        return _mm_castsi128_pd(_xmm);
+    }
+    
+    inline void set_xmm_d(__m128d xmm) {
+        _xmm = _mm_castpd_si128(xmm);
     }
     
     inline uint8_t b(int n) {
@@ -200,8 +215,8 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     boost::thread _thread;
     SPUChannels _channels;
     std::function<void(SPUThread*, SPUThreadEvent)> _eventHandler;
-    std::atomic<bool> _dbgPaused = false;
-    std::atomic<bool> _singleStep = false;
+    std::atomic<bool> _dbgPaused;
+    std::atomic<bool> _singleStep;
     int32_t _exitCode;
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
@@ -220,6 +235,7 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     bool _groupExitPending = false;
     std::function<std::vector<uint32_t>()> _getGroupThreads;
     ReservationGranule _granule;
+    void markExecMap(uint32_t va);
 
 public:
     SPUThread(std::string name,

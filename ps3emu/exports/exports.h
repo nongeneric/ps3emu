@@ -5,15 +5,7 @@
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/libs/sys_defs.h"
 
-#include <boost/hana/append.hpp>
-#include <boost/hana/eval_if.hpp>
-#include <boost/hana/equal.hpp>
-#include <boost/hana/minus.hpp>
-#include <boost/hana/for_each.hpp>
-#include <boost/hana/length.hpp>
-#include <boost/hana/tuple.hpp>
-#include <boost/hana/unpack.hpp>
-#include <boost/hana/zip.hpp>
+#include <boost/hana.hpp>
 
 namespace hana = boost::hana;
 using namespace hana::literals;

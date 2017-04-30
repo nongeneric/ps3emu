@@ -3,29 +3,18 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 
-#include <boost/fusion/adapted/struct/define_struct.hpp>
-#include <boost/fusion/include/define_struct.hpp>
-
-#include <boost/fusion/adapted/boost_tuple.hpp>
-#include <boost/fusion/include/boost_tuple.hpp>
-
-#include <boost/fusion/support/is_sequence.hpp>
-#include <boost/fusion/include/is_sequence.hpp>
-
-#include <boost/fusion/sequence/intrinsic/value_at.hpp>
-#include <boost/fusion/include/value_at.hpp>
-
-#include <boost/mpl/bool.hpp>
-#include <boost/mpl/size.hpp>
-#include <boost/mpl/for_each.hpp>
-#include <boost/mpl/at.hpp>
-
+#include <boost/hana.hpp>
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <iostream>
 
-namespace f = boost::fusion;
-namespace mpl = boost::mpl;
+namespace sql {
+
+class SqliteDB;
+    
+namespace hana = boost::hana;
+using namespace boost::hana::literals;
 
 class DatabaseOpeningException : public virtual std::exception {
 public:
@@ -34,218 +23,135 @@ public:
     }
 };
 
-class SQLParseException : public virtual std::exception {
-    const char* what() const noexcept override {
-        return "An error occurred during the SQL query parsing";
-    }
-};
-
 class SQLException : public virtual std::exception {
+    std::string _message;
+public:
+    inline SQLException(std::string message) : _message(message) { }
     const char* what() const noexcept override {
-        return "An error occurred during the query execution";
-    }
-};
-
-struct TypeCollector {
-    typedef std::vector<std::string> Types;
-    Types* types;
-    TypeCollector(Types* types) : types(types) { }
-    template<typename U> void operator()(U) {
-        if (std::is_same<U, int>::value ||
-            std::is_same<U, unsigned int>::value)
-            types->push_back("INT");
-        else if (std::is_same<U, std::string>::value)
-            types->push_back("TEXT");
-        else if (std::is_same<U, float>::value)
-            types->push_back("FLOAT");
-        else if (std::is_same<U, std::vector<uint8_t>>::value)
-            types->push_back("BLOB");
-        else
-            assert(false); // TODO: replace by a static_assert
-    }
-};
-
-/**
- *  Setter
- *  FSeq - random-access fusion sequence
- *  ValueType - one of the supported types:
- *      int, uint32_t, std::string, std::vector<uint8_t>
- *  Sets Nth element of seq to Nth column of the current row, contained by stmt
- */
-
-template <typename FSeq, int N, typename ValueType>
-struct Setter {
-    static inline void Set(FSeq& seq, sqlite3_stmt* stmt) {        
-        static_assert(std::is_integral<ValueType>::value && false, "Not supported type");
-    }
-};
-
-template <typename FSeq, int N>
-struct Setter<FSeq, N, std::vector<uint8_t>> {
-    static inline void Set(FSeq& seq, sqlite3_stmt* stmt) {
-        const void* blob = sqlite3_column_blob(stmt, N);
-        const unsigned char* typed = static_cast<const uint8_t*>(blob);
-        int count = sqlite3_column_bytes(stmt, N);
-        deref(f::advance< mpl::int_<N> >(f::begin(seq))) =
-            std::vector<uint8_t>(typed, typed + count);
-    }
-};
-
-template <typename FSeq, int N>
-struct Setter<FSeq, N, int> {
-    static inline void Set(FSeq& seq, sqlite3_stmt* stmt) {
-        deref(f::advance< mpl::int_<N> >(f::begin(seq))) =
-            sqlite3_column_int(stmt, N);
-    }
-};
-
-template <typename FSeq, int N>
-struct Setter<FSeq, N, unsigned int> {
-    static inline void Set(FSeq& seq, sqlite3_stmt* stmt) {
-        deref(f::advance< mpl::int_<N> >(f::begin(seq))) =
-            static_cast<unsigned int>(sqlite3_column_int(stmt, N));
-    }
-};
-
-template <typename FSeq, int N>
-struct Setter<FSeq, N, std::string> {
-    static inline void Set(FSeq& seq, sqlite3_stmt* stmt) {
-        deref(f::advance< mpl::int_<N> >(f::begin(seq))) =
-            std::string( reinterpret_cast<const char*>(sqlite3_column_text(stmt, N)) );
-    }
-};
-
-/**
- *  Filler
- *  FSeq - random-access fusion sequence
- *  N - number of columns (and elements in FSeq)
- *  Fills seq with values of the current row, contained by stmt. Works only for
- *  types supported by Setter
- */
-
-template <typename FSeq, int N>
-struct Filler {
-    static inline void Fill(FSeq& seq, sqlite3_stmt* stmt) {
-        typedef typename f::result_of::value_at< FSeq, mpl::int_<N> >::type Type;
-        Setter<FSeq, N, Type>::Set(seq, stmt);
-        Filler<FSeq, N - 1>::Fill(seq, stmt);
+        return _message.c_str();
     }
 };
 
 template <typename FSeq>
-struct Filler<FSeq, -1> {
-    static inline void Fill(FSeq& seq, sqlite3_stmt* stmt) { }
+void set(FSeq& seq, sqlite3_stmt* statement) {
+    int i = 0;
+    auto accessors = hana::accessors<FSeq>();
+    auto members = hana::to_tuple(hana::members(seq));
+    hana::for_each(hana::make_range(0_c, hana::size(seq)), [&](auto t) {
+        auto m = members[t];
+        using U = decltype(m);
+        if constexpr(std::is_integral<U>::value) {
+             hana::second(accessors[t])(seq) = sqlite3_column_int64(statement, i);
+        } else if constexpr(std::is_same<U, std::string>::value) {
+             hana::second(accessors[t])(seq)= std::string(reinterpret_cast<const char*>(sqlite3_column_text(statement, i)));
+        } else if constexpr(std::is_same<U, std::vector<uint8_t>>::value) {
+            auto blob = sqlite3_column_blob(statement, i);
+            auto typed = static_cast<const uint8_t*>(blob);
+            auto count = sqlite3_column_bytes(statement, i);
+            hana::second(accessors[t])(seq) = std::vector<uint8_t>(typed, typed + count);
+        } else {
+            static_assert(std::is_integral<U>::value && false, "unknown type");
+        }
+        i++;
+    });
+}
+
+class Statement {
+    sqlite3_stmt* _handle = nullptr;
+    friend class SQLiteDB;
+public:
+    Statement() = default;
+    Statement(Statement&) = delete;
+    inline Statement(Statement&& s);
+    inline Statement(std::string_view sql, SQLiteDB& db);
+    inline ~Statement();
+    inline Statement& operator=(Statement&& s);
 };
 
-/**
- * BinderSetter
- * Binds specified value to an sql parameter
- * Supported types:
- *     int, unsigned int, std::string, std::vector<unsigned char>
- */
-
-template <int N, typename T>
-struct BinderSetter {
-    static inline void Set(sqlite3_stmt* stmt, const T& t) {
-        static_assert(std::is_integral<T>::value && false, "Not supported type");
-    }
-};
-
-template <int N>
-struct BinderSetter<N, std::vector<unsigned char>> {
-    static inline void Set(sqlite3_stmt* stmt, std::vector<unsigned char> const& t) {
-        sqlite3_bind_blob(stmt, N, t.data(), t.size(), SQLITE_STATIC);
-    }
-};
-
-template <int N>
-struct BinderSetter<N, int> {
-    static inline void Set(sqlite3_stmt* stmt, int t) {
-        sqlite3_bind_int(stmt, N, t);        
-    }
-};
-
-template <int N>
-struct BinderSetter<N, unsigned int> {
-    static inline void Set(sqlite3_stmt* stmt, unsigned int t) {
-        sqlite3_bind_int64(stmt, N, static_cast<int>(t));
-    }
-};
-
-template <int N>
-struct BinderSetter<N, std::string> {
-    static inline void Set(sqlite3_stmt* stmt, const std::string& t) {
-        sqlite3_bind_text(stmt, N, t.c_str(), t.size(), NULL);
-    }
-};
-
-class Null { };
-
-/**
- * Binder
- * ts - a list of values of types Ts to bind
- * Binds ts to sql parameters of stmt
- */
-
-template <int N, typename T, typename... Ts>
-struct BinderImpl {
-    static inline void Bind(sqlite3_stmt* stmt, const T& t, const Ts&... ts) {
-        BinderSetter<N, T>::Set(stmt, t);
-        BinderImpl<N + 1, Ts...>::Bind(stmt, ts...);
-    }
-};
-
-template <int N>
-struct BinderImpl<N, Null> {
-    static inline void Bind(sqlite3_stmt* stmt, Null) { }
-};
-
-template <typename... Ts>
-struct Binder {
-    static inline void Bind(sqlite3_stmt* stmt, const Ts&... ts) {
-        assert(sqlite3_bind_parameter_count(stmt) == sizeof...(Ts)
-               && "Parameter count mismatch");
-        BinderImpl<1, Ts..., Null>::Bind(stmt, ts..., Null());
-    }
-};
+template <typename FSeq>
+std::vector<std::string> collectTypes() {
+    std::vector<std::string> types;
+    hana::for_each(hana::members(FSeq()), [&](auto t) {
+        using U = decltype(t);
+        if constexpr(std::is_integral<U>::value) {
+            types.push_back("INT");
+        } else if constexpr(std::is_same<U, std::string>::value){
+            types.push_back("TEXT");
+        } else if constexpr(std::is_same<U, float>::value) {
+            types.push_back("FLOAT");
+        } else if constexpr(std::is_same<U, std::vector<uint8_t>>::value) {
+            types.push_back("BLOB");
+        } else {
+            static_assert(std::is_integral<U>::value && false, "unknown type");
+        }
+    });
+    return types;
+}
 
 class SQLiteDB {
-    sqlite3 *_db;    
+    sqlite3 *_db = nullptr;
+    void throwSqlException(std::string error) {
+        throw SQLException(error + " - (" + std::to_string(sqlite3_errcode(_db)) + ") " +
+                           sqlite3_errmsg(_db));
+    }
+    
+    template <typename... Ts>
+    void bind(sqlite3_stmt* statement, const Ts&... ts) {
+        assert(sqlite3_bind_parameter_count(statement) == sizeof...(Ts));
+        int i = 1;
+        hana::for_each(hana::make_tuple(ts...), [&](auto t) {
+            using U = decltype(t);
+            int res = 0;
+            if constexpr(std::is_integral<U>::value) {
+                res = sqlite3_bind_int64(statement, i, t);
+            } else if constexpr(std::is_same<U, std::string>::value) {
+                res = sqlite3_bind_text(statement, i, t.c_str(), -1, SQLITE_TRANSIENT);
+            } else if constexpr(std::is_same<U, std::vector<uint8_t>>::value) {
+                res = sqlite3_bind_blob(statement, i, t.data(), t.size(), SQLITE_TRANSIENT);
+            } else {
+                static_assert(std::is_integral<U>::value && false, "unknown type");
+            }
+            if (res)
+                throwSqlException("bind");
+            i++;
+        });
+    }
+    
+    friend class Statement;
+    
 public:
     SQLiteDB(std::string path, std::string sqlScheme) {
-        bool createTables = !boost::filesystem::exists(path);
         int rc;
         rc = sqlite3_open(path.c_str(), &_db);
         if (rc) {
             sqlite3_close(_db);
             throw DatabaseOpeningException();
         }
-        if (createTables) {
-            rc = sqlite3_exec(_db, sqlScheme.c_str(), NULL, NULL, NULL);
-            if (rc) {
-                throw SQLException();
-            }
+        sqlite3_busy_timeout(_db, 1000);
+        rc = sqlite3_exec(_db, sqlScheme.c_str(), NULL, NULL, NULL);
+        if (rc) {
+            throwSqlException("open");
         }
     }
     ~SQLiteDB() {
-        sqlite3_free(_db);
+        if (_db) {
+            sqlite3_free(_db);
+        }
     }
     template <typename... Ts>
-    int Insert(std::string sql, const Ts&... ts) {
-        sqlite3_stmt *statement;
-        int rc;
-        rc = sqlite3_prepare_v2(_db, sql.c_str(), sql.size(), &statement, NULL);
-        if (rc) {
-            throw SQLParseException();
-        }
-        Binder<Ts...>::Bind(statement, ts...);
-        rc = sqlite3_step(statement);
+    uint64_t Insert(Statement& statement, Ts&&... ts) {
+        bind(statement._handle, ts...);
+        auto rc = sqlite3_step(statement._handle);
         if (rc != SQLITE_DONE) {
-            throw SQLException();
+            throwSqlException("insert");
         }
-        rc = sqlite3_finalize(statement);
-        assert(rc == SQLITE_OK);
-        return (int)sqlite3_last_insert_rowid(_db); // use uint64 all the way?
+        sqlite3_reset(statement._handle);
+        return sqlite3_last_insert_rowid(_db);
+    }
+    template <typename... Ts>
+    uint64_t Insert(std::string_view sql, Ts&&... ts) {
+        Statement statement(sql, *this);
+        return Insert(statement, std::forward<Ts>(ts)...);
     }
     std::string SQLiteTypeToString(int type) {
         switch(type) {
@@ -263,51 +169,70 @@ public:
             assert(false);
         }
         throw std::runtime_error("unsupported type");
-    }    
+    }
     template <typename FSeq, typename... Ts>
-    std::vector<FSeq> Select(std::string sql, Ts... ts) {
-        sqlite3_stmt *statement;
-        int rc;
-        rc = sqlite3_prepare_v2(_db, sql.c_str(), sql.size(), &statement, NULL);
-        if (rc) {
-            throw SQLParseException();
-        }
+    std::vector<FSeq> Select(Statement& statement, Ts&&... ts) {
+        bind(statement._handle, ts...);
+        auto types = collectTypes<FSeq>();
 
-        Binder<Ts...>::Bind(statement, ts...);
-
-        TypeCollector::Types types;
-        mpl::for_each<FSeq>(TypeCollector(&types));
-
-        rc = sqlite3_step(statement);
         std::vector<FSeq> res;
         int idxRow = 0;
-        const int staticSize = mpl::size<FSeq>::value;
-        while (rc == SQLITE_ROW) {
-            int colCount = sqlite3_column_count(statement);
-            assert(colCount == staticSize && "Column count mismatch");
+        int rc;
+        for (;;) {
+            rc = sqlite3_step(statement._handle);
+            if (rc != SQLITE_ROW) {
+                if (rc != SQLITE_DONE)
+                    throwSqlException("select");
+                break;
+            }
+            unsigned colCount = sqlite3_column_count(statement._handle);
+            assert(colCount == hana::size(FSeq()).value && "Column count mismatch");
 
-            for (int idxCol = 0; idxCol < colCount; ++idxCol) {
-                sqlite3_value* colValue = sqlite3_column_value(statement, idxCol); // unprotected!!!
+            for (auto idxCol = 0u; idxCol < colCount; ++idxCol) {
+                sqlite3_value* colValue = sqlite3_column_value(statement._handle, idxCol); // unprotected!!!
                 int colType = sqlite3_value_type(colValue);                
                 if (SQLiteTypeToString(colType) != types[idxCol] &&
                     SQLiteTypeToString(colType) != "NULL")
                     throw std::runtime_error("Type mismatch");
             }
 
-            FSeq curSeq;
-            Filler<FSeq, staticSize - 1>::Fill(curSeq, statement);
-            res.push_back(curSeq);
-            rc = sqlite3_step(statement);            
+            FSeq row;
+            set(row, statement._handle);
+            res.push_back(row);
             idxRow++;
         }
         assert(rc == SQLITE_DONE);
-
-        if (rc != SQLITE_DONE) {
-            throw SQLException();
-        }
-        rc = sqlite3_finalize(statement);
-        assert(rc == SQLITE_OK);
-
+        sqlite3_reset(statement._handle);
         return res;
     }
+    template <typename FSeq, typename... Ts>
+    std::vector<FSeq> Select(std::string_view sql, Ts&&... ts) {
+        Statement statement(sql, *this);
+        return Select<FSeq, Ts...>(statement, std::forward<Ts>(ts)...);
+    }
 };
+
+inline Statement::Statement(Statement&& s) {
+    _handle = s._handle;
+    s._handle = nullptr;
+}
+
+inline Statement::Statement(std::string_view sql, SQLiteDB& db) {
+    auto rc = sqlite3_prepare_v2(db._db, begin(sql), -1, &_handle, NULL);
+    if (rc)
+        db.throwSqlException("prepare statement");
+}
+
+inline Statement::~Statement() {
+    if (!_handle)
+        return;
+    sqlite3_finalize(_handle);
+    _handle = nullptr;
+}
+
+inline Statement& Statement::operator=(Statement&& s) {
+    std::swap(_handle, s._handle);
+    return *this;
+}
+
+}

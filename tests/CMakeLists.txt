@@ -18,6 +18,7 @@ set(SRC
     RewriterTests.cpp
     TestUtils.cpp
     SPUDasmTests.cpp
+    InstrDbTests.cpp
 )
 
 add_executable(tests ${SRC})

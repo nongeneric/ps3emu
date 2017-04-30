@@ -42,7 +42,7 @@ namespace br = boost::range;
 
 typedef std::array<float, 4> glvec4_t;
 
-Rsx::Rsx() = default;
+Rsx::Rsx() : _isFlipInProgress(false), _lastFlipTime(0) {}
 
 Rsx::~Rsx() {
     shutdown();

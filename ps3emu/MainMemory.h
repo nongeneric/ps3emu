@@ -38,10 +38,10 @@ union VirtualAddress {
 };
 
 struct MemoryPage {
-    std::atomic<uintptr_t> ptr = 0;
+    std::atomic<uintptr_t> ptr;
     void alloc();
     void dealloc();
-    inline MemoryPage() { ptr = 0; }
+    inline MemoryPage() : ptr(0) { }
 };
 
 struct ProtectionRange {

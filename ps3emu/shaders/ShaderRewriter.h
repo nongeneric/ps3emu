@@ -20,7 +20,7 @@ namespace ShaderRewriter {
     std::vector<Statement*> RewriteIfStubs(ASTContext& context,
                                            std::vector<Statement*> statements);
     std::string PrintStatement(Statement* stat);
-    int GetLastRegisterNum(Expression* expr);
+    std::tuple<int, int> GetLastRegisterNum(Expression* expr);
     
     class UsedConstsVisitor : public DefaultVisitor {
         std::set<unsigned> _consts;

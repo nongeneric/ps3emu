@@ -1935,7 +1935,7 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
     });
     ppu.join();
     
-    std::atomic<bool> step1 = false, step2 = false;
+    std::atomic<bool> step1(false), step2(false);
     
     // th1 gets reservation
     boost::thread th1([&] {

@@ -209,8 +209,8 @@ class SPUChannels {
     ConcurrentBoundedQueue<uint32_t> _outboundInterruptMailbox;
     ConcurrentBoundedQueue<uint32_t> _inboundMailbox;
     std::array<std::atomic<uint32_t>, 28> _channels;
-    std::atomic<uint32_t> _spuStatus = 0;
-    std::atomic<uint32_t> _interrupt2 = 0;
+    std::atomic<uint32_t> _spuStatus;
+    std::atomic<uint32_t> _interrupt2;
     SpuEvent _event;
     SpuSignal _snr1, _snr2;
     void command(uint32_t word);

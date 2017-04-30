@@ -10,8 +10,8 @@ class PPUThread;
 class SPUThread;
 class EmuCallbacks;
 class Config;
-class ReservationGranule;
-class ExecutionMap;
+struct ReservationGranule;
+struct ExecutionMapCollection;
 
 struct g_state_t {
     g_state_t();
@@ -26,7 +26,7 @@ struct g_state_t {
     ELFLoader* elf;
     EmuCallbacks* callbacks;
     Config* config;
-    ExecutionMap* executionMap;
+    ExecutionMapCollection* executionMaps;
     thread_local static PPUThread* th;
     thread_local static SPUThread* sth;
     thread_local static bool rewriter_ncall;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <experimental/string_view>
+#include <string_view>
 #include <boost/variant.hpp>
 
 #include <vector>
@@ -46,10 +46,10 @@ struct SFOEntry {
 class ContentManager {
     std::string _elfPath;
 public:
-    void setElfPath(std::experimental::string_view path);
+    void setElfPath(std::string_view path);
     std::string usrDir();
     std::string contentDir();
-    std::string toHost(std::experimental::string_view path);
+    std::string toHost(std::string_view path);
     std::string cacheDir();
     std::vector<SFOEntry> sfo();
 };

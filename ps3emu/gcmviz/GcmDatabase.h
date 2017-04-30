@@ -22,9 +22,9 @@ struct GcmCommand {
     std::vector<unsigned char> blob;
 };
 
-class SQLiteDB;
+namespace sql { class SQLiteDB; }
 class GcmDatabase {
-    std::unique_ptr<SQLiteDB> _db;
+    std::unique_ptr<sql::SQLiteDB> _db;
 public:
     GcmDatabase();
     ~GcmDatabase();

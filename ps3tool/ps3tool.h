@@ -34,8 +34,6 @@ struct RewriteCommand {
     std::string cpp;
     uint32_t imageBase;
     bool isSpu = false;
-    std::vector<uint32_t> entryPoints;
-    std::vector<uint32_t> ignoredEntryPoints;
 };
 
 struct PrxStoreCommand {
@@ -52,6 +50,8 @@ struct FindSpuElfsCommand {
     std::string elf;
 };
 
+struct DumpInstrDbCommand { };
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
@@ -61,3 +61,4 @@ void HandleRewrite(RewriteCommand const& command);
 void HandlePrxStore(PrxStoreCommand const& command);
 void HandleRsxDasm(RsxDasmCommand const& command);
 void HandleFindSpuElfs(FindSpuElfsCommand const& command);
+void HandleDumpInstrDb(DumpInstrDbCommand const& command);

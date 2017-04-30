@@ -2609,3 +2609,31 @@ TEST_CASE("lwarx_stwcx") {
     );
 }
 
+TEST_CASE("spu_generic_test2") {
+    test_interpreter_and_rewriter({"./binaries/spu_generic_test2/a.elf"},
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "All SPU threads exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 0\n"
+        "message: ! 10 !\n"
+        "o[0] = 00000000 00000000 43fa0000 c3fa0000\n"
+        "o[1] = 00000000 00000000 437a0000 c37a0000\n"
+        "o[2] = 00000000 00000000 42fa0000 c2fa0000\n"
+        "o[3] = 00000000 00000000 41fa0000 c1fa0000\n"
+        "o[4] = 00000000 0000000a fffffff6 000000c8\n"
+        "o[5] = 00000000 00000014 ffffffec 00000190\n"
+        "o[6] = 00000000 00000028 ffffffd8 00000320\n"
+        "o[7] = 00000000 7fffffff 80000000 7fffffff\n"
+        "o[8] = 00000000 00000000 43fa0000 4f7ffffe\n"
+        "o[9] = 00000000 00000000 437a0000 4efffffe\n"
+        "o[10] = 00000000 00000000 42fa0000 4e7ffffe\n"
+        "o[11] = 00000000 00000000 41fa0000 4d7ffffe\n"
+        "o[12] = 00000000 000f4240 00000000 ffffffff\n"
+        "o[13] = 00000000 001e8480 00000000 ffffffff\n"
+        "o[14] = 00000000 003d0900 00000000 ffffffff\n"
+        "o[15] = 00000000 0f424000 00000000 ffffffff\n"
+        "complete"
+    );
+}

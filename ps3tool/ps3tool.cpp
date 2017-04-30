@@ -1,14 +1,21 @@
 #include "ps3tool.h"
 #include <boost/program_options.hpp>
 #include <boost/variant.hpp>
+#include <boost/hana.hpp>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <fstream>
 
 using namespace boost::program_options;
+namespace hana = boost::hana;
 
-typedef boost::variant<ShaderDasmCommand,
+struct NoneCommand {};
+struct BadCommand {};
+
+typedef boost::variant<NoneCommand,
+                       BadCommand,
+                       ShaderDasmCommand,
                        UnsceCommand,
                        RestoreElfCommand,
                        ReadPrxCommand,
@@ -16,9 +23,169 @@ typedef boost::variant<ShaderDasmCommand,
                        RewriteCommand,
                        PrxStoreCommand,
                        RsxDasmCommand,
-                       FindSpuElfsCommand>
+                       FindSpuElfsCommand,
+                       DumpInstrDbCommand>
     Command;
 
+template <typename C>
+struct CommandParser {
+    C command;
+    options_description desc;
+    std::string name;
+    
+    CommandParser(std::string name) : desc(name), name(name) {}
+    virtual void init() = 0;
+    virtual void parse(variables_map& vm) = 0;
+    virtual ~CommandParser() = default;
+    
+    bool run(variables_map& vm, parsed_options& parsed, bool help) {
+        init();
+        desc.add_options() ("help", "produce help message");
+        auto opts = collect_unrecognized(parsed.options, include_positional);
+        if (begin(opts) != end(opts)) {
+            opts.erase(begin(opts));
+        }
+        store(command_line_parser(opts).options(desc).run(), vm);
+        if (vm.count("help") || help) {
+            std::cout << desc;
+            return false;
+        }
+        notify(vm);
+        parse(vm);
+        return true;
+    }
+};
+
+struct ShaderParser : CommandParser<ShaderDasmCommand> {
+    ShaderParser() : CommandParser<ShaderDasmCommand>("shader") {}
+    
+    void init() override {
+        desc.add_options()(
+            "binary", value<std::string>(&command.binary)->required(), "binary path");
+    }
+    
+    void parse(variables_map& vm) override { }
+};
+
+struct UnsceParser : CommandParser<UnsceCommand> {
+    UnsceParser() : CommandParser<UnsceCommand>("unsce") {}
+    
+    void init() override {
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "output elf file")
+            ("sce", value<std::string>(&command.sce)->required(), "input sce file")
+            ("data", value<std::string>(&command.data)->required(), "data directory");
+    }
+    
+    void parse(variables_map& vm) override { }
+};
+
+struct RestoreElfParser : CommandParser<RestoreElfCommand> {
+    RestoreElfParser() : CommandParser<RestoreElfCommand>("restore-elf") {}
+    
+    void init() override {
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
+            ("dump", value<std::string>(&command.dump)->required(), "dump file")
+            ("output", value<std::string>(&command.output)->required(), "output file");
+    }
+    
+    void parse(variables_map& vm) override { }
+};
+
+struct ReadPrxParser : CommandParser<ReadPrxCommand> {
+    ReadPrxParser() : CommandParser<ReadPrxCommand>("read-prx") {}
+    
+    void init() override {
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
+            ("script", "write Ida script");
+    }
+    
+    void parse(variables_map& vm) override {
+        command.writeIdaScript = vm.count("script");
+    }
+};
+
+struct ParseSpursTraceParser : CommandParser<ParseSpursTraceCommand> {
+    ParseSpursTraceParser() : CommandParser<ParseSpursTraceCommand>("parse-spurs-trace") {}
+    
+    void init() override {
+        desc.add_options()
+            ("dump", value<std::string>(&command.dump)->required(), "trace buffer dump file");
+    }
+    
+    void parse(variables_map& vm) override { }
+};
+
+struct RewriteParser : CommandParser<RewriteCommand> {
+    RewriteParser() : CommandParser<RewriteCommand>("rewrite") {}
+    
+    std::string imageBaseStr;
+    
+    void init() override {
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
+            ("cpp", value<std::string>(&command.cpp)->required(), "output cpp file")
+            ("image-base", value<std::string>(&imageBaseStr)->default_value("0"), "image base")
+            ("spu", bool_switch()->default_value(false), "spu")
+            ;
+    }
+    
+    void parse(variables_map& vm) override {
+        command.imageBase = std::stoi(imageBaseStr, 0, 16);
+        command.isSpu = vm["spu"].as<bool>();
+    }
+};
+
+struct PrxStoreParser : CommandParser<PrxStoreCommand> {
+    PrxStoreParser() : CommandParser<PrxStoreCommand>("prx-store") {}
+    
+    void init() override {
+        desc.add_options()
+            ("map", bool_switch()->default_value(false), "update prx segment bases in ps3 config")
+            ("rewrite", bool_switch()->default_value(false), "rewrite prx binaries")
+            ("verbose", bool_switch()->default_value(false), "verbose")
+            ;
+    }
+    
+    void parse(variables_map& vm) override {
+        command.map = vm["map"].as<bool>();
+        command.rewrite = vm["rewrite"].as<bool>();
+        command.verbose = vm["verbose"].as<bool>();
+    }
+};
+
+struct DumpInstrDbParser : CommandParser<DumpInstrDbCommand> {
+    DumpInstrDbParser() : CommandParser<DumpInstrDbCommand>("dump-instrdb") {}
+    void init() override { }
+    void parse(variables_map& vm) override { }
+};
+
+struct RsxDasmParser : CommandParser<RsxDasmCommand> {
+    RsxDasmParser() : CommandParser<RsxDasmCommand>("rsx-dasm") {}
+    
+    void init() override {
+        desc.add_options()
+            ("bin", value<std::string>(&command.bin)->required(), "bin file")
+            ;
+    }
+    
+    void parse(variables_map& vm) override { }
+};
+    
+struct FindSpuElfsParser : CommandParser<FindSpuElfsCommand> {
+    FindSpuElfsParser() : CommandParser<FindSpuElfsCommand>("find-spu-elfs") {}
+    
+    void init() override {
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf file")
+            ;
+    }
+    
+    void parse(variables_map& vm) override { }
+};
+    
 Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
     std::string commandName;
@@ -40,173 +207,50 @@ Command ParseOptions(int argc, const char *argv[]) {
 
     store(parsed, vm);
     notify(vm);
-
-    if (commandName == "shader") {
-        ShaderDasmCommand command;
-        options_description desc("shader");
-
-        desc.add_options()
-            ("binary", value<std::string>(&command.binary)->required(), "binary path");
-
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        return command;
-    } else if (commandName == "unsce") {
-        UnsceCommand command;
-        options_description desc("unsce");
-
-        desc.add_options()
-            ("elf", value<std::string>(&command.elf)->required(), "output elf file")
-            ("sce", value<std::string>(&command.sce)->required(), "input sce file")
-            ("data", value<std::string>(&command.data)->required(), "data directory");
-
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        return command;
-    } else if (commandName == "restore-elf") {
-        RestoreElfCommand command;
-        options_description desc("restore-elf");
-
-        desc.add_options()
-            ("elf", value<std::string>(&command.elf)->required(), "elf file")
-            ("dump", value<std::string>(&command.dump)->required(), "dump file")
-            ("output", value<std::string>(&command.output)->required(), "output file");
-
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        return command;
-    } else if (commandName == "read-prx") {
-        ReadPrxCommand command;
-        options_description desc("read-prx");
-
-        desc.add_options()
-            ("elf", value<std::string>(&command.elf)->required(), "elf file")
-            ("script", "write Ida script");
-
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        command.writeIdaScript = vm.count("script");
-        return command;
-    } else if (commandName == "parse-spurs-trace") {
-        ParseSpursTraceCommand command;
-        options_description desc("parse-spurs-trace");
-
-        desc.add_options()
-            ("dump", value<std::string>(&command.dump)->required(), "trace buffer dump file");
-
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        return command;
-    } else if (commandName == "rewrite") {
-        RewriteCommand command;
-        options_description desc("rewrite");
-
-        std::vector<std::string> entries, ignored;
-        std::string entriesFile, imageBaseStr;
-        
-        desc.add_options()
-            ("elf", value<std::string>(&command.elf)->required(), "elf file")
-            ("cpp", value<std::string>(&command.cpp)->required(), "output cpp file")
-            ("entries", value<std::vector<std::string>>(&entries)->multitoken(), "entry points")
-            ("entries-file", value<std::string>(&entriesFile), "entry points file")
-            ("image-base", value<std::string>(&imageBaseStr)->default_value("0"), "image base")
-            ("spu", bool_switch()->default_value(false), "spu")
-            ("ignored", value<std::vector<std::string>>(&ignored)->multitoken(), "ignored entry points");
-        
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        
-        command.imageBase = std::stoi(imageBaseStr, 0, 16);
-        command.isSpu = vm["spu"].as<bool>();
-        
-        for (auto str : entries) {
-            command.entryPoints.push_back(std::stoi(str, 0, 16));
-        }
-        
-        if (!entriesFile.empty()) {
-            std::ifstream f(entriesFile);
-            assert(f.is_open());
-            std::string line;
-            while (std::getline(f, line)) {
-                command.entryPoints.push_back(std::stoi(line, 0, 16));
+    
+    auto parsers = hana::make_tuple(
+        ShaderParser(),
+        UnsceParser(),
+        RestoreElfParser(),
+        ReadPrxParser(),
+        ParseSpursTraceParser(),
+        RewriteParser(),
+        PrxStoreParser(),
+        RsxDasmParser(),
+        FindSpuElfsParser(),
+        DumpInstrDbParser()
+    );
+    
+    if (commandName == "") {
+        std::cout << "Usage: ps3tool [COMMAND] [OPTIONS]...\n";
+        hana::for_each(parsers, [&](auto parser) {
+            std::cout << "    " << parser.name << std::endl;
+        });
+        return NoneCommand();
+    }
+    
+    Command command = BadCommand();
+    hana::for_each(parsers, [&](auto parser) {
+        if (parser.name == commandName) {
+            if (parser.run(vm, parsed, false)) {
+                command = parser.command;
+            } else {
+                command = NoneCommand();
             }
         }
-        
-        for (auto str : ignored) {
-            command.ignoredEntryPoints.push_back(std::stoi(str, 0, 16));
-        }
-        
-        return command;
-    } else if (commandName == "prx-store") {
-        PrxStoreCommand command;
-        options_description desc("prx-store");
+    });
 
-        std::vector<std::string> entries, ignored;
-        std::string entriesFile;
-        
-        desc.add_options()
-            ("map", bool_switch()->default_value(false), "update prx segment bases in ps3 config")
-            ("rewrite", bool_switch()->default_value(false), "rewrite prx binaries")
-            ("verbose", bool_switch()->default_value(false), "verbose")
-            ;
-        
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        
-        command.map = vm["map"].as<bool>();
-        command.rewrite = vm["rewrite"].as<bool>();
-        command.verbose = vm["verbose"].as<bool>();
-        
-        return command;
-    } else if (commandName == "rsx-dasm") {
-        RsxDasmCommand command;
-        options_description desc("rsx-dasm");
-        
-        desc.add_options()
-            ("bin", value<std::string>(&command.bin)->required(), "bin file")
-            ;
-        
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        
-        return command;
-    } else if (commandName == "find-spu-elfs") {
-        FindSpuElfsCommand command;
-        options_description desc("find-spu-elfs");
-        
-        desc.add_options()
-            ("elf", value<std::string>(&command.elf)->required(), "elf file")
-            ;
-        
-        auto opts = collect_unrecognized(parsed.options, include_positional);
-        opts.erase(opts.begin());
-        store(command_line_parser(opts).options(desc).run(), vm);
-        notify(vm);
-        
-        return command;
-    } else {
-        throw std::runtime_error("unknown command");
-    }
+    return command;
 }
 
 class CommandVisitor : public boost::static_visitor<> {
 public:
+    void operator()(NoneCommand& command) const { }
+    
+    void operator()(BadCommand& command) const { 
+        std::cout << "unrecognized command\n";
+    }
+    
     void operator()(ShaderDasmCommand& command) const {
         HandleShaderDasm(command);
     }
@@ -241,6 +285,10 @@ public:
     
     void operator()(FindSpuElfsCommand& command) const {
         HandleFindSpuElfs(command);
+    }
+    
+    void operator()(DumpInstrDbCommand& command) const {
+        HandleDumpInstrDb(command);
     }
 };
 

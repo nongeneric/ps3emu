@@ -1,6 +1,7 @@
 #include "RewriterUtils.h"
 
 #include "ps3emu/utils.h"
+#include "ps3emu/log.h"
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <stdlib.h>

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "ps3emu/int.h"
 #include <string>
+#include <functional>
+#include <string_view>
 
 constexpr bool static_debug =
 #if !defined(NDEBUG)
