@@ -87,7 +87,8 @@ set(SRC
     libs/graphics/GL/src/glad.c
     libs/message.cpp
     libs/trophy.cpp
-    libs/savedata.cpp
+    libs/savedata/savedata.cpp
+    libs/savedata/SfoDb.cpp
     libs/spurs.cpp
 )
 

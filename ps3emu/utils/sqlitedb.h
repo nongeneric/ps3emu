@@ -5,6 +5,7 @@
 
 #include <boost/hana.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <cstdint>
 #include <iostream>
@@ -75,7 +76,7 @@ std::vector<std::string> collectTypes() {
         using U = decltype(t);
         if constexpr(std::is_integral<U>::value) {
             types.push_back("INT");
-        } else if constexpr(std::is_same<U, std::string>::value){
+        } else if constexpr(std::is_same<U, std::string>::value || std::is_same<U, std::string_view>::value){
             types.push_back("TEXT");
         } else if constexpr(std::is_same<U, float>::value) {
             types.push_back("FLOAT");
@@ -104,8 +105,8 @@ class SQLiteDB {
             int res = 0;
             if constexpr(std::is_integral<U>::value) {
                 res = sqlite3_bind_int64(statement, i, t);
-            } else if constexpr(std::is_same<U, std::string>::value) {
-                res = sqlite3_bind_text(statement, i, t.c_str(), -1, SQLITE_TRANSIENT);
+            } else if constexpr(std::is_same<U, std::string>::value || std::is_same<U, std::string_view>::value) {
+                res = sqlite3_bind_text(statement, i, t.data(), -1, SQLITE_TRANSIENT);
             } else if constexpr(std::is_same<U, std::vector<uint8_t>>::value) {
                 res = sqlite3_bind_blob(statement, i, t.data(), t.size(), SQLITE_TRANSIENT);
             } else {
@@ -120,15 +121,15 @@ class SQLiteDB {
     friend class Statement;
     
 public:
-    SQLiteDB(std::string path, std::string sqlScheme) {
+    SQLiteDB(std::string_view path, std::string_view sqlScheme) {
         int rc;
-        rc = sqlite3_open(path.c_str(), &_db);
+        rc = sqlite3_open(begin(path), &_db);
         if (rc) {
             sqlite3_close(_db);
             throw DatabaseOpeningException();
         }
         sqlite3_busy_timeout(_db, 1000);
-        rc = sqlite3_exec(_db, sqlScheme.c_str(), NULL, NULL, NULL);
+        rc = sqlite3_exec(_db, begin(sqlScheme), NULL, NULL, NULL);
         if (rc) {
             throwSqlException("open");
         }

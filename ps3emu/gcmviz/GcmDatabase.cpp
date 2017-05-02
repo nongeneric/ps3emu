@@ -1,6 +1,6 @@
 #include "GcmDatabase.h"
 
-#include "sqlitedb.h"
+#include "ps3emu/utils/sqlitedb.h"
 
 BOOST_HANA_ADAPT_STRUCT(GcmCommandArg, value, name, type);
 

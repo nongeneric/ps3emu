@@ -21,7 +21,7 @@
 #include "ps3emu/libs/audio/libaudio.h"
 #include "ps3emu/libs/message.h"
 #include "ps3emu/libs/trophy.h"
-#include "ps3emu/libs/savedata.h"
+#include "ps3emu/libs/savedata/savedata.h"
 #include "ps3emu/libs/spurs.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"

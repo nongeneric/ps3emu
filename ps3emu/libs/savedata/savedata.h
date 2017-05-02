@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sys.h"
+#include "ps3emu/libs/sys.h"
 
 struct CellSaveDataSetBuf {
     big_uint32_t dirListMax;

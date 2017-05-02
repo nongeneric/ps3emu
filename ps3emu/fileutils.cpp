@@ -1,8 +1,34 @@
 #include "fileutils.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 #include <stdio.h>
 #include <stdexcept>
+
+using namespace boost::filesystem;
+
+namespace {
+  
+    template <typename Iterator, bool Files>
+    std::vector<std::string> get_files(std::string_view path,
+                                std::string_view rxPattern) {
+        boost::regex rx(begin(rxPattern));
+        std::vector<std::string> res;
+        for (Iterator i(begin(path)); i != Iterator(); ++i) {
+            if (Files && !is_regular_file(i->status()))
+                continue;
+            if (!Files && !is_directory(i->status()))
+                continue;
+            boost::cmatch m;
+            if (!boost::regex_match(i->path().filename().string().c_str(), m, rx))
+                continue;
+            res.push_back(i->path().string());
+        }
+        return res;
+    }
+    
+};
 
 std::vector<uint8_t> read_all_bytes(std::string_view path) {
     auto f = fopen(begin(path), "r");
@@ -39,4 +65,14 @@ void write_all_text(std::string_view text, std::string_view path) {
 void write_all_lines(std::vector<std::string> lines, std::string_view path) {
     auto str = boost::algorithm::join(lines, "\n");
     write_all_text(str, path);
+}
+
+std::vector<std::string> get_files(std::string_view path,
+                                   std::string_view rxPattern,
+                                   bool recursive) {
+    if (recursive) {
+        return get_files<directory_iterator, true>(path, rxPattern);
+    } else {
+        return get_files<recursive_directory_iterator, true>(path, rxPattern);
+    }
 }

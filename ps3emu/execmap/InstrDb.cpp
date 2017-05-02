@@ -1,6 +1,6 @@
 #include "InstrDb.h"
 
-#include "ps3emu/gcmviz/sqlitedb.h"
+#include "ps3emu/utils/sqlitedb.h"
 #include "ps3emu/state.h"
 #include "ps3emu/Config.h"
 #include "ps3emu/utils.h"
