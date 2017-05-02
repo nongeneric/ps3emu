@@ -2750,7 +2750,10 @@ PRINT(cflts) {
     auto& rt = th->r(_rt); \
     auto mul = std::pow(2.f, float(173 - _i8)); \
     for (int i = 0; i < 4; ++i) { \
-        rt.set_w(i, int32_t(std::clamp<float>(ra.fs(i) * mul, INT32_MIN, INT32_MAX))); \
+        auto f = ra.fs(i) * mul; \
+        auto s = f <= float(INT32_MIN) ? INT32_MIN \
+               : f >= float(INT32_MAX) ? INT32_MAX : (int32_t)f; \
+        rt.set_w(i, s); \
     } \
 }
 EMU_REWRITE(cflts, i->RA.u(), i->RT.u(), i->I8.u())
@@ -2781,7 +2784,10 @@ PRINT(cfltu) {
     auto& rt = th->r(_rt); \
     auto mul = std::pow(2.f, float(173 - _i8)); \
     for (int i = 0; i < 4; ++i) { \
-        rt.set_w(i, uint32_t(std::clamp(ra.fs(i) * mul, 0.f, float(UINT32_MAX)))); \
+        auto f = ra.fs(i) * mul; \
+        auto u = f < 0.f ? 0u \
+               : f >= float(UINT32_MAX) ? UINT32_MAX : (uint32_t)f; \
+        rt.set_w(i, u); \
     } \
 }
 EMU_REWRITE(cfltu, i->RA.u(), i->RT.u(), i->I8.u())

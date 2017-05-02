@@ -20,9 +20,7 @@ TEST_CASE("rewriter_simple") {
     std::string output;
     auto line = rewrite(
         "./binaries/rewriter_simple/a.elf",
-        cppPath,
-        "--entries 1022c 10314 1039c 10418 10484 10518 1053c 105ac 10654"
-        "--ignored 1045c 104c8");
+        cppPath, {});
     auto res = exec(line, output);
     REQUIRE(res);
     line = compile(cppPath + ".ninja");
