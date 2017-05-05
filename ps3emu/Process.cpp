@@ -9,6 +9,7 @@
 #include "state.h"
 #include "Config.h"
 #include "ps3emu/libs/sync/queue.h"
+#include "ps3emu/HeapMemoryAlloc.h"
 
 #include <SDL2/SDL.h>
 #include "ppu/InterruptPPUThread.h"
@@ -109,6 +110,14 @@ int32_t executeExportedFunction(uint32_t imageBase,
     return thread->getGPR(3);
 }
 
+void Process::insertSegment(ModuleSegment segment) {
+    _segments.push_back(segment);
+    std::inplace_merge(begin(_segments),
+                       --end(_segments),
+                       end(_segments),
+                       [&](auto& a, auto& b) { return a.va < b.va; });
+}
+
 void Process::loadPrxStore() {
     path storePath = g_state.config->prxStorePath;
     loadPrx((storePath / "sys" / "external" / "liblv2.sprx.elf").string());
@@ -120,6 +129,7 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
     auto& segments = g_state.proc->getSegments();
     // TODO: make the recursive ps3call using continuations instead of the for loop
     // when prx store contains modules other than lv2
+    // (lv2 loads and starts all other modules)
     for (auto i = 1u; i < segments.size(); ++i) {
         auto& s = segments[i];
         if (s.index != 0)
@@ -143,9 +153,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
                                                            EmuInternalAreaSize,
                                                            "internal alloc"));
-    _heapMemoryManager.reset(new InternalMemoryManager(HeapArea,
-                                                       HeapAreaSize,
-                                                       "heap alloc"));
+    _heapMemoryManager.reset(new HeapMemoryAlloc());
     _stackBlocks.reset(new InternalMemoryManager(StackArea,
                                                  StackAreaSize,
                                                  "stack allock"));
@@ -158,7 +166,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _elf.reset(new ELFLoader());
     _elf->load(elfPath);
     _elf->map([&](auto va, auto size, auto index) {
-        _segments.push_back({_elf, index, va, size});
+        insertSegment({_elf, index, va, size});
     }, 0, g_state.config->x86Paths, &_rewriterStore, false);
     if (!g_state.config->sysPrxInfos.empty()) {
         assert(_segments.back().va + _segments.back().size <
@@ -227,7 +235,7 @@ uint32_t Process::loadPrx(std::string path) {
         }
     }
     auto stolen = prx->map([&](auto va, auto size, auto index) {
-        _segments.push_back({prx, index, va, size});
+        insertSegment({prx, index, va, size});
     }, imageBase, x86paths, &_rewriterStore, false);
     std::copy(begin(stolen), end(stolen), std::back_inserter(_stolenInfos));
     for (auto p : _prxs) {

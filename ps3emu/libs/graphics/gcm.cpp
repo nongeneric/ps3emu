@@ -423,10 +423,11 @@ int32_t cellGcmMapEaIoAddressWithFlags(uint32_t ea, uint32_t io, uint32_t size, 
 
 int32_t cellGcmMapMainMemory(uint32_t address, uint32_t size, boost::endian::big_uint32_t* offset, Process* proc) {
     auto& eas = emuGcmState.offsetTable->eaAddress;
-    auto ioGap = findGap<big_uint16_t>(begin(eas),
-                                       end(eas),
-                                       size / DefaultMainMemoryPageSize,
-                                       [](big_uint16_t x) { return x == 0xffff; });
+    auto ioGap = findGap(begin(eas),
+                         end(eas),
+                         size / DefaultMainMemoryPageSize,
+                         1,
+                         [](auto x) { return *x == 0xffff; });
     auto io = (uint32_t)std::distance(begin(eas), ioGap) << 20;
     *offset = io;
     return cellGcmMapEaIoAddress(address, io, size, proc);
@@ -589,4 +590,9 @@ void deserializeOffsetTable(std::vector<uint16_t> const& vec) {
         table->mapPageCount[vec[pos]] = vec[pos + 1];
         pos += 2;
     }
+}
+
+emu_void_t cellGcmSetUserHandler(uint32_t handler) {
+    ERROR(rsx) << "cellGcmSetUserHandler not implemented";
+    return emu_void;
 }

@@ -914,7 +914,7 @@ void Rsx::updateShaders() {
             arraySizes};
         auto shader = _context->vertexShaderCache.retrieve(key);
         if (!shader) {
-            INFO(rsx) << ssnprintf("updating vertex shader");
+            INFO(rsx) << "updating vertex shader";
             INFO(rsx) << ssnprintf("updated vertex shader:\n%s\n%s",
                      PrintVertexBytecode(&_context->vertexInstructions[0]),
                      PrintVertexProgram(&_context->vertexInstructions[0]));

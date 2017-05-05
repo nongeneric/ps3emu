@@ -65,18 +65,6 @@ CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, Process* proc) 
     return cellFsStat(pathStr.c_str(), sb, proc);
 }
 
-CellFsErrno cellFsOpen_proxy(ps3_uintptr_t path, 
-                             int flags, 
-                             big_int32_t* fd,
-                             uint64_t arg, 
-                             uint64_t size, 
-                             Process* proc)
-{
-    std::string pathStr;
-    readString(g_state.mm, path, pathStr);
-    return cellFsOpen(pathStr.c_str(), flags, fd, arg, size, proc);
-}
-
 CellFsErrno cellFsMkdir_proxy(ps3_uintptr_t path,
                               uint32_t mode,
                               Process* proc)
@@ -176,11 +164,12 @@ NCallEntry ncallTable[] {
     ENTRY(cellSysmoduleIsLoaded),
     ENTRY(cellSysmoduleInitialize),
     { "cellFsStat", calcFnid("cellFsStat"), [](PPUThread* th) { wrap(cellFsStat_proxy, th); } },
-    { "cellFsOpen", calcFnid("cellFsOpen"), [](PPUThread* th) { wrap(cellFsOpen_proxy, th); } },
     { "cellFsMkdir", calcFnid("cellFsMkdir"), [](PPUThread* th) { wrap(cellFsMkdir_proxy, th); } },
     { "cellFsGetFreeSize", calcFnid("cellFsGetFreeSize"), [](PPUThread* th) { wrap(cellFsGetFreeSize_proxy, th); } },
     { "cellFsUnlink", calcFnid("cellFsUnlink"), [](PPUThread* th) { wrap(cellFsUnlink_proxy, th); } },
     { "cellFsOpendir", calcFnid("cellFsOpendir"), [](PPUThread* th) { wrap(cellFsOpendir_proxy, th); } },
+    ENTRY(cellFsOpen),
+    ENTRY(cellFsSdataOpen),
     ENTRY(cellFsLseek),
     ENTRY(cellFsClose),
     ENTRY(cellFsFstat),
@@ -302,6 +291,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellAudioGetPortBlockTag),
     ENTRY(cellAudioGetPortTimestamp),
     ENTRY(cellAudioAddData),
+    ENTRY(cellGcmSetUserHandler),
 };
 
 constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry); }

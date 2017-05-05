@@ -2725,3 +2725,23 @@ TEST_CASE("sysutil_save_basic_auto_only", TAG_SERIAL) {
         "thr_auto_load() end\n"
     );
 }
+
+TEST_CASE("ppu_mem_alloc") {
+    test_interpreter_and_rewriter({"./binaries/ppu_mem_alloc/a.elf"},
+        "at lease 180 mb have been allocated\n"
+    );
+}
+
+TEST_CASE("spurs_sample_jobqueue_sync_command") {
+    test_interpreter_and_rewriter({"./binaries/spurs_sample_jobqueue_sync_command/a.elf"},
+        "*** sync with sync() method \n"
+        "*** sync with SYNC command with multiple tags\n"
+        "## libspurs : sample_spurs_jobqueue_sync_command SUCCEEDED ##\n"
+    );
+}
+
+TEST_CASE("spurs_sample_jobqueue_hello") {
+    test_interpreter_and_rewriter({"./binaries/spurs_sample_jobqueue_hello/a.elf"},
+        "Hello, jobqueue!\n"
+    );
+}

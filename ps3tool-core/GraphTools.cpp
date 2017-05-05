@@ -27,7 +27,7 @@ Graph buildGraph(std::vector<BasicBlock> const& blocks, analyze_t analyze) {
         auto info = analyze(lastVa);
         std::vector<uint32_t> targets;
         if (info.flow && info.target) {
-            targets.push_back(info.target);
+            targets.push_back(*info.target);
         }
         targets.push_back(lastVa + 4);
         for (auto target : targets) {

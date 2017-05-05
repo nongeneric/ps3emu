@@ -115,6 +115,7 @@ class MainMemory;
 class ContentManager;
 class InternalMemoryManager;
 class CallbackThread;
+class HeapMemoryAlloc;
 
 struct ModuleSegment {
     ModuleSegment(std::shared_ptr<ELFLoader> elf, unsigned index, ps3_uintptr_t va, uint32_t size)
@@ -133,7 +134,7 @@ class Process {
     std::unique_ptr<MainMemory> _mainMemory;
     std::unique_ptr<ContentManager> _contentManager;
     std::unique_ptr<InternalMemoryManager> _internalMemoryManager;
-    std::unique_ptr<InternalMemoryManager> _heapMemoryManager;
+    std::unique_ptr<HeapMemoryAlloc> _heapMemoryManager;
     std::unique_ptr<InternalMemoryManager> _stackBlocks;
     std::unique_ptr<CallbackThread> _callbackThread;
     std::vector<std::unique_ptr<PPUThread>> _threads;
@@ -158,6 +159,7 @@ class Process {
                        uint32_t tls);
     ps3_uintptr_t storeArgs(std::vector<std::string> const& args);
     void loadPrxStore();
+    void insertSegment(ModuleSegment segment);
     Process(Process&) = delete;
     Process& operator=(Process&) = delete;
     

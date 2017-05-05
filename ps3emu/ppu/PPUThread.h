@@ -143,7 +143,7 @@ class PPUThread {
     bool _threadFinishedGracefully;
     int _priority;
     std::atomic<unsigned> _id;
-    bool _running;
+    bool _running = false;
     boost::condition_variable _cvRunning;
     boost::mutex _mutexRunning;
     std::string _name;

@@ -163,8 +163,9 @@ public:
             assert((va & 0b11) == 0);
         if constexpr(Len == 8)
             assert((va & 0b111) == 0);
-        if constexpr(Len == 128)
-            assert((va & 0b1111111) == 0);
+        if constexpr(Len == 128) {
+            va &= ~0b1111111;
+        }
         
         auto granule = g_state.granule;
         assert(granule);

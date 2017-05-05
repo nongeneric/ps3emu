@@ -8,6 +8,7 @@
 #include "ps3emu/libs/sync/rwlock.h"
 #include "ps3emu/libs/sync/queue.h"
 #include "ps3emu/libs/sync/event_flag.h"
+#include "ps3emu/libs/memoryContainer.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 
@@ -27,7 +28,7 @@ uint32_t sys_fs_open_proxy(uint32_t path,
     } else {
         argVec[0] = 0;
     }
-    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size, g_state.proc);
+    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
 }
 
 void PPUThread::scall() {
@@ -151,6 +152,9 @@ void PPUThread::scall() {
         case 184: wrap(sys_spu_thread_write_snr, this); break;
         case 351: wrap(sys_memory_get_page_attribute, this); break;
         case 140: wrap(sys_event_port_connect_ipc, this); break;
+        case 324: wrap(sys_memory_container_create, this); break;
+        case 343: wrap(sys_memory_container_get_size, this); break;
+        case 497: wrap(sys_prx_load_module_on_memcontainer, this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

@@ -1,0 +1,35 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample_sync_command", "sample_sync_command.vcxproj", "{63FD5079-65F7-406D-84DB-11F7B7C214F7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job_sync_command", "job\job_sync_command.vcxproj", "{923F5495-BAB4-4555-ACFC-DA7998D7A99F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.Debug|PS3.ActiveCfg = Debug|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.Debug|PS3.Build.0 = Debug|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.Release|PS3.ActiveCfg = Release|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.Release|PS3.Build.0 = Release|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{63FD5079-65F7-406D-84DB-11F7B7C214F7}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.Debug|PS3.ActiveCfg = Debug|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.Debug|PS3.Build.0 = Debug|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.Release|PS3.ActiveCfg = Release|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.Release|PS3.Build.0 = Release|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.SNC Debug|PS3.ActiveCfg = Debug|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.SNC Debug|PS3.Build.0 = Debug|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.SNC Release|PS3.ActiveCfg = Release|PS3
+		{923F5495-BAB4-4555-ACFC-DA7998D7A99F}.SNC Release|PS3.Build.0 = Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

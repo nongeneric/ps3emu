@@ -5,6 +5,7 @@
 #include <boost/type_traits.hpp>
 #include <string>
 #include <vector>
+#include <optional>
 
 enum class DasmMode {
     Print, Emulate, Name, Rewrite
@@ -133,7 +134,7 @@ void invoke_impl(const char* name, P* phandler, E* ehandler, R* rhandler, void* 
 struct InstructionInfo {
     bool flow = false;
     bool passthrough = false;
-    uint32_t target = 0;
+    std::optional<uint32_t> target;
     bool ncall = 0;
 };
 

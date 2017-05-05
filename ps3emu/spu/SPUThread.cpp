@@ -49,8 +49,10 @@ void SPUThread::loop() {
 
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
     
-//     f = fopen(ssnprintf("/tmp/spu_%d_trace", _id).c_str(), "w");
-//     bool trace = false;
+//     auto traceFilePath = ssnprintf("/tmp/spu_trace_%s", _name);
+//     auto tf = fopen(traceFilePath.c_str(), "w");
+//     bool trace = true;
+//     int instrTraced = 0;
     
     for (;;) {
         if (_singleStep) {
@@ -65,30 +67,36 @@ void SPUThread::loop() {
         try {
             cia = getNip();
 
-//             if (cia == 0x5c10)
+//             if (cia == 0x1c00)
 //                 trace = true;
-//             if (cia == 0x8384)
+//             if (cia == 0x1c44)
 //                 trace = false;
 //            
 //             if (trace)
 //             {
+//                 instrTraced++;
+//                 if ((instrTraced % 10000) == 0) {
+//                     fclose(tf);
+//                     tf = fopen(traceFilePath.c_str(), "w");
+//                     instrTraced = 0;
+//                 }
 //                 std::string str;
 //                 auto instr = ptr(cia);
 //                 SPUDasm<DasmMode::Print>(instr, cia, &str);
 //                 std::string name;
 //                 SPUDasm<DasmMode::Name>(instr, cia, &name);
 //                 
-//                 fprintf(f, "pc:%08x;", cia);
+//                 fprintf(tf, "pc:%08x;", cia);
 //                 for (auto i = 0u; i < 128; ++i) {
 //                     auto v = r(i);
-//                     fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
+//                     fprintf(tf, "r%03d:%08x%08x%08x%08x;", i, 
 //                             v.w<0>(),
 //                             v.w<1>(),
 //                             v.w<2>(),
 //                             v.w<3>());
 //                 }
-//                 fprintf(f, " #%s\n", str.c_str());
-//                 fflush(f);
+//                 fprintf(tf, " #%s\n", str.c_str());
+//                 fflush(tf);
 //             }
 
             auto instr = *(big_uint32_t*)ptr(cia);
@@ -284,6 +292,7 @@ void SPUThread::handleInterrupt(uint32_t interruptValue) {
 
 void SPUThread::handleReceiveEvent() {
     INFO(spu) << "receive event";
+    boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
     uint32_t port = _channels.mmio_read(SPU_Out_MBox);
     auto info = boost::find_if(_eventQueuesToSPU, [=](auto& i) {
         return i.port == port;

@@ -9,6 +9,7 @@
 #include "../InternalMemoryManager.h"
 #include "../ELFLoader.h"
 #include "../IDMap.h"
+#include "ps3emu/HeapMemoryAlloc.h"
 #include "ps3emu/EmuCallbacks.h"
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
@@ -16,6 +17,7 @@
 #include <boost/range/algorithm.hpp>
 #include "../log.h"
 #include "../state.h"
+#include "ps3emu/libs/fs.h"
 #include <memory>
 #include <map>
 
@@ -174,6 +176,15 @@ sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t op
     return proc->loadPrx(hostPath);
 }
 
+sys_prx_id_t sys_prx_load_module_on_memcontainer(
+    cstring_ptr_t path,
+    uint32_t mem_container,
+    uint64_t flags,
+    uint32_t pOpt)
+{
+    return sys_prx_load_module(path, flags, pOpt, g_state.proc);
+}
+
 int32_t sys_prx_stop_module(sys_prx_id_t id,
                             uint64_t flags,
                             sys_prx_start_module_t* opt,
@@ -229,16 +240,17 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
     (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
-    uint32_t ea;
     auto alignment = SYS_MEMORY_PAGE_SIZE_1M ? (1ul << 20) : (64u << 10);
-    g_state.heapalloc->allocInternalMemory(&ea, size, alignment);
-    *alloc_addr = ea;
+    auto [ptr, va] = g_state.heapalloc->alloc(size, alignment);
+    if (!ptr)
+        return CELL_ENOMEM;
+    *alloc_addr = va;
     return CELL_OK;
 }
 
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
     INFO(libs) << ssnprintf("sys_memory_free(%x)", start_addr);
-    g_state.heapalloc->free(start_addr);
+    g_state.heapalloc->dealloc(start_addr);
     return CELL_OK;
 }
 

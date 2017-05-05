@@ -8,6 +8,7 @@
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/InternalMemoryManager.h"
+#include "ps3emu/HeapMemoryAlloc.h"
 #include "ps3tool-core/NinjaScript.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
@@ -60,7 +61,7 @@ void mapPrxStore() {
     });
     
     RewriterStore rewriterStore;
-    auto imageBase = 10 << 20;
+    auto imageBase = 30 << 20;
     for (auto& prxPath : prxPaths) {
         auto& prxInfos = g_state.config->sysPrxInfos;
         auto name = prxPath.filename().string();
@@ -151,7 +152,7 @@ void HandlePrxStore(PrxStoreCommand const& command) {
     g_state.mm = &mm;
     auto internalAlloc = std::make_unique<InternalMemoryManager>(
         EmuInternalArea, EmuInternalAreaSize, "");
-    auto heapAlloc = std::make_unique<InternalMemoryManager>(HeapArea, HeapAreaSize, "");
+    auto heapAlloc = std::make_unique<HeapMemoryAlloc>();
     g_state.memalloc = internalAlloc.get();
     g_state.heapalloc = heapAlloc.get();
     

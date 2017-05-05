@@ -62,6 +62,7 @@ set(SRC
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp
     execmap/InstrDb.cpp
+    HeapMemoryAlloc.cpp
     
     libs/sys.cpp
     libs/fs.cpp
@@ -90,6 +91,7 @@ set(SRC
     libs/savedata/savedata.cpp
     libs/savedata/SfoDb.cpp
     libs/spurs.cpp
+    libs/memoryContainer.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})

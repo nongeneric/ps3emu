@@ -536,18 +536,18 @@ TEST_CASE("analyze_1") {
     auto info = analyze(0x4e800020, 0x12e3c); // blr
     REQUIRE(!info.passthrough);
     REQUIRE(info.flow);
-    REQUIRE(info.target == 0);
+    REQUIRE(!info.target);
 }
 
 TEST_CASE("analyze_2") {
     auto info = analyze(0x4800d181, 0x10b40); // bl
     REQUIRE(info.passthrough);
     REQUIRE(info.flow);
-    REQUIRE(info.target == 0x1dcc0);
+    REQUIRE(*info.target == 0x1dcc0);
 }
 
 TEST_CASE("analyze_3") {
     auto info = analyze(0x4C00012C, 0x10b40); // isync
     REQUIRE(!info.flow);
-    REQUIRE(info.target == 0);
+    REQUIRE(!info.target);
 }

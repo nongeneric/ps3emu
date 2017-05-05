@@ -4,6 +4,7 @@
 #include "ps3emu/log.h"
 #include "ps3emu/Process.h"
 #include "ps3emu/TimedCounter.h"
+#include "ps3emu/HeapMemoryAlloc.h"
 #include <boost/chrono.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -236,10 +237,12 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     context.port0tags.resize(audioParam->nBlock);
     std::fill(begin(context.port0tags), end(context.port0tags), 1);
     
-    context.readIndexAddr =
-        g_state.heapalloc->internalAlloc<8, big_uint64_t>(&context.eaReadIndexAddr);
-    context.portAddr = (uint8_t*)g_state.heapalloc->allocInternalMemory(
-        &context.eaPortAddr, calcBlockSize() * context.nBlock, 64u << 10);
+    auto offset = calcBlockSize() * context.nBlock;
+    auto [ptr, va] = g_state.heapalloc->alloc(offset + sizeof(big_uint64_t), 64u << 10u);
+    context.portAddr = ptr;
+    context.eaPortAddr = va;
+    context.readIndexAddr = (big_uint64_t*)(ptr + offset);
+    context.eaReadIndexAddr = va + offset;
     
     context.pulseSpec = { PA_SAMPLE_FLOAT32BE, 48000, 2 };    
     pa_channel_map channels;

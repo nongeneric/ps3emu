@@ -109,25 +109,6 @@ inline void split128(uint128_t i, float* fs) {
 void ums_sleep(uint64_t microseconds);
 std::string print_hex(const void* buf, int len, bool cArray = false);
 
-template <typename T, typename Iter, typename IsEmptyPred>
-Iter findGap(Iter begin, Iter end, unsigned width, IsEmptyPred isEmpty) {
-    auto current = begin;
-    auto count = 0u;
-    while (begin != end) {
-        if (isEmpty(*current)) {
-            count++;
-        } else {
-            current = begin;
-            count = 0;
-        }
-        if (count == width)
-            break;
-        ++begin;
-    }
-    assert(count == width);
-    return current;
-}
-
 template <typename T>
 bool intersects(T a, T alen, T b, T blen) {
     return !(a + alen <= b || b + blen <= a);
@@ -149,4 +130,30 @@ void erase_if(Container& container, Pred pred) {
     auto it = std::find_if(begin(container), end(container), pred);
     assert(it != end(container));
     container.erase(it);
+}
+
+template <typename Iter, typename IsEmptyPred>
+Iter findGap(Iter begin, Iter end, unsigned width, unsigned alignment, IsEmptyPred isEmpty) {
+    auto lower = begin;
+    auto current = begin;
+    auto count = 0u;
+    while (lower <= end) {
+        if (count == 0) {
+            auto index = std::distance(begin, current);
+            index = ::align(index, alignment);
+            current = begin + index;
+        }
+        if (isEmpty(current)) {
+            count++;
+        } else {
+            current = lower;
+            count = 0;
+        }
+        if (count == width)
+            break;
+        ++lower;
+    }
+    if (count == width)
+        return current;
+    return end;
 }

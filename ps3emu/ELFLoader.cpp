@@ -301,19 +301,19 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
     
     if (!rewriter) {
         std::vector<Replacement> proxies = {
-            { "cellSpurs", "_cellSpursTaskAttribute2Initialize", "_cellSpursTaskAttribute2Initialize_proxy" },
-            { "cellSpurs", "cellSpursCreateTaskset2", "cellSpursCreateTaskset2_proxy" },
-            { "cellSpurs", "cellSpursCreateTaskset", "cellSpursCreateTaskset2_proxy" },
-            { "cellSpurs", "cellSpursCreateTask2", "cellSpursCreateTask2_proxy" },
-            { "cellSpurs", "cellSpursCreateTask", "cellSpursCreateTask2_proxy" },
-            { "cellSpurs", "cellSpursCreateTaskWithAttribute", "cellSpursCreateTaskWithAttribute_proxy" },
-            { "cellSpurs", "cellSpursEventFlagAttachLv2EventQueue", "cellSpursEventFlagAttachLv2EventQueue_proxy" },
-            { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
-            { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
-            { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
-            { "cellSpurs", "_cellSpursAttributeInitialize", "_cellSpursAttributeInitialize_proxy" },
-            { "cellSpurs", "cellSpursAttributeSetSpuThreadGroupType", "cellSpursAttributeSetSpuThreadGroupType_proxy" },
-            { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
+//             { "cellSpurs", "_cellSpursTaskAttribute2Initialize", "_cellSpursTaskAttribute2Initialize_proxy" },
+//             { "cellSpurs", "cellSpursCreateTaskset2", "cellSpursCreateTaskset2_proxy" },
+//             { "cellSpurs", "cellSpursCreateTaskset", "cellSpursCreateTaskset2_proxy" },
+//             { "cellSpurs", "cellSpursCreateTask2", "cellSpursCreateTask2_proxy" },
+//             { "cellSpurs", "cellSpursCreateTask", "cellSpursCreateTask2_proxy" },
+//             { "cellSpurs", "cellSpursCreateTaskWithAttribute", "cellSpursCreateTaskWithAttribute_proxy" },
+//             { "cellSpurs", "cellSpursEventFlagAttachLv2EventQueue", "cellSpursEventFlagAttachLv2EventQueue_proxy" },
+//             { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
+//             { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
+//             { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
+//             { "cellSpurs", "_cellSpursAttributeInitialize", "_cellSpursAttributeInitialize_proxy" },
+//             { "cellSpurs", "cellSpursAttributeSetSpuThreadGroupType", "cellSpursAttributeSetSpuThreadGroupType_proxy" },
+//             { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
         };
         
         for (auto&& repl : proxies) {

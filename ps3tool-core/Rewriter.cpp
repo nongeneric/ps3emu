@@ -47,8 +47,8 @@ struct BasicBlockContext {
                                       target - imageBase);
                 };
                 if (info.target) {
-                    leads.push(info.target);
-                    logLead(info.target);
+                    leads.push(*info.target);
+                    logLead(*info.target);
                 }
                 if (info.flow) {
                     if (info.passthrough) {
@@ -176,8 +176,7 @@ std::vector<EmbeddedElfInfo> discoverEmbeddedSpuElfs(std::vector<uint8_t> const&
         bool isJob = false;
         if (header->e_entry == 0x10) {
             auto ep = (big_uint32_t*)((char*)header + vaToOffset(header, header->e_entry));
-            isJob = ep[0] == 0x44012850 && ep[1] == 0x32000080 && ep[2] == 0x44012850 &&
-                    ep[3] == 0x32000280 && ep[4] == 0x62696E32 && ep[5] == 0x00000000;
+            isJob = ep[0] == 0x44012850 && ep[1] == 0x32000080 && ep[2] == 0x44012850 && ep[4] == 0x62696E32;
         }
         elfs.push_back({(uint32_t)std::distance(begin(elf), elfit), end, isJob, header});
     }

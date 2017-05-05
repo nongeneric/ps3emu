@@ -45,7 +45,9 @@ int32_t sys_event_flag_wait(uint32_t id,
         auto masked = flag->value & bitptn;
         return (mode & SYS_EVENT_FLAG_WAIT_AND) ? masked == bitptn : masked;
     });
-    *result = flag->value;
+    if (result) {
+        *result = flag->value;
+    }
     if (mode & SYS_EVENT_FLAG_WAIT_CLEAR) {
         flag->value &= ~bitptn;
     } else if (mode & SYS_EVENT_FLAG_WAIT_CLEAR_ALL) {

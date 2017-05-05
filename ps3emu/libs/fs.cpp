@@ -25,9 +25,8 @@ CellFsErrno sys_fs_open(const char* path,
                         big_int32_t* fd,
                         uint64_t mode,
                         const void* arg,
-                        uint64_t size,
-                        Process* proc) {
-    return cellFsOpen(path, flags, fd, mode, 0, proc);
+                        uint64_t size) {
+    return cellFsOpen({std::string(path)}, flags, fd, mode, 0);
 }
 
 CellFsErrno sys_fs_lseek(int32_t fd,
@@ -141,8 +140,8 @@ FILE* openFile(const char* path, int flags) {
     return f;
 }
 
-CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t, Process* proc) {
-    auto hostPath = g_state.content->toHost(path);
+CellFsErrno cellFsOpen(cstring_ptr_t path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t) {
+    auto hostPath = g_state.content->toHost(path.str.c_str());
     INFO(libs) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
     auto f = openFile(hostPath.c_str(), flags);
     if (!f) {
@@ -150,6 +149,14 @@ CellFsErrno cellFsOpen(const char* path, int32_t flags, big_int32_t* fd, uint64_
     }
     *fd = fileMap.create(f);
     return CELL_OK;
+}
+
+CellFsErrno cellFsSdataOpen(cstring_ptr_t path,
+                       int32_t flags,
+                       big_int32_t *fd,
+                       uint64_t arg,
+                       uint64_t size) {
+    return cellFsOpen({path.str + ".decrypted"}, flags, fd, arg, size);
 }
 
 #define CELL_FS_SEEK_SET 0
@@ -312,4 +319,8 @@ CellFsErrno cellFsGetDirectoryEntries(int32_t fd,
         *data_count = 0;
     }
     return CELL_FS_SUCCEEDED;
+}
+
+FILE* searchFileMap(int32_t fd) {
+    return fileMap.get(fd);
 }

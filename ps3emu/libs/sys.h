@@ -68,8 +68,17 @@ int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags);
 
 typedef big_uint32_t sys_prx_id_t;
 
+struct sys_prx_load_module_option_t {
+    big_uint64_t size; // TODO: !
+};
+
 int sys_prx_exitspawn_with_level(uint64_t level);
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc);
+sys_prx_id_t sys_prx_load_module_on_memcontainer(
+    cstring_ptr_t path,
+    uint32_t mem_container,
+    uint64_t flags,
+    uint32_t pOpt);
 
 ENUM(prx_module_mode,
     (user_lookup, 1),

@@ -6,6 +6,7 @@
 # each line is either starts with a # and ignored or has the following format
 #     pc:%08x;r0=%016x;...;r31=%016x;v0=%032;...;v31=%032; #optional comment
 
+import sys
 import argparse
 
 class Trace:
@@ -45,16 +46,21 @@ if args.rebase:
 
 if args.changes:
     traces = []
+    lineNum = 1
     with open(args.changes) as f:
         for line in f.readlines():
             comment = line.find('#')
             if comment != -1:
                 line = line[0:comment]
-            if comment == 0:
+            if comment == 0 or line.strip() == '':
                 continue
             split = line.split(';')
             trace = Trace()
-            trace.nip = int(split[0].split(':')[1], 16)
+            split2 = split[0].split(':')
+            if len(split2) != 2:
+                sys.stderr.write('parsing error (:) line ' + str(lineNum) + '\n')
+                exit(0)
+            trace.nip = int(split2[1], 16)
             trace.nip -= imagebase
             if args.spu:
                 trace.regs = parse_regs(split[1:-1])
@@ -63,6 +69,7 @@ if args.changes:
                 trace.regs = parse_regs(split[1:34])
                 trace.vregs = parse_regs(split[34:-1])
             traces.append(trace)
+            lineNum += 1
             
     print(len(traces), "lines")
     for c, n in zip(traces, traces[1:]):

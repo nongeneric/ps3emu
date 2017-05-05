@@ -33,23 +33,35 @@ using namespace boost::filesystem;
 
 auto mainText =
 R"(#include "{headerName}.h"
-
-FILE *f, *spuf;
 void init() {
-#ifdef TRACE
-    auto tracefile = "/tmp/ps3trace-rewriter";
-    f = fopen(tracefile, "w");
-    auto sputracefile = "/tmp/ps3trace-spu-rewriter";
-    spuf = fopen(sputracefile, "w");
-#endif
 }
 
-thread_local bool trace = true;
-
 #ifdef TRACE
+#undef th
+
+thread_local bool trace = true;
+thread_local bool thread_init = false;
+thread_local FILE* f;
+thread_local FILE* spuf;
+
+void trace_init() {
+    if (thread_init)
+        return;
+    thread_init = true;
+    if (g_state.sth) {
+        auto sputracefile = "/tmp/ps3trace-spu-rewriter_" + g_state.sth->getName();
+        spuf = fopen(sputracefile.c_str(), "w");
+    }
+    if (g_state.th) {
+        auto tracefile = "/tmp/ps3trace-rewriter" + g_state.th->getName();
+        f = fopen(tracefile.c_str(), "w");
+    }
+}
+
 void log(uint32_t nip, PPUThread* thread) {
     if (!trace)
         return;
+    trace_init();
     fprintf(f, "pc:%08x;", nip);
     for (auto i = 0u; i < 32; ++i) {
         auto r = thread->getGPR(i);
@@ -71,6 +83,8 @@ void log(uint32_t nip, PPUThread* thread) {
 void logSPU(uint32_t nip, SPUThread* thread) {
     if (!trace)
         return;
+    trace_init();
+    
     fprintf(spuf, "pc:%08x;", nip);
     
     for (auto i = 0u; i < 128; ++i) {
@@ -157,24 +171,20 @@ std::vector<uint32_t> updateSignatureOffsets(std::vector<BasicBlock>& blocks) {
     return offsets;
 }
 
-std::tuple<uint32_t, uint32_t> outOfPartTargets(BasicBlock const& block, std::vector<BasicBlock> const& part, auto analyzeFunc) {
+std::tuple<std::optional<uint32_t>, uint32_t> outOfPartTargets(BasicBlock const& block, std::vector<BasicBlock> const& part, auto analyzeFunc) {
     auto info = analyzeFunc(block.start + block.len - 4);
     auto find = [&](uint32_t target) {
         return part.end() != std::find_if(part.begin(), part.end(), [&](auto& block) {
             return block.start == target;
         });
     };
-    uint32_t target = 0, fallthrough = block.start + block.len;
-    if (find(fallthrough)) {
+    std::optional<uint32_t> target;
+    uint32_t fallthrough = block.start + block.len;
+    if ((info.flow && !info.passthrough) || find(fallthrough)) {
         fallthrough = 0;
     }
-    if (info.flow && info.target) {
-        if (!find(info.target)) {
-            target = info.target;
-        }
-        if (!info.passthrough) {
-            fallthrough = 0;
-        }
+    if (info.flow && info.target && !find(*info.target)) {
+        target = *info.target;
     }
     return {target, fallthrough};
 }
@@ -250,7 +260,7 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
             if (target) {
                 block.body.insert(block.body.begin(), "#define SET_NIP SET_NIP_INDIRECT");
                 block.body.insert(block.body.begin(), "#undef SET_NIP");
-                block.body.insert(block.body.begin(), ssnprintf("// target %x leads out of part", target));
+                block.body.insert(block.body.begin(), ssnprintf("// target %x leads out of part", *target));
                 block.body.push_back("#undef SET_NIP");
                 block.body.push_back("#define SET_NIP SET_NIP_INITIAL");
             }
@@ -422,13 +432,24 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
             
             if (elf.isJob) {
                 // a spurs job has its EP pointed to a special stub that looks like a series of instructions
+                //     42855402        0: ila r2,0x10aa8
+                //     435c1082        4: ila r2,0x2b821
+                //     42f8ab02        8: ila r2,0x1f156
+                //     42f41b82        c: ila r2,0x1e837
                 //     44012850       10: xori r80,r80,4
                 //     32000080       14: br 18
                 //     44012850       18: xori r80,r80,4
                 //     32000280       1c: br 30
                 //     ascii "bin2"
-                // this stub consists of two basic blocks and must never be overwritten
-                blocks.erase(begin(blocks), begin(blocks) + 2);
+                // this stub consists of up to three basic blocks and must never be overwritten
+                for (auto offset : {0u, 4u, 8u, 0xcu, 0x10u, 0x14u, 0x18u, 0x1cu}) {
+                    auto it = std::find_if(begin(blocks), end(blocks), [&](auto& block) {
+                        return block.start == offset;
+                    });
+                    if (it != end(blocks)) {
+                        blocks.erase(it);
+                    }
+                }
             }
             
             SegmentInfo info;
@@ -436,9 +457,13 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 return spuElfVaToParentVaInCurrentSegment(va, segment);
             });
                 
+            auto analyzeFunc = [&](uint32_t cia) { 
+                auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);
+                return analyzeSpu(g_state.mm->load32(elfVa), cia);
+            };
+            
             for (auto& block : blocks) {
-                if (elf.isJob) {
-                    // jobs are position independent
+                if (elf.isJob) { // all jobs are position independent
                     block.body.push_back(ssnprintf(
                         "if (!pic_offset_set) { pic_offset = bb_va - 0x%x; pic_offset_set = true; }",
                         block.start));
@@ -456,22 +481,22 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                         auto rva = cia - command.imageBase;
                         std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
                     }
-                    
-                    auto info = analyzeSpu(instr, cia);
-                    auto outOfSegmentBr = info.flow && info.target != 0 &&
-                                          !subset<uint32_t>(info.target, 4, segment.p_vaddr, segment.p_filesz);
-                    
                     auto line = ssnprintf("/* %08x %8x: %-24s*/ logSPU(0x%x, th); %s;", instr, cia, printed, cia, rewritten);
-                    if (outOfSegmentBr) {
-                        block.body.push_back("#undef SPU_SET_NIP");
-                        block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INDIRECT");
-                    }
                     block.body.push_back(line);
-                    if (outOfSegmentBr) {
-                        block.body.push_back("#undef SPU_SET_NIP");
-                        block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
-                    }
                 }
+                
+                auto [target, fallthrough] = outOfPartTargets(block, blocks, analyzeFunc);
+                if (target) {
+                    block.body.insert(begin(block.body), "#define SPU_SET_NIP SPU_SET_NIP_INDIRECT_PIC");
+                    block.body.insert(begin(block.body), "#undef SPU_SET_NIP");
+                    block.body.push_back("#undef SPU_SET_NIP");
+                    block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
+                }
+                if (fallthrough) {
+                    block.body.insert(block.body.begin(), ssnprintf("// possible fallthrough %x leads out of part", fallthrough));
+                    block.body.push_back(ssnprintf("SPU_SET_NIP_INDIRECT_PIC(0x%x);", fallthrough));
+                }
+                
                 info.blocks.push_back({spuElfVaToParentVaInCurrentSegment(block.start, segment),
                                        block.len,
                                        block.body,

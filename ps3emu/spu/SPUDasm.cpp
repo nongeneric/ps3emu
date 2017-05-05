@@ -74,7 +74,8 @@ union SPUForm {
 #endif
 
 #ifdef EMU_REWRITER
-    #define SPU_SET_NIP_INDIRECT(x) { thread->setNip(x & ~3ul); return; }
+    #define SPU_SET_NIP_INDIRECT_PIC(x) { thread->setNip(((x) & ~3ul) + pic_offset); return; }
+    #define SPU_SET_NIP_INDIRECT(x) { thread->setNip((x) & ~3ul); return; }
     #define SPU_SET_NIP_INITIAL(x) goto _##x
     #define SPU_SET_NIP SPU_SET_NIP_INITIAL
     #define SPU_RESTORE_NIP(cia) thread->setNip(cia + 4 + pic_offset)
@@ -254,7 +255,7 @@ PRINT(lqr) {
 }
 
 #define _lqr(_cia_lsa, _rt) { \
-    auto lsa = _cia_lsa; \
+    auto lsa = SPU_ADJUST_LINK(_cia_lsa); \
     auto val = _mm_lddqu_si128((__m128i*)th->ptr(lsa)); \
     val = _mm_shuffle_epi8(val, ENDIAN_SWAP_MASK128); \
     th->r(_rt).set_xmm(val); \
@@ -306,7 +307,7 @@ PRINT(stqr) {
 }
 
 #define _stqr(_cia_lsa, _rt) { \
-    auto lsa = _cia_lsa; \
+    auto lsa = SPU_ADJUST_LINK(_cia_lsa); \
     auto val = th->r(_rt).xmm(); \
     val = _mm_shuffle_epi8(val, ENDIAN_SWAP_MASK128); \
     _mm_store_si128((__m128i*)th->ptr(lsa), val); \
@@ -429,7 +430,7 @@ PRINT(ilhu) {
     auto t = _mm_set1_epi32(_i16_16); \
     th->r(_rt).set_xmm(t); \
 }
-EMU_REWRITE(ilhu, i->RT.u(), (i->I16 << 16))
+EMU_REWRITE(ilhu, i->RT.u(), (i->I16.u() << 16))
 
 
 PRINT(il) {
@@ -3314,7 +3315,6 @@ InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
     InstructionInfo info;
     info.flow = false;
     info.passthrough = false;
-    info.target = 0;
 
     switch (i->OP11.u()) {
         case 0b00110101000: // bi

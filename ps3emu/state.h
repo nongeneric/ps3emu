@@ -12,6 +12,7 @@ class EmuCallbacks;
 class Config;
 struct ReservationGranule;
 struct ExecutionMapCollection;
+class HeapMemoryAlloc;
 
 struct g_state_t {
     g_state_t();
@@ -20,7 +21,7 @@ struct g_state_t {
     // internal emu memory allocator
     InternalMemoryManager* memalloc;
     // regular ps3 memory allocator
-    InternalMemoryManager* heapalloc;
+    HeapMemoryAlloc* heapalloc;
     ContentManager* content;
     Rsx* rsx;
     ELFLoader* elf;

@@ -75,3 +75,16 @@ TEST_CASE("spudasm_bg") {
     REQUIRE( th.r(20).w(2) == 1 );
     REQUIRE( th.r(20).w(3) == 0 );
 }
+
+TEST_CASE("spu_analyze_1") {
+    auto info = analyzeSpu(0x35000000, 0xdc); // bi r0
+    REQUIRE(info.flow);
+    REQUIRE(!info.target);
+}
+
+TEST_CASE("spu_analyze_2") {
+    auto info = analyzeSpu(0x81064d03, 0x1184); // selb r8,r26,r25,r3
+    REQUIRE(!info.flow);
+    REQUIRE(!info.target);
+    REQUIRE(!info.passthrough);
+}
