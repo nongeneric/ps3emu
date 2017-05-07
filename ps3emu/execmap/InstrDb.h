@@ -28,6 +28,7 @@ public:
     ~InstrDb();
     void open(std::string path = "");
     std::optional<InstrDbEntry> findPpuEntry(std::string path);
+    std::vector<InstrDbEntry> findSpuEntries(std::string path);
     std::optional<InstrDbEntry> findSpuEntry(std::string path, int totalSegment);
     InstrDbEntry selectEntry(uint64_t id);
     std::vector<InstrDbEntry> entries();

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../utils.h"
-#include "../BitField.h"
+#include "ps3emu/utils.h"
+#include "ps3emu/BitField.h"
+#include "ps3emu/spu/R128.h"
 #include "ps3emu/ReservationMap.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread/mutex.hpp>
@@ -156,7 +157,7 @@ class PPUThread {
     
     std::array<uint64_t, 32> _GPR;
     std::array<double, 32> _FPR;
-    std::array<uint128_t, 32> _V;
+    std::array<R128, 32> _V;
     std::array<uint64_t, 2> _EMUREG;
     FPSCR_t _FPSCR;
     CR_t _CR;
@@ -222,76 +223,7 @@ public:
     }
     
     template <typename V>
-    inline void setV(V i, uint128_t value) {
-        _V[getUValue(i)] = value;
-    }
-    
-    template <typename V>
-    inline std::array<float, 4> getVf(V i) {
-        assert(getUValue(i) < _V.size());
-        std::array<float, 4> vals;
-        split128(_V[getUValue(i)], &vals[0]);
-        return vals;
-    }
-    
-    template <typename V>
-    inline void setVf(V i, std::array<float, 4>& v) {
-        assert(getUValue(i) < _V.size());
-        auto src = (uint32_t*)&v[0];
-        auto u128 = make128(src[0], src[1], src[2], src[3]);
-        setV(i, u128);
-    }
-    
-    template <typename V>
-    inline std::array<uint32_t, 4> getVuw(V i) {
-        assert(getUValue(i) < _V.size());
-        std::array<uint32_t, 4> vals;
-        split128(_V[getUValue(i)], &vals[0]);
-        return vals;
-    }
-    
-    template <typename V>
-    inline void setVuw(V i, std::array<uint32_t, 4>& v) {
-        assert(getUValue(i) < _V.size());
-        auto u128 = make128(v[0], v[1], v[2], v[3]);
-        setV(i, u128);
-    }
-    
-    template <typename V>
-    inline std::array<int32_t, 4> getVw(V i) {
-        assert(getUValue(i) < _V.size());
-        std::array<int32_t, 4> vals;
-        split128(_V[getUValue(i)], (uint32_t*)&vals[0]);
-        return vals;
-    }
-    
-    template <typename V>
-    inline void setVw(V i, std::array<int32_t, 4>& v) {
-        assert(getUValue(i) < _V.size());
-        auto u128 = make128(
-            (uint32_t)v[0],
-            (uint32_t)v[1],
-            (uint32_t)v[2],
-            (uint32_t)v[3]);
-        setV(i, u128);
-    }
-    
-    template <typename V>
-    inline void setV(V i, uint8_t* be) {
-        assert(getUValue(i) < _V.size());
-        auto v = (uint8_t*)&_V[getUValue(i)];
-        std::reverse_copy(be, be + 16, v);
-    }
-    
-    template <typename V>
-    inline void getV(V i, uint8_t* be) {
-        assert(getUValue(i) < _V.size());
-        auto v = (uint8_t*)&_V[getUValue(i)];
-        std::reverse_copy(v, v + 16, be);
-    }
-    
-    template <typename V>
-    inline uint128_t getV(V i) {
+    inline R128& r(V i) {
         return _V[getUValue(i)];
     }
     

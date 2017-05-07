@@ -246,22 +246,14 @@ public:
             } else if (_view == 1) {
                 return print(_thread->getGPR(row));
             } else if (_view == 2) {
-                uint8_t be[16];
-                auto be64 = (big_uint64_t*)be;
-                _thread->getV(row, be);
+                auto r = _thread->r(row);
                 return QString::fromStdString(ssnprintf("%016" PRIx64 "%016" PRIx64,
-                                                        (uint64_t)be64[0],
-                                                        (uint64_t)be64[1]));
+                                                        (uint64_t)r.dw(0),
+                                                        (uint64_t)r.dw(1)));
             } else if (_view == 3) {
-                uint8_t be[16];
-                _thread->getV(row, be);
-                auto ui32 = (uint32_t*)be;
-                auto fs = (float*)be;
-                for (int i = 0; i < 4; ++i) {
-                    boost::endian::endian_reverse_inplace(ui32[i]);
-                }
+                auto r = _thread->r(row);
                 return QString::fromStdString(
-                    ssnprintf("%g:%g:%g:%g", fs[0], fs[1], fs[2], fs[3]));
+                    ssnprintf("%g:%g:%g:%g", r.fs(0), r.fs(1), r.fs(2), r.fs(3)));
             }
         }
         return "";
@@ -1022,12 +1014,12 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
         }
         fprintf(f, "r%d:%08x%08x;", 32, 0, (uint32_t)_activeThread->getLR());
         for (auto i = 0u; i < 32; ++i) {
-            auto v = _activeThread->getV(i);
+            auto r = _activeThread->r(i);
             fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
-                    (uint32_t)(v >> 96),
-                    (uint32_t)(v >> 64),
-                    (uint32_t)(v >> 32),
-                    (uint32_t)v);
+                    (uint32_t)r.w(0),
+                    (uint32_t)r.w(1),
+                    (uint32_t)r.w(2),
+                    (uint32_t)r.w(3));
         }
         fprintf(f, " #%s\n", str.c_str());
         fflush(f);

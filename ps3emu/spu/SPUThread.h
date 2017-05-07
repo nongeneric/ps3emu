@@ -7,6 +7,7 @@
 #include "ps3emu/ReservationMap.h"
 #include "ps3emu/enum.h"
 #include "SPUChannels.h"
+#include "R128.h"
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -18,7 +19,7 @@
 #include <string.h>
 #include <functional>
 #include <vector>
-#include <experimental/optional>
+#include <optional>
 #include <x86intrin.h>
 
 static constexpr uint32_t LSLR = 0x3ffff;
@@ -64,131 +65,6 @@ enum class SPUThreadEvent {
     Failure
 };
 
-struct alignas(16) R128 {
-    __m128i _xmm;
-public:
-    R128() = default;
-    inline R128(R128 const& r) {
-        _xmm = r._xmm;
-    }
-    
-    inline __m128i xmm() {
-        return _xmm;
-    }
-    
-    inline void set_xmm(__m128i xmm) {
-        _xmm = xmm;
-    }
-    
-    inline __m128 xmm_f() {
-        return _mm_castsi128_ps(_xmm);
-    }
-    
-    inline void set_xmm_f(__m128 xmm) {
-        _xmm = _mm_castps_si128(xmm);
-    }
-    
-    inline __m128d xmm_d() {
-        return _mm_castsi128_pd(_xmm);
-    }
-    
-    inline void set_xmm_d(__m128d xmm) {
-        _xmm = _mm_castpd_si128(xmm);
-    }
-    
-    inline uint8_t b(int n) {
-        uint8_t vec[16];
-        memcpy(vec, &_xmm, 16);
-        return vec[15 - n];
-    }
-    
-    inline void set_b(int n, uint8_t val) {
-        uint8_t vec[16];
-        memcpy(vec, &_xmm, 16);
-        vec[15 - n] = val;
-        memcpy(&_xmm, vec, 16);
-    }
-    
-    inline int16_t hw(int n) {
-        int16_t vec[8];
-        memcpy(vec, &_xmm, 16);
-        return vec[7 - n];
-    }
-    
-    inline void set_hw(int n, uint16_t val) {
-        int16_t vec[8];
-        memcpy(vec, &_xmm, 16);
-        vec[7 - n] = val;
-        memcpy(&_xmm, vec, 16);
-    }
-    
-    template <int N>
-    int32_t w() {
-        return (int32_t)_mm_extract_epi32(_xmm, 3 - N);
-    }
-    
-    inline int32_t w(int n) {
-        int32_t vec[4];
-        memcpy(vec, &_xmm, 16);
-        return vec[3 - n];
-    }
-    
-    inline void set_w(int n, uint32_t val) {
-        int32_t vec[4];
-        memcpy(vec, &_xmm, 16);
-        vec[3 - n] = val;
-        memcpy(&_xmm, vec, 16);
-    }
-    
-    template <int N>
-    int64_t dw() {
-        return (int64_t)_mm_extract_epi64(_xmm, 1 - N);
-    }
-    
-    inline int64_t dw(int n) {
-        int64_t vec[2];
-        memcpy(vec, &_xmm, 16);
-        return vec[1 - n];
-    }
-    
-    inline void set_dw(int n, int64_t val) {
-        int64_t vec[2];
-        memcpy(vec, &_xmm, 16);
-        vec[1 - n] = val;
-        memcpy(&_xmm, vec, 16);
-    }
-    
-    inline float fs(int n) {
-        float vec[4];
-        memcpy(vec, &_xmm, 16);
-        return vec[3 - n];
-    }
-    
-    inline void set_fs(int n, float val) {
-        float vec[4];
-        memcpy(vec, &_xmm, 16);
-        vec[3 - n] = val;
-        memcpy(&_xmm, vec, 16);
-    }
-    
-    inline double fd(int n) {
-        double vec[2];
-        memcpy(vec, &_xmm, 16);
-        return vec[1 - n];
-    }
-    
-    inline void set_fd(int n, double val) {
-        double vec[2];
-        memcpy(vec, &_xmm, 16);
-        vec[1 - n] = val;
-        memcpy(&_xmm, vec, 16);
-    }
-    
-    inline int16_t hw_pref() {
-        return hw(1);
-    }
-};
-
 struct SPUThreadExitInfo {
     SPUThreadExitCause cause;
     int32_t status;
@@ -220,7 +96,7 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     int32_t _exitCode;
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
-    std::experimental::optional<InterruptThreadInfo> _interruptHandler;
+    std::optional<InterruptThreadInfo> _interruptHandler;
     uint64_t _id;
     boost::mutex _eventQueuesMutex;
     std::vector<EventQueueInfo> _eventQueuesToPPU;
@@ -246,7 +122,6 @@ public:
     
     template <typename V>
     inline R128& r(V i) {
-        assert(getUValue(i) < 128);
         return _rs[getUValue(i)];
     }
     

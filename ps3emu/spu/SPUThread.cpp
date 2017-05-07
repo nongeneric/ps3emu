@@ -377,7 +377,6 @@ void SPUThread::markExecMap(uint32_t va) {
         }
         if (match) {
             map.mark(va);
-            return;
         }
     }
     WARNING(spu, perf) << "unknown spu image executed";

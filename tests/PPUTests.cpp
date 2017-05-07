@@ -1856,43 +1856,6 @@ TEST_CASE("cntlzw r11,r11") {
     REQUIRE( th.getGPR(11) == 16 );
 }
 
-TEST_CASE("vsldoi") {
-    MainMemory mm;
-    g_state.mm = &mm;
-    PPUThread th;
-    unsigned __int128 i = 0x1122334455667788ull;
-    i <<= 64;
-    i |= 0xaabbccddeeff0099ull;
-    
-    unsigned __int128 res = 0x22334455667788aaull;
-    res <<= 64;
-    res |= 0xbbccddeeff009911ull;
-    
-    th.setV(0, i);
-    // vsldoi v2,v0,v0,1
-    uint8_t instr[] = { 0x10, 0x40, 0x00, 0x6c };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getV(2) == res) );
-    
-    // vsldoi v2,v0,v0,0
-    uint8_t instr2[] = { 0x10, 0x40, 0x00, 0x2c };
-    ppu_dasm<DasmMode::Emulate>(instr2, 0, &th);
-    REQUIRE( (th.getV(2) == i) );
-}
-
-TEST_CASE("vxor v0,v0,v0") {
-    MainMemory mm;
-    g_state.mm = &mm;
-    PPUThread th;
-    unsigned __int128 i = 0x1122334455667788ull;
-    i <<= 64;
-    i |= 0xaabbccddeeff0099ull;
-    th.setV(0, i);
-    uint8_t instr[] = { 0x10, 0x00, 0x04, 0xc4 };
-    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getV(0) == 0) );
-}
-
 TEST_CASE("addc r5,r4,r3") {
     MainMemory mm;
     g_state.mm = &mm;

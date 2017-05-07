@@ -99,14 +99,6 @@ PRINT(bbcall) {
 }
 EMU_REWRITE(bbcall, 0);
 
-static const __m128i ENDIAN_SWAP_MASK128 =
-    _mm_set_epi8(
-        0, 1, 2, 3,
-        4, 5, 6, 7,
-        8, 9, 10, 11,
-        12, 13, 14, 15
-    );
-
 alignas(16) static const __m128i BYTE_ROTATE_LEFT_SHUFFLE_CONTROL[16] {
     _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
     _mm_set_epi8(14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 15),
@@ -124,41 +116,6 @@ alignas(16) static const __m128i BYTE_ROTATE_LEFT_SHUFFLE_CONTROL[16] {
     _mm_set_epi8(2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3),
     _mm_set_epi8(1, 0, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2),
     _mm_set_epi8(0, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1),
-};
-
-alignas(16) static const __m128i BYTE_SHIFT_LEFT_SHUFFLE_CONTROL[32] {
-    _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
-    _mm_set_epi8(14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1),
-    _mm_set_epi8(13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -1),
-    _mm_set_epi8(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -1, -1),
-    _mm_set_epi8(11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -1, -1, -1),
-    _mm_set_epi8(10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -1, -1, -1, -1),
-    _mm_set_epi8(9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(7, 6, 5, 4, 3, 2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(6, 5, 4, 3, 2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(5, 4, 3, 2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(4, 3, 2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(3, 2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
-    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
 };
 
 alignas(16) static const __m128i GENERATE_CONTROL_BYTE[32] {
@@ -1407,22 +1364,19 @@ PRINT(shufb) {
     auto a = th->r(_ra).xmm(); \
     auto b = th->r(_rb).xmm(); \
     auto c = th->r(_rc).xmm(); \
-    __m128i mx = _mm_cmplt_epi8(c, _mm_setzero_si128()); \
-    __m128i masked_c = c & _mm_set1_epi8(0b11111); \
-    __m128i m16 = _mm_cmplt_epi8(masked_c, _mm_set1_epi8(16)) & ~mx; \
-    __m128i m32 = ~(mx | m16); \
-    __m128i ab_index = _mm_sub_epi8(_mm_set1_epi8(15), c & _mm_set1_epi8(0b1111)); \
-    __m128i x_index = _mm_srli_epi16(c, 5) & _mm_set1_epi8(0b111); \
-    __m128i templ = _mm_set_epi32( \
-        0x00000000, 0x00000000, \
-        0x80ff0000, 0x00000000 \
-    ); \
-    __m128i s16 = _mm_shuffle_epi8(a, ab_index); \
-    __m128i s32 = _mm_shuffle_epi8(b, ab_index); \
-    __m128i sx = _mm_shuffle_epi8(templ, x_index); \
-    __m128i t = _mm_blendv_epi8(sx, s16, m16); \
-    t = _mm_blendv_epi8(t, s32, m32); \
-    th->r(_rt_abc).set_xmm(t); \
+    auto sx = _mm_and_si128(_mm_srli_epi64(c, 5), _mm_set1_epi8(0b111)); \
+    auto snx = _mm_and_si128(c, _mm_set1_epi8(0b11111)); \
+    snx = _mm_sub_epi8(_mm_set1_epi8(31), snx); \
+    auto gt = _mm_cmpgt_epi8(snx, _mm_set1_epi8(15)); \
+    auto s1 = snx; \
+    auto s2 = _mm_sub_epi8(snx, _mm_set1_epi8(16)); \
+    auto d1 = _mm_shuffle_epi8(b, s1); \
+    auto d2 = _mm_shuffle_epi8(a, s2); \
+    auto x = _mm_set1_epi32(0x80ff0000); \
+    auto dx = _mm_shuffle_epi8(x, sx); \
+    auto d = _mm_blendv_epi8(d1, d2, gt); \
+    d = _mm_blendv_epi8(d, dx, _mm_cmplt_epi8(c, _mm_setzero_si128())); \
+    th->r(_rt_abc).set_xmm(d); \
 }
 
 EMU_REWRITE(shufb, i->RA.u(), i->RB.u(), i->RC.u(), i->RT_ABC.u())

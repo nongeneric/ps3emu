@@ -35,7 +35,9 @@ Graph buildGraph(std::vector<BasicBlock> const& blocks, analyze_t analyze) {
                 return block.start == target;
             });
             if (it == blocks.end()) {
-                assert(target == lastVa + 4);
+                // target might point out of the current segment in SPU
+                // in this case the branch is treated as indirect and
+                // will be handled when rewriting basic blocks
                 continue;
             }
             auto targetIndex = std::distance(blocks.begin(), it);

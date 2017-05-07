@@ -101,6 +101,15 @@ std::optional<InstrDbEntry> InstrDb::findPpuEntry(std::string path) {
     return selectEntry(entries.front().value);
 }
 
+std::vector<InstrDbEntry> InstrDb::findSpuEntries(std::string path) {
+    std::vector<InstrDbEntry> entries;
+    auto entrySql = "SELECT oid FROM Entry WHERE ElfPath = ? AND IsPPU = 0;";
+    for (auto id : _db->Select<db::ScalarInt>(entrySql, path)) {
+        entries.push_back(selectEntry(id.value));
+    }
+    return entries;
+}
+
 std::optional<InstrDbEntry> InstrDb::findSpuEntry(std::string path, int totalSegment) {
     auto entrySql = "SELECT oid FROM Entry WHERE ElfPath = ? AND Segment = ? AND IsPPU = 0;";
     auto entries = _db->Select<db::ScalarInt>(entrySql, path, totalSegment);

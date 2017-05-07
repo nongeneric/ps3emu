@@ -42,7 +42,7 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
     for(auto& r : _FPR)
         r = 0;
     for(auto& r : _V)
-        r = 0;
+        r.set_xmm(_mm_setzero_si128());
 }
 
 void PPUThread::vmenter(uint32_t to) {

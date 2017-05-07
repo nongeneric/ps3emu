@@ -332,7 +332,6 @@ std::tuple<uint32_t, std::vector<EmbeddedElfInfo>> mapEmbeddedElfs(
 }
 
 void handleSpuSignature(std::vector<BasicBlock>& blocks,
-                        SegmentInfo& info,
                         uint32_t segmentStartVa,
                         int segmentNumber,
                         std::string elfName,
@@ -413,14 +412,18 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
         
         std::vector<uint32_t> leads;
         leads.push_back(elf.header->e_entry);
+        
+        std::vector<uint32_t> allDbLeads;
+        auto allEntries = db.findSpuEntries(command.elf);
+        for (auto& entry : allEntries) {
+            std::copy(begin(entry.leads), end(entry.leads), std::back_inserter(allDbLeads));
+        }
                 
         for (auto& segment : copySegments) {
             auto segmentLeads = selectSubset(leads, segment.p_vaddr, segment.p_filesz);
-            auto entry = db.findSpuEntry(command.elf, totalSegmentNumber);
-            if (entry) {
-                auto dbLeads = selectSubset(entry->leads, segment.p_vaddr, segment.p_filesz);
-                std::copy(begin(dbLeads), end(dbLeads), std::back_inserter(segmentLeads));
-            }
+            auto dbLeads = selectSubset(allDbLeads, segment.p_vaddr, segment.p_filesz);
+            std::copy(begin(dbLeads), end(dbLeads), std::back_inserter(segmentLeads));
+            
             if (segmentLeads.empty())
                 continue;
             
@@ -452,8 +455,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 }
             }
             
-            SegmentInfo info;
-            handleSpuSignature(blocks, info, segment.p_vaddr, totalSegmentNumber, command.elf, [&](auto va) {
+            handleSpuSignature(blocks, segment.p_vaddr, totalSegmentNumber, command.elf, [&](auto va) {
                 return spuElfVaToParentVaInCurrentSegment(va, segment);
             });
                 
@@ -462,55 +464,64 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 return analyzeSpu(g_state.mm->load32(elfVa), cia);
             };
             
-            for (auto& block : blocks) {
-                if (elf.isJob) { // all jobs are position independent
-                    block.body.push_back(ssnprintf(
-                        "if (!pic_offset_set) { pic_offset = bb_va - 0x%x; pic_offset_set = true; }",
-                        block.start));
-                }
-                for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
-                    std::string rewritten, printed;
-                    big_uint32_t instr = g_state.mm->load32(spuElfVaToParentVaInCurrentSegment(cia, segment));
-                    try {
-                        SPUDasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
-                        SPUDasm<DasmMode::Print>(&instr, cia, &printed);
-                    } catch (...) {
-                        rewritten = "throw std::runtime_error(\"dasm error\")";
-                        printed = "error";
-                        auto file = path(command.elf).filename().string();
-                        auto rva = cia - command.imageBase;
-                        std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
-                    }
-                    auto line = ssnprintf("/* %08x %8x: %-24s*/ logSPU(0x%x, th); %s;", instr, cia, printed, cia, rewritten);
-                    block.body.push_back(line);
-                }
-                
-                auto [target, fallthrough] = outOfPartTargets(block, blocks, analyzeFunc);
-                if (target) {
-                    block.body.insert(begin(block.body), "#define SPU_SET_NIP SPU_SET_NIP_INDIRECT_PIC");
-                    block.body.insert(begin(block.body), "#undef SPU_SET_NIP");
-                    block.body.push_back("#undef SPU_SET_NIP");
-                    block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
-                }
-                if (fallthrough) {
-                    block.body.insert(block.body.begin(), ssnprintf("// possible fallthrough %x leads out of part", fallthrough));
-                    block.body.push_back(ssnprintf("SPU_SET_NIP_INDIRECT_PIC(0x%x);", fallthrough));
-                }
-                
-                info.blocks.push_back({spuElfVaToParentVaInCurrentSegment(block.start, segment),
-                                       block.len,
-                                       block.body,
-                                       block.start});
-            }
-            
-            info.isSpu = true;
-            info.suffix = ssnprintf("spu_%x_%x_%x%s",
-                                    elf.startOffset,
-                                    segment.p_vaddr,
-                                    segment.p_vaddr + segment.p_filesz,
-                                    elf.isJob ? "_SPURS_JOB" : "");
-            infos.push_back(info);
             totalSegmentNumber++;
+            
+            auto parts = partitionBasicBlocks(blocks, analyzeFunc);
+            int partNum = 0;
+            for (auto& part : parts) {
+                SegmentInfo info;
+                for (auto& block : part) {
+                    if (elf.isJob) { // all jobs are position independent
+                        block.body.push_back(ssnprintf(
+                            "if (!pic_offset_set) { pic_offset = bb_va - 0x%x; pic_offset_set = true; }",
+                            block.start));
+                    }
+                    for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
+                        std::string rewritten, printed;
+                        big_uint32_t instr = g_state.mm->load32(spuElfVaToParentVaInCurrentSegment(cia, segment));
+                        try {
+                            SPUDasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
+                            SPUDasm<DasmMode::Print>(&instr, cia, &printed);
+                        } catch (...) {
+                            rewritten = "throw std::runtime_error(\"dasm error\")";
+                            printed = "error";
+                            auto file = path(command.elf).filename().string();
+                            auto rva = cia - command.imageBase;
+                            std::cout << ssnprintf("error disassembling instruction %s: %x\n", file, rva);
+                        }
+                        auto line = ssnprintf("/* %08x %8x: %-24s*/ logSPU(0x%x, th); %s;", instr, cia, printed, cia, rewritten);
+                        block.body.push_back(line);
+                    }
+                    
+                    auto [target, fallthrough] = outOfPartTargets(block, part, analyzeFunc);
+                    if (target) {
+                        block.body.insert(begin(block.body), "#define SPU_SET_NIP SPU_SET_NIP_INDIRECT_PIC");
+                        block.body.insert(begin(block.body), "#undef SPU_SET_NIP");
+                        block.body.insert(begin(block.body), ssnprintf("// target %x leads out of part", *target));
+                        block.body.push_back("#undef SPU_SET_NIP");
+                        block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
+                    }
+                    if (fallthrough) {
+                        block.body.insert(block.body.begin(), ssnprintf("// possible fallthrough %x leads out of part", fallthrough));
+                        block.body.push_back(ssnprintf("SPU_SET_NIP_INDIRECT_PIC(0x%x);", fallthrough));
+                    }
+                    
+                    info.blocks.push_back({spuElfVaToParentVaInCurrentSegment(block.start, segment),
+                                        block.len,
+                                        block.body,
+                                        block.start});
+                }
+                
+                info.isSpu = true;
+                info.suffix = ssnprintf("spu_%x_%x_%x_part_%d_%s",
+                                        elf.startOffset,
+                                        segment.p_vaddr,
+                                        segment.p_vaddr + segment.p_filesz,
+                                        partNum,
+                                        elf.isJob ? "_SPURS_JOB" : "");
+                infos.push_back(info);
+                partNum++;
+            }
         }
     }
     

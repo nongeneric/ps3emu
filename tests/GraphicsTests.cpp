@@ -92,9 +92,9 @@ TEST_CASE("gcm_cube_mrt") {
 
 TEST_CASE("gcm_human") {
     runAndWait("./binaries/gcm_human/a.elf");
-    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0, 5, 5);
-    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1, 5, 5);
-    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2, 5, 5);
+    compareLastFrame("./binaries/gcm_human/ps3frame0.png", 0, 20, 20);
+    compareLastFrame("./binaries/gcm_human/ps3frame1.png", 1, 20, 20);
+    compareLastFrame("./binaries/gcm_human/ps3frame2.png", 2, 20, 20);
 }
 
 TEST_CASE("gcm_vertex_shader_branch") {
@@ -146,14 +146,14 @@ TEST_CASE("gcm_video_texturing") {
 
 TEST_CASE("gcm_stencil_reflect") {
     runAndWait("./binaries/gcm_stencil_reflect/a.elf");
-    compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame0.png", 0);
-    compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame0.png", 0, 5, 10);
+    compareLastFrame("./binaries/gcm_stencil_reflect/ps3frame1.png", 1, 5, 10);
 }
 
 TEST_CASE("gcm_render_to_texture") {
     runAndWait("./binaries/gcm_render_to_texture/a.elf");
-    compareLastFrame("./binaries/gcm_render_to_texture/ps3frame0.png", 0);
-    compareLastFrame("./binaries/gcm_render_to_texture/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_render_to_texture/ps3frame0.png", 0, 5, 10);
+    compareLastFrame("./binaries/gcm_render_to_texture/ps3frame1.png", 1, 5, 10);
 }
 
 TEST_CASE("opengl_1_basiccg", TAG_SERIAL) {
@@ -178,7 +178,7 @@ TEST_CASE("opengl_4_proc_anim", TAG_SERIAL) {
 
 TEST_CASE("opengl_5_mipmap", TAG_SERIAL) {
     runAndWait("./binaries/opengl_5_mipmap/a.elf");
-    compareLastFrame("./binaries/opengl_5_mipmap/ps3frame1.png", 1);
+    compareLastFrame("./binaries/opengl_5_mipmap/ps3frame1.png", 1, 5, 100);
 }
 
 TEST_CASE("opengl_6_gloss_map", TAG_SERIAL) {
@@ -206,13 +206,13 @@ TEST_CASE("gcm_strip_branch", TAG_SERIAL) {
     for (int i = 0; i <= 18; ++i) {
         compareLastFrame(
             ssnprintf("./binaries/gcm_strip_branch/ps3frame%d.png", i).c_str(),
-            i);
+            i, 30, 400);
     }
 }
 
 TEST_CASE("cube_with_font") {
     runAndWait("./binaries/cube_with_font/a.elf");
-    compareLastFrame("./binaries/cube_with_font/ps3frame0.png", 0);
+    compareLastFrame("./binaries/cube_with_font/ps3frame0.png", 0, 5, 100);
 }
 
 TEST_CASE("resc_basic") {
@@ -222,7 +222,7 @@ TEST_CASE("resc_basic") {
 
 TEST_CASE("particle_simulator_02_spu_particles") {
     runAndWait("./binaries/particle_simulator_02_spu_particles/a.elf");
-    compareLastFrame("./binaries/particle_simulator_02_spu_particles/ps3frame1.png", 1);
+    compareLastFrame("./binaries/particle_simulator_02_spu_particles/ps3frame1.png", 1, 5, 20);
 }
 
 TEST_CASE("particle_simulator_01_ppu_particles") {

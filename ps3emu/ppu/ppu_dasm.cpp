@@ -78,6 +78,98 @@ using namespace boost::endian;
         }
 #endif
 
+namespace {
+    
+alignas(16) static const __m128i BYTE_SHIFT_RIGHT_SHUFFLE_CONTROL[17] {
+    _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+    _mm_set_epi8(-1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1),
+    _mm_set_epi8(-1, -1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2),
+    _mm_set_epi8(-1, -1, -1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3),
+    _mm_set_epi8(-1, -1, -1, -1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4),
+    _mm_set_epi8(-1, -1, -1, -1, -1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, 15, 14, 13, 12, 11, 10, 9, 8, 7),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 15, 14, 13, 12, 11, 10, 9, 8),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 14, 13, 12, 11, 10, 9),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 14, 13, 12, 11, 10),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 14, 13, 12, 11),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 14, 13, 12),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 14, 13),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 14),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15),
+    _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1),
+};
+
+alignas(16) static const __m128i VSPLTW_SHUFFLE_CONTROL[4] {
+    _mm_set_epi8(15, 14, 13, 12, 15, 14, 13, 12, 15, 14, 13, 12, 15, 14, 13, 12),
+    _mm_set_epi8(11, 10, 9, 8, 11, 10, 9, 8, 11, 10, 9, 8, 11, 10, 9, 8),
+    _mm_set_epi8(7, 6, 5, 4, 7, 6, 5, 4, 7, 6, 5, 4, 7, 6, 5, 4),
+    _mm_set_epi8(3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0),
+};
+
+static const __m128i VMRGHH1_SHUFFLE_CONTROL =
+    _mm_set_epi8(15, 14, -1, -1, 13, 12, -1, -1, 11, 10, -1, -1, 9, 8, -1, -1);
+    
+static const __m128i VMRGHH2_SHUFFLE_CONTROL =
+    _mm_set_epi8(-1, -1, 15, 14, -1, -1, 13, 12, -1, -1, 11, 10, -1, -1, 9, 8);
+
+static const __m128i VMRGLH1_SHUFFLE_CONTROL =
+    _mm_set_epi8(7, 6, -1, -1, 5, 4, -1, -1, 3, 2, -1, -1, 1, 0, -1, -1);
+    
+static const __m128i VMRGLH2_SHUFFLE_CONTROL =
+    _mm_set_epi8(-1, -1, 7, 6, -1, -1, 5, 4, -1, -1, 3, 2, -1, -1, -1, 0);
+
+static const __m128i VMRGHW1_SHUFFLE_CONTROL =
+    _mm_set_epi8(15, 14, 13, 12, -1, -1, -1, -1, 11, 10, 9, 8, -1, -1, -1, -1);
+    
+static const __m128i VMRGHW2_SHUFFLE_CONTROL =
+    _mm_set_epi8(-1, -1, -1, -1, 15, 14, 13, 12, -1, -1, -1, -1, 11, 10, 9, 8);
+    
+static const __m128i VMRGLW1_SHUFFLE_CONTROL =
+    _mm_set_epi8(7, 6, 5, 4, -1, -1, -1, -1, 3, 2, 1, 0, -1, -1, -1, -1);
+    
+static const __m128i VMRGLW2_SHUFFLE_CONTROL =
+    _mm_set_epi8(-1, -1, -1, -1, 7, 6, 5, 4, -1, -1, -1, -1, 3, 2, 1, 0);
+
+static const __m128i LVSR_TABLE[] = {
+    _mm_set_epi64x(0x1011121314151617ull, 0x18191A1B1C1D1E1Full),
+    _mm_set_epi64x(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull),
+    _mm_set_epi64x(0x0E0F101112131415ull, 0x161718191A1B1C1Dull),
+    _mm_set_epi64x(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull),
+    _mm_set_epi64x(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull),
+    _mm_set_epi64x(0x0B0C0D0E0F101112ull, 0x131415161718191Aull),
+    _mm_set_epi64x(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull),
+    _mm_set_epi64x(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull),
+    _mm_set_epi64x(0x08090A0B0C0D0E0Full, 0x1011121314151617ull),
+    _mm_set_epi64x(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull),
+    _mm_set_epi64x(0x060708090A0B0C0Dull, 0x0E0F101112131415ull),
+    _mm_set_epi64x(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull),
+    _mm_set_epi64x(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull),
+    _mm_set_epi64x(0x030405060708090Aull, 0x0B0C0D0E0F101112ull),
+    _mm_set_epi64x(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull),
+    _mm_set_epi64x(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull),
+};
+
+static const __m128i LVSL_TABLE[] = {
+    _mm_set_epi64x(0x0001020304050607ull, 0x08090A0B0C0D0E0Full),
+    _mm_set_epi64x(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull),
+    _mm_set_epi64x(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull),
+    _mm_set_epi64x(0x030405060708090Aull, 0x0B0C0D0E0F101112ull),
+    _mm_set_epi64x(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull),
+    _mm_set_epi64x(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull),
+    _mm_set_epi64x(0x060708090A0B0C0Dull, 0x0E0F101112131415ull),
+    _mm_set_epi64x(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull),
+    _mm_set_epi64x(0x08090A0B0C0D0E0Full, 0x1011121314151617ull),
+    _mm_set_epi64x(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull),
+    _mm_set_epi64x(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull),
+    _mm_set_epi64x(0x0B0C0D0E0F101112ull, 0x131415161718191Aull),
+    _mm_set_epi64x(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull),
+    _mm_set_epi64x(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull),
+    _mm_set_epi64x(0x0E0F101112131415ull, 0x161718191A1B1C1Dull),
+    _mm_set_epi64x(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull),
+};
+
+}    
 // Branch I-form, p24
 
 inline uint64_t getNIA(IForm* i, uint64_t cia) {
@@ -3042,7 +3134,10 @@ PRINT(STVX, SIMDForm) {
 #define _STVX(_ra, _rb, _vs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store128(ea, TH->getV(_vs)); \
+    auto v = TH->r(_vs).xmm(); \
+    uint128_t u128; \
+    memcpy(&u128, &v, 16); \
+    MM->store128(ea, u128); \
 }
 EMU_REWRITE(STVX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 
@@ -3064,7 +3159,10 @@ PRINT(LVX, SIMDForm) {
 #define _LVX(_ra, _rb, _vd) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    TH->setV(_vd, MM->load128(ea)); \
+    uint128_t u128 = MM->load128(ea); \
+    __m128i xmm; \
+    memcpy(&xmm, &u128, 16); \
+    TH->r(_vd).set_xmm(xmm); \
 }
 EMU_REWRITE(LVX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
@@ -3087,9 +3185,10 @@ PRINT(LVLX, SIMDForm) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto eb = ea & 0b1111ull; \
-    uint8_t be[16] = {0}; \
-    MM->readMemory(ea, be, 16 - eb); \
-    TH->setV(_vd, be); \
+    __m128i v = _mm_setzero_si128(); \
+    MM->readMemory(ea, &v, 16 - eb); \
+    v = _mm_shuffle_epi8(v, ENDIAN_SWAP_MASK128); \
+    TH->r(_vd).set_xmm(v); \
 }
 EMU_REWRITE(LVLX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
@@ -3102,11 +3201,12 @@ PRINT(LVRX, SIMDForm) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto eb = ea & 0b1111ull; \
-    uint8_t be[16] = {0}; \
+    __m128i v = _mm_setzero_si128(); \
     if (eb) { \
-        MM->readMemory(ea - eb, be + 16 - eb, eb); \
+        MM->readMemory(ea - eb, (char*)&v + 16 - eb, eb); \
     } \
-    TH->setV(_vd, be); \
+    v = _mm_shuffle_epi8(v, ENDIAN_SWAP_MASK128); \
+    TH->r(_vd).set_xmm(v); \
 }
 EMU_REWRITE(LVRX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
@@ -3115,77 +3215,78 @@ PRINT(VSLDOI, SIMDForm) {
     *result = format_nnnn("vsldoi", i->vD, i->vA, i->vB, i->SHB);
 }
 
+#ifdef EMU_REWRITER
+#define _VSLDOI(_shb, _va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_bslli_si128(a, _shb); \
+    a = _mm_bsrli_si128(a, 16 - _shb); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(t); \
+}
+#else
 #define _VSLDOI(_shb, _va, _vb, _vd) { \
     assert(_shb <= 16); \
-    uint8_t be[32]; \
-    TH->getV(_va, be); \
-    TH->getV(_vb, be + 16); \
-    TH->setV(_vd, be + _shb); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_shuffle_epi8(a, BYTE_SHIFT_LEFT_SHUFFLE_CONTROL[_shb]); \
+    b = _mm_shuffle_epi8(b, BYTE_SHIFT_RIGHT_SHUFFLE_CONTROL[16 - _shb]); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
+#endif
 EMU_REWRITE(VSLDOI, SIMDForm, i->SHB.u(), i->vA.u(), i->vB.u(), i->vD.u())
 
 
-PRINT(LVEWX, SIMDForm) { // TODO: test
+PRINT(LVEWX, SIMDForm) {
     *result = format_nnn("lvewx", i->vD, i->rA, i->rB);
 }
 
 #define _LVEWX(_ra, _rb, _vd) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    uint8_t be[16]; \
-    MM->readMemory(ea, be, 16); \
-    TH->setV(_vd, be); \
+    uint128_t u128 = MM->load128(ea); \
+    __m128i xmm; \
+    memcpy(&xmm, &u128, 16); \
+    TH->r(_vd).set_xmm(xmm); \
 }
 EMU_REWRITE(LVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
 
-PRINT(VSPLTW, SIMDForm) { // TODO: test
+PRINT(VSPLTW, SIMDForm) {
     *result = format_nnn("vspltw", i->vD, i->vB, i->UIMM);
 }
 
 #define _VSPLTW(_vb, _uimm, _vd) { \
-    uint32_t be[4]; \
-    TH->getV(_vb, (uint8_t*)be); \
-    auto b = _uimm; \
-    be[0] = be[b]; \
-    be[1] = be[b]; \
-    be[2] = be[b]; \
-    be[3] = be[b]; \
-    TH->setV(_vd, (uint8_t*)be); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_shuffle_epi8(b, VSPLTW_SHUFFLE_CONTROL[_uimm]); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSPLTW, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
 
 
-PRINT(VSPLTISH, SIMDForm) { // TODO: test
+PRINT(VSPLTISH, SIMDForm) {
     *result = format_nn("vspltish", i->vD, i->SIMM);
 }
 
 #define _VSPLTISH(_simms, _vd) { \
-    int16_t v = _simms; \
-    int16_t be[8] = { \
-        v, v, v, v, \
-        v, v, v, v \
-    }; \
-    TH->setV(_vd, (uint8_t*)be); \
+    auto d = _mm_set1_epi16(_simms); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSPLTISH, SIMDForm, i->SIMM.s(), i->vD.u())
 
 
-PRINT(VMRGHH, SIMDForm) { // TODO: test
+PRINT(VMRGHH, SIMDForm) {
     *result = format_nnn("vmrghh", i->vD, i->vA, i->vB);
 }
 
 #define _VMRGHH(_va, _vb, _vd) { \
-    int16_t abe[8], bbe[8]; \
-    TH->getV(_va, (uint8_t*)abe); \
-    TH->getV(_vb, (uint8_t*)bbe); \
-    int16_t dbe[8] = { \
-        abe[0], bbe[0], \
-        abe[1], bbe[1], \
-        abe[2], bbe[2], \
-        abe[3], bbe[3], \
-    }; \
-    TH->setV(_vd, (uint8_t*)dbe); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_shuffle_epi8(a, VMRGHH1_SHUFFLE_CONTROL); \
+    b = _mm_shuffle_epi8(b, VMRGHH2_SHUFFLE_CONTROL); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VMRGHH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3195,16 +3296,14 @@ PRINT(VMULOSH, SIMDForm) { // TODO: test
 }
 
 #define _VMULOSH(_va, _vb, _vd) { \
-    int16_t abe[8], bbe[8]; \
-    TH->getV(_va, (uint8_t*)abe); \
-    TH->getV(_vb, (uint8_t*)bbe); \
-    int32_t dbe[4] = { \
-        (int32_t)abe[1] * (int32_t)bbe[1], \
-        (int32_t)abe[3] * (int32_t)bbe[3], \
-        (int32_t)abe[5] * (int32_t)bbe[5], \
-        (int32_t)abe[7] * (int32_t)bbe[7], \
-    }; \
-    TH->setV(_vd, (uint8_t*)dbe); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_slli_epi32(a, 16); \
+    a = _mm_srai_epi32(a, 16); \
+    b = _mm_slli_epi32(b, 16); \
+    b = _mm_srai_epi32(b, 16); \
+    auto d = _mm_mullo_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VMULOSH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3214,16 +3313,12 @@ PRINT(VMRGLH, SIMDForm) { // TODO: test
 }
 
 #define _VMRGLH(_va, _vb, _vd) { \
-    int16_t abe[8], bbe[8]; \
-    TH->getV(_va, (uint8_t*)abe); \
-    TH->getV(_vb, (uint8_t*)bbe); \
-    int16_t dbe[8] = { \
-        abe[4], bbe[4], \
-        abe[5], bbe[5], \
-        abe[6], bbe[6], \
-        abe[7], bbe[7], \
-    }; \
-    TH->setV(_vd, (uint8_t*)dbe); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_shuffle_epi8(a, VMRGLH1_SHUFFLE_CONTROL); \
+    b = _mm_shuffle_epi8(b, VMRGLH2_SHUFFLE_CONTROL); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VMRGLH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3233,9 +3328,8 @@ PRINT(VSPLTISW, SIMDForm) { // TODO: test
 }
 
 #define _VSPLTISW(_simms, _vd) { \
-    int32_t v = _simms; \
-    big_uint32_t be[4] = { v, v, v, v }; \
-    TH->setV(_vd, (uint8_t*)be); \
+    auto d = _mm_set1_epi32(_simms); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSPLTISW, SIMDForm, i->SIMM.s(), i->vD.u())
 
@@ -3245,14 +3339,11 @@ PRINT(VMADDFP, SIMDForm) {
 }
 
 #define _VMADDFP(_va, _vb, _vc, _vd) { \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    auto c = TH->getVf(_vc); \
-    std::array<float, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] * c[i] + b[i]; \
-    } \
-    TH->setVf(_vd, d); \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto c = TH->r(_vc).xmm_f(); \
+    auto d = _mm_fmadd_ps(a, c, b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VMADDFP, SIMDForm, i->vA.u(), i->vB.u(), i->vC.u(), i->vD.u())
 
@@ -3262,14 +3353,12 @@ PRINT(VNMSUBFP, SIMDForm) {
 }
 
 #define _VNMSUBFP(_va, _vb, _vc, _vd) { \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    auto c = TH->getVf(_vc); \
-    std::array<float, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = -(a[i] * c[i] - b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto c = TH->r(_vc).xmm_f(); \
+    auto d = _mm_fmsub_ps(a, c, b); \
+    d = _mm_xor_ps(d, _mm_set1_ps(-0.f)); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VNMSUBFP, SIMDForm, i->vA.u(), i->vB.u(), i->vC.u(), i->vD.u())
 
@@ -3279,8 +3368,10 @@ PRINT(VXOR, SIMDForm) {
 }
 
 #define _VXOR(_va, _vb, _vd) { \
-    auto d = TH->getV(_va) ^ TH->getV(_vb); \
-    TH->setV(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_xor_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VXOR, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3290,8 +3381,11 @@ PRINT(VNOR, SIMDForm) {
 }
 
 #define _VNOR(_va, _vb, _vd) { \
-    auto d = ~(TH->getV(_va) | TH->getV(_vb)); \
-    TH->setV(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_or_si128(a, b); \
+    d = _mm_xor_si128(d, _mm_set1_epi8(-1)); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VNOR, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3301,8 +3395,10 @@ PRINT(VOR, SIMDForm) {
 }
 
 #define _VOR(_va, _vb, _vd) { \
-    auto d = TH->getV(_va) | TH->getV(_vb); \
-    TH->setV(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VOR, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3312,8 +3408,10 @@ PRINT(VAND, SIMDForm) {
 }
 
 #define _VAND(_va, _vb, _vd) { \
-    auto d = TH->getV(_va) & TH->getV(_vb); \
-    TH->setV(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_and_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VAND, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3323,11 +3421,11 @@ PRINT(VSEL, SIMDForm) {
 }
 
 #define _VSEL(_vc, _va, _vb, _vd) { \
-    auto m = TH->getV(_vc); \
-    auto a = TH->getV(_va); \
-    auto b = TH->getV(_vb); \
+    auto m = TH->r(_vc).xmm(); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
     auto d = (m & b) | (~m & a); \
-    TH->setV(_vd, d); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSEL, SIMDForm, i->vC.u(), i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3337,13 +3435,10 @@ PRINT(VADDFP, SIMDForm) {
 }
 
 #define _VADDFP(_va, _vb, _vd) { \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    std::array<float, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] + b[i]; \
-    } \
-    TH->setVf(_vd, d); \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_add_ps(a, b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VADDFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3353,13 +3448,10 @@ PRINT(VSUBFP, SIMDForm) {
 }
 
 #define _VSUBFP(_va, _vb, _vd) { \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    std::array<float, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] - b[i]; \
-    } \
-    TH->setVf(_vd, d); \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_sub_ps(a, b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VSUBFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3369,12 +3461,11 @@ PRINT(VRSQRTEFP, SIMDForm) {
 }
 
 #define _VRSQRTEFP(_vb, _vd) { \
-    auto b = TH->getVf(_vb); \
-    std::array<float, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = 1.f / sqrt(b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto abs_mask = _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff)); \
+    b = _mm_and_ps(b, abs_mask); \
+    auto d = _mm_rsqrt_ps(b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VRSQRTEFP, SIMDForm, i->vB.u(), i->vD.u())
 
@@ -3384,13 +3475,11 @@ PRINT(VCTSXS, SIMDForm) {
 }
 
 #define _VCTSXS(_vb, _uimm, _vd) { \
-    auto b = TH->getVf(_vb); \
-    std::array<uint32_t, 4> d; \
-    auto m = 1u << _uimm; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = b[i] * m; \
-    } \
-    TH->setVuw(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto m = _mm_set1_ps(1u << _uimm); \
+    auto x = _mm_mul_ps(b, m); \
+    auto d = _mm_cvtps_epi32(x);\
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VCTSXS, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
 
@@ -3400,14 +3489,11 @@ PRINT(VCFSX, SIMDForm) {
 }
 
 #define _VCFSX(_vb, _uimm, _vd) { \
-    auto b = TH->getVw(_vb); \
-    auto div = 1u << _uimm; \
-    std::array<float, 4> d; \
-    for (int n = 0; n < 4; ++n) { \
-        d[n] = b[n]; \
-        d[n] /= div; \
-    } \
-    TH->setVf(_vd, d); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_cvtepi32_ps(b); \
+    auto div = _mm_set1_ps(1u << _uimm); \
+    d = _mm_div_ps(d, div); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VCFSX, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
 
@@ -3417,13 +3503,10 @@ PRINT(VADDUWM, SIMDForm) {
 }
 
 #define _VADDUWM(_va, _vb, _vd) { \
-    auto a = TH->getVuw(_va); \
-    auto b = TH->getVuw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int n = 0; n < 4; ++n) { \
-        d[n] = a[n] + b[n]; \
-    } \
-    TH->setVuw(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_add_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VADDUWM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3433,13 +3516,10 @@ PRINT(VSUBUWM, SIMDForm) {
 }
 
 #define _VSUBUWM(_va, _vb, _vd) { \
-    auto a = TH->getVuw(_va); \
-    auto b = TH->getVuw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int n = 0; n < 4; ++n) { \
-        d[n] = a[n] - b[n]; \
-    } \
-    TH->setVuw(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_sub_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSUBUWM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3448,21 +3528,20 @@ PRINT(VCMPEQUW, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpequw." : "vcmpequw", i->vD, i->vA, i->vB);
 }
 
-#define _VCMPEQUW(_va, _vb, _vd, _rc) { \
-    auto a = TH->getVuw(_va); \
-    auto b = TH->getVuw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] == b[i] ? 0xffffffff : 0; \
-    } \
-    TH->setVuw(_vd, d); \
-    if (_rc) { \
-        auto d128 = TH->getV(_vd); \
-        auto t = ~d128 == 0; \
-        auto f = d128 == 0; \
+#define updateCRF(d, rc) \
+    {if (rc) { \
+        bool t = _mm_test_all_ones(d); \
+        bool f = _mm_test_all_ones(~d); \
         auto c = t << 3 | f << 1; \
         TH->setCRF(6, c); \
-    } \
+    }}
+
+#define _VCMPEQUW(_va, _vb, _vd, _rc) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_cmpeq_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
 }
 EMU_REWRITE(VCMPEQUW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
@@ -3472,20 +3551,11 @@ PRINT(VCMPGTFP, SIMDForm) {
 }
 
 #define _VCMPGTFP(_va, _vb, _vd, _rc) { \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] > b[i] ? 0xffffffff : 0; \
-    } \
-    TH->setVuw(_vd, d); \
-    if (_rc) { \
-        auto d128 = TH->getV(_vd); \
-        auto t = ~d128 == 0; \
-        auto f = d128 == 0; \
-        auto c = t << 3 | f << 1; \
-        TH->setCRF(6, c); \
-    } \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_cmpgt_ps(a, b); \
+    TH->r(_vd).set_xmm_f(d); \
+    updateCRF(_mm_castps_si128(d), _rc); \
 }
 EMU_REWRITE(VCMPGTFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
@@ -3495,20 +3565,14 @@ PRINT(VCMPGTUW, SIMDForm) {
 }
 
 #define _VCMPGTUW(_va, _vb, _vd, _rc) { \
-    auto a = TH->getVuw(_va); \
-    auto b = TH->getVuw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] > b[i] ? 0xffffffff : 0; \
-    } \
-    TH->setVuw(_vd, d); \
-    if (_rc) { \
-        auto d128 = TH->getV(_vd); \
-        auto t = ~d128 == 0; \
-        auto f = d128 == 0; \
-        auto c = t << 3 | f << 1; \
-        TH->setCRF(6, c); \
-    } \
+    auto val = _mm_set1_epi32(0x80000000); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_sub_epi32(a, val); \
+    b = _mm_sub_epi32(b, val); \
+    auto d = _mm_cmpgt_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
 }
 EMU_REWRITE(VCMPGTUW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
@@ -3518,20 +3582,11 @@ PRINT(VCMPGTSW, SIMDForm) {
 }
 
 #define _VCMPGTSW(_va, _vb, _vd, _rc) { \
-    auto a = TH->getVw(_va); \
-    auto b = TH->getVw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] > b[i] ? 0xffffffff : 0; \
-    } \
-    TH->setVuw(_vd, d); \
-    if (_rc) { \
-        auto d128 = TH->getV(_vd); \
-        auto t = ~d128 == 0; \
-        auto f = d128 == 0; \
-        auto c = t << 3 | f << 1; \
-        TH->setCRF(6, c); \
-    } \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_cmpgt_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
 }
 EMU_REWRITE(VCMPGTSW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
@@ -3541,20 +3596,11 @@ PRINT(VCMPEQFP, SIMDForm) { // TODO: test
 }
 
 #define _VCMPEQFP(_va, _vb, _vd, _rc) { \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] == b[i] ? 0xffffffff : 0; \
-    } \
-    TH->setVuw(_vd, d); \
-    if (_rc) { \
-        auto d128 = TH->getV(_vd); \
-        auto t = ~d128 == 0; \
-        auto f = d128 == 0; \
-        auto c = t << 3 | f << 1; \
-        TH->setCRF(6, c); \
-    } \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_cmpeq_ps(a, b); \
+    TH->r(_vd).set_xmm_f(d); \
+    updateCRF(_mm_castps_si128(d), _rc); \
 }
 EMU_REWRITE(VCMPEQFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
@@ -3564,13 +3610,11 @@ PRINT(VSRW, SIMDForm) {
 }
 
 #define _VSRW(_va, _vb, _vd) { \
-    auto a = TH->getVuw(_va); \
-    auto b = TH->getVuw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] >> (b[i] & 31); \
-    } \
-    TH->setVuw(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    b = _mm_and_si128(b, _mm_set1_epi32(0b11111)); \
+    auto d = _mm_srlv_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSRW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3580,13 +3624,11 @@ PRINT(VSLW, SIMDForm) {
 }
 
 #define _VSLW(_va, _vb, _vd) { \
-    auto a = TH->getVuw(_va); \
-    auto b = TH->getVuw(_vb); \
-    std::array<uint32_t, 4> d; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = a[i] << (b[i] & 31); \
-    } \
-    TH->setVuw(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    b = _mm_and_si128(b, _mm_set1_epi32(0b11111)); \
+    auto d = _mm_sllv_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSLW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3596,60 +3638,52 @@ PRINT(VMRGHW, SIMDForm) {
 }
 
 #define _VMRGHW(_va, _vb, _vd) { \
-    uint32_t abe[4]; \
-    uint32_t bbe[4]; \
-    TH->getV(_va, (uint8_t*)abe); \
-    TH->getV(_vb, (uint8_t*)bbe); \
-    uint32_t dbe[4]; \
-    dbe[0] = abe[0]; \
-    dbe[1] = bbe[0]; \
-    dbe[2] = abe[1]; \
-    dbe[3] = bbe[1]; \
-    TH->setV(_vd, (uint8_t*)dbe); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_shuffle_epi8(a, VMRGHW1_SHUFFLE_CONTROL); \
+    b = _mm_shuffle_epi8(b, VMRGHW2_SHUFFLE_CONTROL); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VMRGHW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 
-PRINT(VMRGLW, SIMDForm) { // TODO: test
+PRINT(VMRGLW, SIMDForm) {
     *result = format_nnn("vmrglw", i->vD, i->vA, i->vB);
 }
 
 #define _VMRGLW(_va, _vb, _vd) { \
-    uint32_t abe[4]; \
-    uint32_t bbe[4]; \
-    TH->getV(_va, (uint8_t*)abe); \
-    TH->getV(_vb, (uint8_t*)bbe); \
-    uint32_t dbe[4]; \
-    dbe[0] = abe[2]; \
-    dbe[1] = bbe[2]; \
-    dbe[2] = abe[3]; \
-    dbe[3] = bbe[3]; \
-    TH->setV(_vd, (uint8_t*)dbe); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_shuffle_epi8(a, VMRGLW1_SHUFFLE_CONTROL); \
+    b = _mm_shuffle_epi8(b, VMRGLW2_SHUFFLE_CONTROL); \
+    auto d = _mm_or_si128(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VMRGLW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 
-PRINT(VPERM, SIMDForm) { // TODO: test
+PRINT(VPERM, SIMDForm) {
     *result = format_nnnn("vperm", i->vD, i->vA, i->vB, i->vC);
 }
 
 #define _VPERM(_va, _vb, _vc, _vd) { \
-    uint8_t be[32]; \
-    TH->getV(_va, be); \
-    TH->getV(_vb, be + 16); \
-    uint8_t cbe[16]; \
-    TH->getV(_vc, cbe); \
-    uint8_t dbe[16] = { 0 }; \
-    for (int i = 0; i < 16; ++i) { \
-        auto b = cbe[i] & 31; \
-        dbe[i] = be[b]; \
-    } \
-    TH->setV(_vd, dbe); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto c = TH->r(_vc).xmm(); \
+    c = _mm_sub_epi8(_mm_set1_epi8(31), c); \
+    auto gt = _mm_cmpgt_epi8(c, _mm_set1_epi8(15)); \
+    auto s1 = c; \
+    auto s2 = _mm_sub_epi8(c, _mm_set1_epi8(16)); \
+    auto d1 = _mm_shuffle_epi8(b, s1); \
+    auto d2 = _mm_shuffle_epi8(a, s2); \
+    auto d = _mm_blendv_epi8(d1, d2, gt); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VPERM, SIMDForm, i->vA.u(), i->vB.u(), i->vC.u(), i->vD.u())
 
 
-PRINT(LVSR, SIMDForm) { // TODO: test
+PRINT(LVSR, SIMDForm) {
     *result = format_nnn("lvsr", i->vD, i->rA, i->rB);
 }
 
@@ -3657,26 +3691,8 @@ PRINT(LVSR, SIMDForm) { // TODO: test
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto sh = ea & 15; \
-    unsigned __int128 vd = 0; \
-    switch (sh) { \
-        case 0: vd = make128(0x1011121314151617ull, 0x18191A1B1C1D1E1Full); break; \
-        case 1: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break; \
-        case 2: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break; \
-        case 3: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break; \
-        case 4: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break; \
-        case 5: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break; \
-        case 6: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break; \
-        case 7: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break; \
-        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break; \
-        case 9: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break; \
-        case 10: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break; \
-        case 11: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break; \
-        case 12: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break; \
-        case 13: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break; \
-        case 14: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break; \
-        case 15: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break; \
-    } \
-    TH->setV(_vd, vd); \
+    auto d = LVSR_TABLE[sh]; \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(LVSR, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
@@ -3689,39 +3705,21 @@ PRINT(LVSL, SIMDForm) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto sh = ea & 15; \
-    unsigned __int128 vd = 0; \
-    switch (sh) { \
-        case 0: vd = make128(0x0001020304050607ull, 0x08090A0B0C0D0E0Full); break; \
-        case 1: vd = make128(0x0102030405060708ull, 0x090A0B0C0D0E0F10ull); break; \
-        case 2: vd = make128(0x0203040506070809ull, 0x0A0B0C0D0E0F1011ull); break; \
-        case 3: vd = make128(0x030405060708090Aull, 0x0B0C0D0E0F101112ull); break; \
-        case 4: vd = make128(0x0405060708090A0Bull, 0x0C0D0E0F10111213ull); break; \
-        case 5: vd = make128(0x05060708090A0B0Cull, 0x0D0E0F1011121314ull); break; \
-        case 6: vd = make128(0x060708090A0B0C0Dull, 0x0E0F101112131415ull); break; \
-        case 7: vd = make128(0x0708090A0B0C0D0Eull, 0x0F10111213141516ull); break; \
-        case 8: vd = make128(0x08090A0B0C0D0E0Full, 0x1011121314151617ull); break; \
-        case 9: vd = make128(0x090A0B0C0D0E0F10ull, 0x1112131415161718ull); break; \
-        case 10: vd = make128(0x0A0B0C0D0E0F1011ull, 0x1213141516171819ull); break; \
-        case 11: vd = make128(0x0B0C0D0E0F101112ull, 0x131415161718191Aull); break; \
-        case 12: vd = make128(0x0C0D0E0F10111213ull, 0x1415161718191A1Bull); break; \
-        case 13: vd = make128(0x0D0E0F1011121314ull, 0x15161718191A1B1Cull); break; \
-        case 14: vd = make128(0x0E0F101112131415ull, 0x161718191A1B1C1Dull); break; \
-        case 15: vd = make128(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull); break; \
-    } \
-    TH->setV(_vd, vd); \
+    auto d = LVSL_TABLE[sh]; \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(LVSL, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
 
-PRINT(VANDC, SIMDForm) { // TODO: test
+PRINT(VANDC, SIMDForm) {
     *result = format_nnn("vandc", i->vD, i->vA, i->vB);
 }
 
 #define _VANDC(_va, _vb, _vd) { \
-    auto a = TH->getV(_va); \
-    auto b = TH->getV(_vb); \
-    auto d = a & ~b; \
-    TH->setV(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_andnot_si128(b, a); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VANDC, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3731,12 +3729,9 @@ PRINT(VREFP, SIMDForm) {
 }
 
 #define _VREFP(_vb, _vd) { \
-    std::array<float, 4> d; \
-    auto b = TH->getVf(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = 1.f / b[i]; \
-    } \
-    TH->setVf(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_rcp_ps(b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VREFP, SIMDForm, i->vB.u(), i->vD.u())
 
@@ -3746,14 +3741,11 @@ PRINT(VSRAW, SIMDForm) {
 }
 
 #define _VSRAW(_va, _vb, _vd) { \
-    std::array<int32_t, 4> d; \
-    auto a = TH->getVw(_va); \
-    auto b = TH->getVuw(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        auto sh = b[i] & 31; \
-        d[i] = a[i] >> sh; \
-    } \
-    TH->setVw(_vd, d); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    b = _mm_and_si128(b, _mm_set1_epi32(0b11111)); \
+    auto d = _mm_srav_epi32(a, b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSRAW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3763,12 +3755,9 @@ PRINT(VRFIP, SIMDForm) {
 }
 
 #define _VRFIP(_vb, _vd) { \
-    std::array<float, 4> d; \
-    auto b = TH->getVf(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = std::ceil(b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_ceil_ps(b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VRFIP, SIMDForm, i->vB.u(), i->vD.u())
 
@@ -3778,12 +3767,9 @@ PRINT(VRFIM, SIMDForm) {
 }
 
 #define _VRFIM(_vb, _vd) { \
-    std::array<float, 4> d; \
-    auto b = TH->getVf(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = std::floor(b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_floor_ps(b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VRFIM, SIMDForm, i->vB.u(), i->vD.u())
 
@@ -3793,12 +3779,9 @@ PRINT(VRFIZ, SIMDForm) {
 }
 
 #define _VRFIZ(_vb, _vd) { \
-    std::array<float, 4> d; \
-    auto b = TH->getVf(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = std::trunc(b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_round_ps(b, _MM_FROUND_TO_ZERO |_MM_FROUND_NO_EXC); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VRFIZ, SIMDForm, i->vB.u(), i->vD.u())
 
@@ -3808,13 +3791,10 @@ PRINT(VMAXFP, SIMDForm) {
 }
 
 #define _VMAXFP(_va, _vb, _vd) { \
-    std::array<float, 4> d; \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = std::max(a[i], b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_max_ps(a, b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VMAXFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3824,13 +3804,10 @@ PRINT(VMINFP, SIMDForm) {
 }
 
 #define _VMINFP(_va, _vb, _vd) { \
-    std::array<float, 4> d; \
-    auto a = TH->getVf(_va); \
-    auto b = TH->getVf(_vb); \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = std::min(a[i], b[i]); \
-    } \
-    TH->setVf(_vd, d); \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_min_ps(a, b); \
+    TH->r(_vd).set_xmm_f(d); \
 }
 EMU_REWRITE(VMINFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
@@ -3839,14 +3816,14 @@ PRINT(VCTUXS, SIMDForm) {
     *result = format_nnn("vctuxs", i->vD, i->vB, i->UIMM);
 }
 
+// TODO: test
 #define _VCTUXS(_vb, _uimm, _vd) { \
-    std::array<uint32_t, 4> d; \
-    auto b = TH->getVf(_vb); \
-    auto scale = 1 << _uimm; \
-    for (int i = 0; i < 4; ++i) { \
-        d[i] = b[i] * scale; \
-    } \
-    TH->setVuw(_vd, d); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto m = _mm_set1_ps(1u << _uimm); \
+    b = _mm_mul_ps(b, m); \
+    b = _mm_max_ps(b, _mm_setzero_ps()); \
+    auto d = _mm_cvtps_epi32(b); \
+    TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VCTUXS, SIMDForm, i->vB.u(), i->UIMM.u(), i->vD.u())
 
@@ -3858,9 +3835,8 @@ PRINT(STVEWX, SIMDForm) {
 #define _STVEWX(_ra, _rb, _vs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    auto s = TH->getVuw(_vs); \
     auto eb = ea & 3; \
-    MM->store32(ea, s[eb]); \
+    MM->store32(ea, TH->r(_vs).w(eb)); \
 }
 EMU_REWRITE(STVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 
