@@ -237,3 +237,7 @@ TEST_CASE("gcm_texture_cache") {
     compareLastFrame("./binaries/gcm_texture_cache/ps3frame2.png", 2);
 }
 
+TEST_CASE("ppu_codec_jdec") {
+    runAndWait("./binaries/ppu_codec_jdec/a.elf");
+    compareLastFrame("./binaries/ppu_codec_jdec/ps3frame0.png", 0);
+}
