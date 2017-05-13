@@ -66,6 +66,7 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint16_t base,
                            uint8_t bank);
 uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue);
+uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue);
 int32_t cellGcmBindTile(uint8_t index);
 int32_t cellGcmUnbindTile(uint8_t index);
 int32_t cellGcmBindZcull(uint8_t index,

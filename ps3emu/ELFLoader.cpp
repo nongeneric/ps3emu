@@ -207,7 +207,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                                         segment.description,
                                         segment.blocks->size());
                 for (auto i = 0u; i < segment.blocks->size(); ++i) {
-                    auto instr = asm_bb_call(index, i);
+                    auto instr = asm_bb_call(
+                        segment.spuEntryPoint ? SPU_BB_CALL_OPCODE : BB_CALL_OPCODE, index, i);
                     auto va = (*segment.blocks)[i].va;
                     bbBytes[va] = g_state.mm->load32(va);
                     g_state.mm->store32(va, instr);

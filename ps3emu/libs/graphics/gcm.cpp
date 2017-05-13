@@ -9,6 +9,7 @@
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
+#include "ps3emu/ppu/CallbackThread.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <algorithm>
@@ -201,7 +202,12 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     g_state.rsx->setPut(emuGcmState.defaultContext->current - ioAddress);
     auto rsxPrimaryDmaLabel = 3;
     g_state.rsx->setLabel(rsxPrimaryDmaLabel, 1, false);
-    return CELL_OK;  
+    
+    auto callbackThread = new CallbackThread();
+    g_state.rsx->setCallbackThread(callbackThread);
+    callbackThread->ps3callInit("gcm_intr");
+    
+    return g_state.th->getGPR(3);  
 }
 
 uint32_t cellGcmGetTileInfo() {
@@ -289,10 +295,13 @@ int32_t cellGcmSetTileInfo(uint8_t index,
 }
 
 uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
-    assert(false);
     INFO(libs) << __FUNCTION__;
     setFlipCommand(0, labelindex, labelvalue, id);
     return CELL_OK;
+}
+
+uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
+    return _cellGcmSetFlipWithWaitLabel(id, labelindex, labelvalue);
 }
 
 int32_t cellGcmBindTile(uint8_t index) {
@@ -489,7 +498,7 @@ uint32_t cellGcmGetZcullInfo() {
 }
 
 int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
-    INFO(libs) << "NOT IMPLEMENTED: cellGcmInitDefaultFifoMode";
+    //assert(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
     return CELL_OK;
 }
 

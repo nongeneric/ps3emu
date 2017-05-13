@@ -584,7 +584,8 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
 void Rsx::invokeHandler(uint32_t descrEa) {
     fdescr descr;
     g_state.mm->readMemory(descrEa, &descr, sizeof(descr));
-    auto future = g_state.proc->getCallbackThread()->schedule({1}, descr.tocBase, descr.va);
+    assert(_callbackThread);
+    auto future = _callbackThread->schedule({1}, descr.tocBase, descr.va);
     future.get();
 }
 
@@ -2323,4 +2324,12 @@ uint32_t getReportDataAddressLocation(uint32_t index, MemoryLocation location) {
 void Rsx::captureFrames() {
     _frameCapturePending = true;
     _shortTrace = true;
+}
+
+void Rsx::setCallbackThread(CallbackThread* thread) {
+    _callbackThread.reset(thread);
+}
+
+void Rsx::terminateCallbackThread() {
+    _callbackThread->terminate();
 }

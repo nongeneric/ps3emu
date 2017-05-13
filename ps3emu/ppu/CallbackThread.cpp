@@ -1,7 +1,6 @@
 #include "CallbackThread.h"
 
 #include "../Process.h"
-#include "../ELFLoader.h"
 #include "../MainMemory.h"
 #include "../InternalMemoryManager.h"
 #include "../state.h"
@@ -11,7 +10,9 @@
 
 using namespace boost::endian;
 
-struct ThreadBody {
+struct CallbackThreadInitInfo {
+    big_uint64_t threadId;
+    char name[16];
     fdescr descr;
     big_uint32_t ncall;
     big_uint32_t bl;
@@ -22,21 +23,23 @@ std::future<void> CallbackThread::schedule(std::vector<uint64_t> args,
                                            uint32_t toc,
                                            uint32_t ea) {
     CallbackInfo info{false, args, toc, ea, std::make_shared<std::promise<void>>()};
-    auto promise = info.promise->get_future();
+    auto future = info.promise->get_future();
+    if (_terminated) {
+        info.promise->set_value();
+        return future;
+    }
     _queue.enqueue(std::move(info));
-    return promise;
+    return future;
 }
 
-CallbackThread::CallbackThread(Process* proc) : _queue(1) {
+CallbackThread::CallbackThread() : _queue(1) {
     _lastCallback.terminate = true;
     
     uint32_t index;
     findNCallEntry(calcFnid("callbackThreadQueueWait"), index);
     
-    uint32_t bodyEa;
-    auto body = g_state.memalloc->internalAlloc<2, ThreadBody>(&bodyEa);
-
-    body->ncall = (1 << 26) | index;
+    _initInfo = g_state.memalloc->internalAlloc<4, CallbackThreadInitInfo>(&_initInfoVa);
+    _initInfo->ncall = (1 << 26) | index;
     
     IForm bl {0};
     bl.OPCD.set(18);
@@ -44,12 +47,10 @@ CallbackThread::CallbackThread(Process* proc) : _queue(1) {
     bl.AA.set(0);
     bl.LK.set(1);
     
-    body->bl = bl.u32;
-    body->descr.va = bodyEa + offsetof(ThreadBody, bl);
-    body->descr.tocBase = 0;
-    body->thread = (uint64_t)this;
-    
-    _id = proc->createThread(0x1000, bodyEa, 0, "callback", 0);
+    _initInfo->bl = bl.u32;
+    _initInfo->descr.va = _initInfoVa + offsetof(CallbackThreadInitInfo, bl);
+    _initInfo->descr.tocBase = 0;
+    _initInfo->thread = (uint64_t)this;
 }
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
@@ -83,9 +84,30 @@ uint64_t callbackThreadQueueWait(PPUThread* ppuThread) {
 }
 
 void CallbackThread::terminate() {
+    _terminated = true;
     _queue.enqueue({true, {}, 0, 0, nullptr});
 }
 
 uint64_t CallbackThread::id() {
-    return _id;
+    return _initInfo->threadId;
+}
+
+void CallbackThread::ps3callInit(std::string_view name) {
+    strncpy(_initInfo->name, begin(name), sizeof(CallbackThreadInitInfo::name) - 1);
+    auto& segments = g_state.proc->getSegments();
+    assert(segments.size() > 2);
+    auto& lv2segment = segments[2];
+    auto func = g_state.proc->findExport(g_state.mm, lv2segment.elf.get(), calcFnid("sys_ppu_thread_create"));
+    assert(func);
+    g_state.th->setGPR(2, func->tocBase);
+    g_state.th->setGPR(3, _initInfoVa + offsetof(CallbackThreadInitInfo, threadId));
+    g_state.th->setGPR(4, _initInfoVa + offsetof(CallbackThreadInitInfo, descr));
+    g_state.th->setGPR(5, 0); // arg
+    g_state.th->setGPR(6, 1000); // priority
+    g_state.th->setGPR(7, 0x1000); // stack size
+    g_state.th->setGPR(8, 0); // flags
+    g_state.th->setGPR(9, _initInfoVa + offsetof(CallbackThreadInitInfo, name));
+    g_state.th->ps3call(func->va, [=]{
+        g_state.th->setGPR(3, CELL_OK);
+    });
 }

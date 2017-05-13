@@ -50,7 +50,7 @@ void PPUThread::vmenter(uint32_t to) {
         auto cia = getNIP();
         auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
         uint32_t segment, label;
-        if (dasm_bb_call(instr, segment, label)) {
+        if (dasm_bb_call(BB_CALL_OPCODE, instr, segment, label)) {
             g_state.proc->bbcall(segment, label);
         } else {
 #ifdef EXECMAP_ENABLED
@@ -81,7 +81,7 @@ void PPUThread::innerLoop() {
             cia = getNIP();
             auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
             uint32_t segment, label;
-            if (dasm_bb_call(instr, segment, label)) {
+            if (dasm_bb_call(BB_CALL_OPCODE, instr, segment, label)) {
                 g_state.proc->bbcall(segment, label);
             } else {
 #ifdef EXECMAP_ENABLED

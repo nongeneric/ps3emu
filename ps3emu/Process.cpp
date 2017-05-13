@@ -5,7 +5,6 @@
 #include "ContentManager.h"
 #include "InternalMemoryManager.h"
 #include "ELFLoader.h"
-#include "ppu/CallbackThread.h"
 #include "state.h"
 #include "Config.h"
 #include "ps3emu/libs/sync/queue.h"
@@ -32,13 +31,11 @@ Rsx* Process::rsx() {
     return _rsx.get();
 }
 
-boost::optional<fdescr> findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva = nullptr) {
+boost::optional<fdescr> Process::findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva) {
     prx_export_t* exports;
     int count;
     std::tie(exports, count) = prx->exports(mm);
     for (auto i = 0; i < count; ++i) {
-        if (exports[i].name)
-            continue;
         auto fnids = (big_uint32_t*)mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
         auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
         for (auto j = 0; j < exports[i].functions; ++j) {
@@ -75,7 +72,7 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name) {
         }
     }
     ps3_uintptr_t fdescrva;
-    if (findExport(g_state.mm, segment->elf.get(), calcEid(name), &fdescrva))
+    if (g_state.proc->findExport(g_state.mm, segment->elf.get(), calcEid(name), &fdescrva))
         return fdescrva;
     return 0;
 }
@@ -96,7 +93,7 @@ int32_t executeExportedFunction(uint32_t imageBase,
             return CELL_OK;
         }
     }
-    auto func = findExport(g_state.mm, segment->elf.get(), calcEid(name));
+    auto func = g_state.proc->findExport(g_state.mm, segment->elf.get(), calcEid(name));
     if (!func) {
         INFO(libs) << ssnprintf("module %08x has no %s function", imageBase, name);
         return CELL_OK;
@@ -134,7 +131,7 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
         auto& s = segments[i];
         if (s.index != 0)
             continue;
-        thread->setGPR(11, g_state.elf->entryPoint());
+        thread->setGPR(11, g_state.elf->entryPoint()); // module_start of lv2 branches to this fdescr
         executeExportedFunction(s.va, 0, 0, modresVa, thread, "module_start");
     }
     return thread->getGPR(3);
@@ -269,7 +266,7 @@ Event Process::run() {
         {
             boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
             boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);   
-            if (_spuThreads.empty() && _processFinished && _callbackThreadFinished) {
+            if (_spuThreads.empty() && _processFinished) {
                 // there might be a dangling spu_printf thread or similar
                 bool dangling = false;
                 for (auto& t : _threads) {
@@ -300,7 +297,6 @@ Event Process::run() {
         threadEvent.promise->signal();
         
         if (_firstRun) {
-            _callbackThread.reset(new CallbackThread(this));
             _firstRun = false;
         }
 
@@ -308,6 +304,7 @@ Event Process::run() {
             switch (ev->event) {
                 case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
                 case PPUThreadEvent::ProcessFinished: {
+                    _rsx->terminateCallbackThread();
                     dbgPause(false);
                     {
                         boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
@@ -329,7 +326,6 @@ Event Process::run() {
                         boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
                     }
                     _rsx->shutdown();
-                    _callbackThread->terminate();
                     _processFinished = true;
                     break;
                 }
@@ -341,11 +337,6 @@ Event Process::run() {
                 case PPUThreadEvent::MemoryAccessError:
                     return MemoryAccessErrorEvent{ev->thread};
                 case PPUThreadEvent::Finished: {
-                    boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
-                    if (ev->thread->getId() == _callbackThread->id()) {
-                        removeThread(ev->thread);
-                        _callbackThreadFinished = true;
-                    }
                     return PPUThreadFinishedEvent{nullptr};
                 }
                 case PPUThreadEvent::Failure: return PPUThreadFailureEvent{ev->thread};
@@ -543,10 +534,6 @@ std::vector<SPUThread*> Process::dbgSPUThreads() {
     for (auto& th : _spuThreads)
         vec.push_back(th.get());
     return vec;
-}
-
-CallbackThread* Process::getCallbackThread() {
-    return _callbackThread.get();
 }
 
 Process::~Process() = default;

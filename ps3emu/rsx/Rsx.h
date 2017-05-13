@@ -162,6 +162,7 @@ class GLBuffer;
 class FragmentShader;
 struct RsxTextureInfo;
 class GLPersistentCpuBuffer;
+class CallbackThread;
 class Rsx {
     static RsxOperationMode _mode;
     uint32_t _get = 0;
@@ -190,6 +191,7 @@ class Rsx {
     bool _shortTrace = false;
     RsxTextureReader* _textureReader;
     std::map<uint32_t, PerfMapEntry> _perfMap;
+    std::unique_ptr<CallbackThread> _callbackThread;
     
     void watchTextureCache();
     void watchShaderCache();
@@ -468,6 +470,8 @@ public:
                           uint32_t width,
                           uint32_t height);
     void init();
+    void setCallbackThread(CallbackThread* thread);
+    void terminateCallbackThread();
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
     void setVBlankHandler(uint32_t descrEa);
     void setFlipHandler(uint32_t descrEa);

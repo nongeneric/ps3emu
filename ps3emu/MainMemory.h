@@ -226,7 +226,7 @@ public:
 
 uint32_t calcFnid(const char* name);
 uint32_t calcEid(const char* name);
-void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index);
+uint32_t encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index);
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound = false);
 uint32_t addNCallEntry(NCallEntry entry);
 void readString(MainMemory* mm, uint32_t va, std::string& str);

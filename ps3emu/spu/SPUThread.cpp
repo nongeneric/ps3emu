@@ -101,7 +101,7 @@ void SPUThread::loop() {
 
             auto instr = *(big_uint32_t*)ptr(cia);
             uint32_t segment, label;
-            if (dasm_bb_call(instr, segment, label)) {
+            if (dasm_bb_call(SPU_BB_CALL_OPCODE, instr, segment, label)) {
                 g_state.proc->bbcallSpu(segment, label, cia);
             } else {
 #ifdef EXECMAP_ENABLED

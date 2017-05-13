@@ -1,6 +1,7 @@
 #include "MainMemory.h"
 
 #include "libs/spu/sysSpu.h"
+#include "ps3emu/ppu/ppu_dasm.h"
 #include "state.h"
 #include "rsx/Rsx.h"
 #include "log.h"
@@ -251,9 +252,12 @@ void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
     }
 }
 
-void encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
+uint32_t encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
     uint32_t ncall = (1 << 26) | index;
-    mm->store32(va, ncall);
+    if (va) {
+        mm->store32(va, ncall);
+    }
+    return ncall;
 }
 
 MainMemory::MainMemory() {

@@ -3239,7 +3239,7 @@ void SPUDasm(void* instr, uint32_t cia, S* state) {
         case 0b0001001: INVOKE(hbrr);
     }
     switch (i->OP6.u()) {
-        case BB_CALL_OPCODE: INVOKE(bbcall);
+        case SPU_BB_CALL_OPCODE: INVOKE(bbcall);
     }
     switch (i->OP4.u()) {
         case 0b1100: INVOKE(mpya);

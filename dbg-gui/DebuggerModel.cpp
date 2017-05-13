@@ -191,6 +191,8 @@ public:
                 case 6: return "SO";
                 case 17: return "NIP";
                 case 19: return "MEM";
+                case 21: return "EMUR0";
+                case 22: return "EMUR1";
                 default: return "";
             }
         }
@@ -229,6 +231,8 @@ public:
                     }
                     return QString("%1%2 (%3)").arg(usage).arg(measure).arg(pages);
                 }
+                case 21: return print(_thread->getEMUREG(0));
+                case 22: return print(_thread->getEMUREG(1));
                 default: return "";
             }
         }

@@ -139,6 +139,7 @@ struct InstructionInfo {
 };
 
 #define BB_CALL_OPCODE 0b111101
+#define SPU_BB_CALL_OPCODE 0b100100
 
 union BBCallForm {
     uint32_t val;
@@ -147,19 +148,19 @@ union BBCallForm {
     BitField<14, 32> Label;
 };
 
-inline uint32_t asm_bb_call(uint32_t segment, uint32_t label) {
+inline uint32_t asm_bb_call(unsigned opcode, uint32_t segment, uint32_t label) {
     assert((1u << decltype(BBCallForm::Segment)::W) > segment);
     assert((1u << decltype(BBCallForm::Label)::W) > label);
     BBCallForm instr { 0 };
-    instr.OPCD.set(BB_CALL_OPCODE);
+    instr.OPCD.set(opcode);
     instr.Segment.set(segment);
     instr.Label.set(label);
     return instr.val;
 }
 
-inline bool dasm_bb_call(uint32_t instr, uint32_t& segment, uint32_t& label) {
+inline bool dasm_bb_call(unsigned opcode, uint32_t instr, uint32_t& segment, uint32_t& label) {
     BBCallForm form { instr };
-    if (form.OPCD.u() == BB_CALL_OPCODE) {
+    if (form.OPCD.u() == opcode) {
         segment = form.Segment.u();
         label = form.Label.u();
         return true;

@@ -114,7 +114,6 @@ class Rsx;
 class MainMemory;
 class ContentManager;
 class InternalMemoryManager;
-class CallbackThread;
 class HeapMemoryAlloc;
 
 struct ModuleSegment {
@@ -136,7 +135,6 @@ class Process {
     std::unique_ptr<InternalMemoryManager> _internalMemoryManager;
     std::unique_ptr<HeapMemoryAlloc> _heapMemoryManager;
     std::unique_ptr<InternalMemoryManager> _stackBlocks;
-    std::unique_ptr<CallbackThread> _callbackThread;
     std::vector<std::unique_ptr<PPUThread>> _threads;
     boost::recursive_mutex _ppuThreadMutex;
     std::vector<std::shared_ptr<SPUThread>> _spuThreads;
@@ -149,7 +147,6 @@ class Process {
     std::vector<std::shared_ptr<ELFLoader>> _prxs;
     std::vector<StolenFuncInfo> _stolenInfos;
     bool _processFinished = false;
-    bool _callbackThreadFinished = false;
     RewriterStore _rewriterStore;
     void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
     void initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
@@ -187,7 +184,6 @@ public:
     uint32_t createSpuThread(std::string name);
     std::shared_ptr<SPUThread> getSpuThread(uint32_t id);
     std::shared_ptr<SPUThread> getSpuThreadBySpuNum(uint32_t spuNum);
-    CallbackThread* getCallbackThread();
     std::vector<PPUThread*> dbgPPUThreads();
     std::vector<SPUThread*> dbgSPUThreads();
     uint64_t getFrequency();
@@ -198,6 +194,10 @@ public:
     void unloadSegment(uint32_t va);
     std::vector<std::shared_ptr<ELFLoader>> loadedModules();
     StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
+    boost::optional<fdescr> findExport(MainMemory* mm,
+                                       ELFLoader* prx,
+                                       uint32_t eid,
+                                       ps3_uintptr_t* fdescrva = nullptr);
     void dbgPause(bool pause);
     
     inline void bbcall(unsigned index, unsigned label) {

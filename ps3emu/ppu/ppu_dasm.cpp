@@ -3157,10 +3157,10 @@ PRINT(STVXL, SIMDForm) {
     *result = format_nnn("stvxl", i->vS, i->rA, i->rB);
 }
 
-#define _STVXL(_) { \
-    emulateSTVX(i, cia, thread); \
+#define _STVXL(_ra, _rb, _vs) { \
+    _STVX(_ra, _rb, _vs); \
 }
-EMU_REWRITE(STVXL, SIMDForm, 0)
+EMU_REWRITE(STVXL, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 
 
 PRINT(LVX, SIMDForm) {
@@ -3182,10 +3182,10 @@ PRINT(LVXL, SIMDForm) {
     *result = format_nnn("lvxl", i->vD, i->rA, i->rB);
 }
 
-#define _LVXL(_) { \
-    emulateLVX(i, cia, thread); \
+#define _LVXL(_ra, _rb, _vs) { \
+    _LVX(_ra, _rb, _vs); \
 }
-EMU_REWRITE(LVXL, SIMDForm, 0)
+EMU_REWRITE(LVXL, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
 
 
 PRINT(LVLX, SIMDForm) {
@@ -3231,9 +3231,9 @@ PRINT(VSLDOI, SIMDForm) {
     auto a = TH->r(_va).xmm(); \
     auto b = TH->r(_vb).xmm(); \
     a = _mm_bslli_si128(a, _shb); \
-    a = _mm_bsrli_si128(a, 16 - _shb); \
+    b = _mm_bsrli_si128(b, 16 - _shb); \
     auto d = _mm_or_si128(a, b); \
-    TH->r(_vd).set_xmm(t); \
+    TH->r(_vd).set_xmm(d); \
 }
 #else
 #define _VSLDOI(_shb, _va, _vb, _vd) { \
