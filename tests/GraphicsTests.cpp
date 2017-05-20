@@ -4,7 +4,8 @@
 #include "TestUtils.h"
 #include "ps3emu/utils.h"
 
-static const char* runnerPath = "../ps3run/ps3run";
+static auto runnerPath = "../ps3run/ps3run";
+static auto gcmvizPath = "../gcmviz/gcmviz";
 
 int comparisonNum = 0;
 int lastProcId = 0;
@@ -39,9 +40,20 @@ void compareLastFrame(const char* expected, int n = 0, int tolerance = 5, int sa
     CHECK( output <= safePixels );
 }
 
-void runAndWait(QString path) {
+void runAndWait(QString path, bool gcmviz = false, bool nocapture = false) {
     QProcess proc;
-    proc.start(runnerPath, QStringList() << "--elf" << path);
+    QStringList args;
+    if (gcmviz) {
+        args << "--trace"
+             << QString::fromStdString(ssnprintf("/tmp/ps3emu_%d.trace", lastProcId))
+             << "--replay";
+    } else {
+        args << "--elf" << path;
+        if (!nocapture) {
+            args << "--capture-rsx";
+        }
+    }   
+    proc.start(gcmviz ? gcmvizPath : runnerPath, args);
     lastProcId = proc.processId();
     proc.waitForFinished(-1);
     if (proc.exitCode() != 0) {
@@ -53,15 +65,21 @@ void runAndWait(QString path) {
 TEST_CASE("gcm_hello") {
     runAndWait("./binaries/gcm_hello/a.elf");
     compareLastFrame("./binaries/gcm_hello/ps3frame.png");
+    runAndWait("", true);
+    compareLastFrame("./binaries/gcm_hello/ps3frame.png");
 }
 
 TEST_CASE("gcm_simple_fshader") {
     runAndWait("./binaries/gcm_simple_fshader/a.elf");
     compareLastFrame("./binaries/gcm_simple_fshader/ps3frame.png");
+    runAndWait("", true);
+    compareLastFrame("./binaries/gcm_simple_fshader/ps3frame.png");
 }
 
 TEST_CASE("gcm_simple_shaders") {
     runAndWait("./binaries/gcm_simple_shaders/a.elf");
+    compareLastFrame("./binaries/gcm_simple_shaders/ps3frame.png");
+    runAndWait("", true);
     compareLastFrame("./binaries/gcm_simple_shaders/ps3frame.png");
 }
 
@@ -82,6 +100,8 @@ TEST_CASE("gcm_vertex_texture") {
 
 TEST_CASE("gcm_cube") {
     runAndWait("./binaries/gcm_cube/a.elf");
+    compareLastFrame("./binaries/gcm_cube/ps3frame.png");
+    runAndWait("", true);
     compareLastFrame("./binaries/gcm_cube/ps3frame.png");
 }
 
@@ -104,6 +124,15 @@ TEST_CASE("gcm_vertex_shader_branch") {
 
 TEST_CASE("gcm_fragment_texture") {
     runAndWait("./binaries/gcm_fragment_texture/a.elf");
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame2.png", 2);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame3.png", 3);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame4.png", 4);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame5.png", 5);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame6.png", 6);
+    compareLastFrame("./binaries/gcm_fragment_texture/ps3frame7.png", 7);
+    runAndWait("", true);
     compareLastFrame("./binaries/gcm_fragment_texture/ps3frame0.png", 0);
     compareLastFrame("./binaries/gcm_fragment_texture/ps3frame1.png", 1);
     compareLastFrame("./binaries/gcm_fragment_texture/ps3frame2.png", 2);
@@ -199,10 +228,12 @@ TEST_CASE("opengl_8_irradiance_map", TAG_SERIAL) {
 TEST_CASE("pngdec_ppu_graphics", TAG_SERIAL) {
     runAndWait("./binaries/pngdec_ppu/a.elf");
     compareLastFrame("./binaries/pngdec_ppu/ps3frame0.png", 0);
+    runAndWait("", true);
+    compareLastFrame("./binaries/pngdec_ppu/ps3frame0.png", 0);
 }
 
 TEST_CASE("gcm_strip_branch", TAG_SERIAL) {
-    runAndWait("./binaries/gcm_strip_branch/a.elf");
+    runAndWait("./binaries/gcm_strip_branch/a.elf", false, true);
     for (int i = 0; i <= 18; ++i) {
         compareLastFrame(
             ssnprintf("./binaries/gcm_strip_branch/ps3frame%d.png", i).c_str(),
@@ -235,9 +266,13 @@ TEST_CASE("gcm_texture_cache") {
     compareLastFrame("./binaries/gcm_texture_cache/ps3frame0.png", 0);
     compareLastFrame("./binaries/gcm_texture_cache/ps3frame1.png", 1);
     compareLastFrame("./binaries/gcm_texture_cache/ps3frame2.png", 2);
+    runAndWait("", true);
+    compareLastFrame("./binaries/gcm_texture_cache/ps3frame0.png", 0);
+    compareLastFrame("./binaries/gcm_texture_cache/ps3frame1.png", 1);
+    compareLastFrame("./binaries/gcm_texture_cache/ps3frame2.png", 2);
 }
 
 TEST_CASE("ppu_codec_jdec") {
-    runAndWait("./binaries/ppu_codec_jdec/a.elf");
+    runAndWait("./binaries/ppu_codec_jdec/a.elf", false, true);
     compareLastFrame("./binaries/ppu_codec_jdec/ps3frame0.png", 0);
 }

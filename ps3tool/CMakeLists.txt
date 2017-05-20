@@ -13,6 +13,7 @@ set(SRC
     rsx_dasm.cpp
     find_spu_elfs.cpp
     dump_instrdb.cpp
+    print-gcmviz-parse.cpp
 )
 add_executable(ps3tool ${SRC})
 target_link_libraries(ps3tool ps3emu ps3tool-core ${Boost_LIBRARIES} z)

@@ -458,6 +458,7 @@ GLuint primitiveTypeToFeedbackPrimitiveType(GLuint type) {
         case GL_TRIANGLE_STRIP:
         case GL_TRIANGLE_FAN:
         case GL_QUADS:
+        case GL_QUAD_STRIP:
             return GL_TRIANGLES;
         case GL_LINES:
         case GL_LINE_LOOP:
@@ -645,7 +646,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
 #if TESTS
     static int framenum = 0;
     auto id = getpid();
-    if (framenum < 22 && _mode != RsxOperationMode::Replay && tex) {
+    if (framenum < 22 && tex) {
         auto filename = ssnprintf("/tmp/ps3frame_%d_%d.png", id, framenum);
         dumpOpenGLTexture(tex->handle(), false, 0, filename, true, true);
         framenum++;
@@ -999,7 +1000,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
 //             t->update(buf);
             INFO(rsx, cache) << ssnprintf("updating texture %x, %x", va, size);
             auto buffer = this->getBuffer(info.location);
-            _textureReader->loadTexture(info, buffer->handle(), t->handle(), t->levelHandles());
+            _textureReader->loadTexture(info, buffer->handle(), t->levelHandles());
             this->_context->uTextureUpdateDuration +=
                 duration_cast<microseconds>(steady_clock::now() - past).count();
         }
@@ -2293,6 +2294,7 @@ void Rsx::UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t s
 }
 
 RsxContext* Rsx::context() {
+    assert(_context);
     return _context.get();
 }
 

@@ -30,6 +30,7 @@ public:
     void loadTrace(std::string path);
     void update();
     void runTo(unsigned lastCommand, unsigned frame);
+    void replay();
 public slots:
     void onRun();
     void onVisualizeFeedback();

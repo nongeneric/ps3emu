@@ -12,11 +12,13 @@ using namespace boost::program_options;
 int main(int argc, char *argv[]) {
     log_init(log_console, log_info, log_rsx | log_libs | log_debugger, log_trace, log_simple);    
     std::string tracePath;
+    bool replay;
     options_description consoleDescr("Allowed options");
     try {
         consoleDescr.add_options()
             ("help", "produce help message")
             ("trace", value<std::string>(&tracePath), "trace file")
+            ("replay", bool_switch()->default_value(false), "replay trace file and exit")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);
@@ -25,6 +27,7 @@ int main(int argc, char *argv[]) {
             return 0;
         }
         notify(console_vm);
+        replay = console_vm["replay"].as<bool>();
     } catch(std::exception& e) {
         std::cout << "can't parse program options:\n";
         std::cout << e.what() << "\n\n";
@@ -42,5 +45,9 @@ int main(int argc, char *argv[]) {
         mainWindowModel.loadTrace(tracePath);
     }
     mainWindowModel.window()->show();
+    if (replay) {
+        mainWindowModel.replay();
+        return 0;
+    }
     return app.exec();
 }

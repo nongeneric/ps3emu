@@ -2784,3 +2784,14 @@ TEST_CASE("ppu_simd_generic") {
     );
 }
 
+TEST_CASE("gcm_cube_tls_callback") {
+    // also checks gcmFlush/flipCallback synchronization, testing for a possible deadlock
+    test_interpreter_and_rewriter({"./binaries/gcm_cube_tls_callback/a.elf"},
+        "tls int: 201\n"
+        "tls int: 202\n"
+        "tls int: 203\n"
+        "tls int: 204\n"
+        "tls int: 205\n"
+        "tls int: 206\n"
+    );
+}

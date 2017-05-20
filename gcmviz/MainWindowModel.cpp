@@ -764,6 +764,7 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
     if (!_proc) {
         _proc.reset(new Process());
         _rsx.reset(new Rsx());
+        g_state.rsx = _rsx.get();
         _rsx->init();
         _rsx->resetContext();
         g_state.mm->mark(RsxFbBaseAddr, GcmLocalMemorySize, false, "gcmviz");
@@ -874,4 +875,13 @@ void MainWindowModel::updateContextTable() {
         _window.contextTable->setModel(typed->getTable(_rsx->context()));
         _window.contextTable->resizeColumnsToContents();
     }
+}
+
+void MainWindowModel::replay() {
+    for (auto i = 0; i < _db.frames(); ++i) {
+        onRun();
+    }
+    GcmCommand command;
+    command.id = (unsigned)CommandId::StopReplay;
+    _rsx->sendCommand({command, false});
 }

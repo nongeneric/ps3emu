@@ -164,7 +164,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
     }
     if (header.val == 0x20000) {
         INFO(rsx) << ssnprintf("rsx ret to %x", _ret);
-        if (!_get) {
+        if (!get) {
             INFO(rsx) << "rsx ret to 0, command buffer corruption is likely";
         }
         auto offset = _ret - get;
@@ -1615,25 +1615,25 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
 }
 
 void Rsx::setPut(uint32_t put) {
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    boost::unique_lock<SpinLock> lock(_mutex);
     INFO(rsx) << ssnprintf("setting put = %x", put);
     _put = put;
     _cv.notify_all();
 }
 
 void Rsx::setGet(uint32_t get) {
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    boost::unique_lock<SpinLock> lock(_mutex);
     _get = get;
     _cv.notify_all();
 }
 
 uint32_t Rsx::getRef() {
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    boost::unique_lock<SpinLock> lock(_mutex);
     return _ref;
 }
 
 void Rsx::setRef(uint32_t ref) {
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    boost::unique_lock<SpinLock> lock(_mutex);
     _ref = ref;
     _cv.notify_all();
 }
@@ -1654,15 +1654,20 @@ void Rsx::loop() {
 }
 
 void Rsx::runLoop() {
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    boost::unique_lock<SpinLock> lock(_mutex);
     auto read = [&](uint32_t get) {
         return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get));
     };
     for (;;) {
         while (_get != _put || _ret) {
-            _get += interpret(_get, read);
+            auto localGet = _get;
+            lock.unlock();
+            auto len = interpret(localGet, read);
+            lock.lock();
+            _get += len;
         }
         if (_shutdown && _get == _put) {
+            lock.unlock();
             waitForIdle();
             return;
         }
@@ -1708,7 +1713,7 @@ void Rsx::shutdown() {
     if (!_shutdown) {
         INFO(rsx) << "waiting for shutdown";
         {
-            boost::unique_lock<boost::mutex> lock(_mutex);
+            boost::unique_lock<SpinLock> lock(_mutex);
             _shutdown = true;
             _cv.notify_all();
         }

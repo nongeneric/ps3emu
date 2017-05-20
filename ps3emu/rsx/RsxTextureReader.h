@@ -16,6 +16,5 @@ public:
     void init();
     void loadTexture(RsxTextureInfo const& info,
                      GLuint buffer,
-                     GLuint texture,
                      std::vector<uint64_t> const& levelHandles);
 };

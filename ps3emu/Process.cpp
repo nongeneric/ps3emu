@@ -27,10 +27,6 @@ ELFLoader* Process::elfLoader() {
     return _elf.get();
 }
 
-Rsx* Process::rsx() {
-    return _rsx.get();
-}
-
 boost::optional<fdescr> Process::findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva) {
     prx_export_t* exports;
     int count;
@@ -318,7 +314,6 @@ Event Process::run() {
                     _spuThreads.clear();
                     {
                         boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
-                        assert(ev->thread == _threads[0].get());
                         removeThread(ev->thread);
                     }
                     if (_threads.size() > 1) {

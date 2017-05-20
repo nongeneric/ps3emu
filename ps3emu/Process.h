@@ -163,7 +163,6 @@ class Process {
 public:
     Process();
     ~Process();
-    Rsx* rsx();
     ELFLoader* elfLoader();
     void init(std::string elfPath, std::vector<std::string> args);
     uint32_t loadPrx(std::string path);

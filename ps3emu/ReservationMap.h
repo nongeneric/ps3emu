@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ps3emu/utils/SpinLock.h"
+
 #include <stdint.h>
 #include <memory>
 #include <atomic>
@@ -7,19 +9,6 @@
 #include <assert.h>
 #include <vector>
 #include <string>
-
-class SpinLock {
-    std::atomic_flag _flag = ATOMIC_FLAG_INIT;
-
-public:
-    inline void lock() {
-        while (_flag.test_and_set(std::memory_order_acquire)) ;
-    }
-    
-    inline void unlock() {
-        _flag.clear(std::memory_order_release);
-    }
-};
 
 struct ReservationGranule;
 

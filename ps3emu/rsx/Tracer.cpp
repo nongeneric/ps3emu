@@ -8,8 +8,9 @@
 void Tracer::enable(bool enabled) {
     _enabled = enabled;
     if (_enabled) {
-        system("rm -rf /tmp/ps3emu.trace");
-        _db.createOrOpen("/tmp/ps3emu.trace");
+        auto path = ssnprintf("/tmp/ps3emu_%d.trace", getpid());
+        system(("rm -rf " + path).c_str());
+        _db.createOrOpen(path);
     }
 }
 

@@ -87,10 +87,7 @@ add_subdirectory(ps3emu)
 add_subdirectory(ps3tool-core)
 add_subdirectory(ps3run)
 add_subdirectory(ps3tool)
-
-if(${EMU_CONFIGURATION_DEBUG})
-    add_subdirectory(gcmviz)
-endif()
+add_subdirectory(gcmviz)
 
 if(${EMU_CONFIGURATION_PAUSE})
     add_subdirectory(dbg-gui)

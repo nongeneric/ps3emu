@@ -1,4 +1,5 @@
 #include "ps3emu/Process.h"
+#include "ps3emu/rsx/Rsx.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
@@ -35,6 +36,7 @@ void sigint_handler(int sig) {
 
 int main(int argc, char* argv[]) {
     std::string elfPath, elfArgs, verbosity, filter, sinks, format, area;
+    bool captureRsx;
     options_description consoleDescr("Allowed options");
     try {
         consoleDescr.add_options()
@@ -53,6 +55,7 @@ int main(int argc, char* argv[]) {
                 "logging area: trace, perf")
             ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),
                 "rewritten and compiled x86 so file")
+            ("capture-rsx", bool_switch()->default_value(false), "capture rsx")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);
@@ -61,6 +64,8 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         notify(console_vm);
+        captureRsx = console_vm["capture-rsx"].as<bool>();
+        
     } catch(std::exception& e) {
         std::cout << "can't parse program options:\n";
         std::cout << e.what() << "\n\n";
@@ -76,6 +81,10 @@ int main(int argc, char* argv[]) {
 
     signal(SIGSEGV, sigsegv_handler);
     signal(SIGINT, sigint_handler);
+    
+    if (captureRsx) {
+        Rsx::setOperationMode(RsxOperationMode::RunCapture);
+    }
     
     try {
         std::vector<std::string> argvec;

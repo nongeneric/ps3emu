@@ -640,7 +640,6 @@ unsigned getTexelSize(GcmTextureFormat format) {
 
 void RsxTextureReader::loadTexture(RsxTextureInfo const& info,
                                    GLuint buffer,
-                                   GLuint texture,
                                    std::vector<uint64_t> const& levelHandles) {
     auto uniform = (TextureInfoUniform*)_uniformBuffer.mapped();
     uniform->format = (uint32_t)info.format;

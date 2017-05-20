@@ -24,7 +24,8 @@ typedef boost::variant<NoneCommand,
                        PrxStoreCommand,
                        RsxDasmCommand,
                        FindSpuElfsCommand,
-                       DumpInstrDbCommand>
+                       DumpInstrDbCommand,
+                       PrintGcmVizTraceCommand>
     Command;
 
 template <typename C>
@@ -185,6 +186,20 @@ struct FindSpuElfsParser : CommandParser<FindSpuElfsCommand> {
     
     void parse(variables_map& vm) override { }
 };
+
+struct PrintGcmVizTraceParser : CommandParser<PrintGcmVizTraceCommand> {
+    PrintGcmVizTraceParser() : CommandParser<PrintGcmVizTraceCommand>("print-gcmviz-trace") {}
+    
+    void init() override {
+        desc.add_options()
+            ("trace", value<std::string>(&command.trace)->required(), "trace file")
+            ("frame", value<int>(&command.frame)->default_value(-1), "frame")
+            ("command", value<int>(&command.command)->default_value(-1), "command")
+            ;
+    }
+    
+    void parse(variables_map& vm) override { }
+};
     
 Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
@@ -218,7 +233,8 @@ Command ParseOptions(int argc, const char *argv[]) {
         PrxStoreParser(),
         RsxDasmParser(),
         FindSpuElfsParser(),
-        DumpInstrDbParser()
+        DumpInstrDbParser(),
+        PrintGcmVizTraceParser()
     );
     
     if (commandName == "") {
@@ -289,6 +305,10 @@ public:
     
     void operator()(DumpInstrDbCommand& command) const {
         HandleDumpInstrDb(command);
+    }
+    
+    void operator()(PrintGcmVizTraceCommand& command) const {
+        HandlePrintGcmVizTrace(command);
     }
 };
 

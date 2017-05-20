@@ -76,8 +76,7 @@ struct OffsetTable {
     uint32_t eaToOffset(uint32_t ea) {
         boost::lock_guard<boost::mutex> lock(_m);
         auto ioIdx = ioAddress[ea >> 20];
-        if (ioIdx == 0xffff)
-            throw std::exception();
+        assert(ioIdx != 0xffff); (void)ioIdx;
         return ((uint32_t)ioAddress[ea >> 20] << 20) | ((ea << 12) >> 12);
     }
     
@@ -107,6 +106,8 @@ struct OffsetTable {
     
     void map(uint32_t ea, uint32_t io, uint32_t size) {
         INFO(rsx) << ssnprintf("mapping ea %08x to io %08x of size %08x", ea, io, size);
+        assert((size & (DefaultMainMemoryPageSize - 1)) == 0);
+        assert((ea & (DefaultMainMemoryPageSize - 1)) == 0);
         boost::lock_guard<boost::mutex> lock(_m);
         auto pages = size / DefaultMainMemoryPageSize;
         auto ioIndex = io >> 20;
@@ -222,7 +223,7 @@ int32_t cellGcmSetDisplayBuffer(const uint8_t id,
                                 const uint32_t height,
                                 Process* proc)
 {
-    proc->rsx()->setDisplayBuffer(id, offset, pitch, width, height);
+    g_state.rsx->setDisplayBuffer(id, offset, pitch, width, height);
     return CELL_OK;
 }
 
@@ -235,18 +236,18 @@ ps3_uintptr_t cellGcmGetLabelAddress(uint8_t index) {
 }
 
 uint32_t cellGcmGetFlipStatus(Process* proc) {
-    return proc->rsx()->isFlipInProgress() ?
+    return g_state.rsx->isFlipInProgress() ?
         CELL_GCM_DISPLAY_FLIP_STATUS_WAITING :
         CELL_GCM_DISPLAY_FLIP_STATUS_DONE;
 }
 
 emu_void_t cellGcmSetFlipStatus(Process* proc) {
-    proc->rsx()->setFlipStatus();
+    g_state.rsx->setFlipStatus();
     return emu_void;
 }
 
 emu_void_t cellGcmResetFlipStatus(Process* proc) {
-    proc->rsx()->resetFlipStatus(); 
+    g_state.rsx->resetFlipStatus(); 
     return emu_void;
 }
 
@@ -422,7 +423,7 @@ int32_t cellGcmMapEaIoAddress(uint32_t ea, uint32_t io, uint32_t size, Process* 
         return CELL_GCM_ERROR_FAILURE;
     }
     emuGcmState.offsetTable->map(ea, io, size);
-    g_state.mm->provideMemory(ea, size, (uint8_t*)proc->rsx()->context()->mainMemoryBuffer.mapped() + io);
+    g_state.mm->provideMemory(ea, size, g_state.rsx->context()->mainMemoryBuffer.mapped() + io);
     return CELL_OK;
 }
 
@@ -455,7 +456,7 @@ int32_t cellGcmUnmapIoAddress(uint32_t io) {
 }
 
 emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc) {
-    proc->rsx()->setVBlankHandler(handler);
+    g_state.rsx->setVBlankHandler(handler);
     return emu_void;
 }
 
@@ -503,7 +504,7 @@ int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
 }
 
 uint32_t cellGcmGetLastFlipTime(Process* proc) {
-    return proc->rsx()->getLastFlipTime();
+    return g_state.rsx->getLastFlipTime();
 }
 
 uint64_t cellGcmGetTimeStamp(uint32_t index) {
@@ -598,6 +599,15 @@ void deserializeOffsetTable(std::vector<uint16_t> const& vec) {
     for (auto i = 0u; i < vec[2]; ++i) {
         table->mapPageCount[vec[pos]] = vec[pos + 1];
         pos += 2;
+    }
+    for (auto i = 0u; i < table->mapPageCount.size(); ++i) {
+        if (table->mapPageCount[i]) {
+            auto io = i << 20;
+            auto ea = (uint32_t)table->eaAddress[i] << 20;
+            auto size = table->mapPageCount[i] * DefaultMainMemoryPageSize;
+            auto ptr = g_state.rsx->context()->mainMemoryBuffer.mapped() + io;
+            g_state.mm->provideMemory(ea, size, ptr);
+        }
     }
 }
 

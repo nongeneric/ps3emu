@@ -6,6 +6,7 @@
 #include "ps3emu/libs/ConcurrentQueue.h"
 #include "ps3emu/gcmviz/GcmDatabase.h"
 #include "ps3emu/BitField.h"
+#include "ps3emu/utils/SpinLock.h"
 #include "GLFramebuffer.h"
 #include "RsxTextureReader.h"
 #include "ps3emu/enum.h"
@@ -173,8 +174,8 @@ class Rsx {
     std::atomic<uint32_t> _lastFlipTime;
     bool _shutdown = false;
     bool _initialized = false;
-    mutable boost::mutex _mutex;
-    boost::condition_variable _cv;
+    mutable SpinLock _mutex;
+    boost::condition_variable_any _cv;
     mutable boost::mutex _initMutex;
     boost::condition_variable _initCv;
     std::unique_ptr<boost::thread> _thread;
