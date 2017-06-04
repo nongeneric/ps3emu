@@ -322,7 +322,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
                 return std::get<0>(parseFileName(file)) == getFileName(fileSet);
             });
             if (file == end(files)) {
-                WARNING(libs) << ssnprintf("save file %s not found", fileSet->fileName);
+                WARNING(libs) << ssnprintf("a save file not found");
                 break;
             }
             auto body = read_all_bytes(*file);
@@ -344,7 +344,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
                 return std::get<0>(parseFileName(file)) == getFileName(fileSet);
             });
             if (file == end(files)) {
-                WARNING(libs) << ssnprintf("save file %s not found", fileSet->fileName);
+                WARNING(libs) << ssnprintf("a save file not found");
                 break;
             }
             remove(*file);

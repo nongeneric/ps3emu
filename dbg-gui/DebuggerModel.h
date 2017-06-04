@@ -66,6 +66,7 @@ class DebuggerModel : public QWidget {
     void ppuTraceTo(ps3_uintptr_t va);
     void updateUI();
     void setSoftBreak(ps3_uintptr_t va);
+    void setMemoryBreakpoint(ps3_uintptr_t va, uint32_t size, bool write);
     void clearSoftBreak(ps3_uintptr_t va);
     void clearSoftBreaks();
     void setSPUSoftBreak(uint32_t elfSource, ps3_uintptr_t va);

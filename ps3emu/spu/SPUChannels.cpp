@@ -180,7 +180,6 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTLLUC_CMD:
         case MFC_PUTQLLUC_CMD: {
             assert(opcode != MFC_PUTQLLUC_CMD);
-            assert(size == 0x80); // cache line
             _channels[MFC_RdAtomicStat] |= 0b010; // U
             _mm->writeCond<128, true>(eal, lsa);
             log();

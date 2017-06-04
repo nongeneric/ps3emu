@@ -276,3 +276,8 @@ TEST_CASE("ppu_codec_jdec") {
     runAndWait("./binaries/ppu_codec_jdec/a.elf", false, true);
     compareLastFrame("./binaries/ppu_codec_jdec/ps3frame0.png", 0);
 }
+
+TEST_CASE("spu_render") {
+    runAndWait("./binaries/spu_render/a.elf", false, true);
+    compareLastFrame("./binaries/spu_render/ps3frame0.png", 0);
+}

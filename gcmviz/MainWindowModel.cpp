@@ -9,6 +9,7 @@
 #include <QImage>
 #include <QSize>
 #include <QPainter>
+#include <QSortFilterProxyModel>
 #include <boost/endian/conversion.hpp>
 #include <boost/range/numeric.hpp>
 #include <boost/algorithm/string/join.hpp>
@@ -449,20 +450,23 @@ public:
         if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
             return QVariant();
         switch (section) {
-            case 0: return "Enabled";
-            case 1: return "Offset";
-            case 2: return "Location";
-            case 3: return "Frequency";
-            case 4: return "Stride";
-            case 5: return "Size";
-            case 6: return "Type";
-            case 7: return "Divider Op";
+            case 0: return "#";
+            case 1: return "Mask";
+            case 2: return "Fetch";
+            case 3: return "Offset";
+            case 4: return "Location";
+            case 5: return "Frequency";
+            case 6: return "Stride";
+            case 7: return "Size";
+            case 8: return "Type";
+            case 9: return "Divider Op";
+            case 10: return "Disabled Const";
         }
         return QVariant();
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 8;
+        return 11;
     }
     
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
@@ -479,6 +483,9 @@ public:
                 case 5: return _rsx->context()->feedbackCount;
                 case 6: return "float";
                 case 7: return "";
+                case 8: return "";
+                case 9: return "";
+                case 10: return "";
             }
         }
         
@@ -486,16 +493,30 @@ public:
         auto input = _rsx->context()->vertexInputs[index.row()];
         auto op = _rsx->context()->frequencyDividerOperation & (1 << index.row());
         switch (index.column()) {
-            case 0: return QString::fromStdString(ssnprintf("%d", input.rank != 0));
-            case 1: return QString::fromStdString(ssnprintf("#%08x", vda.offset));
-            case 2: return vda.location == MemoryLocation::Local ? "Local" : "Main";
-            case 3: return QString::fromStdString(ssnprintf("%d", vda.frequency));
-            case 4: return QString::fromStdString(ssnprintf("%d", vda.stride));
-            case 5: return QString::fromStdString(ssnprintf("%d", vda.size));
-            case 6: return vda.type == CELL_GCM_VERTEX_UB ? "uint8_t"
+            case 0: return QString::fromStdString(ssnprintf("%d", index.row()));
+            case 1: {
+                auto mask = (uint32_t)_rsx->context()->vertexAttribInputMask;
+                auto enabled = mask & (1 << index.row());
+                return QString::fromStdString(ssnprintf("%d", enabled != 0));
+            }
+            case 2: return QString::fromStdString(ssnprintf("%d", input.rank != 0));
+            case 3: return QString::fromStdString(ssnprintf("#%08x", vda.offset));
+            case 4: return vda.location == MemoryLocation::Local ? "Local" : "Main";
+            case 5: return QString::fromStdString(ssnprintf("%d", vda.frequency));
+            case 6: return QString::fromStdString(ssnprintf("%d", vda.stride));
+            case 7: return QString::fromStdString(ssnprintf("%d", vda.size));
+            case 8: return vda.type == CELL_GCM_VERTEX_UB ? "uint8_t"
                          : vda.type == CELL_GCM_VERTEX_F ? "float"
                          : "unknown";
-            case 7: return op ? "MODULO" : "DIVIDE";
+            case 9: return op ? "MODULO" : "DIVIDE";
+            case 10: {
+                auto uniform = (VertexShaderSamplerUniform*)_rsx->context()->vertexSamplersBuffer.mapped();
+                return QString::fromStdString(ssnprintf("%g,%g,%g,%g",
+                                              uniform->disabledInputValues[index.row()][0],
+                                              uniform->disabledInputValues[index.row()][1],
+                                              uniform->disabledInputValues[index.row()][2],
+                                              uniform->disabledInputValues[index.row()][3]));
+            }
         }
         return QVariant();
     }
@@ -695,7 +716,10 @@ void MainWindowModel::update() {
             auto sizes = getFragmentSamplerSizes(context);
             auto asmText = PrintFragmentProgram(&context->fragmentBytecode[0]);
             bool mrt = boost::accumulate(context->surface.colorTarget, 0) > 1;
-            auto glslText = GenerateFragmentShader(context->fragmentBytecode, sizes, context->isFlatShadeMode, mrt);
+            auto glslText = GenerateFragmentShader(context->fragmentBytecode,
+                                                   sizes,
+                                                   context->isFlatShadeMode,
+                                                   mrt);
             _window.teFragmentAsm->setText(QString::fromStdString(asmText));
             _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
             
@@ -811,19 +835,23 @@ void MainWindowModel::changeFrame() {
     _window.labelFrame->setText(QString::fromStdString(text));
     
     auto commandModel = new CommandTableModel(&_db, _currentFrame);
-    _window.commandTableView->setModel(commandModel);
+    auto proxyModel = new QSortFilterProxyModel();
+    proxyModel->setFilterKeyColumn(1);
+    proxyModel->setFilterRegExp(QRegExp(_window.leSearchCommand->text(), Qt::CaseInsensitive, QRegExp::FixedString));
+    proxyModel->setSourceModel(commandModel);
+    _window.commandTableView->setModel(proxyModel);
     _window.commandTableView->resizeColumnsToContents();
     auto selectionModel = _window.commandTableView->selectionModel();
     QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=] (auto current) {
         if (current == QModelIndex())
             return;
-        auto command = _db.getCommand(_currentFrame, current.row());
+        auto command = _db.getCommand(_currentFrame, proxyModel->mapToSource(current).row());
         _window.twArgs->setModel(new ArgumentTableModel(command));
     });
     
     QObject::disconnect(_window.leSearchCommand, &QLineEdit::textChanged, 0, 0);
     QObject::connect(_window.leSearchCommand, &QLineEdit::textChanged, [=] (auto text) {
-        
+        proxyModel->setFilterRegExp(QRegExp(text, Qt::CaseInsensitive, QRegExp::FixedString));
     });
 }
 

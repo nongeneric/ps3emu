@@ -731,6 +731,24 @@ void DebuggerModel::execSingleCommand(QString command) {
         } else if (name == "bp") {
             setSoftBreak(exprVal);
             return;
+        } else if (name == "mwbp") {
+            bool ok;
+            auto size = command.section(':', 2, 2).toInt(&ok, 16);
+            if (!ok) {
+                emit message("bad size");
+                return;
+            }
+            setMemoryBreakpoint(exprVal, size, true);
+            return;
+        } else if (name == "mrbp") {
+            bool ok;
+            auto size = command.section(':', 2, 2).toInt(&ok, 16);
+            setMemoryBreakpoint(exprVal, size, false);
+            if (!ok) {
+                emit message("bad size");
+                return;
+            }
+            return;
         } else if (name == "sbp") {
             bool ok;
             auto elfSource = command.section(':', 2, 2).toInt(&ok, 16);
@@ -1100,6 +1118,10 @@ void DebuggerModel::updateUI() {
 void DebuggerModel::runto(ps3_uintptr_t va) {
     setSoftBreak(va);
     run();
+}
+
+void DebuggerModel::setMemoryBreakpoint(ps3_uintptr_t va, uint32_t size, bool write) {
+    g_state.mm->dbgMemoryBreakpoint(va, size, write);
 }
 
 void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {

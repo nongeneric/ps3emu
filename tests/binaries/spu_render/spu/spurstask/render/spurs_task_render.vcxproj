@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="release|PS3">
+      <Configuration>release</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="debug|PS3">
+      <Configuration>debug</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{0E76DA9B-D3C1-49BA-AFA7-B69F7842E488}</ProjectGuid>
+    <RootNamespace>spurs_task_render</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='release|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SPU</PlatformToolset>
+    <SpursUsage>SpursTask</SpursUsage>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='debug|PS3'">
+    <PlatformToolset>SPU</PlatformToolset>
+    <SpursUsage>SpursTask</SpursUsage>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='release|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">PS3_Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">PS3_Debug\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">*.obj%3b*.d%3b*.map%3b*.lst%3b*.pch%3b*.bin%3b$(TargetPath)%3b$(OutDir)$(TargetName).ppu.obj</ExtensionsToDeleteOnClean>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='release|PS3'">PS3_Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='release|PS3'">PS3_Release\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='release|PS3'">*.obj;*.d;*.map;*.lst;*.pch;*.bin;$(TargetPath);$(OutDir)$(TargetName).ppu.obj;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='release|PS3'">$(ProjectName)</TargetName>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='debug|PS3'">$(SCE_PS3_ROOT)\target\spu\include;$(SCE_PS3_ROOT)\target\common\include;$(SCE_PS3_ROOT)\host-win32\spu\lib\gcc\spu-lv2\4.1.1\include;</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <AdditionalOptions>-g -Wall -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -mspurs-task %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(SN_PS3_PATH)\spu\include\sn;$(SCE_PS3_ROOT)\target\spu\include;$(SCE_PS3_ROOT)\target\common\include;$(SolutionDir)\common\include;$(SolutionDir)\spu\common\include;$(SolutionDir)\spu\spurstask\common\include;$(ProjectDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SN_TARGET_PS3_SPU;_DEBUG;__GCC__;SPU;__CELL_ASSERT__;CELL_DMA_ASSERT_VERBOSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <CompileAs>Default</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-mspurs-task -Wl,--gc-sections -fstack-check %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>-ldma;-lspurs;-llsguard;-lgcm_spu;%(AdditionalDependencies)</AdditionalDependencies>
+      <ShowProgress>NotSet</ShowProgress>
+      <OutputFile>$(OutDir)$(ProjectName).elf</OutputFile>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <ProgramDatabaseFile>
+      </ProgramDatabaseFile>
+      <ImportLibrary>$(OutDir)$(TargetName).ppu.obj</ImportLibrary>
+    </Link>
+    <PostBuildEvent>
+      <Message>Creating PPU Export Library from Task: "$(TargetName).ppu.obj"</Message>
+      <Command>spu_elf-to-ppu_obj "$(TargetPath)" "$(OutDir)$(TargetName).ppu.obj"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='release|PS3'">
+    <ClCompile>
+      <AdditionalOptions>-funroll-loops -ffunction-sections -fdata-sections %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(SN_PS3_PATH)\spu\include\sn;$(SCE_PS3_ROOT)\target\spu\include;$(SCE_PS3_ROOT)\target\common\include;$(SolutionDir)\common\include;$(SolutionDir)\spu\common\include;$(SolutionDir)\spu\spurstask\common\include;$(ProjectDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SN_TARGET_PS3_SPU;NDEBUG;__GCC__;SPU;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OptimizationLevel>Level3</OptimizationLevel>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-Wl,--gc-sections %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>-ldma;-lspurs;-llsguard;-lgcm_spu;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='debug|PS3'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)\common\include;$(SolutionDir)\spu\common\include;$(SolutionDir)\spu\spurstask\common\include;$(ProjectDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>-ldma;-lspurs;-llsguard;-lgcm_spu;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="source\fs_constant_patch.cpp" />
+    <ClCompile Include="source\render_state_cache.cpp" />
+    <ClCompile Include="source\spu_address_to_offset.cpp" />
+    <ClCompile Include="source\spu_command_context.cpp" />
+    <ClCompile Include="source\spu_render.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\dma_cache.h" />
+    <ClInclude Include="include\fs_constant_patch.h" />
+    <ClInclude Include="include\render_state_cache.h" />
+    <ClInclude Include="include\spu_address_to_offset.h" />
+    <ClInclude Include="include\spu_command_context.h" />
+    <ClInclude Include="include\spu_render.h" />
+    <ClInclude Include="include\spu_render_tag.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

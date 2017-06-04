@@ -387,7 +387,18 @@ void MainMemory::unmark(uint32_t ea, uint32_t len) {
     
 }
 
+void MainMemory::dbgMemoryBreakpoint(uint32_t ea, int32_t len, bool write) {
+    _memoryBreakpoints.push_back({ea, (uint32_t)len, write});
+}
+
 void MainMemory::validate(uint32_t ea, uint32_t len, bool write) {
+    auto mb = std::find_if(begin(_memoryBreakpoints), end(_memoryBreakpoints), [&](auto& m) {
+        return m.write == write && ::intersects(ea, len, m.ea, m.len);
+    });
+    if (mb != end(_memoryBreakpoints)) {
+        _memoryBreakpoints.erase(mb);
+        throw BreakpointException();
+    }
     auto& map = write ? writeMap : readMap;
     auto& infos = write ? writeInfos : readInfos;
     iterate(ea, len, [&] (auto page, auto start, auto end) {

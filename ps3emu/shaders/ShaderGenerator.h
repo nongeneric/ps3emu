@@ -11,7 +11,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    bool isMrt);
 
 enum class VertexInputType {
-    float32, float16, u8
+    float32, float16, u8, s16
 };
 
 struct VertexShaderInputFormat {

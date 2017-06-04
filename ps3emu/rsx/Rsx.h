@@ -134,6 +134,62 @@ ENUMF(GcmClearMask,
     (M, 0xf3)
 )
 
+ENUMF(PointSpriteTex,
+    (Tex0, (1<<8)),
+    (Tex1, (1<<9)),
+    (Tex2, (1<<10)),
+    (Tex3, (1<<11)),
+    (Tex4, (1<<12)),
+    (Tex5, (1<<13)),
+    (Tex6, (1<<14)),
+    (Tex7, (1<<15)),
+    (Tex8, (1<<16)),
+    (Tex9, (1<<17))
+)
+
+ENUMF(InputMask,
+    (VDA15, 1 << 0),
+    (VDA14, 1 << 1),
+    (VDA13, 1 << 2),
+    (VDA12, 1 << 3),
+    (VDA11, 1 << 4),
+    (VDA10, 1 << 5),
+    (VDA9, 1 << 6),
+    (VDA8, 1 << 7),
+    (VDA7, 1 << 8),
+    (VDA6, 1 << 9),
+    (VDA5, 1 << 10),
+    (VDA4, 1 << 11),
+    (VDA3, 1 << 12),
+    (VDA2, 1 << 13),
+    (VDA1, 1 << 14),
+    (VDA0, 1 << 15)
+)
+
+struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
+    std::array<uint32_t, 4> wraps[4];
+    std::array<float, 4> borderColor[4];
+    std::array<float, 4> disabledInputValues[16];
+    std::array<uint32_t, 4> enabledInputs[16];
+    std::array<uint32_t, 4> inputBufferBases[16];
+    std::array<uint32_t, 4> inputBufferStrides[16];
+    std::array<uint32_t, 4> inputBufferOps[16];
+    std::array<uint32_t, 4> inputBufferFrequencies[16];
+};
+
+struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
+    uint32_t flip[16];
+    float xOffset[16];
+    float yOffset[16];
+    float xScale[16];
+    float yScale[16];
+    uint32_t pointSpriteControl[16];
+    uint32_t outputFromH;
+    uint32_t reserved0;
+    uint32_t reserved1;
+    uint32_t reserved2;
+};
+
 constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 constexpr auto FragmentProgramSize = 512 * 16;
 
@@ -245,10 +301,10 @@ class Rsx {
     void VertexDataBaseOffset(uint32_t baseOffset, uint32_t baseIndex);
     void AlphaFunc(GcmOperator af, uint32_t ref);
     void AlphaTestEnable(bool enable);
-    void ShaderControl(uint32_t control, uint8_t registerCount);
+    void ShaderControl(bool depthReplace, bool outputFromH0, bool pixelKill, uint8_t registerCount);
     void TransformProgramLoad(uint32_t load, uint32_t start);
     void TransformProgram(uint32_t locationOffset, unsigned size);
-    void VertexAttribInputMask(uint16_t mask);
+    void VertexAttribInputMask(InputMask mask);
     void TransformTimeout(uint16_t count, uint16_t registerCount);
     void ShaderProgram(uint32_t offset, uint32_t location);
     void ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h);
@@ -439,8 +495,12 @@ class Rsx {
     void PolySmoothEnable(bool enable);
     void PolyOffsetLineEnable(bool enable);
     void PolyOffsetFillEnable(bool enable);
+    void DriverInterrupt(uint32_t cause);
+    void PointSize(float size);
+    void PointParamsEnable(bool enable);
+    void PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex);
     
-    void invokeHandler(uint32_t descrEa);
+    void invokeHandler(uint32_t descrEa, uint32_t arg);
     
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);
@@ -485,6 +545,7 @@ public:
     void captureFrames();
     void resetContext();
     int64_t interpret(uint32_t get, std::function<uint32_t(uint32_t)> read);
+    void setUserHandler(uint32_t handler);
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);

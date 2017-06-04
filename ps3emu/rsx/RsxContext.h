@@ -197,6 +197,19 @@ struct FragmentOps {
     GcmClearMask clearMask;
 };
 
+struct FragmentShaderControl {
+    bool depthReplace = false;
+    bool outputFromH0 = false;
+    bool pixelKill = false;
+    uint8_t registerCount = 0;
+};
+
+struct PointSpriteControl {
+    bool enabled = false;
+    uint16_t rmode;
+    PointSpriteTex tex = PointSpriteTex();
+};
+
 class GLFramebuffer;
 class TextureRenderer;
 struct RsxContext {
@@ -224,6 +237,8 @@ struct RsxContext {
     GLPersistentCpuBuffer elementArrayIndexBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
+    uint32_t fragmentBytecodeOffset = 0;
+    uint32_t fragmentBytecodeLocation = 0;
     std::vector<uint8_t> fragmentBytecode;
     uint32_t fragmentConstCount = 0;
     GLPersistentCpuBuffer fragmentConstBuffer;
@@ -253,6 +268,12 @@ struct RsxContext {
     uint16_t frequencyDividerOperation = 0;
     FragmentOps fragmentOps;
     GcmCullFace cullFace;
+    uint32_t userHandler = 0;
+    FragmentShaderControl fragmentShaderControl;
+    bool pointSizeVertexOutputEnabled = false;
+    float pointSize = 0;
+    PointSpriteControl pointSpriteControl;
+    InputMask vertexAttribInputMask = {};
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

@@ -1,0 +1,22 @@
+/*  SCE CONFIDENTIAL
+ *  PlayStation(R)3 Programmer Tool Runtime Library 400.001
+ *  Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *  All Rights Reserved.
+ */
+
+#include "shader_common.h"
+
+void main
+(
+ in float2 texcoord     : TEXCOORD0,
+ in float4 normal       : TEXCOORD1,
+ out float4 color_out : COLOR
+ )
+{
+  normal = normalize(normal);
+
+
+  color_out = I_a * K_a * tex2D(color_sampler, texcoord);
+  color_out += I_d * K_d * max (0, dot(normal, directional_light_dir)) * directional_light_color;
+  color_out.a = 0.5;
+}

@@ -54,9 +54,9 @@ fragment_opcode_t fragment_opcodes[] = {
     { 1, 0, 0, 0, "UPG", fragment_op_t::UPG },
     { 3, 0, 0, 0, "DP2A", fragment_op_t::DP2A },
     { 3, 0, 0, 1, "TXL", fragment_op_t::TXL },
-    { 0, 0, 0, 0, "illegal" },
+    { 0, 0, 0, 0, "illegal_1" },
     { 3, 0, 0, 1, "TXB", fragment_op_t::TXB },
-    { 0, 0, 0, 0, "illegal" },
+    { 0, 0, 0, 0, "illegal_2" },
     { 3, 0, 0, 1, "TEXBEM", fragment_op_t::TEXBEM },
     { 3, 0, 0, 1, "TXPBEM", fragment_op_t::TXPBEM },
     { 3, 0, 0, 0, "BEMLUM", fragment_op_t::BEMLUM },
@@ -69,7 +69,7 @@ fragment_opcode_t fragment_opcodes[] = {
     { 1, 0, 0, 0, "LIF", fragment_op_t::LIF },
     { 0, 1, 0, 0, "FENCT", fragment_op_t::FENCT },
     { 0, 1, 0, 0, "FENCB", fragment_op_t::FENCB },
-    { 0, 0, 0, 0, "illegal" },
+    { 0, 0, 0, 0, "illegal_3" },
     { 0, 1, 0, 0, "BRK", fragment_op_t::BRK },
     { 0, 1, 0, 0, "CAL", fragment_op_t::CAL },
     { 0, 1, 0, 0, "IFE", fragment_op_t::IFE },
@@ -1128,7 +1128,7 @@ FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr) {
             return { map, pos };
         }
     }
-    throw std::runtime_error("can't find the last instructions");
+    throw std::runtime_error("can't find the last instruction");
 }
 
 uint32_t get_fragment_bytecode_length(const uint8_t* ptr) {

@@ -211,12 +211,20 @@ public:
     }
     
 #ifdef MEMORY_PROTECTION
+    struct MemoryBreakpointInfo {
+        uint32_t ea;
+        uint32_t len;
+        bool write;
+    };
+    std::vector<MemoryBreakpointInfo> _memoryBreakpoints;
+    void dbgMemoryBreakpoint(uint32_t ea, int32_t len, bool write);
     void reportViolation(uint32_t ea, uint32_t len, bool write);
     void mark(uint32_t ea, uint32_t len, bool readonly, std::string comment);
     void unmark(uint32_t ea, uint32_t len);
     void validate(uint32_t ea, uint32_t len, bool write);
     ProtectionRange addressRange(uint32_t ea);
 #else
+    inline void dbgMemoryBreakpoint(uint32_t ea, int32_t len, bool write);
     inline void mark(uint32_t ea, uint32_t len, bool readonly, std::string comment) { }
     inline void unmark(uint32_t ea, uint32_t len) { }
     inline void validate(uint32_t ea, uint32_t len, bool write) { }

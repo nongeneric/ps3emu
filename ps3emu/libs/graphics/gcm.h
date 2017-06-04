@@ -65,8 +65,8 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint8_t comp,
                            uint16_t base,
                            uint8_t bank);
-uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue);
-uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue);
+uint32_t _cellGcmSetFlipWithWaitLabel(uint32_t context, uint8_t id, uint8_t labelindex, uint32_t labelvalue);
+uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint32_t context, uint8_t id, uint8_t labelindex, uint32_t labelvalue);
 int32_t cellGcmBindTile(uint8_t index);
 int32_t cellGcmUnbindTile(uint8_t index);
 int32_t cellGcmBindZcull(uint8_t index,
@@ -115,7 +115,8 @@ uint32_t cellGcmGetTileInfo();
 uint32_t cellGcmGetZcullInfo();
 uint32_t cellGcmGetLastFlipTime(Process* proc);
 uint64_t cellGcmGetTimeStamp(uint32_t index);
-
+emu_void_t cellGcmSetSecondVFrequency(uint32_t freq);
+emu_void_t cellGcmSetUserHandler(uint32_t handler);
 emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
 
 }}
@@ -123,4 +124,3 @@ emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset);
 std::vector<uint16_t> serializeOffsetTable();
 void deserializeOffsetTable(std::vector<uint16_t> const& vec);
-emu_void_t cellGcmSetUserHandler(uint32_t handler);

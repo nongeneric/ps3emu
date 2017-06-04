@@ -1,0 +1,20 @@
+/*  SCE CONFIDENTIAL
+ *  PlayStation(R)3 Programmer Tool Runtime Library 400.001
+ *  Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *  All Rights Reserved.
+ */
+
+#include "shader_common.h"
+
+void main
+(in float4 position : POSITION,
+ in float3 normal   : NORMAL,
+ in float2 texcoord : TEXCOORD0,
+ out float4 oPosition  : POSITION,
+ out float2 oTexCoord  : TEXCOORD0,
+ out float4 oNormal    : TEXCOORD1)
+{
+  oPosition = mul(modelViewProj, position);
+  oTexCoord = texcoord;
+  oNormal = mul(modelView,float4(normal,0.0f));
+}

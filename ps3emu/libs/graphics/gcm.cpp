@@ -75,18 +75,16 @@ struct OffsetTable {
     
     uint32_t eaToOffset(uint32_t ea) {
         boost::lock_guard<boost::mutex> lock(_m);
-        auto ioIdx = ioAddress[ea >> 20];
-        assert(ioIdx != 0xffff); (void)ioIdx;
         return ((uint32_t)ioAddress[ea >> 20] << 20) | ((ea << 12) >> 12);
     }
     
     uint32_t offsetToEa(uint32_t offset) {
         boost::lock_guard<boost::mutex> lock(_m);
-        assert(eaAddress[offset >> 20] != 0xffff);
         return ((uint32_t)eaAddress[offset >> 20] << 20) | ((offset << 12) >> 12);
     }
     
     void unmapEa(uint32_t ea) {
+        INFO(rsx) << ssnprintf("unmapping ea %08x", ea);
         boost::lock_guard<boost::mutex> lock(_m);
         ea >>= 20;
         auto io = ioAddress[ea];
@@ -149,7 +147,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
                           uint32_t ioSize,
                           ps3_uintptr_t ioAddress,
                           Process* proc) {
-    INFO(libs) << __FUNCTION__;
+    INFO(rsx) << ssnprintf("_cellGcmInitBody(..., %x, %x, %x)", cmdSize, ioSize, ioAddress);
     
     emuGcmState.offsetTable = g_state.memalloc->internalAlloc<128, OffsetTable>(&emuGcmState.offsetTableEmuEa);
     emuGcmState.ioSize = ioSize;
@@ -295,14 +293,14 @@ int32_t cellGcmSetTileInfo(uint8_t index,
     return CELL_OK;
 }
 
-uint32_t _cellGcmSetFlipWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
-    INFO(libs) << __FUNCTION__;
-    setFlipCommand(0, labelindex, labelvalue, id);
+uint32_t _cellGcmSetFlipWithWaitLabel(uint32_t context, uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
+    INFO(rsx) << ssnprintf("_cellGcmSetFlipWithWaitLabel(..., %d, %x, %x)", id, labelindex, labelvalue);
+    setFlipCommand(context, labelindex, labelvalue, id);
     return CELL_OK;
 }
 
-uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
-    return _cellGcmSetFlipWithWaitLabel(id, labelindex, labelvalue);
+uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint32_t context, uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
+    return _cellGcmSetFlipWithWaitLabel(context, id, labelindex, labelvalue);
 }
 
 int32_t cellGcmBindTile(uint8_t index) {
@@ -513,6 +511,16 @@ uint64_t cellGcmGetTimeStamp(uint32_t index) {
     return g_state.mm->load64(ea + valueOffset);
 }
 
+emu_void_t cellGcmSetUserHandler(uint32_t handler) {
+    g_state.rsx->setUserHandler(handler);
+    return emu_void;
+}
+
+emu_void_t cellGcmSetSecondVFrequency(uint32_t freq) {
+    WARNING(rsx) << "cellGcmSetSecondVFrequency not implemented";
+    return emu_void;
+}
+
 }}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset) {
@@ -609,9 +617,4 @@ void deserializeOffsetTable(std::vector<uint16_t> const& vec) {
             g_state.mm->provideMemory(ea, size, ptr);
         }
     }
-}
-
-emu_void_t cellGcmSetUserHandler(uint32_t handler) {
-    ERROR(rsx) << "cellGcmSetUserHandler not implemented";
-    return emu_void;
 }

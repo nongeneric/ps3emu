@@ -120,8 +120,10 @@ FramebufferTextureResult GLFramebuffer::findTexture(FramebufferTextureKey key) {
 //         if (key.format != texture->format())
 //             continue;
         if (key.offset == cachedKey.offset) {
-            auto xscale = (float)key.width / (float)texture->width();
-            auto yscale = (float)key.height / (float)texture->height();
+            // the pixels outside the clip are undefined so just assume the shader won't access them
+            // and do not any scaling
+            auto xscale = key.width > texture->width() ? 1.f : (float)key.width / (float)texture->width();
+            auto yscale = key.height > texture->height() ? 1.f : (float)key.height / (float)texture->height();
             return FramebufferTextureResult{texture, 0, 0, xscale, yscale};
         }
     }

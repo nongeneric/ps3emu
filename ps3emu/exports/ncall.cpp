@@ -293,6 +293,7 @@ NCallEntry ncallTable[] {
     ENTRY(cellAudioAddData),
     ENTRY(cellGcmSetUserHandler),
     ENTRY(_cellGcmSetFlipCommandWithWaitLabel),
+    ENTRY(cellGcmSetSecondVFrequency),
 };
 
 constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry); }

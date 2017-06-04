@@ -142,7 +142,7 @@ FILE* openFile(const char* path, int flags) {
 
 CellFsErrno cellFsOpen(cstring_ptr_t path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t) {
     auto hostPath = g_state.content->toHost(path.str.c_str());
-    INFO(libs) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path, hostPath, flags);
+    INFO(libs) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path.str, hostPath, flags);
     auto f = openFile(hostPath.c_str(), flags);
     if (!f) {
         return toCellErrno(errno);
@@ -198,7 +198,7 @@ CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint6
     if (nread) {
          *nread = bytesRead;
     }
-    mm->writeMemory(buf, &localBuf[0], *nread);
+    mm->writeMemory(buf, &localBuf[0], bytesRead);
     INFO(libs) << ssnprintf("cellFsRead(%x, %x, %d) : %d", fd, buf, nbytes, bytesRead);
     return CELL_FS_SUCCEEDED;
 }

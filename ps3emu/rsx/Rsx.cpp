@@ -106,10 +106,12 @@ void Rsx::SemaphoreRelease(uint32_t value) {
 }
 
 void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
+    // the label is set when all texture referencing processing
+    // and fragment shader processing are complete
     auto offset = _context->semaphoreOffset;
-    INFO(rsx) << ssnprintf("releasing texture semaphore %x at offset %x with value %x",
-        _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
-    );
+    INFO(rsx) << ssnprintf("releasing texture semaphore at offset %x with value %x",
+                           GcmLabelBaseOffset + offset,
+                           value);
     g_state.mm->store32(GcmLabelBaseOffset + offset, value);
 }
 
@@ -130,7 +132,32 @@ void Rsx::FlatShadeOp(uint32_t x) {
 
 void Rsx::VertexAttribOutputMask(uint32_t mask) {
     TRACE(VertexAttribOutputMask, mask);
-    //TODO: implement
+    union {
+        uint32_t val;
+        BitField<31, 32> COL0;
+        BitField<30, 31> COL1;
+        BitField<29, 30> BCOL0;
+        BitField<28, 29> BCOL1;
+        BitField<27, 28> FOG;
+        BitField<26, 27> PSIZE;
+        BitField<25, 26> CLP0;
+        BitField<24, 25> CLP1;
+        BitField<23, 24> CLP2;
+        BitField<22, 23> CLP3;
+        BitField<21, 22> CLP4;
+        BitField<20, 21> CLP5;
+        BitField<18, 19> TEX8;
+        BitField<19, 20> TEX9;
+        BitField<17, 18> TEX0;
+        BitField<16, 17> TEX1;
+        BitField<15, 16> TEX2;
+        BitField<14, 15> TEX3;
+        BitField<13, 14> TEX4;
+        BitField<12, 13> TEX5;
+        BitField<11, 12> TEX6;
+        BitField<10, 11> TEX7;
+    } umask = { mask };
+    _context->pointSizeVertexOutputEnabled = umask.PSIZE.u();
 }
 
 void Rsx::FrequencyDividerOperation(uint16_t op) {
@@ -203,9 +230,12 @@ void Rsx::AlphaTestEnable(bool enable) {
     glEnableb(GL_ALPHA_TEST, enable);
 }
 
-void Rsx::ShaderControl(uint32_t control, uint8_t registerCount) {
-    TRACE(ShaderControl, control, registerCount);
-    //TODO: implement
+void Rsx::ShaderControl(bool depthReplace, bool outputFromH0, bool pixelKill, uint8_t registerCount) {
+    TRACE(ShaderControl, depthReplace, outputFromH0, pixelKill, registerCount);
+    _context->fragmentShaderControl.depthReplace = depthReplace;
+    _context->fragmentShaderControl.outputFromH0 = outputFromH0;
+    _context->fragmentShaderControl.pixelKill = pixelKill;
+    _context->fragmentShaderControl.registerCount = registerCount;
 }
 
 void Rsx::TransformProgramLoad(uint32_t load, uint32_t start) {
@@ -233,14 +263,16 @@ void Rsx::TransformProgram(uint32_t locationOffset, unsigned size) {
     _context->vertexLoadOffset += bytes;
 }
 
-void Rsx::VertexAttribInputMask(uint16_t mask) {
+void Rsx::VertexAttribInputMask(InputMask mask) {
     TRACE(VertexAttribInputMask, mask);
+    _context->vertexAttribInputMask = mask;
+    auto val = (uint32_t)mask;
     for (auto i = 0u; i < 16; ++i) {
-        if (!(mask & 1)) {
+        if (!(val & 1)) {
             glDisableVertexAttribArray(i);
             glVertexAttrib4f(i, 0, 0, 0, 1);
         }
-        mask >>= 1;
+        val >>= 1;
     }
 }
 
@@ -412,6 +444,9 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
         case CELL_GCM_VERTEX_SF:
             vinput.type = VertexInputType::float16;
             break;
+        case CELL_GCM_VERTEX_S32K:
+            vinput.type = VertexInputType::s16;
+            break;
         default: throw std::runtime_error("not implemented array type");
     }
 }
@@ -552,25 +587,6 @@ void Rsx::resetFlipStatus() {
     _isFlipInProgress = true;
 }
 
-struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
-    std::array<uint32_t, 4> wraps[4];
-    std::array<float, 4> borderColor[4];
-    std::array<float, 4> disabledInputValues[16];
-    std::array<uint32_t, 4> enabledInputs[16];
-    std::array<uint32_t, 4> inputBufferBases[16];
-    std::array<uint32_t, 4> inputBufferStrides[16];
-    std::array<uint32_t, 4> inputBufferOps[16];
-    std::array<uint32_t, 4> inputBufferFrequencies[16];
-};
-
-struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
-    uint32_t flip[16];
-    float xOffset[16];
-    float yOffset[16];
-    float xScale[16];
-    float yScale[16];
-};
-
 struct VertexShaderViewportUniform {
     glm::mat4 glInverseGcm;
 };
@@ -582,11 +598,11 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
     _gcmIoAddress = ioAddress;
 }
 
-void Rsx::invokeHandler(uint32_t descrEa) {
+void Rsx::invokeHandler(uint32_t descrEa, uint32_t arg) {
     fdescr descr;
     g_state.mm->readMemory(descrEa, &descr, sizeof(descr));
     assert(_callbackThread);
-    auto future = _callbackThread->schedule({1}, descr.tocBase, descr.va);
+    auto future = _callbackThread->schedule({arg}, descr.tocBase, descr.va);
     future.get();
 }
 
@@ -653,17 +669,18 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
 #endif
     
+    this->setLabel(1, 0);
+    if (label != (uint32_t)-1) {
+        //this->setLabel(label, labelValue);
+        while (g_state.mm->load32(GcmLabelBaseOffset + label * 0x10) != labelValue) ;
+    }
+    
     if (_context->vBlankHandlerDescr) {
-        invokeHandler(_context->vBlankHandlerDescr);
+        invokeHandler(_context->vBlankHandlerDescr, 1);
     }
     
     if (_context->flipHandlerDescr) {
-        invokeHandler(_context->flipHandlerDescr);
-    }
-    
-    this->setLabel(1, 0);
-    if (label != (uint32_t)-1) {
-        this->setLabel(label, labelValue);
+        invokeHandler(_context->flipHandlerDescr, 1);
     }
     
     _isFlipInProgress = false;
@@ -867,6 +884,21 @@ bool isMrt(SurfaceInfo const& surface) {
 }
 
 void Rsx::updateShaders() {
+    glEnableb(GL_PROGRAM_POINT_SIZE, _context->pointSizeVertexOutputEnabled);
+    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->fragmentSamplersBuffer.mapped();
+    fragmentSamplerUniform->outputFromH = _context->fragmentShaderControl.outputFromH0;
+    fragmentSamplerUniform->pointSpriteControl[0] = _context->pointSpriteControl.enabled;
+    fragmentSamplerUniform->pointSpriteControl[1] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex0);
+    fragmentSamplerUniform->pointSpriteControl[2] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex1);
+    fragmentSamplerUniform->pointSpriteControl[3] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex2);
+    fragmentSamplerUniform->pointSpriteControl[4] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex3);
+    fragmentSamplerUniform->pointSpriteControl[5] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex4);
+    fragmentSamplerUniform->pointSpriteControl[6] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex5);
+    fragmentSamplerUniform->pointSpriteControl[7] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex6);
+    fragmentSamplerUniform->pointSpriteControl[8] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex7);
+    fragmentSamplerUniform->pointSpriteControl[9] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex8);
+    fragmentSamplerUniform->pointSpriteControl[10] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex9);
+    
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
         
@@ -1032,7 +1064,7 @@ GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
     return texture;
 }
 
-GLenum gcmTextureFilterToOpengl(uint8_t filter) {
+GLenum gcmTextureMinFilterToOpengl(uint8_t filter) {
     static_assert(CELL_GCM_TEXTURE_LINEAR_NEAREST ==
                   CELL_GCM_TEXTURE_CONVOLUTION_MAG, "");
     switch (filter) {
@@ -1043,6 +1075,15 @@ GLenum gcmTextureFilterToOpengl(uint8_t filter) {
         case CELL_GCM_TEXTURE_LINEAR_NEAREST: return GL_LINEAR_MIPMAP_NEAREST;
         case CELL_GCM_TEXTURE_NEAREST_LINEAR: return GL_NEAREST_MIPMAP_LINEAR;
         case CELL_GCM_TEXTURE_LINEAR_LINEAR: return GL_LINEAR_MIPMAP_LINEAR;
+        default: throw std::runtime_error("bad filter value");
+    }
+}
+
+GLenum gcmTextureMagFilterToOpengl(uint8_t filter) {
+    switch (filter) {
+        case CELL_GCM_TEXTURE_CONVOLUTION_MAG:
+        case CELL_GCM_TEXTURE_NEAREST: return GL_NEAREST;
+        case CELL_GCM_TEXTURE_LINEAR: return GL_LINEAR;
         default: throw std::runtime_error("bad filter value");
     }
 }
@@ -1125,10 +1166,10 @@ void Rsx::updateTextures() {
             glSamplerParameterf(handle, GL_TEXTURE_LOD_BIAS, sampler.bias);
             glSamplerParameteri(handle,
                                 GL_TEXTURE_MIN_FILTER,
-                                gcmTextureFilterToOpengl(sampler.fragmentMin));
+                                gcmTextureMinFilterToOpengl(sampler.fragmentMin));
             glSamplerParameteri(handle,
                                 GL_TEXTURE_MAG_FILTER,
-                                gcmTextureFilterToOpengl(sampler.fragmentMag));
+                                gcmTextureMagFilterToOpengl(sampler.fragmentMag));
             glSamplerParameteri(handle,
                                 GL_TEXTURE_WRAP_S,
                                 gcmFragmentTextureWrapToOpengl(sampler.wraps));
@@ -2334,4 +2375,30 @@ void Rsx::setCallbackThread(CallbackThread* thread) {
 
 void Rsx::terminateCallbackThread() {
     _callbackThread->terminate();
+}
+
+void Rsx::setUserHandler(uint32_t handler) {
+    _context->userHandler = handler;
+}
+
+void Rsx::DriverInterrupt(uint32_t cause) {
+    invokeHandler(_context->userHandler, cause);
+}
+
+void Rsx::PointSize(float size) {
+    TRACE(PointSize, size);
+    _context->pointSize = size;
+    glPointSize(size);
+}
+
+void Rsx::PointParamsEnable(bool enable) {
+    TRACE(PointParamsEnable, enable);
+    _context->pointSpriteControl.enabled = enable;
+}
+
+void Rsx::PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex) {
+    TRACE(PointSpriteControl, enable, rmode, tex);
+    _context->pointSpriteControl.enabled = enable;
+    _context->pointSpriteControl.rmode = rmode;
+    _context->pointSpriteControl.tex = tex;
 }

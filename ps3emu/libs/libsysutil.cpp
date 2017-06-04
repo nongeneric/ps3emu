@@ -139,9 +139,9 @@ int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
 }
 
 int32_t cellSysCacheClear(Process* proc) {
-    INFO(libs) << ssnprintf("cellSysCacheClear");
     auto cacheDir = g_state.content->cacheDir();
     auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
+    INFO(libs) << ssnprintf("cellSysCacheClear %s", hostCacheDir);
     system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());
     return CELL_OK;
 }

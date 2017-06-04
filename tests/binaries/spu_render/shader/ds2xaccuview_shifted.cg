@@ -1,0 +1,10 @@
+/*  SCE CONFIDENTIAL
+ *  PlayStation(R)3 Programmer Tool Runtime Library 400.001
+ *  Copyright (C) 2010 Sony Computer Entertainment Inc.
+ *  All Rights Reserved.
+ */
+
+#define DOWNSAMPLE_2X_ACCUVIEW_SHIFTED
+
+#include "downsample.h"
+

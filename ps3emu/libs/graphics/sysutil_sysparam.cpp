@@ -30,7 +30,6 @@ int cellVideoOutConfigure(uint32_t videoOut,
 {
     INFO(libs) << __FUNCTION__;
     assert(videoOut == CELL_VIDEO_OUT_PRIMARY);
-    assert(waitForEvent == 0);
     assert(option == NULL);
     return CELL_OK;
 }

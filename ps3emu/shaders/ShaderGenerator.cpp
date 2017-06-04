@@ -69,16 +69,16 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     }
     line("in vec4 f_COL1;");
     line("in vec4 f_FOGC;");
-    line("in vec4 f_TEX0;");
-    line("in vec4 f_TEX1;");
-    line("in vec4 f_TEX2;");
-    line("in vec4 f_TEX3;");
-    line("in vec4 f_TEX4;");
-    line("in vec4 f_TEX5;");
-    line("in vec4 f_TEX6;");
-    line("in vec4 f_TEX7;");
-    line("in vec4 f_TEX8;");
-    line("in vec4 f_TEX9;");
+    line("in vec4 f_TEX0_varying;");
+    line("in vec4 f_TEX1_varying;");
+    line("in vec4 f_TEX2_varying;");
+    line("in vec4 f_TEX3_varying;");
+    line("in vec4 f_TEX4_varying;");
+    line("in vec4 f_TEX5_varying;");
+    line("in vec4 f_TEX6_varying;");
+    line("in vec4 f_TEX7_varying;");
+    line("in vec4 f_TEX8_varying;");
+    line("in vec4 f_TEX9_varying;");
     line("in vec4 f_SSA;");
     line(ssnprintf("layout (std140, binding = %d) uniform FragmentSamplersInfo {",
                    FragmentShaderSamplesInfoBinding));
@@ -87,6 +87,8 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("    vec4 yOffset[4];");
     line("    vec4 xScale[4];");
     line("    vec4 yScale[4];");
+    line("    bvec4 pointSpriteControl[4];");
+    line("    bvec4 outputFromH;");
     line("} fragmentSamplersInfo;");
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
         if (samplerSizes[i] == 0)
@@ -101,7 +103,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
             line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
             line(ssnprintf("    float xScale = fragmentSamplersInfo.xScale%s;", flipIndex(i)));
             line(ssnprintf("    float yScale = fragmentSamplersInfo.yScale%s;", flipIndex(i)));
-            line(ssnprintf("    int isFlip = fragmentSamplersInfo.flip%s;", flipIndex(i)));            
+            line(ssnprintf("    int isFlip = fragmentSamplersInfo.flip%s;", flipIndex(i)));
             line(ssnprintf("    uvp = isFlip == 0 ? uvp : vec4(xScale * uvp.x, 1 - yScale * uvp.y, uvp.zw);"));
             line(ssnprintf("    return texture(s%d, uvp.xy);", i));
             line("}");
@@ -109,6 +111,21 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         }
     }
     line("void main(void) {");
+    line("    bool outputFromH = fragmentSamplersInfo.outputFromH.x;");
+    line("    bvec4 t0 = fragmentSamplersInfo.pointSpriteControl[0];");
+    line("    bvec4 t1 = fragmentSamplersInfo.pointSpriteControl[1];");
+    line("    bvec4 t2 = fragmentSamplersInfo.pointSpriteControl[2];");
+    line("    bvec4 t3 = fragmentSamplersInfo.pointSpriteControl[3];");
+    line("    vec4 f_TEX0 = (t0[0] && t0[1]) ? vec4(gl_PointCoord, 0, 0) : f_TEX0_varying;");
+    line("    vec4 f_TEX1 = (t0[0] && t0[2]) ? vec4(gl_PointCoord, 0, 0) : f_TEX1_varying;");
+    line("    vec4 f_TEX2 = (t0[0] && t0[3]) ? vec4(gl_PointCoord, 0, 0) : f_TEX2_varying;");
+    line("    vec4 f_TEX3 = (t0[0] && t1[0]) ? vec4(gl_PointCoord, 0, 0) : f_TEX3_varying;");
+    line("    vec4 f_TEX4 = (t0[0] && t1[1]) ? vec4(gl_PointCoord, 0, 0) : f_TEX4_varying;");
+    line("    vec4 f_TEX5 = (t0[0] && t1[2]) ? vec4(gl_PointCoord, 0, 0) : f_TEX5_varying;");
+    line("    vec4 f_TEX6 = (t0[0] && t1[3]) ? vec4(gl_PointCoord, 0, 0) : f_TEX6_varying;");
+    line("    vec4 f_TEX7 = (t0[0] && t2[0]) ? vec4(gl_PointCoord, 0, 0) : f_TEX7_varying;");
+    line("    vec4 f_TEX8 = (t0[0] && t2[1]) ? vec4(gl_PointCoord, 0, 0) : f_TEX8_varying;");
+    line("    vec4 f_TEX9 = (t0[0] && t2[2]) ? vec4(gl_PointCoord, 0, 0) : f_TEX9_varying;");
     line("    vec4 f_WPOS = gl_FragCoord;");
     line("    vec4 c[2];");
     line(ssnprintf("    vec4 r[%d];", lastRReg + 1));
@@ -123,15 +140,15 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         auto str = PrintStatement(st);
         line(str);
     }
-    
+        
     if (isMrt) {
         int regs[] = { 0, 2, 3, 4 };
         for (int i = 0; i < 4 && regs[i] <= lastRReg; ++i) {
             line(ssnprintf("    color[%d] = r[%d];", i, regs[i]));
         }
     } else {
-        line("    color[0] = r[0];");
-        line("    color[1] = r[0];");
+        line("    color[0] = outputFromH ? h[0] : r[0];");
+        line("    color[1] = outputFromH ? h[0] : r[0];");
     }
     line("}");
     return res;
@@ -143,7 +160,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                                  unsigned loadOffset,
                                  std::vector<unsigned>* usedConsts,
                                  bool feedback)
-{   
+{
     std::string res;
     auto line = [&](auto&& s) { res += s; res += "\n"; };
     line("#version 450 core");
@@ -185,6 +202,15 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "    return uintBitsToFloat(readuint(input_idx, offset));\n"
         "}");
     line(
+        "vec4 read_f16vec(uint rank, uint input_idx, uint offset) {\n"
+        "    vec4 vec = vec4( unpackHalf2x16(readuint(input_idx, offset)),\n"
+        "                     unpackHalf2x16(readuint(input_idx, offset + 4)));\n"
+        "    return vec4(vec.x,\n"
+        "                rank > 1 ? vec.y : 0,\n"
+        "                rank > 2 ? vec.z : 0,\n"
+        "                rank > 3 ? vec.w : 1);\n"
+        "}");
+    line(
         "vec4 read_f32vec(uint rank, uint input_idx, uint offset) {\n"
         "    return vec4(readfloat(input_idx, offset),\n"
         "                rank > 1 ? readfloat(input_idx, offset + 4) : 0,\n"
@@ -197,6 +223,13 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "                rank > 1 ? readbyte(input_idx, offset + 1) : 0,\n"
         "                rank > 2 ? readbyte(input_idx, offset + 2) : 0,\n"
         "                rank > 3 ? readbyte(input_idx, offset + 3) : 255) / 255.0;\n"
+        "}");
+     line(
+        "vec4 read_s16vec(uint rank, uint input_idx, uint offset) {\n"
+        "    return vec4((readbyte(input_idx, offset) << 8) | readbyte(input_idx, offset + 1),\n"
+        "                rank > 1 ? ((readbyte(input_idx, offset + 2) << 8) | readbyte(input_idx, offset + 3)) : 0,\n"
+        "                rank > 2 ? ((readbyte(input_idx, offset + 4) << 8) | readbyte(input_idx, offset + 5)) : 0,\n"
+        "                rank > 3 ? ((readbyte(input_idx, offset + 6) << 8) | readbyte(input_idx, offset + 7)) : 65535) / 65535.0;\n"
         "}");
     line(
         "uint get_input_offset(uint i) {\n"
@@ -229,7 +262,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         line("out gl_PerVertex {");
         line("    vec4 gl_Position;");
     }
-    //line("    float gl_PointSize;");
+    line("    float gl_PointSize;");
     //line("    float gl_ClipDistance[];");
     line("};");
     line("out vec4 f_COL0;");
@@ -344,6 +377,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     for (size_t i = 0; i < inputs.size(); ++i) {
         auto type = inputs[i].type == VertexInputType::float32 ? "f32" 
                     : inputs[i].type == VertexInputType::float16 ? "f16"
+                    : inputs[i].type == VertexInputType::s16 ? "s16"
                     : "u8";
         line(ssnprintf(
                 "if (samplersInfo.enabledInputs[%d] == 1) {\n"
@@ -398,6 +432,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    f_TEX7 = v_out[14];");
     line("    f_TEX8 = v_out[15];");
     line("    f_TEX9 = v_out[6];");
+    line("    gl_PointSize = v_out[6].x;");
     line("}");
     
     return res;

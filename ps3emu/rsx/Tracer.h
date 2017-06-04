@@ -131,6 +131,9 @@
     X(PolySmoothEnable) \
     X(PolyOffsetLineEnable) \
     X(PolyOffsetFillEnable) \
+    X(PointSize) \
+    X(PointParamsEnable) \
+    X(PointSpriteControl)
     
 enum class CommandId { CommandIdX };
 #undef X

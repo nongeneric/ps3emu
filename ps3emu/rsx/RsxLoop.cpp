@@ -24,6 +24,10 @@ uint32_t swap16(uint32_t v) {
     return (v >> 16) | (v << 16);
 }
 
+uint32_t swap02(uint32_t val) {
+    return (val & 0xff00ff00) | ((val >> 16) & 0xff) | (((val >> 0) & 0xff) << 16);
+}
+
 std::array<float, 4> parseColor(uint32_t raw) {
     union {
         uint32_t val;
@@ -146,7 +150,8 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
     };
     
     if (header.val == 0) {
-        INFO(rsx) << "rsx nop";
+        assert(header.count.u() == 0);
+        INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, _put);
         return 4;
     }
     if (header.prefix.u() == 1) {
@@ -542,7 +547,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         case 0x000008e4: {
             //name = "CELL_GCM_NV4097_SET_SHADER_PROGRAM";
             auto arg = readarg(1);
-            ShaderProgram(arg & ~0b111ul, (arg & 0b111) - 1);
+            ShaderProgram(arg & ~0b11ul, (arg & 0b11) - 1);
             break;
         }
         case 0x00000904:
@@ -775,7 +780,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         case 0x00001d60: {
             //name = "CELL_GCM_NV4097_SET_SHADER_CONTROL";
             auto arg = readarg(1);
-            ShaderControl(arg & 0xfff, arg >> 24);
+            ShaderControl(arg & 0xe, (arg & 0x40) == 0, arg & 0x80, arg >> 24);
             break;
         }
         case 0x00001d64:
@@ -787,9 +792,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             break;
         case 0x00001d70: {
             //name = "CELL_GCM_NV4097_BACK_END_WRITE_SEMAPHORE_RELEASE";
-            auto value = readarg(1);
-            auto p = (uint8_t*)&value;
-            std::swap(p[0], p[2]);
+            auto value = swap02(readarg(1));
             BackEndWriteSemaphoreRelease(value);
             break;
         }
@@ -889,14 +892,19 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             name = "CELL_GCM_NV4097_SET_SCULL_CONTROL";
             break;
         case 0x00001ee0:
-            name = "CELL_GCM_NV4097_SET_POINT_SIZE";
+            //name = "CELL_GCM_NV4097_SET_POINT_SIZE";
+            PointSize(union_cast<uint32_t, float>(readarg(1)));
             break;
         case 0x00001ee4:
-            name = "CELL_GCM_NV4097_SET_POINT_PARAMS_ENABLE";
+            //name = "CELL_GCM_NV4097_SET_POINT_PARAMS_ENABLE";
+            PointParamsEnable(readarg(1));
             break;
-        case 0x00001ee8:
-            name = "CELL_GCM_NV4097_SET_POINT_SPRITE_CONTROL";
+        case 0x00001ee8: {
+            //name = "CELL_GCM_NV4097_SET_POINT_SPRITE_CONTROL";
+            auto arg = readarg(1);
+            PointSpriteControl(arg & 1, (arg >> 1) & 3, enum_cast<PointSpriteTex>(arg & 0xffff00));
             break;
+        }
         case 0x00001ef8: {
             //name = "CELL_GCM_NV4097_SET_TRANSFORM_TIMEOUT";
             auto arg = readarg(1);
@@ -947,7 +955,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             break;
         case 0x00001ff0:
             //name = "CELL_GCM_NV4097_SET_VERTEX_ATTRIB_INPUT_MASK";
-            VertexAttribInputMask(readarg(1));
+            VertexAttribInputMask(enum_cast<InputMask>(readarg(1)));
             break;
         case 0x00001ff4:
             //name = "CELL_GCM_NV4097_SET_VERTEX_ATTRIB_OUTPUT_MASK";
@@ -1235,7 +1243,8 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             name = "CELL_GCM_NV3089_IMAGE_IN";
             break;
         case 0x0000EB00:
-            name = "CELL_GCM_DRIVER_INTERRUPT";
+            //name = "CELL_GCM_DRIVER_INTERRUPT";
+            DriverInterrupt(readarg(1));
             break;
         case 0x0000E944:
             name = "CELL_GCM_DRIVER_QUEUE";
@@ -1318,16 +1327,18 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_OFFSET";
                 offset = 0x00001680;
-                union {
-                    uint32_t val;
-                    BitField<0, 1> location;
-                    BitField<1, 32> offset;
-                } arg = { readarg(1) };
-                VertexDataArrayOffset(
-                    index,
-                    arg.location.u(),
-                    arg.offset.u()
-                );
+                for (auto i = 0u; i < count; ++i, ++index) {
+                    union {
+                        uint32_t val;
+                        BitField<0, 1> location;
+                        BitField<1, 32> offset;
+                    } arg = { readarg(1 + i) };
+                    VertexDataArrayOffset(
+                        index,
+                        arg.location.u(),
+                        arg.offset.u()
+                    );
+                }
                 break;
             }
             if (isScale(offset,
@@ -1337,20 +1348,22 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_FORMAT";
                 offset = 0x00001740;
-                union {
-                    uint32_t val;
-                    BitField<0, 16> frequency;
-                    BitField<16, 24> stride;
-                    BitField<24, 28> size;
-                    BitField<28, 32> type;
-                } arg = { readarg(1) };
-                VertexDataArrayFormat(
-                    index,
-                    arg.frequency.u(),
-                    arg.stride.u(),
-                    arg.size.u(),
-                    arg.type.u()
-                );
+                for (auto i = 0u; i < count; ++i, ++index) {
+                    union {
+                        uint32_t val;
+                        BitField<0, 16> frequency;
+                        BitField<16, 24> stride;
+                        BitField<24, 28> size;
+                        BitField<28, 32> type;
+                    } arg = { readarg(1 + i) };
+                    VertexDataArrayFormat(
+                        index,
+                        arg.frequency.u(),
+                        arg.stride.u(),
+                        arg.size.u(),
+                        arg.type.u()
+                    );
+                }
                 break;
             }
             if (isScale(offset,
@@ -1528,7 +1541,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             if (isScale(offset,
                         0x00000b00,
                         4,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
+                        16,
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL2";
                 offset = 0x00000b00;
