@@ -7,6 +7,7 @@
 #include "ReservationMap.h"
 #include "ModificationMap.h"
 #include "state.h"
+#include "ps3emu/utils/debug.h"
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <functional>
@@ -160,11 +161,11 @@ public:
                             lost_notify_t notify = {}) {
         static_assert(Len == 4 || Len == 8 || Len == 128);
         if constexpr(Len == 4)
-            assert((va & 0b11) == 0);
+            EMU_ASSERT((va & 0b11) == 0);
         if constexpr(Len == 8)
-            assert((va & 0b111) == 0);
+            EMU_ASSERT((va & 0b111) == 0);
         if constexpr(Len == 128) {
-            va &= ~0b1111111;
+            EMU_ASSERT((va & 0x7f) == 0);
         }
         
         auto granule = g_state.granule;
@@ -224,7 +225,7 @@ public:
     void validate(uint32_t ea, uint32_t len, bool write);
     ProtectionRange addressRange(uint32_t ea);
 #else
-    inline void dbgMemoryBreakpoint(uint32_t ea, int32_t len, bool write);
+    inline void dbgMemoryBreakpoint(uint32_t ea, int32_t len, bool write) { }
     inline void mark(uint32_t ea, uint32_t len, bool readonly, std::string comment) { }
     inline void unmark(uint32_t ea, uint32_t len) { }
     inline void validate(uint32_t ea, uint32_t len, bool write) { }

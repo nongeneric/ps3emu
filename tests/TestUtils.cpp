@@ -26,7 +26,7 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     proc.start(runnerPath, list);
     if (!proc.waitForStarted())
         throw std::runtime_error("can't start process");
-    if (!proc.waitForFinished(120 * 1000))
+    if (!proc.waitForFinished(180 * 1000))
         throw std::runtime_error("process timed out");
     return QString(proc.readAll()).toStdString();
 }

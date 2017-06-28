@@ -6,6 +6,7 @@
 #include "ps3emu/BitField.h"
 #include "ps3emu/ReservationMap.h"
 #include "ps3emu/enum.h"
+#include "ps3emu/utils/debug.h"
 #include "SPUChannels.h"
 #include "R128.h"
 #include <boost/thread.hpp>
@@ -126,12 +127,12 @@ public:
     }
     
     inline uint8_t* ptr(uint32_t lsa) {
-        assert(lsa < sizeof(_ls));
+        EMU_ASSERT(lsa < sizeof(_ls));
         return &_ls[lsa];
     }
     
     inline void setNip(uint32_t nip) override {
-        assert(nip < LSLR);
+        EMU_ASSERT(nip < LSLR);
         _nip = nip;
     }
     
@@ -144,12 +145,12 @@ public:
     }
     
     inline void setSrr0(uint32_t val) {
-        assert(val < LSLR);
+        EMU_ASSERT(val < LSLR);
         _srr0 = val;
     }
     
     inline void setSpu(uint32_t num) {
-        assert(num <= 255);
+        EMU_ASSERT(num <= 255);
         _spu = num;
     }
     

@@ -92,6 +92,7 @@ set(SRC
     libs/savedata/SfoDb.cpp
     libs/spurs.cpp
     libs/memoryContainer.cpp
+    libs/perf.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|PS3">
+      <Configuration>Debug</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|PS3">
+      <Configuration>Release</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{D0C8EC0E-E8FF-494F-98F1-96063E6C380D}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SPU</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SPU</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">PS3_SPU_Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">PS3_SPU_Debug\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);undefined;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'" />
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">false</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">PS3_SPU_Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">PS3_SPU_Release\</IntDir>
+    <ExtensionsToDeleteOnClean Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);undefined;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|PS3'" />
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">false</GenerateManifest>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">merge_sort.spu</TargetName>
+    <SpuElfConversionUseInBuild Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">true</SpuElfConversionUseInBuild>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">merge_sort.spu</TargetName>
+    <SpuElfConversionUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">true</SpuElfConversionUseInBuild>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SN_PS3_PATH)\spu\include\sn;$(SCE_PS3_ROOT)\target\spu\include;$(SCE_PS3_ROOT)\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <PreprocessorDefinitions>SN_TARGET_PS3_SPU;_DEBUG;__GCC__;SPU;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-mspurs-task %(AdditionalOptions)</AdditionalOptions>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+    <PostBuildEvent>
+      <Message>Creating PPU Export Library from Task: "$(TargetName).ppu.obj", located at: "_binary_spu_merge_sort_spu_elf_start"</Message>
+      <Command>cd "$(TargetDir)"
+ppu-lv2-objcopy -I binary -O elf64-powerpc-celloslv2 -B powerpc --set-section-align .data=7 --set-section-pad .data=128 --rename-section .data=.spu_image.spu/$(TargetFileName) --redefine-sym _binary_merge_sort_spu_elf_start=_binary_spu_merge_sort_spu_elf_start --redefine-sym _binary_merge_sort_spu_elf_end=_binary_spu_merge_sort_spu_elf_end --redefine-sym _binary_merge_sort_elf_size=_binary_spu_merge_sort_spu_elf_size "$(TargetFileName)" "$(TargetName).ppu.obj"
+</Command>
+    </PostBuildEvent>
+    <SpuElfConversion>
+      <AdditionalOptions>--symbol-name=spu_merge_sort_spu_elf %(AdditionalOptions)</AdditionalOptions>
+    </SpuElfConversion>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SN_PS3_PATH)\spu\include\sn;$(SCE_PS3_ROOT)\target\spu\include;$(SCE_PS3_ROOT)\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OptimizationLevel>Level2</OptimizationLevel>
+      <PreprocessorDefinitions>SN_TARGET_PS3_SPU;NDEBUG;__GCC__;SPU;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>-mspurs-task %(AdditionalOptions)</AdditionalOptions>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+    <PostBuildEvent>
+      <Message>Creating PPU Export Library from Task: "$(TargetName).ppu.obj", located at: "_binary_spu_merge_sort_spu_elf_start"</Message>
+      <Command>cd "$(TargetDir)"
+ppu-lv2-objcopy -I binary -O elf64-powerpc-celloslv2 -B powerpc --set-section-align .data=7 --set-section-pad .data=128 --rename-section .data=.spu_image.spu/$(TargetFileName) --redefine-sym _binary_merge_sort_spu_elf_start=_binary_spu_merge_sort_spu_elf_start --redefine-sym _binary_merge_sort_spu_elf_end=_binary_spu_merge_sort_spu_elf_end --redefine-sym _binary_merge_sort_elf_size=_binary_spu_merge_sort_spu_elf_size "$(TargetFileName)" "$(TargetName).ppu.obj"
+</Command>
+    </PostBuildEvent>
+    <SpuElfConversion>
+      <AdditionalOptions>--symbol-name=spu_merge_sort_spu_elf %(AdditionalOptions)</AdditionalOptions>
+    </SpuElfConversion>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="merge_sort.cpp" />
+    <ClCompile Include="sort_body.cpp" />
+    <ClCompile Include="sort_on_ls.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="common.h" />
+    <ClInclude Include="matrix_transpose.h" />
+    <ClInclude Include="oe_mergesort.h" />
+    <ClInclude Include="sort_body.h" />
+    <ClInclude Include="sort_on_ls.h" />
+    <ClInclude Include="spuvectortable.h" />
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

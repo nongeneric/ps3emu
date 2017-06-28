@@ -14,6 +14,7 @@ public:
 class BreakpointException : public virtual std::runtime_error {
 public:
     BreakpointException() : std::runtime_error("breakpoint") { }
+    BreakpointException(std::string message) : std::runtime_error(message) { }
 };
 
 class InfiniteLoopException : public virtual std::runtime_error {

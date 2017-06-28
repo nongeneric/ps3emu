@@ -49,27 +49,30 @@ if args.changes:
     lineNum = 1
     with open(args.changes) as f:
         for line in f.readlines():
-            comment = line.find('#')
-            if comment != -1:
-                line = line[0:comment]
-            if comment == 0 or line.strip() == '':
-                continue
-            split = line.split(';')
-            trace = Trace()
-            split2 = split[0].split(':')
-            if len(split2) != 2:
-                sys.stderr.write('parsing error (:) line ' + str(lineNum) + '\n')
-                exit(0)
-            trace.nip = int(split2[1], 16)
-            trace.nip -= imagebase
-            if args.spu:
-                trace.regs = parse_regs(split[1:-1])
-                trace.vregs = []
-            else:
-                trace.regs = parse_regs(split[1:34])
-                trace.vregs = parse_regs(split[34:-1])
-            traces.append(trace)
-            lineNum += 1
+            try:
+                comment = line.find('#')
+                if comment != -1:
+                    line = line[0:comment]
+                if comment == 0 or line.strip() == '':
+                    continue
+                split = line.split(';')
+                trace = Trace()
+                split2 = split[0].split(':')
+                if len(split2) != 2:
+                    sys.stderr.write('parsing error (:) line ' + str(lineNum) + '\n')
+                    exit(0)
+                trace.nip = int(split2[1], 16)
+                trace.nip -= imagebase
+                if args.spu:
+                    trace.regs = parse_regs(split[1:-1])
+                    trace.vregs = []
+                else:
+                    trace.regs = parse_regs(split[1:34])
+                    trace.vregs = parse_regs(split[34:-1])
+                traces.append(trace)
+                lineNum += 1
+            except:
+                pass
             
     print(len(traces), "lines")
     for c, n in zip(traces, traces[1:]):

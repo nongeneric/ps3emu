@@ -77,7 +77,8 @@ void log_unconditional(log_severity_t severity, log_type_t type, log_area_t area
 
 #if LOG_ENABLED
 bool log_should(log_severity_t severity, log_type_t type, log_area_t area) {
-    return severity >= active_severity && (type & active_types) && (area & active_areas);
+    return severity == log_error || (severity >= active_severity &&
+                                     (type & active_types) && (area & active_areas));
 }
 #endif
 

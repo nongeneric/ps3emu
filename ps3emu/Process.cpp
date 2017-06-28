@@ -9,6 +9,7 @@
 #include "Config.h"
 #include "ps3emu/libs/sync/queue.h"
 #include "ps3emu/HeapMemoryAlloc.h"
+#include "ps3emu/utils/debug.h"
 
 #include <SDL2/SDL.h>
 #include "ppu/InterruptPPUThread.h"
@@ -162,8 +163,12 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
         insertSegment({_elf, index, va, size});
     }, 0, g_state.config->x86Paths, &_rewriterStore, false);
     if (!g_state.config->sysPrxInfos.empty()) {
-        assert(_segments.back().va + _segments.back().size <
-               g_state.config->sysPrxInfos.front().imageBase);
+        auto& infos = g_state.config->sysPrxInfos;
+        auto lv2 = std::min_element(begin(infos), end(infos), [&](auto& a, auto& b) {
+            return a.imageBase < b.imageBase;
+        });
+        HARD_ASSERT(lv2 != end(infos));
+        HARD_ASSERT(_segments.back().va + _segments.back().size < lv2->imageBase);
     }
     _prxs.push_back(_elf);
     loadPrxStore();

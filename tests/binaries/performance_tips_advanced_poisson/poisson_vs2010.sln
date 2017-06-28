@@ -1,0 +1,55 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "poisson", "poisson.vcxproj", "{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Framework", "..\..\..\..\..\fw\Framework.vcxproj", "{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "poisson_spu", "poisson_spu.vcxproj", "{6444CBF5-0B4B-4521-B1E4-009F710B88CD}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hl_spurs", "..\..\..\..\..\common\hl\spurs\ppu\hl_spurs_ppu.vcxproj", "{905BEE14-05AB-41CC-A8FC-9A483EF739F9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.Debug|PS3.ActiveCfg = Debug|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.Debug|PS3.Build.0 = Debug|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.Release|PS3.ActiveCfg = Release|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.Release|PS3.Build.0 = Release|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{52839BD7-CA1A-4FDE-B750-6EB0AA057EA5}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.Debug|PS3.ActiveCfg = Debug|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.Debug|PS3.Build.0 = Debug|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.Release|PS3.ActiveCfg = Release|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.Release|PS3.Build.0 = Release|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{2EC13638-539A-4EE8-A6E3-102DCD5B67EB}.SNC Release|PS3.Build.0 = SNC Release|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.Debug|PS3.ActiveCfg = Debug|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.Debug|PS3.Build.0 = Debug|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.Release|PS3.ActiveCfg = Release|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.Release|PS3.Build.0 = Release|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.SNC Debug|PS3.ActiveCfg = Debug|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.SNC Debug|PS3.Build.0 = Debug|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.SNC Release|PS3.ActiveCfg = Release|PS3
+		{6444CBF5-0B4B-4521-B1E4-009F710B88CD}.SNC Release|PS3.Build.0 = Release|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.Debug|PS3.ActiveCfg = Debug|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.Debug|PS3.Build.0 = Debug|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.Release|PS3.ActiveCfg = Release|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.Release|PS3.Build.0 = Release|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{905BEE14-05AB-41CC-A8FC-9A483EF739F9}.SNC Release|PS3.Build.0 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

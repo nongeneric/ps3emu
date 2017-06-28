@@ -58,7 +58,8 @@ ENUM(MfcTag,
     X(MFC_RdAtomicStat   ,27) \
     X(SPU_WrOutMbox      ,28) \
     X(SPU_RdInMbox       ,29) \
-    X(SPU_WrOutIntrMbox  ,30)
+    X(SPU_WrOutIntrMbox  ,30) \
+    X(SPU_PerfBookmark   ,69)
 
 enum SpuChannels { SpuChannelsX };
 #undef X
@@ -208,7 +209,7 @@ class SPUChannels {
     ConcurrentBoundedQueue<uint32_t> _outboundMailbox;
     ConcurrentBoundedQueue<uint32_t> _outboundInterruptMailbox;
     ConcurrentBoundedQueue<uint32_t> _inboundMailbox;
-    std::array<std::atomic<uint32_t>, 28> _channels;
+    std::array<std::atomic<uint32_t>, SPU_PerfBookmark + 1> _channels;
     std::atomic<uint32_t> _spuStatus;
     std::atomic<uint32_t> _interrupt2;
     SpuEvent _event;

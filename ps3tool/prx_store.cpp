@@ -61,7 +61,7 @@ void mapPrxStore() {
     });
     
     RewriterStore rewriterStore;
-    auto imageBase = 30 << 20;
+    auto imageBase = 32 << 20;
     for (auto& prxPath : prxPaths) {
         auto& prxInfos = g_state.config->sysPrxInfos;
         auto name = prxPath.filename().string();

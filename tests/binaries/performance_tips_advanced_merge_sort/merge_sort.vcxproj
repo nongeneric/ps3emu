@@ -1,0 +1,242 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project
+	 DefaultTargets="Build"
+	 ToolsVersion="4.0"
+	 xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup
+		 Label="ProjectConfigurations">
+		<ProjectConfiguration
+			 Include="Debug|PS3">
+			<Configuration>Debug</Configuration>
+			<Platform>PS3</Platform>
+		</ProjectConfiguration>
+		<ProjectConfiguration
+			 Include="Release|PS3">
+			<Configuration>Release</Configuration>
+			<Platform>PS3</Platform>
+		</ProjectConfiguration>
+		<ProjectConfiguration
+			 Include="SNC Debug|PS3">
+			<Configuration>SNC Debug</Configuration>
+			<Platform>PS3</Platform>
+		</ProjectConfiguration>
+		<ProjectConfiguration
+			 Include="SNC Release|PS3">
+			<Configuration>SNC Release</Configuration>
+			<Platform>PS3</Platform>
+		</ProjectConfiguration>
+	</ItemGroup>
+	<PropertyGroup
+		 Label="Globals">
+		<ProjectGuid>{D59FC8BE-3D52-4734-AFCC-1BD2DA0125CB}</ProjectGuid>
+		<RootNamespace>merge_sort</RootNamespace>
+	</PropertyGroup>
+	<Import
+		 Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props"
+	 />
+	<PropertyGroup
+		 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'"
+		 Label="Configuration">
+		<ConfigurationType>Application</ConfigurationType>
+		<PlatformToolset>SNC</PlatformToolset>
+		<ExceptionsAndRtti>NoExceptsNoRtti</ExceptionsAndRtti>
+	</PropertyGroup>
+	<PropertyGroup
+		 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'"
+		 Label="Configuration">
+		<ConfigurationType>Application</ConfigurationType>
+		<PlatformToolset>SNC</PlatformToolset>
+		<ExceptionsAndRtti>NoExceptsNoRtti</ExceptionsAndRtti>
+	</PropertyGroup>
+	<PropertyGroup
+		 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'"
+		 Label="Configuration">
+		<ConfigurationType>Application</ConfigurationType>
+		<PlatformToolset>GCC</PlatformToolset>
+		<ExceptionsAndRtti>NoExceptsNoRtti</ExceptionsAndRtti>
+	</PropertyGroup>
+	<PropertyGroup
+		 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'"
+		 Label="Configuration">
+		<ConfigurationType>Application</ConfigurationType>
+		<PlatformToolset>GCC</PlatformToolset>
+		<ExceptionsAndRtti>NoExceptsNoRtti</ExceptionsAndRtti>
+	</PropertyGroup>
+	<Import
+		 Project="$(VCTargetsPath)\Microsoft.Cpp.props"
+	 />
+	<ImportGroup
+		 Label="ExtensionSettings">
+	</ImportGroup>
+	<ImportGroup
+		 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'"
+		 Label="PropertySheets">
+		<Import
+			 Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+			 Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+			 Label="LocalAppDataPlatform"
+		 />
+	</ImportGroup>
+	<ImportGroup
+		 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'"
+		 Label="PropertySheets">
+		<Import
+			 Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+			 Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+			 Label="LocalAppDataPlatform"
+		 />
+	</ImportGroup>
+	<ImportGroup
+		 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'"
+		 Label="PropertySheets">
+		<Import
+			 Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+			 Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+			 Label="LocalAppDataPlatform"
+		 />
+	</ImportGroup>
+	<ImportGroup
+		 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'"
+		 Label="PropertySheets">
+		<Import
+			 Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+			 Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+			 Label="LocalAppDataPlatform"
+		 />
+	</ImportGroup>
+	<PropertyGroup
+		 Label="UserMacros"
+	 />
+	<PropertyGroup>
+		<_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+		<OutDir
+			 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">PS3_PPU_Debug\</OutDir>
+		<IntDir
+			 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">PS3_PPU_Debug\</IntDir>
+		<ExtensionsToDeleteOnClean
+			 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+		<LinkIncremental
+			 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'"
+		 />
+		<GenerateManifest
+			 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">false</GenerateManifest>
+		<OutDir
+			 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">PS3_PPU_Release\</OutDir>
+		<IntDir
+			 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">PS3_PPU_Release\</IntDir>
+		<ExtensionsToDeleteOnClean
+			 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+		<LinkIncremental
+			 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'"
+		 />
+		<GenerateManifest
+			 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">false</GenerateManifest>
+		<OutDir
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">PS3_PPU_Debug_SNC\</OutDir>
+		<IntDir
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">PS3_PPU_Debug_SNC\</IntDir>
+		<ExtensionsToDeleteOnClean
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+		<LinkIncremental
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'"
+		 />
+		<GenerateManifest
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">false</GenerateManifest>
+		<OutDir
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">PS3_PPU_Release_SNC\</OutDir>
+		<IntDir
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">PS3_PPU_Release_SNC\</IntDir>
+		<ExtensionsToDeleteOnClean
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath);$(TargetDir)$(TargetName).self;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+		<LinkIncremental
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'"
+		 />
+		<GenerateManifest
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">false</GenerateManifest>
+		<TargetName
+			 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">$(ProjectName)</TargetName>
+		<TargetName
+			 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">$(ProjectName)</TargetName>
+		<TargetName
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">$(ProjectName)</TargetName>
+		<TargetName
+			 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">$(ProjectName)</TargetName>
+	</PropertyGroup>
+	<ItemDefinitionGroup
+		 Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+		<ClCompile>
+			<AdditionalIncludeDirectories>$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;..\..\..\..\..\common\hl\spurs\ppu;..\..\common\ppu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<PreprocessorDefinitions>SN_TARGET_PS3;_DEBUG;__GCC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+			<GenerateDebugInformation>true</GenerateDebugInformation>
+		</ClCompile>
+		<Link>
+			<AdditionalDependencies>$(SN_PS3_PATH)\ppu\lib\sn\libsn.a;$(SCE_PS3_ROOT)\target\ppu\lib\libm.a;$(SCE_PS3_ROOT)\target\ppu\lib\libio_stub.a;$(SCE_PS3_ROOT)\target\ppu\lib\libspurs_stub.a;-lperf;%(AdditionalDependencies)</AdditionalDependencies>
+		</Link>
+	</ItemDefinitionGroup>
+	<ItemDefinitionGroup
+		 Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+		<ClCompile>
+			<AdditionalIncludeDirectories>$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;..\..\..\..\..\common\hl\spurs\ppu;..\..\common\ppu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<PreprocessorDefinitions>SN_TARGET_PS3;NDEBUG;__GCC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+			<OptimizationLevel>Level2</OptimizationLevel>
+		</ClCompile>
+		<Link>
+			<AdditionalDependencies>$(SN_PS3_PATH)\ppu\lib\sn\libsn.a;$(SCE_PS3_ROOT)\target\ppu\lib\libm.a;$(SCE_PS3_ROOT)\target\ppu\lib\libio_stub.a;$(SCE_PS3_ROOT)\target\ppu\lib\libspurs_stub.a;-lperf;%(AdditionalDependencies)</AdditionalDependencies>
+		</Link>
+	</ItemDefinitionGroup>
+	<ItemDefinitionGroup
+		 Condition="'$(Configuration)|$(Platform)'=='SNC Debug|PS3'">
+		<ClCompile>
+			<AdditionalOptions>--multibyte_chars %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalIncludeDirectories>$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;..\..\..\..\..\common\hl\spurs\ppu;..\..\common\ppu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<PreprocessorDefinitions>SN_TARGET_PS3;_DEBUG;__SNC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+			<GenerateDebugInformation>true</GenerateDebugInformation>
+		</ClCompile>
+		<Link>
+			<AdditionalDependencies>$(SN_PS3_PATH)\ppu\lib\sn\libsn.a;$(SCE_PS3_ROOT)\target\ppu\lib\libm.a;$(SCE_PS3_ROOT)\target\ppu\lib\libio_stub.a;$(SCE_PS3_ROOT)\target\ppu\lib\libspurs_stub.a;-lperf;%(AdditionalDependencies)</AdditionalDependencies>
+		</Link>
+	</ItemDefinitionGroup>
+	<ItemDefinitionGroup
+		 Condition="'$(Configuration)|$(Platform)'=='SNC Release|PS3'">
+		<ClCompile>
+			<AdditionalOptions>--multibyte_chars %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalIncludeDirectories>$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;..\..\..\..\..\common\hl\spurs\ppu;..\..\common\ppu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<PreprocessorDefinitions>SN_TARGET_PS3;NDEBUG;__SNC__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+			<OptimizationLevel>Level2</OptimizationLevel>
+		</ClCompile>
+		<Link>
+			<AdditionalDependencies>$(SN_PS3_PATH)\ppu\lib\sn\libsn.a;$(SCE_PS3_ROOT)\target\ppu\lib\libm.a;$(SCE_PS3_ROOT)\target\ppu\lib\libio_stub.a;$(SCE_PS3_ROOT)\target\ppu\lib\libspurs_stub.a;-lperf;%(AdditionalDependencies)</AdditionalDependencies>
+		</Link>
+	</ItemDefinitionGroup>
+	<ItemGroup>
+		<ClCompile
+			 Include="main.cpp"
+		 />
+	</ItemGroup>
+	<ItemGroup>
+		<None
+			 Include="readme_e.txt"
+		 />
+		<None
+			 Include="readme_j.txt"
+		 />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference
+			 Include="..\..\..\..\..\common\hl\spurs\ppu\hl_spurs_ppu.vcxproj">
+			<Project>{905bee14-05ab-41cc-a8fc-9a483ef739f9}</Project>
+			<ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+		</ProjectReference>
+		<ProjectReference
+			 Include="spu\merge_sort_spu.vcxproj">
+			<Project>{d0c8ec0e-e8ff-494f-98f1-96063e6c380d}</Project>
+			<ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+		</ProjectReference>
+	</ItemGroup>
+	<Import
+		 Project="$(VCTargetsPath)\Microsoft.Cpp.targets"
+	 />
+	<ImportGroup
+		 Label="ExtensionTargets">
+	</ImportGroup>
+</Project>

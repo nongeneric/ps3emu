@@ -281,3 +281,8 @@ TEST_CASE("spu_render") {
     runAndWait("./binaries/spu_render/a.elf", false, true);
     compareLastFrame("./binaries/spu_render/ps3frame0.png", 0);
 }
+
+TEST_CASE("performance_tips_advanced_poisson") {
+    runAndWait("./binaries/performance_tips_advanced_poisson/a.elf", false, true);
+    compareLastFrame("./binaries/performance_tips_advanced_poisson/ps3frame0.png", 0);
+}

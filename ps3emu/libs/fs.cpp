@@ -39,9 +39,15 @@ CellFsErrno sys_fs_lseek(int32_t fd,
 CellFsErrno sys_fs_read(int32_t fd,
                         ps3_uintptr_t buf,
                         uint64_t nbytes,
-                        big_uint64_t* nread,
-                        MainMemory* mm) {
-    return cellFsRead(fd, buf, nbytes, nread, mm);
+                        big_uint64_t* nread) {
+    return cellFsRead(fd, buf, nbytes, nread, g_state.mm);
+}
+
+CellFsErrno sys_fs_write(int32_t fd,
+                        ps3_uintptr_t buf,
+                        uint64_t nbytes,
+                        big_uint64_t* nwrite) {
+    return cellFsWrite(fd, buf, nbytes, nwrite, g_state.mm);
 }
 
 CellFsErrno sys_fs_close(int32_t fd) {

@@ -2795,3 +2795,12 @@ TEST_CASE("gcm_cube_tls_callback") {
         "tls int: 206\n"
     );
 }
+
+TEST_CASE("performance_tips_advanced_merge_sort") {
+    test_interpreter_and_rewriter({"./binaries/performance_tips_advanced_merge_sort/a.elf"},
+        "Initilaize Sort Data ... Done\n"
+        "initializing communication\n"
+        "Check Sorted Data ... done\n"
+        "SPURS task finished\n"
+    );
+}

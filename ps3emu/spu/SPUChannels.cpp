@@ -6,6 +6,8 @@
 #include "ps3emu/state.h"
 #include "ps3emu/Process.h"
 #include "ps3emu/int.h"
+#include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/utils/debug.h"
 #include <stdexcept>
 #include <algorithm>
 
@@ -130,9 +132,10 @@ void SPUChannels::command(uint32_t word) {
     assert(cmd.rid.u() == 0);
     auto eal = _channels[MFC_EAL].load();
     assert(_channels[MFC_EAH] == 0);
-    auto lsaVa = _channels[MFC_LSA].load();
-    auto lsa = _thread->ls(lsaVa);
+    auto lsaVa = _channels[MFC_LSA].load() & LSLR;
     auto size = _channels[MFC_Size].load();
+    EMU_ASSERT(subset<uint32_t>(lsaVa, size, 0, LocalStorageSize));
+    auto lsa = _thread->ls(lsaVa);
     auto opcode = cmd.opcode.u();
     auto name = mfcCommandToString(opcode);
     auto tag = _channels[MFC_TagID].load();
@@ -196,7 +199,8 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTRB_CMD: {
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
-            log();
+            INFO(spu) << ssnprintf("%s(%x, %x, %x) %x: %s", name, size, lsaVa, eal, tag, print_hex(lsa, std::max<uint32_t>(size, 0x100), false));
+            //log();
             break;
         }
         case MFC_GETL_CMD:
@@ -274,7 +278,7 @@ unsigned SPUChannels::readCount(unsigned ch) {
 }
 
 void SPUChannels::write(unsigned ch, uint32_t data) {
-    assert(ch <= SPU_WrOutIntrMbox);
+    EMU_ASSERT(ch <= SPU_WrOutIntrMbox || ch == SPU_PerfBookmark);
     if (ch == SPU_WrEventMask) {
         _event.setMask(data);
     } else if (ch == SPU_WrEventAck) {

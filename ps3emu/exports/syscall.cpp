@@ -9,6 +9,7 @@
 #include "ps3emu/libs/sync/queue.h"
 #include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/libs/memoryContainer.h"
+#include "ps3emu/libs/perf.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 
@@ -110,6 +111,7 @@ void PPUThread::scall() {
         case 818: wrap(sys_fs_lseek, this); break;
         case 809: wrap(sys_fs_fstat, this); break;
         case 802: wrap(sys_fs_read, this); break;
+        case 803: wrap(sys_fs_write, this); break;
         case 804: wrap(sys_fs_close, this); break;
         case 137: wrap(sys_event_port_disconnect, this); break;
         case 135: wrap(sys_event_port_destroy, this); break;
@@ -155,6 +157,7 @@ void PPUThread::scall() {
         case 324: wrap(sys_memory_container_create, this); break;
         case 343: wrap(sys_memory_container_get_size, this); break;
         case 497: wrap(sys_prx_load_module_on_memcontainer, this); break;
+        case 962: wrap(sys_perf_insert_cbe_bookmark, this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }
