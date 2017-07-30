@@ -1,9 +1,11 @@
 #pragma once
 
+#include "ps3emu/log.h"
 #include "ps3emu/utils.h"
 #include "ps3emu/BitField.h"
 #include "ps3emu/spu/R128.h"
 #include "ps3emu/ReservationMap.h"
+#include "ps3emu/ppu/ppu_dasm.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread.hpp>
@@ -133,10 +135,14 @@ class PPUThread {
     std::function<void(PPUThread*, PPUThreadEvent)> _eventHandler;
     boost::thread _thread;
     bool _init;
-#ifdef DEBUGPAUSE
+
+    // placing these variables under an ifdef will change the
+    // object size and memory layout, thus invalidating
+    // prx store and any other rewritten code
+    // it is safer to leave them here
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
-#endif
+    
     bool _isStackInfoSet;
     uint32_t _stackBase;
     uint32_t _stackSize;

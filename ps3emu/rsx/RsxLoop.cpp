@@ -706,11 +706,13 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         case 0x00001814: {
             //name = "CELL_GCM_NV4097_DRAW_ARRAYS";
             auto arg = readarg(1);
-            auto vertexCount = (arg >> 24) + 1;
             if (drawArrayFirst == -1u) {
                 drawArrayFirst = arg & 0xffffff;
             }
-            drawCount += vertexCount * count;
+            for (auto i = 1u; i <= count; ++i) {
+                arg = readarg(i);
+                drawCount += (arg >> 24) + 1;
+            }
             break;
         }
         case 0x00001818:
@@ -719,21 +721,32 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             break;
         case 0x0000181c: {
             //name = "CELL_GCM_NV4097_SET_INDEX_ARRAY_ADDRESS";
-            auto arg2 = readarg(2);
-            IndexArrayAddress(arg2 & 0xf, readarg(1), arg2 >> 4);
+            if (count == 1) {
+                IndexArrayAddress1(readarg(1));
+            } else {
+                assert(count == 2);
+                auto arg2 = readarg(2);
+                IndexArrayAddress(arg2 & 0xf, readarg(1), enum_cast<GcmDrawIndexArrayType>(arg2 >> 4));
+            }
             break;
         }
-        case 0x00001820:
-            name = "CELL_GCM_NV4097_SET_INDEX_ARRAY_DMA";
+        case 0x00001820: {
+            //name = "CELL_GCM_NV4097_SET_INDEX_ARRAY_DMA";
+            auto arg = readarg(1);
+            IndexArrayDma(arg & 0xf, enum_cast<GcmDrawIndexArrayType>(arg >> 4));
+            assert(count == 1);
             break;
+        }
         case 0x00001824: {
             //name = "CELL_GCM_NV4097_DRAW_INDEX_ARRAY";
             auto arg = readarg(1);
-            auto indexCount = (arg >> 24) + 1;
             if (drawIndexFirst == -1u) {
                 drawIndexFirst = arg & 0xffffff;
             }
-            drawCount = indexCount * count;
+            for (auto i = 1u; i <= count; ++i) {
+                arg = readarg(i);
+                drawCount += (arg >> 24) + 1;
+            }
             break;
         }
         case 0x00001828:
@@ -1361,7 +1374,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                         arg.frequency.u(),
                         arg.stride.u(),
                         arg.size.u(),
-                        arg.type.u()
+                        enum_cast<VertexInputType>(arg.type.u())
                     );
                 }
                 break;

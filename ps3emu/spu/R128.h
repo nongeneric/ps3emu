@@ -58,7 +58,7 @@ public:
         _xmm = r._xmm;
     }
     
-    inline __m128i xmm() {
+    inline __m128i xmm() const {
         return _xmm;
     }
     
@@ -66,7 +66,7 @@ public:
         _xmm = xmm;
     }
     
-    inline __m128 xmm_f() {
+    inline __m128 xmm_f() const {
         return _mm_castsi128_ps(_xmm);
     }
     
@@ -74,7 +74,7 @@ public:
         _xmm = _mm_castps_si128(xmm);
     }
     
-    inline __m128d xmm_d() {
+    inline __m128d xmm_d() const {
         return _mm_castsi128_pd(_xmm);
     }
     
@@ -82,7 +82,7 @@ public:
         _xmm = _mm_castpd_si128(xmm);
     }
     
-    inline uint8_t b(int n) {
+    inline uint8_t b(int n) const {
         uint8_t vec[16];
         memcpy(vec, &_xmm, 16);
         return vec[15 - n];
@@ -95,7 +95,7 @@ public:
         memcpy(&_xmm, vec, 16);
     }
     
-    inline int16_t hw(int n) {
+    inline int16_t hw(int n) const {
         int16_t vec[8];
         memcpy(vec, &_xmm, 16);
         return vec[7 - n];
@@ -113,7 +113,7 @@ public:
         return (int32_t)_mm_extract_epi32(_xmm, 3 - N);
     }
     
-    inline int32_t w(int n) {
+    inline int32_t w(int n) const {
         int32_t vec[4];
         memcpy(vec, &_xmm, 16);
         return vec[3 - n];
@@ -127,11 +127,11 @@ public:
     }
     
     template <int N>
-    int64_t dw() {
+    int64_t dw() const {
         return (int64_t)_mm_extract_epi64(_xmm, 1 - N);
     }
     
-    inline int64_t dw(int n) {
+    inline int64_t dw(int n) const {
         int64_t vec[2];
         memcpy(vec, &_xmm, 16);
         return vec[1 - n];
@@ -144,7 +144,7 @@ public:
         memcpy(&_xmm, vec, 16);
     }
     
-    inline float fs(int n) {
+    inline float fs(int n) const {
         float vec[4];
         memcpy(vec, &_xmm, 16);
         return vec[3 - n];
@@ -157,7 +157,7 @@ public:
         memcpy(&_xmm, vec, 16);
     }
     
-    inline double fd(int n) {
+    inline double fd(int n) const {
         double vec[2];
         memcpy(vec, &_xmm, 16);
         return vec[1 - n];
@@ -170,7 +170,7 @@ public:
         memcpy(&_xmm, vec, 16);
     }
     
-    inline int16_t hw_pref() {
+    inline int16_t hw_pref() const {
         return hw(1);
     }
 };

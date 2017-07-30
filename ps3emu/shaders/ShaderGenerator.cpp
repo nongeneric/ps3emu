@@ -203,8 +203,8 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "}");
     line(
         "vec4 read_f16vec(uint rank, uint input_idx, uint offset) {\n"
-        "    vec4 vec = vec4( unpackHalf2x16(readuint(input_idx, offset)),\n"
-        "                     unpackHalf2x16(readuint(input_idx, offset + 4)));\n"
+        "    vec4 vec = vec4( unpackHalf2x16(readuint(input_idx, offset)).yx,\n"
+        "                     unpackHalf2x16(readuint(input_idx, offset + 4)).yx);\n"
         "    return vec4(vec.x,\n"
         "                rank > 1 ? vec.y : 0,\n"
         "                rank > 2 ? vec.z : 0,\n"
@@ -230,6 +230,25 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "                rank > 1 ? ((readbyte(input_idx, offset + 2) << 8) | readbyte(input_idx, offset + 3)) : 0,\n"
         "                rank > 2 ? ((readbyte(input_idx, offset + 4) << 8) | readbyte(input_idx, offset + 5)) : 0,\n"
         "                rank > 3 ? ((readbyte(input_idx, offset + 6) << 8) | readbyte(input_idx, offset + 7)) : 65535) / 65535.0;\n"
+        "}");
+     line(
+        "vec4 read_x11y11z10nvec(uint rank, uint input_idx, uint offset) {\n"
+        "    int u = int(readuint(input_idx, offset));\n"
+        "    return vec4((float(bitfieldExtract(u, 21, 11)) + 0.5) / 1023.5,\n"
+        "                rank > 1 ? (float(bitfieldExtract(u, 10, 11)) + 0.5) / 1023.5 : 0,\n"
+        "                rank > 2 ? (float(bitfieldExtract(u, 0, 10)) + 0.5) / 511.5 : 0,\n"
+        "                rank > 3 ? 1 : 0);\n"
+        "}");
+     line(
+        "vec4 read_s1vec(uint rank, uint input_idx, uint offset) {\n"
+        "    float u0 = int((readbyte(input_idx, offset) << 8) | readbyte(input_idx, offset + 1));\n"
+        "    float u1 = int((readbyte(input_idx, offset + 2) << 8) | readbyte(input_idx, offset + 3));\n"
+        "    float u2 = int((readbyte(input_idx, offset + 4) << 8) | readbyte(input_idx, offset + 5));\n"
+        "    float u3 = int((readbyte(input_idx, offset + 6) << 8) | readbyte(input_idx, offset + 7));\n"
+        "    return vec4((2.0 * u0 + 1.0) / 65535.0,\n"
+        "                rank > 1 ? (2.0 * u1 + 1.0) / 65535.0 : 0,\n"
+        "                rank > 2 ? (2.0 * u2 + 1.0) / 65535.0 : 0,\n"
+        "                rank > 3 ? (2.0 * u3 + 1.0) / 65535.0 : 0);\n"
         "}");
     line(
         "uint get_input_offset(uint i) {\n"
@@ -375,15 +394,13 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         line(ssnprintf("    v_out[%d] = vec4(0,0,0,1);", i));
     }
     for (size_t i = 0; i < inputs.size(); ++i) {
-        auto type = inputs[i].type == VertexInputType::float32 ? "f32" 
-                    : inputs[i].type == VertexInputType::float16 ? "f16"
-                    : inputs[i].type == VertexInputType::s16 ? "s16"
-                    : "u8";
+        auto type = to_string(inputs[i].type);
+        auto rank = inputs[i].type == VertexInputType::x11y11z10n ? 4 : inputs[i].rank;
         line(ssnprintf(
                 "if (samplersInfo.enabledInputs[%d] == 1) {\n"
                 "    v_in[%d] = read_%svec(%d, %d, get_input_offset(%d));\n"
                 "} else { v_in[%d] = samplersInfo.disabledInputValues[%d]; }",
-                i, i, type, inputs[i].rank, i, i, i, i));
+                i, i, type, rank, i, i, i, i));
     }
     std::vector<Statement*> sts;
     std::array<VertexInstr, 2> instr;

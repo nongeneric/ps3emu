@@ -1,6 +1,7 @@
 #include "ps3tool.h"
 #include "ps3emu/shaders/shader_dasm.h"
 #include "ps3emu/shaders/ShaderGenerator.h"
+#include "ps3emu/fileutils.h"
 
 #include <stdio.h>
 #include <cstdint>
@@ -15,22 +16,26 @@ struct ShaderHeader {
 };
 
 void HandleShaderDasm(ShaderDasmCommand const& command) {
-    auto f = fopen(command.binary.c_str(), "r");
-    if (!f) {
-        throw std::runtime_error("can't open shader file\n");
+    auto vec = read_all_bytes(command.binary);
+    uint8_t* code;
+    if (command.naked) {
+        code = &vec[0];
+    } else {
+        auto header = (ShaderHeader*)&vec[0];
+        code = &vec[0] + header->codeOffset;
     }
-    fseek(f, 0, SEEK_END);
 
-    std::vector<uint8_t> vec(ftell(f));
-    fseek(f, 0, SEEK_SET);
-    fread(&vec[0], vec.size(), 1, f);
-    fclose(f);
-
-    auto header = (ShaderHeader*)&vec[0];
-    auto code = &vec[0] + header->codeOffset;
-
-    auto dasm = PrintVertexProgram(code, false);
-    printf("%s\n\n", dasm.c_str());
-    auto glsl = GenerateVertexShader(code, {}, {}, 0);
-    printf("%s", glsl.c_str());
+    if (command.vertex) {
+        auto bytecode = PrintVertexBytecode(code);
+        printf("%s\n", bytecode.c_str());
+        auto dasm = PrintVertexProgram(code, false);
+        printf("%s\n", dasm.c_str());
+        auto glsl = GenerateVertexShader(code, {}, {}, 0);
+        printf("%s", glsl.c_str());
+    } else {
+        auto bytecode = PrintFragmentBytecode(code);
+        printf("%s\n", bytecode.c_str());
+        auto asmText = PrintFragmentProgram(code);
+        printf("%s", asmText.c_str());
+    }
 }

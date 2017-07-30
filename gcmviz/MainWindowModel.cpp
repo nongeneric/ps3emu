@@ -23,8 +23,11 @@
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/shaders/shader_dasm.h"
 #include "ps3emu/libs/graphics/gcm.h"
+#include "ps3emu/ImageUtils.h"
+#include "ps3emu/fileutils.h"
 #include "OpenGLPreview.h"
 #include "OpenGLPreviewWidget.h"
+#include "emmintrin.h"
 
 #define GCM_EMU
 #include <gcm_tool.h>
@@ -245,7 +248,7 @@ public:
         auto regular = _rsx->context()->textureCache.cacheSnapshot();
         auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
         
-        uint32_t width, height;
+        uint32_t width, height, levels;
         GLuint handle;
         
         bool isRegular = row < regular.size();
@@ -255,13 +258,19 @@ public:
             handle = info.value->handle();
             width = info.key.width;
             height = info.key.height;
+            levels = info.value->info().mipmap;
         } else {
             row -= regular.size();
             auto entry = framebuffer[row];
             handle = entry.texture->handle();
             width = entry.texture->width();
             height = entry.texture->height();
+            levels = 1;
         }
+        
+        execInRsxThread(_rsx, [&] {
+            dumpOpenGLTextureAllImages(handle, false, levels, "/tmp", "last_texture");
+        });
         
         QImage background(width, height, QImage::Format_RGBA8888);
         for (auto x = 0u; x < width; ++x) {
@@ -475,15 +484,31 @@ public:
         
         if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size()) {
             switch (index.column()) {
+                case 0: return "INDEX";
+                case 1: return "ARRAY";
+                case 2: return "";
+                case 3: return QString::fromStdString(ssnprintf("#%08x", _rsx->context()->indexArray.offset));
+                case 4: return _rsx->context()->indexArray.location == MemoryLocation::Local ? "Local" : "Main";
+                case 5: return "";
+                case 6: return "";
+                case 7: return "";
+                case 8: return QString::fromStdString(to_string(_rsx->context()->indexArray.type));
+                case 9: return "";
+                case 10: return "";
+            }
+        }
+        
+        if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size() + 1) {
+            switch (index.column()) {
                 case 0: return "TRANSFORM";
                 case 1: return "FEEDBACK";
                 case 2: return "";
                 case 3: return 0;
                 case 4: return 12;
                 case 5: return _rsx->context()->feedbackCount;
-                case 6: return "float";
+                case 6: return "";
                 case 7: return "";
-                case 8: return "";
+                case 8: return "float";
                 case 9: return "";
                 case 10: return "";
             }
@@ -505,9 +530,7 @@ public:
             case 5: return QString::fromStdString(ssnprintf("%d", vda.frequency));
             case 6: return QString::fromStdString(ssnprintf("%d", vda.stride));
             case 7: return QString::fromStdString(ssnprintf("%d", vda.size));
-            case 8: return vda.type == CELL_GCM_VERTEX_UB ? "uint8_t"
-                         : vda.type == CELL_GCM_VERTEX_F ? "float"
-                         : "unknown";
+            case 8: return QString::fromStdString(to_string(vda.type));
             case 9: return op ? "MODULO" : "DIVIDE";
             case 10: {
                 auto uniform = (VertexShaderSamplerUniform*)_rsx->context()->vertexSamplersBuffer.mapped();
@@ -530,7 +553,7 @@ public:
     }
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
-        return _rsx->context()->vertexDataArrays.size() + 1;
+        return _rsx->context()->vertexDataArrays.size() + 2;
     }
 };
 
@@ -570,6 +593,8 @@ public:
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
+        if (_info.type == VertexInputType::x11y11z10n)
+            return 5;
         return _info.size + 1;
     }
     
@@ -582,13 +607,55 @@ public:
             return QString::fromStdString(ssnprintf("#%08x", offset));
         }
         
-        auto typeSize = _info.type == CELL_GCM_VERTEX_UB ? 1 : 4;
+        auto typeSize = vertexDataArrayTypeSize(_info.type);
         auto valueOffset = offset + (index.column() - 1) * typeSize;
         
-        if (_info.type == CELL_GCM_VERTEX_UB) {
-            uint8_t u8Value = *(uint8_t*)&_buffer[valueOffset];    
+        if (_info.type == VertexInputType::x11y11z10n) {
+            union {
+                uint32_t val;
+                BitField<0, 11> r;
+                BitField<11, 22> g;
+                BitField<22, 32> b;
+            } t = { *(uint32_t*)&_buffer[offset] };
+            float rgb[] {
+                (t.r.s() + 0.5f) / 1023.5f,
+                (t.g.s() + 0.5f) / 1023.5f,
+                (t.b.s() + 0.5f) / 511.5f,
+                1.f,
+            };
+            auto component = index.column() - 1;
+            assert(component < int(sizeof(rgb) / sizeof(float)));
+            return rgb[component];
+        }
+        
+        if (_info.type == VertexInputType::s1) {
+            assert(_be);
+            auto u16 = *(big_uint16_t*)&_buffer[valueOffset];
+            return (2.0 * u16 + 1.0) / 65535.0;
+        }
+        
+        if (_info.type == VertexInputType::f16) {
+            assert(_be);
+            auto u16 = *(big_uint16_t*)&_buffer[valueOffset];
+            return _cvtsh_ss(u16);
+        }
+        
+        if (_info.type == VertexInputType::u8) {
+            uint8_t u8Value = *(uint8_t*)&_buffer[valueOffset];
             return QString::fromStdString(ssnprintf("#%02x", u8Value));
-        } else {
+        }
+        
+        if (_info.type == VertexInputType::u16) {
+            uint16_t value = *(big_uint16_t*)&_buffer[valueOffset];
+            return QString::fromStdString(ssnprintf("#%04x", value));
+        }
+        
+        if (_info.type == VertexInputType::u32) {
+            uint32_t value = *(big_uint32_t*)&_buffer[valueOffset];
+            return QString::fromStdString(ssnprintf("#%08x", value));
+        }
+        
+        if (_info.type == VertexInputType::f32) {
             float fValue = union_cast<uint32_t, float>(endian_reverse(*(uint32_t*)&_buffer[valueOffset]));
             if (!_be) {
                 fValue = union_cast<uint32_t, float>(*(uint32_t*)&_buffer[valueOffset]);
@@ -755,11 +822,22 @@ void MainWindowModel::update() {
         uint8_t* mapped;
         VertexDataArrayFormatInfo info = {};
         bool be;
-        if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size()) {
+        auto size = _rsx->context()->vertexDataArrays.size();
+        if ((unsigned)index.row() == size) {
+            info.frequency = 0;
+            info.stride =
+                _rsx->context()->indexArray.type == GcmDrawIndexArrayType::_16 ? 2 : 4;
+            info.size = 1;
+            info.type = _rsx->context()->indexArray.type == GcmDrawIndexArrayType::_16
+                            ? VertexInputType::u16
+                            : VertexInputType::u32;
+            mapped = _rsx->context()->feedbackBuffer.mapped();
+            be = true;
+        } else if ((unsigned)index.row() == size + 1) {
             info.frequency = 0;
             info.stride = 16;
             info.size = 4;
-            info.type = CELL_GCM_VERTEX_F;
+            info.type = VertexInputType::f32;
             mapped = _rsx->context()->feedbackBuffer.mapped();
             be = false;
         } else {

@@ -9,6 +9,7 @@
 #include <assert.h>
 
 void dumpOpenGLTexture(unsigned texture, bool cube, unsigned level, std::string pngPath, bool rgb, bool flip) {
+    assert(glIsTexture(texture));
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
     int width, height, depth = cube ? 6 : 1;
     glGetTextureLevelParameteriv(texture, level, GL_TEXTURE_WIDTH, &width);

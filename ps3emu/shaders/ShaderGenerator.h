@@ -4,18 +4,26 @@
 #include <cstdint>
 #include <vector>
 #include <array>
+#include "ps3emu/enum.h"
 
 std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
                                    std::array<int, 16> const& samplerSizes,
                                    bool isFlatColorShading,
                                    bool isMrt);
 
-enum class VertexInputType {
-    float32, float16, u8, s16
-};
+ENUM(VertexInputType,
+    (s1, 1),
+    (f32, 2),
+    (f16, 3),
+    (u8, 4),
+    (s16, 5),
+    (x11y11z10n, 6),
+    (u16, 1000), // gcmviz index array
+    (u32, 1001)  // gcmviz index array
+)
 
 struct VertexShaderInputFormat {
-    VertexInputType type = VertexInputType::float32;
+    VertexInputType type = VertexInputType::f32;
     int rank = 4;
     //int mask;
     // TODO: use dest_mask_t instead of int everywhere

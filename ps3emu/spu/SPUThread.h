@@ -92,8 +92,12 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     boost::thread _thread;
     SPUChannels _channels;
     std::function<void(SPUThread*, SPUThreadEvent)> _eventHandler;
+
+    // see the rationale for leaving these variables without an ifdef
+    // in the PPUThread.cpp file
     std::atomic<bool> _dbgPaused;
     std::atomic<bool> _singleStep;
+
     int32_t _exitCode;
     SPUThreadExitCause _cause;
     uint32_t _elfSource;
@@ -162,7 +166,7 @@ public:
         return _spu;
     }
     
-    void singleStepBreakpoint();
+    void singleStepBreakpoint(bool value);
     void dbgPause(bool val);
     bool dbgIsPaused();
     void run() override;
@@ -190,3 +194,5 @@ public:
     // ISPUChannelsThread
     inline uint8_t* ls(uint32_t i) override { return ptr(i); }
 };
+
+void set_mxcsr_for_spu();

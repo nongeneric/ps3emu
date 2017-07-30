@@ -63,6 +63,8 @@
     X(RestartIndexEnable) \
     X(RestartIndex) \
     X(IndexArrayAddress) \
+    X(IndexArrayAddress1) \
+    X(IndexArrayDma) \
     X(DrawIndexArray) \
     X(VertexTextureOffset) \
     X(VertexTextureControl3) \

@@ -11,6 +11,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <fstream>
 
 struct SoftBreakInfo {
     ps3_uintptr_t va;
@@ -93,6 +94,7 @@ class DebuggerModel : public QWidget {
     bool _updateUIWhenRunning = true;
     boost::mutex _runMutex;
     boost::condition_variable _runCv;
+    std::ofstream _dbgOutput;
     
     template<typename... Ts>
     void messagef(const char* format, Ts... args) {

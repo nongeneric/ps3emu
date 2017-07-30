@@ -521,7 +521,11 @@ void main(void) {
     
     layout(rgba32f) image2D image = layout(rgba32f)
         image2D(i_images[level + gl_GlobalInvocationID.z * i_levels]);
-    imageStore(image, dest, vec4(1,1,0,1));
+    level += 1;
+    vec4 color = vec4(level & 1, (level >> 1) & 1, (level >> 2) & 1, 1);
+    if ((dest.y / 3) % 2 == 0)
+        color = vec4(1,1,1,1);
+    imageStore(image, dest, color);
 }
 
 )"";
@@ -717,7 +721,7 @@ void RsxTextureReader::loadTexture(RsxTextureInfo const& info,
         // twice the height to take into account all mipmap levels
         glDispatchCompute((info.width + 31) / 32, (info.height * 2 + 31) / 32, layers);
     }
-    
+
     glUseProgram(0);
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
     glFinish(); // TODO: see the DrawArrays comment on synchronization

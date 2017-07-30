@@ -6,6 +6,8 @@
 
 struct ShaderDasmCommand {
     std::string binary;
+    bool naked;
+    bool vertex;
 };
 
 struct UnsceCommand {
@@ -58,6 +60,14 @@ struct PrintGcmVizTraceCommand {
     int command;
 };
 
+struct TraceVizCommand {
+    std::string good;
+    std::string bad;
+    std::string dump;
+    uint32_t offset;
+    bool spu;
+};
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
@@ -69,3 +79,4 @@ void HandleRsxDasm(RsxDasmCommand const& command);
 void HandleFindSpuElfs(FindSpuElfsCommand const& command);
 void HandleDumpInstrDb(DumpInstrDbCommand const& command);
 void HandlePrintGcmVizTrace(PrintGcmVizTraceCommand const& command);
+void HandleTraceViz(TraceVizCommand const& command);

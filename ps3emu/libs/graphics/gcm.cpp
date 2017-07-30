@@ -10,6 +10,7 @@
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
 #include "ps3emu/ppu/CallbackThread.h"
+#include "ps3emu/fileutils.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <algorithm>

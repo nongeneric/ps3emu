@@ -1,0 +1,48 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)Edge 1.3.0
+ * Copyright (C) 2007 Sony Computer Entertainment Inc.
+ * All Rights Reserved.
+ */
+
+struct VpOut
+{
+	float4      position        : POSITION; // Not used in fragment program
+	half2       texcoord        : TEX0;
+	half3       tanSpaceLightVec: TEX1; // For L dot N
+	half3       tanSpaceViewVec : TEX2; // For H dot N
+	half3       objSpaceLightVec: TEX3; // Used for computing attenuation only
+};
+
+struct FpOut
+{
+	half4 color : COLOR;
+};
+
+// We would like to put binding semantics on the uniform inputs, but the current compiler does not allow this.
+// cgfx2bin does print out the resource bindings of the uniform inputs on compilation and these can be used
+// by the application to set values.
+FpOut main(VpOut fragment, uniform texobj2D colorMap : TEXUNIT0, uniform texobj2D bumpGlossMap : TEXUNIT1, float facing : FACE, uniform float3 lightRgb)
+{
+	FpOut result;
+	
+	float4 lightAtten = float4(1,0,0,0);
+	float3 ambientRgb = float3(0.2,0.2,0.2);
+	float specPow = 10;
+
+	float d = length(fragment.objSpaceLightVec);
+	float attenuation = saturate(1.0f/(lightAtten.x + lightAtten.y * d + lightAtten.z * d * d) - lightAtten.w);
+
+	float4 normalGloss = tex2D(bumpGlossMap, fragment.texcoord.xy);
+	normalGloss.xyz = normalGloss.xyz * 2.0f - 1.0f;
+	normalGloss.z *= facing;
+	float3 lightVec = normalize(fragment.tanSpaceLightVec);
+	float3 viewVec = normalize(fragment.tanSpaceViewVec);
+	float3 halfVec = normalize(lightVec + viewVec);
+	float3 diffLighting = ambientRgb + attenuation * saturate(dot(lightVec, normalGloss.xyz)) * lightRgb;
+	float3 specLighting = attenuation * pow(saturate(dot(halfVec, normalGloss.xyz)), specPow) * lightRgb;
+
+	result.color = tex2D(colorMap, fragment.texcoord.xy);
+	result.color.rgb = result.color.rgb * diffLighting + normalGloss.w * specLighting;
+
+	return result;
+}

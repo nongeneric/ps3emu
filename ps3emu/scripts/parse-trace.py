@@ -74,7 +74,6 @@ if args.changes:
             except:
                 pass
             
-    print(len(traces), "lines")
     for c, n in zip(traces, traces[1:]):
         changed = []
         rnames = ['r' + str(x) for x in range(0, len(n.regs))]

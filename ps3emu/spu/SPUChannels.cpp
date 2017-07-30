@@ -148,6 +148,9 @@ void SPUChannels::command(uint32_t word) {
                 "%s(%x, %x, %x) %s", name, size, lsaVa, eal, stored ? "OK" : "FAIL");
         }
     };
+    if (opcode == MFC_GETLLAR_CMD || opcode == MFC_PUTLLC_CMD) {
+        eal &= 0xffffff80;
+    }
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
             assert(size == 0x80);
@@ -199,8 +202,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTRB_CMD: {
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
-            INFO(spu) << ssnprintf("%s(%x, %x, %x) %x: %s", name, size, lsaVa, eal, tag, print_hex(lsa, std::max<uint32_t>(size, 0x100), false));
-            //log();
+            log();
             break;
         }
         case MFC_GETL_CMD:
@@ -212,7 +214,7 @@ void SPUChannels::command(uint32_t word) {
                 assert(!STALL_AND_NOTIFY(list[i]));
                 auto cursize = LTS(list[i]);
                 _mm->readMemory(LEAL(list[i]), lsa, cursize);
-                lsa += std::max(8ul, cursize);
+                lsa += cursize;
             }
             log();
             break;
@@ -229,7 +231,7 @@ void SPUChannels::command(uint32_t word) {
                 assert(!STALL_AND_NOTIFY(list[i]));
                 auto cursize = LTS(list[i]);
                 _mm->writeMemory(LEAL(list[i]), lsa, cursize);
-                lsa += std::max(8ul, cursize);
+                lsa += cursize;
             }
             log();
             break;

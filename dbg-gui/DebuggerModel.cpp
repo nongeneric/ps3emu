@@ -503,12 +503,17 @@ void DebuggerModel::dbgLoop() {
     }
 }
 
-DebuggerModel::DebuggerModel() : _debugThreadQueue(1) {
+DebuggerModel::DebuggerModel()
+    : _debugThreadQueue(1), _dbgOutput("/tmp/ps3_dbg_output.log")
+{
     _debugThread = boost::thread([&] { dbgLoop(); });
     if (g_config.config().CaptureRsx) {
         Rsx::setOperationMode(RsxOperationMode::RunCapture);
     }
+
     auto callback = [&](auto str, auto len) {
+        _dbgOutput << std::string(str, len);
+        _dbgOutput.flush();
         emit this->output(QString::fromLatin1(str, len));
     };
     g_state.callbacks->stdout = callback;
@@ -543,8 +548,9 @@ void DebuggerModel::stepIn() {
         runAndWait();
         _activeThread->singleStepBreakpoint(false);
     } else if (_activeSPUThread) {
-        _activeSPUThread->singleStepBreakpoint();
-        run();
+        _activeSPUThread->singleStepBreakpoint(true);
+        runAndWait();
+        _activeSPUThread->singleStepBreakpoint(false);
     }
 }
 
@@ -715,7 +721,11 @@ void DebuggerModel::execSingleCommand(QString command) {
     auto exprVal = evalExpr(expr.toStdString());
     
     try {
-        if (name == "go") {
+        if (name == "spursb") {
+            auto buffer = (char*)g_state.mm->getMemoryPointer(exprVal, 1);
+            dumpSpursTrace([&](auto line) { this->message(QString::fromStdString(line)); }, buffer, 1024*1024*10);
+            return;
+        } else if (name == "go") {
             _dasmModel->navigate(exprVal);
             return;
         } else if (name == "runto") {
@@ -761,12 +771,16 @@ void DebuggerModel::execSingleCommand(QString command) {
         } else if (name == "dump") {
             auto start = exprVal;
             auto end = evalExpr(command.section(':', 2, 2).toStdString());
-            auto path = "/tmp/dump.bin";
-            auto f = fopen(path, "w");
             std::vector<uint8_t> vec(end - start);
-            g_state.mm->readMemory(start, &vec[0], vec.size());
-            fwrite(&vec[0], 1, vec.size(), f);
-            fclose(f);
+            if (_activeThread) {
+                g_state.mm->readMemory(start, &vec[0], vec.size());
+            } else if (_activeSPUThread) {
+                memcpy(&vec[0], _activeSPUThread->ls(0), vec.size());
+            } else {
+                messagef("no active thread");
+            }
+            auto path = "/tmp/dump.bin";
+            write_all_bytes(&vec[0], vec.size(), path);
             messagef("memory dump %x-%x saved to %s", start, end, path);
         } else if (name == "p") {
             emit message(QString(" : 0x%1").arg(exprVal, 0, 16));
@@ -963,6 +977,7 @@ void printFrequencies(FILE* f, std::map<std::string, int>& counts) {
 void DebuggerModel::spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
     ps3_uintptr_t nip;
     std::string str;
+    _activeSPUThread->singleStepBreakpoint(true);
     while ((nip = _activeSPUThread->getNip()) != va) {
         auto instr = _activeSPUThread->ptr(nip);
         SPUDasm<DasmMode::Print>(instr, nip, &str);
@@ -982,9 +997,13 @@ void DebuggerModel::spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
         fprintf(f, " #%s\n", str.c_str());
         
         fflush(f);
-        _activeSPUThread->singleStepBreakpoint();
-        _proc->run();
+        for (;;) {
+            auto ev = _proc->run();
+            if (boost::get<SPUSingleStepBreakpointEvent>(&ev))
+                break;
+        }
     }
+    _activeSPUThread->singleStepBreakpoint(false);
 }
 
 void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
@@ -1012,7 +1031,9 @@ void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
     printFrequencies(f, counts);
     
     fclose(f);
-    fclose(scriptf);
+    if (scriptf) {
+        fclose(scriptf);
+    }
     message(QString("trace completed and saved to ") + tracefile);
 }
 

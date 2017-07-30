@@ -1,0 +1,41 @@
+/* SCE CONFIDENTIAL
+ * PlayStation(R)Edge 1.3.0
+ * Copyright (C) 2007 Sony Computer Entertainment Inc.
+ * All Rights Reserved.
+ */
+
+struct VpIn
+{
+	float4      position        : ATTR0;//POSITION;
+	float3      normal          : ATTR2;//NORMAL;
+	float4      tanFlip         : ATTR14;//TANGENT;
+	float2      texcoord        : ATTR8;//TEXCOORD0;
+};
+
+struct VpOut
+{
+	float4      position        : POSITION; // Not used in fragment program
+	half2       texcoord        : TEX0;
+	half3       tanSpaceLightVec: TEX1; // For L dot N
+	half3       tanSpaceViewVec : TEX2; // For H dot N
+	half3       objSpaceLightVec: TEX3; // Used for computing attenuation only
+};
+
+VpOut main(VpIn vertex, uniform float4x4 mvp : C0, uniform float3 lightPos : C4, uniform float3 eyePos : C5)
+{
+	VpOut result;
+	
+	result.position = mul(mvp, vertex.position);
+	result.texcoord = vertex.texcoord;
+	
+	float3 normal = normalize(vertex.normal);
+	float3 tangent = normalize(vertex.tanFlip.xyz - normal * dot(normal, vertex.tanFlip.xyz));
+	float3 bitangent = cross(normal, tangent) * vertex.tanFlip.w;
+	float3 lightVec = lightPos - (float3)vertex.position;
+	float3 viewVec = eyePos - (float3)vertex.position;
+	result.tanSpaceLightVec = float3(dot(lightVec, tangent), dot(lightVec, bitangent), dot(lightVec, normal));
+	result.tanSpaceViewVec = float3(dot(viewVec, tangent), dot(viewVec, bitangent), dot(viewVec, normal));
+	result.objSpaceLightVec = lightVec;
+	
+	return result;
+}

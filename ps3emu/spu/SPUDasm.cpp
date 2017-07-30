@@ -160,6 +160,36 @@ alignas(16) static const __m128i GENERATE_CONTROL_DW[32] {
     _mm_set_epi8(0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7),
 };
 
+/*
+   Clear the most significant exponent bit if NaN, leave as is otherwise.
+   This conversion is needed because SPU doesn't support NaNs and INFs, and if
+   someone passes 0x7fffffff or 0xffffffff to an instruction, this argument needs
+   to be interpreted as a maximum or minimum value. INFs are also patched but it 
+   shouldn't be a problem because an INF can only arise during emulation in an 
+   erroneous computation.
+*/
+inline R128 patchNaNs(R128 r) {
+    auto xmm = r.xmm();
+    auto expMask = _mm_set1_epi32(0x7f800000);
+    auto masked = _mm_and_si128(xmm, expMask);
+    auto eq = _mm_cmpeq_epi32(masked, expMask);
+    auto neq = _mm_xor_si128(_mm_set1_epi32(-1), eq);
+    auto eqMask = _mm_set1_epi32(0xff7fffff);
+    auto maskedNeq = _mm_or_si128(eqMask, neq);
+    auto res = _mm_and_si128(xmm, maskedNeq);
+    r.set_xmm(res);
+    return r;
+}
+
+inline void assertNotNaN(R128 r) {
+    auto xmm = r.xmm();
+    auto expMask = _mm_set1_epi32(0x7f800000);
+    auto masked = _mm_and_si128(xmm, expMask);
+    auto eq = _mm_cmpeq_epi32(masked, expMask);
+    r.set_xmm(eq);
+    EMU_ASSERT(r.w(0) == 0 && r.w(1) == 0 && r.w(2) == 0 && r.w(3) == 0);
+}
+
 PRINT(lqd) {
     *result = format_br_nnn("lqd", i->RT, i->I10, i->RA);
 }
@@ -1625,7 +1655,7 @@ EMU_REWRITE(rotqby, i->RA.u(), i->RB.u(), i->RT.u())
 
 
 PRINT(rotqbyi) {
-    *result = format_nnn("rotqbyi", i->RT, i->RA, i->I7);
+    *result = format_nnu("rotqbyi", i->RT, i->RA, i->I7.u());
 }
 
 #define _rotqbyi(_ra, _rt, _i7) { \
@@ -2575,8 +2605,8 @@ PRINT(fnms) {
 }
 
 #define _fnms(_ra, _rb, _rc, _rt_abc) { \
-    auto a = th->r(_ra).xmm_f(); \
-    auto b = th->r(_rb).xmm_f(); \
+    auto a = patchNaNs(th->r(_ra)).xmm_f(); \
+    auto b = patchNaNs(th->r(_rb)).xmm_f(); \
     auto c = th->r(_rc).xmm_f(); \
     auto t = _mm_fmsub_ps(a, b, c); \
     t = _mm_xor_ps(t, _mm_set1_ps(-0.f)); \

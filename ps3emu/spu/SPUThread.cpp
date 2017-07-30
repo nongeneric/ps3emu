@@ -8,9 +8,10 @@
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/RewriterUtils.h"
 #include "SPUDasm.h"
+#include <boost/range/algorithm.hpp>
 #include <stdio.h>
 #include <signal.h>
-#include <boost/range/algorithm.hpp>
+#include <xmmintrin.h>
 
 void SPUThread::run() {
     assert(!_hasStarted);
@@ -48,26 +49,29 @@ void SPUThread::loop() {
 #endif
 
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
+    set_mxcsr_for_spu();
     
 //     auto traceFilePath = ssnprintf("/tmp/spu_trace_%s", _name);
 //     auto tf = fopen(traceFilePath.c_str(), "w");
-//     bool trace = true;
+//     bool trace = false;
 //     int instrTraced = 0;
     
     for (;;) {
+#ifdef DEBUGPAUSE
         if (_singleStep) {
             _eventHandler(this, SPUThreadEvent::SingleStepBreakpoint);
-            _singleStep = false;
         }
+        
         while (_dbgPaused) {
             ums_sleep(100);
         }
+#endif
         
         uint32_t cia;
         try {
             cia = getNip();
 
-//             if (cia == 0x1c00)
+//             if (cia == 0x1cfc)
 //                 trace = true;
 //             if (cia == 0x1c44)
 //                 trace = false;
@@ -80,11 +84,6 @@ void SPUThread::loop() {
 //                     tf = fopen(traceFilePath.c_str(), "w");
 //                     instrTraced = 0;
 //                 }
-//                 std::string str;
-//                 auto instr = ptr(cia);
-//                 SPUDasm<DasmMode::Print>(instr, cia, &str);
-//                 std::string name;
-//                 SPUDasm<DasmMode::Name>(instr, cia, &name);
 //                 
 //                 fprintf(tf, "pc:%08x;", cia);
 //                 for (auto i = 0u; i < 128; ++i) {
@@ -95,7 +94,7 @@ void SPUThread::loop() {
 //                             v.w<2>(),
 //                             v.w<3>());
 //                 }
-//                 fprintf(tf, " #%s\n", str.c_str());
+//                 fputs("\n", tf);
 //                 fflush(tf);
 //             }
 
@@ -174,8 +173,9 @@ void SPUThread::loop() {
     _hasStarted = false;
 }
 
-void SPUThread::singleStepBreakpoint() {
-    _singleStep = true;
+#ifdef DEBUGPAUSE
+void SPUThread::singleStepBreakpoint(bool value) {
+    _singleStep = value;
 }
 
 void SPUThread::dbgPause(bool val) {
@@ -185,14 +185,17 @@ void SPUThread::dbgPause(bool val) {
 bool SPUThread::dbgIsPaused() {
     return _dbgPaused;
 }
+#endif
 
 SPUThread::SPUThread(std::string name,
                      std::function<void(SPUThread*, SPUThreadEvent)> eventHandler)
     : _name(name),
       _channels(g_state.mm, this),
       _eventHandler(eventHandler),
+#ifdef DEBUGPAUSE
       _dbgPaused(false),
       _singleStep(false),
+#endif
       _exitCode(0),
       _cause(SPUThreadExitCause::StillRunning),
       _hasStarted(false) {
@@ -380,4 +383,13 @@ void SPUThread::markExecMap(uint32_t va) {
         }
     }
     WARNING(spu, perf) << "unknown spu image executed";
+}
+
+void set_mxcsr_for_spu() {
+    auto mxcsr = _mm_getcsr();
+    mxcsr |= _MM_ROUND_TOWARD_ZERO;
+    mxcsr |= _MM_FLUSH_ZERO_ON;
+    mxcsr |= _MM_EXCEPT_OVERFLOW;
+    mxcsr |= _MM_DENORMALS_ZERO_ON;
+    _mm_setcsr(mxcsr);
 }

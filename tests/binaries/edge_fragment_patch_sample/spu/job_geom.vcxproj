@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|PS3">
+      <Configuration>Debug</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|PS3">
+      <Configuration>Release</Configuration>
+      <Platform>PS3</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5DB77718-5263-4DBF-A59A-E6DE1A72380D}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SPU</PlatformToolset>
+    <SpursUsage>SpursInit</SpursUsage>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>SPU</PlatformToolset>
+    <SpursUsage>SpursInit</SpursUsage>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+    <OutDir>$(ProjectName).$(Platform)_$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+    <IntDir>$(ProjectName).$(Platform)_$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName).spu</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+    <OutDir>$(ProjectName).$(Platform)_$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+    <IntDir>$(ProjectName).$(Platform)_$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName).spu</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|PS3'">
+    <ClCompile>
+      <PreprocessorDefinitions>EDGE_GEOM_DEBUG;SN_TARGET_PS3_SPU;_DEBUG;__GCC__;SPU;__CELL_ASSERT__;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizationLevel>Level0</OptimizationLevel>
+      <FunctionSections>true</FunctionSections>
+      <DataSections>true</DataSections>
+      <StackCheck>true</StackCheck>
+      <AdditionalIncludeDirectories>..\..\..\..\target\spu\include;..\..\..\..\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningsAsErrors>true</WarningsAsErrors>
+    </ClCompile>
+    <Link>
+      <StackCheck>true</StackCheck>
+      <GarbageCollection>true</GarbageCollection>
+      <AdditionalOptions>-Ttext=0x0 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>"$(SCE_PS3_ROOT)\target\spu\lib\pic\libspurs.a";"$(SCE_PS3_ROOT)\target\spu\lib\pic\libdma.a";%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|PS3'">
+    <ClCompile>
+      <PreprocessorDefinitions>SN_TARGET_PS3_SPU;NDEBUG;__GCC__;SPU;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizationLevel>Level2</OptimizationLevel>
+      <FunctionSections>true</FunctionSections>
+      <DataSections>true</DataSections>
+      <AdditionalIncludeDirectories>..\..\..\..\target\spu\include;..\..\..\..\target\common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningsAsErrors>true</WarningsAsErrors>
+    </ClCompile>
+    <Link>
+      <GarbageCollection>true</GarbageCollection>
+      <AdditionalOptions>-Ttext=0x0 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>"$(SCE_PS3_ROOT)\target\spu\lib\pic\libspurs.a";"$(SCE_PS3_ROOT)\target\spu\lib\pic\libdma.a";%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="job_geom.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\target\spu\src\edge\geom\edgegeom_spu.vcxproj">
+      <Project>{ed795481-47a2-474f-8feb-7192964a63f2}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Condition="'$(ConfigurationType)' == 'Makefile' and Exists('$(VCTargetsPath)\Platforms\$(Platform)\SCE.Makefile.$(Platform).targets')" Project="$(VCTargetsPath)\Platforms\$(Platform)\SCE.Makefile.$(Platform).targets" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

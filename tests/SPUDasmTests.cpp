@@ -76,6 +76,41 @@ TEST_CASE("spudasm_bg") {
     REQUIRE( th.r(20).w(3) == 0 );
 }
 
+TEST_CASE("fnms_zero_nan_zero") {
+/*
+    fnms r060,r066,r123,r067
+*/
+    MainMemory mm;
+    g_state.mm = &mm;
+    SPUThread th;
+    
+    set_mxcsr_for_spu();
+    
+    uint8_t instr[] { 0xD7, 0x9E, 0xE1, 0x43 };
+    
+    th.r(66).set_fs(0, 0);
+    th.r(66).set_fs(1, 0);
+    th.r(66).set_fs(2, 0);
+    th.r(66).set_fs(3, 0);
+    
+    th.r(123).set_w(0, -1);
+    th.r(123).set_w(1, -1);
+    th.r(123).set_w(2, -1);
+    th.r(123).set_w(3, -1);
+    
+    th.r(67).set_fs(0, 0);
+    th.r(67).set_fs(1, 0);
+    th.r(67).set_fs(2, 0);
+    th.r(67).set_fs(3, 0);
+    
+    SPUDasm<DasmMode::Emulate>(instr, 0, &th);
+    
+    REQUIRE( th.r(60).fs(0) == 0.f );
+    REQUIRE( th.r(60).fs(1) == 0.f );
+    REQUIRE( th.r(60).fs(2) == 0.f );
+    REQUIRE( th.r(60).fs(3) == 0.f );
+}
+
 TEST_CASE("spu_analyze_1") {
     auto info = analyzeSpu(0x35000000, 0xdc); // bi r0
     REQUIRE(info.flow);

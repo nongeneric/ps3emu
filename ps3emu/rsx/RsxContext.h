@@ -159,7 +159,7 @@ struct VertexDataArrayFormatInfo {
     uint16_t frequency;
     uint8_t stride;
     uint8_t size;
-    uint8_t type;
+    VertexInputType type;
     MemoryLocation location;
     uint32_t offset;
     GLuint binding = 0;
@@ -169,6 +169,7 @@ struct IndexArrayInfo {
     uint32_t offset = 0;
     MemoryLocation location = MemoryLocation::Local;
     GLuint glType = 0;
+    GcmDrawIndexArrayType type;
 };
 
 struct SurfaceToFramebufferLink {

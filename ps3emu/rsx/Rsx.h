@@ -7,6 +7,8 @@
 #include "ps3emu/gcmviz/GcmDatabase.h"
 #include "ps3emu/BitField.h"
 #include "ps3emu/utils/SpinLock.h"
+#include "ps3emu/shaders/ShaderGenerator.h"
+#include "GLQuery.h"
 #include "GLFramebuffer.h"
 #include "RsxTextureReader.h"
 #include "ps3emu/enum.h"
@@ -122,6 +124,11 @@ ENUM(GcmPrimitive,
     (QUADS, 8),
     (QUAD_STRIP, 9),
     (POLYGON, 10)
+)
+
+ENUM(GcmDrawIndexArrayType,
+    (_32, 0),
+    (_16, 1)
 )
 
 ENUMF(GcmClearMask,
@@ -249,6 +256,7 @@ class Rsx {
     RsxTextureReader* _textureReader;
     std::map<uint32_t, PerfMapEntry> _perfMap;
     std::unique_ptr<CallbackThread> _callbackThread;
+    GLQuery _transformFeedbackQuery;
     
     void watchTextureCache();
     void watchShaderCache();
@@ -347,7 +355,7 @@ class Rsx {
                                uint16_t frequency,
                                uint8_t stride,
                                uint8_t size,
-                               uint8_t type);
+                               VertexInputType type);
     void VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset);
     void BeginEnd(GcmPrimitive mode);
     void DrawArrays(unsigned first, unsigned count);
@@ -355,7 +363,9 @@ class Rsx {
     void TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count);
     void RestartIndexEnable(bool enable);
     void RestartIndex(uint32_t index);
-    void IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type);
+    void IndexArrayAddress(uint8_t location, uint32_t offset, GcmDrawIndexArrayType type);
+    void IndexArrayAddress1(uint32_t offset);
+    void IndexArrayDma(uint8_t location, GcmDrawIndexArrayType type);
     void DrawIndexArray(uint32_t first, uint32_t count);
     void VertexTextureOffset(unsigned index, 
                              uint32_t offset, 
@@ -507,6 +517,8 @@ class Rsx {
     inline void StopReplay() { }
     void transferImage();
     void startCopy2d();
+    void beginTransformFeedback();
+    void endTransformFeedback();
     
 public:
     Rsx();
@@ -552,3 +564,4 @@ MemoryLocation gcmEnumToLocation(uint32_t enumValue);
 uint32_t getReportDataAddressLocation(uint32_t index, MemoryLocation location);
 bool isMrt(SurfaceInfo const& surface);
 std::array<int, 16> getFragmentSamplerSizes(const RsxContext* context);
+unsigned vertexDataArrayTypeSize(VertexInputType type);

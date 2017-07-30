@@ -25,6 +25,7 @@ typedef boost::variant<NoneCommand,
                        RsxDasmCommand,
                        FindSpuElfsCommand,
                        DumpInstrDbCommand,
+                       TraceVizCommand,
                        PrintGcmVizTraceCommand>
     Command;
 
@@ -61,11 +62,16 @@ struct ShaderParser : CommandParser<ShaderDasmCommand> {
     ShaderParser() : CommandParser<ShaderDasmCommand>("shader") {}
     
     void init() override {
-        desc.add_options()(
-            "binary", value<std::string>(&command.binary)->required(), "binary path");
+        desc.add_options()
+            ("binary", value<std::string>(&command.binary)->required(), "binary path")
+            ("naked", bool_switch()->default_value(false), "naked ucode without a header")
+            ("vertex", bool_switch()->default_value(false), "vertex shader");
     }
     
-    void parse(variables_map& vm) override { }
+    void parse(variables_map& vm) override {
+        command.naked = vm["naked"].as<bool>();
+        command.vertex = vm["vertex"].as<bool>();
+    }
 };
 
 struct UnsceParser : CommandParser<UnsceCommand> {
@@ -200,6 +206,27 @@ struct PrintGcmVizTraceParser : CommandParser<PrintGcmVizTraceCommand> {
     
     void parse(variables_map& vm) override { }
 };
+
+struct TraceVizParser : CommandParser<TraceVizCommand> {
+    TraceVizParser() : CommandParser<TraceVizCommand>("trace-viz") {}
+    
+    std::string _offsetStr;
+    
+    void init() override {
+        desc.add_options()
+            ("good", value<std::string>(&command.good)->required(), "good changes")
+            ("bad", value<std::string>(&command.bad)->required(), "bad changes")
+            ("dump", value<std::string>(&command.dump), "instruction dump")
+            ("offset", value<std::string>(&_offsetStr)->default_value("0"), "instruction offset")
+            ("spu", bool_switch()->default_value(false), "spu")
+            ;
+    }
+    
+    void parse(variables_map& vm) override {
+        command.offset = std::stoi(_offsetStr, 0, 16);
+        command.spu = vm["spu"].as<bool>();
+    }
+};
     
 Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
@@ -234,7 +261,8 @@ Command ParseOptions(int argc, const char *argv[]) {
         RsxDasmParser(),
         FindSpuElfsParser(),
         DumpInstrDbParser(),
-        PrintGcmVizTraceParser()
+        PrintGcmVizTraceParser(),
+        TraceVizParser()
     );
     
     if (commandName == "") {
@@ -309,6 +337,10 @@ public:
     
     void operator()(PrintGcmVizTraceCommand& command) const {
         HandlePrintGcmVizTrace(command);
+    }
+    
+    void operator()(TraceVizCommand& command) const {
+        HandleTraceViz(command);
     }
 };
 

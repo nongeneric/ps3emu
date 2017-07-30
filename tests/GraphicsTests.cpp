@@ -286,3 +286,8 @@ TEST_CASE("performance_tips_advanced_poisson") {
     runAndWait("./binaries/performance_tips_advanced_poisson/a.elf", false, true);
     compareLastFrame("./binaries/performance_tips_advanced_poisson/ps3frame0.png", 0);
 }
+
+TEST_CASE("edge_fragment_patch_sample") {
+    runAndWait("./binaries/edge_fragment_patch_sample/a.elf", false, true);
+    compareLastFrame("./binaries/edge_fragment_patch_sample/ps3frame0.png", 0);
+}

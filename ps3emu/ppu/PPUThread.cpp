@@ -24,19 +24,13 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandle
                      bool primaryThread)
     : _eventHandler(eventHandler),
       _init(false),
-#ifdef DEBUGPAUSE
       _dbgPaused(false),
       _singleStep(false),
-#endif
       _isStackInfoSet(false),
       _threadFinishedGracefully(primaryThread),
       _priority(1000),
       _id(-1) {
-          
-#ifdef DEBUGPAUSE
-    _singleStep = false;
-    _dbgPaused = false;
-#endif
+
     for(auto& r : _GPR)
         r = 0;
     for(auto& r : _FPR)

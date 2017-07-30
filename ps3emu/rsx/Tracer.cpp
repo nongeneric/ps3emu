@@ -37,7 +37,8 @@ void Tracer::trace(uint32_t frame,
     for (auto& arg : args) {
         argStr += ssnprintf("%s:%s ", arg.name, printArgHex(arg));
     }
-    INFO(rsx) << ssnprintf("%08x/%08x | %s%s",
+    INFO(rsx) << ssnprintf("%08x[%08x/%08x] | %s%s",
+                           rsxOffsetToEa(MemoryLocation::Main, g_state.rsx->getGet()),
                            g_state.rsx->getGet(),
                            g_state.rsx->getPut(),
                            printCommandId(command),

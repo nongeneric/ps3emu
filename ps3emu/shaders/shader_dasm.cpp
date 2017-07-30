@@ -1125,10 +1125,10 @@ FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr) {
         map[pos / 16 + 1] = len == 32;
         pos += len;
         if (fi.is_last) {
-            return { map, pos };
+            break;
         }
     }
-    throw std::runtime_error("can't find the last instruction");
+    return { map, pos };
 }
 
 uint32_t get_fragment_bytecode_length(const uint8_t* ptr) {

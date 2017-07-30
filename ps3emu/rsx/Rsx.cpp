@@ -22,13 +22,13 @@
 #include <boost/range/numeric.hpp>
 #include "ps3emu/libs/graphics/graphics.h"
 #include "ps3emu/libs/message.h"
+#include "ps3emu/fileutils.h"
 
 #include "RsxContext.h"
 #include "TextureRenderer.h"
 #include "GLShader.h"
 #include "GLProgramPipeline.h"
 #include "GLSampler.h"
-#include "GLQuery.h"
 #include "Tracer.h"
 #include "../log.h"
 
@@ -42,7 +42,7 @@ namespace br = boost::range;
 
 typedef std::array<float, 4> glvec4_t;
 
-Rsx::Rsx() : _isFlipInProgress(false), _lastFlipTime(0) {}
+Rsx::Rsx() : _isFlipInProgress(false), _lastFlipTime(0), _transformFeedbackQuery(0) {}
 
 Rsx::~Rsx() {
     shutdown();
@@ -290,7 +290,6 @@ void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
     }
     
     auto ptr = &_context->fragmentBytecode[0];
-    
     _context->tracer.pushBlob(ptr, FragmentProgramSize);
     TRACE(ShaderProgram, offset, location);
     
@@ -424,7 +423,7 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
                                 uint16_t frequency,
                                 uint8_t stride,
                                 uint8_t size,
-                                uint8_t type) {
+                                VertexInputType type) {
     TRACE(VertexDataArrayFormat, index, frequency, stride, size, type);
     auto& format = _context->vertexDataArrays[index];
     format.frequency = frequency;
@@ -434,21 +433,7 @@ void Rsx::VertexDataArrayFormat(uint8_t index,
     
     auto& vinput = _context->vertexInputs[index];
     vinput.rank = size;
-    switch (type) {
-        case CELL_GCM_VERTEX_UB:
-            vinput.type = VertexInputType::u8;
-            break;
-        case CELL_GCM_VERTEX_F:
-            vinput.type = VertexInputType::float32;
-            break;
-        case CELL_GCM_VERTEX_SF:
-            vinput.type = VertexInputType::float16;
-            break;
-        case CELL_GCM_VERTEX_S32K:
-            vinput.type = VertexInputType::s16;
-            break;
-        default: throw std::runtime_error("not implemented array type");
-    }
+    vinput.type = type;
 }
 
 void Rsx::VertexDataArrayOffset(unsigned index, uint8_t location, uint32_t offset) {
@@ -506,6 +491,28 @@ GLuint primitiveTypeToFeedbackPrimitiveType(GLuint type) {
     return 0;
 }
 
+void Rsx::beginTransformFeedback() {
+    if (_mode == RsxOperationMode::Replay) {
+        _transformFeedbackQuery = GLQuery();
+        glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, _transformFeedbackQuery.handle());
+        _context->feedbackMode =
+            primitiveTypeToFeedbackPrimitiveType(_context->glVertexArrayMode);
+        glBeginTransformFeedback(_context->feedbackMode);
+    }
+}
+
+void Rsx::endTransformFeedback() {
+    if (_mode == RsxOperationMode::Replay) {
+        glEndTransformFeedback();
+        glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+        glGetQueryObjectuiv(_transformFeedbackQuery.handle(), GL_QUERY_RESULT, &_context->feedbackCount);
+        if (_context->feedbackMode == GL_TRIANGLES)
+            _context->feedbackCount *= 3;
+        if (_context->feedbackMode == GL_LINES)
+            _context->feedbackCount *= 2;
+    }
+}
+
 void Rsx::DrawArrays(unsigned first, unsigned count) {
     updateTextures();
     updateShaders();
@@ -516,26 +523,9 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     updateScissor();
     updateVertexDataArrays(first, count);
     
-    GLQuery query(0);
-    if (_mode == RsxOperationMode::Replay) {
-        query = GLQuery();
-        glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query.handle());
-        _context->feedbackMode =
-            primitiveTypeToFeedbackPrimitiveType(_context->glVertexArrayMode);
-        glBeginTransformFeedback(_context->feedbackMode);
-    }
-    
+    beginTransformFeedback();
     glDrawArrays(_context->glVertexArrayMode, 0, count);
-    
-    if (_mode == RsxOperationMode::Replay) {
-        glEndTransformFeedback();
-        glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
-        glGetQueryObjectuiv(query.handle(), GL_QUERY_RESULT, &_context->feedbackCount);
-        if (_context->feedbackMode == GL_TRIANGLES)
-            _context->feedbackCount *= 3;
-        if (_context->feedbackMode == GL_LINES)
-            _context->feedbackCount *= 2;
-    }
+    endTransformFeedback();
     
     // Right after a gcm draw command completes, the next command might immediately
     // update buffers or shader constants. OpenGL draw commands are asynchronous
@@ -550,10 +540,15 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     TRACE(DrawArrays, first, count);
 }
 
-unsigned vertexDataArrayTypeSize(unsigned type) {
+unsigned vertexDataArrayTypeSize(VertexInputType type) {
     switch (type) {
-        case CELL_GCM_VERTEX_F: return 4;
-        case CELL_GCM_VERTEX_UB: return 1;
+        case VertexInputType::x11y11z10n:
+        case VertexInputType::u32:
+        case VertexInputType::f32: return 4;
+        case VertexInputType::u16:
+        case VertexInputType::f16:
+        case VertexInputType::s1: return 2;
+        case VertexInputType::u8: return 1;
         default: throw std::runtime_error("unsupported vertex data array type");
     }
 }
@@ -651,6 +646,10 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
     _context->pipeline.bind();
     
+    if (label != (uint32_t)-1) {
+        //while (g_state.mm->load32(GcmLabelBaseOffset + label * 0x10) != labelValue) ;
+    }
+    
     _isFlipInProgress = true;
     
     _window.swapBuffers();
@@ -670,10 +669,8 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
 #endif
     
     this->setLabel(1, 0);
-    if (label != (uint32_t)-1) {
-        //this->setLabel(label, labelValue);
-        while (g_state.mm->load32(GcmLabelBaseOffset + label * 0x10) != labelValue) ;
-    }
+    
+    _isFlipInProgress = false;
     
     if (_context->vBlankHandlerDescr) {
         invokeHandler(_context->vBlankHandlerDescr, 1);
@@ -682,9 +679,7 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     if (_context->flipHandlerDescr) {
         invokeHandler(_context->flipHandlerDescr, 1);
     }
-    
-    _isFlipInProgress = false;
-    
+
     if (_frameCapturePending) {
         _frameCapturePending = false;
         _context->frame = 0;
@@ -812,11 +807,26 @@ void Rsx::RestartIndex(uint32_t index) {
     glcall(glPrimitiveRestartIndex(index));
 }
 
-void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, uint32_t type) {
+void Rsx::IndexArrayAddress1(uint32_t offset) {
+    TRACE(IndexArrayAddress1, offset);
+    _context->indexArray.offset = offset;
+}
+
+void Rsx::IndexArrayDma(uint8_t location, GcmDrawIndexArrayType type) {
+    TRACE(IndexArrayDma, location, type);
+    _context->indexArray.location = gcmEnumToLocation(location);
+    _context->indexArray.type = type;
+    _context->indexArray.glType = type == GcmDrawIndexArrayType::_16
+                                      ? GL_UNSIGNED_SHORT
+                                      : GL_UNSIGNED_INT;
+}
+
+void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, GcmDrawIndexArrayType type) {
     TRACE(IndexArrayAddress, location, offset, type);
     _context->indexArray.location = gcmEnumToLocation(location);
     _context->indexArray.offset = offset;
-    _context->indexArray.glType = type == CELL_GCM_DRAW_INDEX_ARRAY_TYPE_16
+    _context->indexArray.type = type;
+    _context->indexArray.glType = type == GcmDrawIndexArrayType::_16
                                       ? GL_UNSIGNED_SHORT
                                       : GL_UNSIGNED_INT;
 }
@@ -826,7 +836,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     
     auto destBuffer = &_context->elementArrayIndexBuffer;
     auto sourceBuffer = getBuffer(_context->indexArray.location);
-    auto byteSize = _context->indexArray.glType == GL_UNSIGNED_SHORT ? 2 : 4;
+    auto byteSize = _context->indexArray.type == GcmDrawIndexArrayType::_16 ? 2 : 4;
     assert(count * byteSize <= destBuffer->size());
     
     auto source = ((uintptr_t)sourceBuffer->mapped() + _context->indexArray.offset);
@@ -860,7 +870,9 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, destBuffer->handle());
     
     auto offset = (void*)(uintptr_t)(first * byteSize);
+    beginTransformFeedback();
     glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset);
+    endTransformFeedback();
     
     // see DrawArrays for rationale
     waitForIdle();
@@ -1054,7 +1066,9 @@ GLTexture* Rsx::getTextureFromCache(uint32_t samplerId, bool isFragment) {
     };
     
     if (_mode != RsxOperationMode::Replay) {
-        UpdateBufferCache(info.location, info.offset, info.width * info.height * 4);
+        auto height = info.width * info.height * 4;
+        height *= 2; // append possible mipmaps
+        UpdateBufferCache(info.location, info.offset, height);
     }
     
     auto texture = _context->textureCache.retrieve(key);
