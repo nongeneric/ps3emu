@@ -186,9 +186,6 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
     static uint32_t drawCount = 0;
     
     switch (offset) {
-        case EmuFlipCommandMethod:
-            EmuFlip(readarg(1), readarg(2), readarg(3));
-            break;
         case 0x00000050:
             //name = "CELL_GCM_NV406E_SET_REFERENCE";
             SetReference(readarg(1));
@@ -1260,10 +1257,12 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             DriverInterrupt(readarg(1));
             break;
         case 0x0000E944:
-            name = "CELL_GCM_DRIVER_QUEUE";
+            //name = "CELL_GCM_DRIVER_QUEUE";
+            DriverQueue(readarg(1));
             break;
         case 0x0000E924:
-            name = "CELL_GCM_DRIVER_FLIP";
+            //name = "CELL_GCM_DRIVER_FLIP";
+            DriverFlip(readarg(1));
             break;
         case 0x240:
             name = "unknown_240";

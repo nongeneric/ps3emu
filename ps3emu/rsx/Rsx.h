@@ -197,7 +197,6 @@ struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {
     uint32_t reserved2;
 };
 
-constexpr uint32_t EmuFlipCommandMethod = 0xacac;
 constexpr auto FragmentProgramSize = 512 * 16;
 
 enum class RsxOperationMode {
@@ -269,7 +268,8 @@ class Rsx {
     void setSurfaceColorLocation(unsigned index, uint32_t location);
     void initGcm();
     void shutdownGcm();
-    void EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue);
+    void DriverQueue(uint32_t id);
+    void DriverFlip(uint32_t value);
     bool linkShaderProgram();
     void updateVertexDataArrays(unsigned first, unsigned count);
     void updateShaders();

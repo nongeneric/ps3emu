@@ -136,7 +136,6 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmGetTiledPitchSize),
     ENTRY(cellGcmSetTileInfo),
     { "cellGcmSetTile", calcFnid("cellGcmSetTile"), [](PPUThread* th) { wrap(cellGcmSetTileInfo, th); } },
-    ENTRY(_cellGcmSetFlipWithWaitLabel),
     ENTRY(cellGcmBindTile),
     ENTRY(cellGcmUnbindTile),
     ENTRY(cellGcmSetZcull),

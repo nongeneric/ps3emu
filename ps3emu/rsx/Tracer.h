@@ -127,7 +127,8 @@
     X(setDisplayBuffer) \
     X(waitForIdle) \
     X(updateOffsetTableForReplay) \
-    X(EmuFlip) \
+    X(DriverQueue) \
+    X(DriverFlip) \
     X(StopReplay) \
     X(UpdateBufferCache) \
     X(PolySmoothEnable) \

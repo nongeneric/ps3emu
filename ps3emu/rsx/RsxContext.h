@@ -275,6 +275,7 @@ struct RsxContext {
     float pointSize = 0;
     PointSpriteControl pointSpriteControl;
     InputMask vertexAttribInputMask = {};
+    uint32_t flipBuffer = 0;
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

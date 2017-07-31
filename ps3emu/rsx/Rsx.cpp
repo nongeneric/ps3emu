@@ -621,9 +621,15 @@ uint32_t Rsx::getLastFlipTime() {
     return _lastFlipTime;
 }
 
-void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
-    TRACE(EmuFlip, buffer, label, labelValue);
-    auto& fb = _context->displayBuffers[buffer];
+void Rsx::DriverQueue(uint32_t id) {
+    TRACE(DriverQueue, id);
+    _context->flipBuffer = id;
+    _isFlipInProgress = true;
+}
+
+void Rsx::DriverFlip(uint32_t value) {
+    TRACE(DriverFlip, value);
+    auto& fb = _context->displayBuffers[_context->flipBuffer];
     auto va = fb.offset + RsxFbBaseAddr;
     FramebufferTextureKey key{va, fb.width, fb.height, GL_RGBA8}; // GL_RGB32F
     auto tex = _context->framebuffer->findTexture(key).texture;
@@ -646,12 +652,6 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
     _context->pipeline.bind();
     
-    if (label != (uint32_t)-1) {
-        //while (g_state.mm->load32(GcmLabelBaseOffset + label * 0x10) != labelValue) ;
-    }
-    
-    _isFlipInProgress = true;
-    
     _window.swapBuffers();
     
     _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
@@ -668,9 +668,10 @@ void Rsx::EmuFlip(uint32_t buffer, uint32_t label, uint32_t labelValue) {
     }
 #endif
     
-    this->setLabel(1, 0);
-    
     _isFlipInProgress = false;
+    
+    // RSX releases the semaphore here
+    this->setLabel(1, 0);
     
     if (_context->vBlankHandlerDescr) {
         invokeHandler(_context->vBlankHandlerDescr, 1);

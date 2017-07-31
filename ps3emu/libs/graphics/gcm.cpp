@@ -250,26 +250,64 @@ emu_void_t cellGcmResetFlipStatus(Process* proc) {
     return emu_void;
 }
 
-void setFlipCommand(uint32_t contextEa, uint32_t label, uint32_t labelValue, uint32_t buffer) {
+void encodeFlipCommand(uint32_t contextEa,
+                       uint32_t buffer,
+                       uint8_t labelindex,
+                       uint32_t labelvalue,
+                       bool waitLabel) {
     auto context = (TargetCellGcmContextData*)g_state.mm->getMemoryPointer(
         contextEa, sizeof(TargetCellGcmContextData));
-    if (context->end - context->current <= 20) {
+    constexpr auto waitLabelSize = 0x5cu;
+    auto size = waitLabel ? waitLabelSize : 0x4cu;
+    if (context->current + size >= context->end) {
         ERROR(rsx) << "not enough space for EmuFlip in the buffer";
         exit(1);
     }
-    uint32_t header = (3 << CELL_GCM_COUNT_SHIFT) | EmuFlipCommandMethod;
-    g_state.mm->store32(context->current, header);
-    g_state.mm->store32(context->current + 4, buffer);
-    g_state.mm->store32(context->current + 8, label);
-    g_state.mm->store32(context->current + 12, labelValue);
-    g_state.mm->store32(context->current + 16, 2); // CALL 0
-    context->current += 5 * sizeof(uint32_t);
+    big_uint32_t buf[waitLabelSize];
+    auto i = 0u;
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_DRIVER_QUEUE, 1);
+    buf[i++] = buffer;
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SET_CONTEXT_DMA_SEMAPHORE, 1);
+    buf[i++] = 0x56616661;
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_OFFSET, 1);
+    buf[i++] = 0x30;    
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_RELEASE, 1);
+    buf[i++] = 0;    
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_OFFSET, 1);
+    buf[i++] = 0x30;
+    // here gcm acquires the semaphore that is released by RSX
+    // as there is no one to release the semaphore, just release it the second time
+    // the end result 
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_RELEASE, 1);
+    buf[i++] = 1;
+    buf[i++] = CELL_GCM_CALL(0);
+    if (waitLabel) {
+        buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_OFFSET, 1);
+        buf[i++] = labelindex * 0x10;
+        buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_ACQUIRE, 1);
+        buf[i++] = labelvalue;
+    }
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_OFFSET, 1);
+    buf[i++] = 0x10;
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_RELEASE, 1);
+    buf[i++] = 0xffffffff;
+    buf[i++] = CELL_GCM_METHOD(CELL_GCM_DRIVER_FLIP, 1);
+    buf[i++] = 0x8000010f;
+    assert(i * 4 == size);
+    g_state.mm->writeMemory(context->current, buf, size);
+    context->current += size;
 }
 
-emu_void_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer) {
-    setFlipCommand(context, -1, 0, buffer);
-    return emu_void;
+uint32_t _cellGcmSetFlipCommand(uint32_t context, uint32_t buffer) {
+    encodeFlipCommand(context, buffer, 0, 0, false);
+    return CELL_OK;
 }
+
+uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint32_t context, uint8_t buffer, uint8_t labelindex, uint32_t labelvalue) {
+    encodeFlipCommand(context, buffer, labelindex, labelvalue, true);
+    return CELL_OK;
+}
+
 
 uint32_t cellGcmGetTiledPitchSize(uint32_t size) {
     INFO(libs) << __FUNCTION__;
@@ -292,16 +330,6 @@ int32_t cellGcmSetTileInfo(uint8_t index,
     info.pitch = (pitch / 0x100) << 8;
     info.format = (base | (base + ((size - 1) / 0x10000)) << 13) | (comp << 26) | (1 << 30);
     return CELL_OK;
-}
-
-uint32_t _cellGcmSetFlipWithWaitLabel(uint32_t context, uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
-    INFO(rsx) << ssnprintf("_cellGcmSetFlipWithWaitLabel(..., %d, %x, %x)", id, labelindex, labelvalue);
-    setFlipCommand(context, labelindex, labelvalue, id);
-    return CELL_OK;
-}
-
-uint32_t _cellGcmSetFlipCommandWithWaitLabel(uint32_t context, uint8_t id, uint8_t labelindex, uint32_t labelvalue) {
-    return _cellGcmSetFlipWithWaitLabel(context, id, labelindex, labelvalue);
 }
 
 int32_t cellGcmBindTile(uint8_t index) {
