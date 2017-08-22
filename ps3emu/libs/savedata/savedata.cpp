@@ -393,3 +393,19 @@ int32_t cellSaveDataAutoLoad2(uint32_t version,
                                     userdata,
                                     true);
 }
+
+emu_void_t cellSaveDataEnableOverlay(int32_t enable) {
+    WARNING(libs) << "cellSaveDataEnableOverlay not implemented";
+    return emu_void;
+}
+
+int32_t cellSaveDataListLoad2(uint32_t version,
+                              CellSaveDataSetList* setList,
+                              CellSaveDataSetBuf* setBuf,
+                              uint32_t funcList,
+                              uint32_t funcStat,
+                              uint32_t funcFile,
+                              uint32_t container,
+                              uint32_t userdata) {
+    return -1;
+}

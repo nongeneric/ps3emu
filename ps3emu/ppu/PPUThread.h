@@ -14,6 +14,7 @@
 #include <atomic>
 #include <array>
 #include <stack>
+#include <any>
 
 enum class PPUThreadEvent {
     Breakpoint,
@@ -132,7 +133,7 @@ struct ps3call_info_t {
 };
 
 class PPUThread {
-    std::function<void(PPUThread*, PPUThreadEvent)> _eventHandler;
+    std::function<void(PPUThread*, PPUThreadEvent, std::any)> _eventHandler;
     boost::thread _thread;
     bool _init;
 
@@ -190,7 +191,7 @@ protected:
     virtual void innerLoop();
 public:
     PPUThread();
-    PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
+    PPUThread(std::function<void(PPUThread*, PPUThreadEvent, std::any)> eventHandler,
               bool primaryThread);
     void setStackInfo(uint32_t base, uint32_t size);
     void setPriority(int priority);
@@ -368,7 +369,7 @@ public:
     virtual void setArg(uint64_t arg);
     ~PPUThread() = default;
     friend uint64_t ps3call_then(PPUThread* thread);
-    void raiseModuleLoaded();
+    void raiseModuleLoaded(uint32_t imageBase);
     unsigned getTid();
 };
 

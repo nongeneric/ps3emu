@@ -253,7 +253,8 @@ void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
 }
 
 uint32_t encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
-    uint32_t ncall = (1 << 26) | index;
+    assert(index < 0x3ffffff);
+    uint32_t ncall = (NCALL_OPCODE << 26) | index;
     if (va) {
         mm->store32(va, ncall);
     }

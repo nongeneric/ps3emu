@@ -49,7 +49,7 @@ void InterruptPPUThread::setArg(uint64_t arg) {
 }
 
 InterruptPPUThread::InterruptPPUThread(
-    std::function<void(PPUThread*, PPUThreadEvent)> eventHandler)
+    std::function<void(PPUThread*, PPUThreadEvent, std::any)> eventHandler)
     : PPUThread(eventHandler, false), _mask2(0) {}
 
     

@@ -72,6 +72,7 @@ struct PPUThreadFailureEvent {
 
 struct PPUModuleLoadedEvent {
     PPUThread* thread;
+    uint32_t imageBase;
 };
 
 struct SPUThreadFailureEvent {
@@ -97,6 +98,7 @@ using Event = boost::variant<ProcessFinishedEvent,
 struct PPUThreadEventInfo {
     PPUThreadEvent event;
     PPUThread* thread;
+    std::any payload;
 };
 
 struct SPUThreadEventInfo {
@@ -148,7 +150,7 @@ class Process {
     std::vector<StolenFuncInfo> _stolenInfos;
     bool _processFinished = false;
     RewriterStore _rewriterStore;
-    void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event);
+    void ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event, std::any payload);
     void initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptorVa, uint32_t stackSize);
     void initNewThread(PPUThread* thread,
                        ps3_uintptr_t entryDescriptorVa,
@@ -193,8 +195,7 @@ public:
     void unloadSegment(uint32_t va);
     std::vector<std::shared_ptr<ELFLoader>> loadedModules();
     StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
-    boost::optional<fdescr> findExport(MainMemory* mm,
-                                       ELFLoader* prx,
+    boost::optional<fdescr> findExport(ELFLoader* prx,
                                        uint32_t eid,
                                        ps3_uintptr_t* fdescrva = nullptr);
     void dbgPause(bool pause);

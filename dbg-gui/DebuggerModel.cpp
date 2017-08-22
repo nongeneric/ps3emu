@@ -14,6 +14,7 @@
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/fileutils.h"
+#include "ps3emu/exports/splicer.h"
 #include "ps3tool-core/Rewriter.h"
 #include "Config.h"
 #include <QStringList>
@@ -356,14 +357,14 @@ public:
     }
     
     void setThread(PPUThread* thread) {
-        updateSpuElfs();
+        //updateSpuElfs();
         _thread = thread;
         _spuThread = nullptr;
         _elf = g_state.proc->elfLoader();
     }
     
     void setThread(SPUThread* thread) {
-        updateSpuElfs();
+        //updateSpuElfs();
         _thread = nullptr;
         _spuThread = thread;
         _elf = nullptr;
@@ -608,11 +609,20 @@ void DebuggerModel::runHandler(RunCommand command) {
             switchThread(ev->thread);
         } else if (auto ev = boost::get<PPUModuleLoadedEvent>(&untyped)) {
             auto segments = _proc->getSegments();
-            auto& last = segments[segments.size() - 2];
-            emit message(QString::fromStdString(ssnprintf("module loaded: %s", last.elf->shortName())));
-            if (g_config.config().StopAtNewModule) {
+            auto it = std::find_if(begin(segments), end(segments), [&](auto& s) {
+                return s.va == ev->imageBase;
+            });
+            assert(it != end(segments));
+            emit messagef("module loaded: %s", it->elf->shortName());
+            auto stopAlways = g_config.config().StopAtNewModule;
+            auto expectedModule = _moduleToWait == it->elf->shortName();
+            if (stopAlways || expectedModule) {
                 cont = false;
                 switchThread(ev->thread);
+                if (expectedModule) {
+                    _moduleToWait = "";
+                    message("the module was expected");
+                }
             }
         } else if (auto ev = boost::get<SPUInvalidInstructionEvent>(&untyped)) {
             emit message(QString("invalid spu instruction at %1")
@@ -709,6 +719,14 @@ void DebuggerModel::execSingleCommand(QString command) {
         return;
     } else if (name == "execmap") {
         dumpExecutionMap();
+        return;
+    } else if (name == "libfunc") {
+        auto name = command.section(':', 1, 1).trimmed().toStdString();
+        messagef("%x", findLibFunc(name));
+        return;
+    } else if (name == "waitmodule") {
+        _moduleToWait = command.section(':', 1, 1).trimmed().toStdString();
+        messagef("waiting for module %s", _moduleToWait);
         return;
     }
     
@@ -821,9 +839,31 @@ void DebuggerModel::execSingleCommand(QString command) {
     }
 }
 
+uint32_t DebuggerModel::findLibFunc(std::string name) {
+    auto fnid = calcFnid(name.c_str());
+    for (auto& segment : _proc->getSegments()) {
+        if (segment.index != 0)
+            continue;
+        auto[exports, nexports] = segment.elf->exports();
+        for (auto i = 0; i < nexports; ++i) {
+            auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(
+                exports[i].fnid_table, 4 * exports[i].functions);
+            auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(
+                exports[i].stub_table, 4 * exports[i].functions);
+            for (auto j = 0; j < exports[i].functions; ++j) {
+                if (fnids[j] == fnid) {
+                    auto codeVa = g_state.mm->load32(stubs[j]);
+                    return codeVa;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 std::string DebuggerModel::printSegment(uint32_t ea) {
     for (auto& segment : _proc->getSegments()) {
-        if (intersects(segment.va, segment.size, ea, 0u)) {
+        if (intersects(segment.va, segment.size, ea, 1u)) {
             return ssnprintf("base: %08x, rva: %08x, name: %s",
                                  segment.va,
                                  ea - segment.va,
@@ -876,26 +916,26 @@ void DebuggerModel::dumpThreads() {
     emit message("PPU Threads (id, nip, state)");
     for (auto th : _proc->dbgPPUThreads()) {
         auto current = th == _activeThread;
-        emit message(QString::asprintf("[%d]%s %08x  %08x  %s  %s",
+        emit message(QString::asprintf("[%03d]%s %08x  %08x %s %s",
                                        i,
                                        current ? "*" : " ",
                                        (uint32_t)th->getId(),
                                        (uint32_t)th->getNIP(),
-                                       th->getName().c_str(),
-                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING"));
+                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING",
+                                       th->getName().c_str()));
         i++;
     }
     emit message("SPU Threads (id, nip, source, name)");
     for (auto th : _proc->dbgSPUThreads()) {
         auto current = th == _activeSPUThread;
-        emit message(QString::asprintf("[%d]%s %08x  %08x  %08x  %s  %s",
+        emit message(QString::asprintf("[%03d]%s %08x  %08x  %08x  %s  %s",
                                        i,
                                        current ? "*" : " ",
                                        (uint32_t)th->getId(),
                                        th->getNip(),
                                        th->getElfSource(),
-                                       th->getName().c_str(),
-                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING"));
+                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING",
+                                       th->getName().c_str()));
         i++;
     }
 }
@@ -922,7 +962,7 @@ void DebuggerModel::dumpImports() {
         
         prx_import_t* imports;
         int count;
-        std::tie(imports, count) = s.elf->imports(g_state.mm);
+        std::tie(imports, count) = s.elf->imports();
         
         for (auto i = 0; i < count; ++i) {
             std::string name;
@@ -1240,7 +1280,7 @@ void DebuggerModel::printBacktrace() {
     if (_activeThread) {
         messagef("backtrace thread %s", _activeThread->getName());
         auto print = [&](auto ip) { this->messagef("  %x\t %s", ip, printSegment(ip)); };
-        print(_activeThread->getNIP());
+        print(_activeThread->getLR());
         for (auto frame : walkStack(_activeThread->getGPR(1))) {
             print(frame.lr);
         }

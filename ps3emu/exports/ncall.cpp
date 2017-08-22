@@ -22,7 +22,8 @@
 #include "ps3emu/libs/message.h"
 #include "ps3emu/libs/trophy.h"
 #include "ps3emu/libs/savedata/savedata.h"
-#include "ps3emu/libs/spurs.h"
+#include "ps3emu/libs/libnet.h"
+#include "ps3emu/libs/libnetctl.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <openssl/sha.h>
@@ -112,10 +113,9 @@ int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t 
 
 #define ENTRY(name) { #name, calcFnid(#name), [](PPUThread* th) { wrap(name, th); } }
 
-NCallEntry ncallTable[] {
+std::vector<NCallEntry> ncallTable {
     ENTRY(EmuInitLoadedPrxModules),
     ENTRY(defaultContextCallback),
-    ENTRY(sys_time_get_system_time),
     ENTRY(_sys_process_atexitspawn),
     ENTRY(_sys_process_at_Exitspawn),
     ENTRY(sys_prx_exitspawn_with_level),
@@ -187,6 +187,7 @@ NCallEntry ncallTable[] {
     ENTRY(sceNpInit),
     ENTRY(sceNp2Term),
     ENTRY(sceNpBasicSetPresence),
+    ENTRY(sceNpBasicRegisterContextSensitiveHandler),
     ENTRY(sceNpManagerGetContentRatingFlag),
     ENTRY(sceNpBasicRegisterHandler),
     { "sceNpDrmIsAvailable2", calcFnid("sceNpDrmIsAvailable2"), [](PPUThread* th) { wrap(sceNpDrmIsAvailable2_proxy, th); } },
@@ -269,22 +270,11 @@ NCallEntry ncallTable[] {
     ENTRY(sceNpTrophyGetRequiredDiskSpace),
     ENTRY(sceNpTrophyGetTrophyUnlockState),
     ENTRY(cellGcmGetTimeStamp),
+    ENTRY(cellGcmGetReport),
     ENTRY(cellSaveDataAutoSave2),
     ENTRY(cellSaveDataAutoLoad2),
-    ENTRY(emuProxyEnter),
-    ENTRY(emuProxyExit),
-    ENTRY(emuBranch),
-    ENTRY(_cellSpursTaskAttribute2Initialize_proxy),
-    ENTRY(cellSpursCreateTaskset2_proxy),
-    ENTRY(cellSpursCreateTask2_proxy),
-    ENTRY(cellSpursCreateTaskWithAttribute_proxy),
-    ENTRY(cellSpursEventFlagAttachLv2EventQueue_proxy),
-    ENTRY(_cellSpursEventFlagInitialize_proxy),
-    ENTRY(cellSyncQueueInitialize_proxy),
-    ENTRY(_cellSpursQueueInitialize_proxy),
-    ENTRY(cellSpursEventFlagWait_proxy),
-    ENTRY(_cellSpursAttributeInitialize_proxy),
-    ENTRY(cellSpursAttributeSetSpuThreadGroupType_proxy),
+    ENTRY(cellSaveDataEnableOverlay),
+    ENTRY(cellSaveDataListLoad2),
     ENTRY(cellAudioOutSetCopyControl),
     ENTRY(cellAudioCreateNotifyEventQueue),
     ENTRY(cellAudioGetPortBlockTag),
@@ -293,44 +283,52 @@ NCallEntry ncallTable[] {
     ENTRY(cellGcmSetUserHandler),
     ENTRY(_cellGcmSetFlipCommandWithWaitLabel),
     ENTRY(cellGcmSetSecondVFrequency),
+    ENTRY(sys_net_initialize_network_ex),
+    ENTRY(cellNetCtlInit),
+    ENTRY(cellNetCtlNetStartDialogLoadAsync),
+    ENTRY(sceNpManagerRegisterCallback),
+    ENTRY(cellAudioPortStop),
+    ENTRY(cellAudioPortClose),
+    ENTRY(cellAudioSetPortLevel),
+    ENTRY(cellAudioOutGetNumberOfDevice),
+    ENTRY(sceNpManagerGetStatus),
 };
 
-constexpr auto staticTableSize() { return sizeof(ncallTable) / sizeof(NCallEntry); }
-
-static std::vector<NCallEntry> dynamicEntries;
-
 void PPUThread::ncall(uint32_t index) {
-    
-    if (index >= staticTableSize() + dynamicEntries.size()) {
+    if (index >= ncallTable.size()) {
         auto msg = ssnprintf("unknown ncall index %x", index);
         ERROR(libs) << msg;
         throw std::runtime_error(msg);
     }
     setEMUREG(0, getNIP());
     setNIP(getLR());
-    NCallEntry* entry;
-    if (index >= staticTableSize()) {
-        entry = &dynamicEntries[index - staticTableSize()];
-    } else {
-        entry = &ncallTable[index];
-    }
+    auto entry = &ncallTable[index];
     //INFO(libs) << ssnprintf("ncall %s", entry->name);
     entry->stub(this);
 }
 
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound) {
-    auto count = staticTableSize();
-    for (uint32_t i = 0; i < count; ++i) {
-        if (ncallTable[i].fnid == fnid) {
-            index = i;
-            return &ncallTable[i];
-        }
-    }
-    assert(!assertFound);
-    return nullptr;
+    auto it = std::find_if(begin(ncallTable), end(ncallTable), [=](auto& entry) {
+        return entry.fnid == fnid;
+    });
+    if (it == end(ncallTable))
+        return nullptr;
+    index = std::distance(begin(ncallTable), it);
+    auto next = std::find_if(it + 1, end(ncallTable), [=](auto& entry) {
+        return entry.fnid == fnid;
+    });
+    (void)next;
+    assert(next == end(ncallTable));
+    return &(*it);
+}
+
+const NCallEntry* findNCallEntryByIndex(uint32_t index) {
+    if (index >= ncallTable.size())
+        return nullptr;
+    return &ncallTable[index];
 }
 
 uint32_t addNCallEntry(NCallEntry entry) {
-    dynamicEntries.push_back(entry);
-    return staticTableSize() + dynamicEntries.size() - 1;
+    ncallTable.push_back(entry);
+    return ncallTable.size() - 1;
 }

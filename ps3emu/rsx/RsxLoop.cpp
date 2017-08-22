@@ -1543,7 +1543,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
             if (isScale(offset,
                         0x00000b40,
                         4,
-                        CELL_GCM_MAX_VERTEX_TEXTURE, // conf->texCoordsInputMask
+                        16, // conf->texCoordsInputMask
                         index)) {
                 //name = "CELL_GCM_NV4097_SET_TEX_COORD_CONTROL";
                 offset = 0x00000b40;

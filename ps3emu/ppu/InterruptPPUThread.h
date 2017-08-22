@@ -1,7 +1,7 @@
 #pragma once
 
 #include "PPUThread.h"
-#include "../libs/ConcurrentQueue.h"
+#include "ps3emu/libs/ConcurrentQueue.h"
 
 class SPUThread;
 
@@ -24,7 +24,7 @@ class InterruptPPUThread : public PPUThread {
     SPUThread* _establishedThread = nullptr;
     
 public:
-    InterruptPPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandler);
+    InterruptPPUThread(std::function<void(PPUThread*, PPUThreadEvent, std::any)> eventHandler);
     void establish(SPUThread* thread);
     void disestablish();
     void setEntry(uint32_t entry);

@@ -223,8 +223,12 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
            audioParam->nChannel == CELL_AUDIO_PORT_8CH);
     assert(audioParam->nBlock == CELL_AUDIO_BLOCK_8 ||
            audioParam->nBlock == CELL_AUDIO_BLOCK_16);
-    static int portnums = 0;
+    static int portnums = 1;
+    if (portnums != 1)
+        return CELL_AUDIO_ERROR_PORT_FULL;
+    
     *portNum = portnums++;
+    
     if (audioParam->attr & CELL_AUDIO_PORTATTR_INITLEVEL) {
         auto volume = union_cast<big_uint32_t, float>(audioParam->float_level);
         WARNING(libs) << ssnprintf("audio port volume %g (not implemented)", volume);
@@ -262,7 +266,7 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     
     pa_stream_set_overflow_callback(context.pulseStream, overflow_handler, nullptr);
     
-    if (portnums > 1) {
+    if (portnums > 2) {
         ERROR(libs) << "too many audio ports have been opened";
         exit(1);
     }
@@ -274,9 +278,19 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     return CELL_OK;
 }
 
+int32_t cellAudioPortStop(uint32_t portNum) {
+    WARNING(libs) << "cellAudioPortStop not implemented";
+    return CELL_OK;
+}
+
+int32_t cellAudioPortClose(uint32_t portNum) {
+    WARNING(libs) << "cellAudioPortClose not implemented";
+    return CELL_OK;
+}
+
 int32_t cellAudioGetPortConfig(uint32_t portNum, CellAudioPortConfig* portConfig) {
     INFO(libs) << ssnprintf("cellAudioGetPortConfig(%x)", portNum);
-    assert(portNum == 0);
+    assert(portNum == 1);
     portConfig->readIndexAddr = context.eaReadIndexAddr;
     portConfig->status = context.portStatus;
     portConfig->nChannel = context.nChannel;
@@ -331,13 +345,13 @@ int32_t cellAudioCreateNotifyEventQueue(sys_event_queue_t *id, sys_ipc_key_t *ke
 }
 
 int32_t cellAudioGetPortBlockTag(uint32_t portNum, uint64_t index, big_uint64_t *frameTag) {
-    assert(portNum == 0);
+    assert(portNum == 1);
     *frameTag = context.port0tags[index];
     return CELL_OK;
 }
 
 int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint64_t *timeStamp) {
-    assert(portNum == 0);
+    assert(portNum == 1);
     for (auto i = 0u; i < context.nBlock; ++i) {
         if (context.port0tags[i] == frameTag) {
             *timeStamp = context.port0stamps[i];
@@ -350,9 +364,8 @@ int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint6
 int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume) {
     volume = g_state.th->getFPRd(0); // TODO: handle in exports.h
     ERROR(libs) << "not impl";
-    exit(0);
     // TODO: make thread safe (readIndexAddr should be atomic)
-//     assert(portNum == 0);
+//     assert(portNum == 1);
 //     auto blockSize = calcBlockSize();
 //     auto block = (*context.readIndexAddr + 1) % context.nBlock;
 //     auto dest = (context.portAddr + blockSize * block);
@@ -360,5 +373,10 @@ int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float
 //     auto ptr = g_state.mm->getMemoryPointer(src, samplesSize);
 //     assert(volume > 0.f && volume <= 1.f);
     //SDL_MixAudioFormat(dest, ptr, AUDIO_F32MSB, samplesSize, 128.f * volume);
+    return CELL_OK;
+}
+
+int32_t cellAudioSetPortLevel(uint32_t portNum, float level) {
+    WARNING(libs) << "not impl";
     return CELL_OK;
 }

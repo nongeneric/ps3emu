@@ -206,7 +206,7 @@ std::set<uint32_t> collectInitialPPULeads(uint32_t vaBase, ELFLoader& elf, Rewri
         }
     }
     
-    auto [exports, nexports] = elf.exports(g_state.mm);
+    auto [exports, nexports] = elf.exports();
     for (auto i = 0; i < nexports; ++i) {
         auto& e = exports[i];
         auto stubs = reinterpret_cast<big_uint32_t*>(g_state.mm->getMemoryPointer(e.stub_table, 0));

@@ -41,3 +41,7 @@ struct SceNpId {
 
 int32_t sceNpManagerGetNpId(SceNpId *npId);
 int32_t sceNpDrmVerifyUpgradeLicense2(cstring_ptr_t content_id);
+int32_t sceNpManagerRegisterCallback(uint32_t callback, uint32_t arg);
+int32_t sceNpBasicRegisterContextSensitiveHandler(
+    const SceNpCommunicationId* context, uint32_t handler, uint32_t arg);
+int32_t sceNpManagerGetStatus(big_int32_t* status);

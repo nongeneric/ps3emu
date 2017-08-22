@@ -1,4 +1,4 @@
-#include "sqlite3.h"
+#include <sqlite3.h>
 
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -12,7 +12,7 @@
 
 namespace sql {
 
-class SqliteDB;
+class SQLiteDB;
     
 namespace hana = boost::hana;
 using namespace boost::hana::literals;

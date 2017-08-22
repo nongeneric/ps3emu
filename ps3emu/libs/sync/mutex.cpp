@@ -43,7 +43,8 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     ret = pthread_mutex_init(&info->mutex, &ptattr);
     assert(ret == 0);
     
-    *mutex_id = mutexes.create(info);
+    info->id = mutexes.create(info);
+    *mutex_id = info->id;
     INFO(libs) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
     return CELL_OK;
 }
@@ -126,7 +127,9 @@ int sys_mutex_unlock(sys_mutex_t mutex_id) {
     
     auto ret = pthread_mutex_unlock(&(*info)->mutex);
     assert(ret == EPERM || ret == 0);
-    return ret == EPERM ? CELL_EPERM : CELL_OK;
+    if (ret == EPERM)
+        return CELL_EPERM;
+    return CELL_OK;
 }
 
 std::shared_ptr<PthreadMutexInfo> find_mutex(sys_mutex_t id) {

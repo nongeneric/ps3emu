@@ -77,9 +77,9 @@ int32_t sys_spu_thread_write_snr(sys_spu_thread_t id, int32_t number, uint32_t v
 
 int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
-                             uint32_t type,
-                             PPUThread* proc);
-int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc);
+                             uint32_t size,
+                             uint32_t flags);
+int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path);
 int32_t sys_spu_image_close(sys_spu_image_t* img);
 int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
                                     uint32_t num,
@@ -135,6 +135,8 @@ int32_t sys_spu_thread_group_disconnect_event(sys_spu_thread_group_t id,
 int32_t sys_spu_thread_group_disconnect_event_all_threads(sys_spu_thread_group_t id, uint8_t spup);
 int32_t sys_spu_image_get_info(const sys_spu_image_t *img, big_uint32_t* entry_point, big_uint32_t* nsegs);
 int32_t sys_spu_image_get_modules(const sys_spu_image_t *img, ps3_uintptr_t buf, uint32_t nsegs);
+int32_t sys_spu_thread_group_suspend(sys_spu_thread_group_t id);
+int32_t sys_spu_thread_group_resume(sys_spu_thread_group_t id);
 
 std::shared_ptr<SPUThread> findRawSpuThread(sys_raw_spu_t id);
 std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id);

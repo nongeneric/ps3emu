@@ -1732,7 +1732,9 @@ EMU_REWRITE(SC, SCForm, 0)
 
 
 PRINT(NCALL, NCallForm) {
-    *result = format_u("ncall", i->idx.u());
+    auto entry = findNCallEntryByIndex(i->idx.u());
+    auto name = entry ? entry->name : "???";
+    *result = ssnprintf("ncall %s (%x)", name, i->idx.u());
 }
 
 #define _NCALL(_idx) { \
@@ -4067,11 +4069,11 @@ struct PPUDasmInstruction {
 
 #if !defined(EMU_REWRITER)
 template <DasmMode M, typename S>
-void ppu_dasm(void* instr, uint64_t cia, S* state) {
-    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
+void ppu_dasm(const void* instr, uint64_t cia, S* state) {
+    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<const uint32_t*>(instr));
     auto iform = reinterpret_cast<IForm*>(&x);
     switch (iform->OPCD.u()) {
-        case 1: invoke(NCALL);
+        case NCALL_OPCODE: invoke(NCALL);
         case BB_CALL_OPCODE: invoke(BBCALL);
         case 4: {
             auto simd = reinterpret_cast<SIMDForm*>(&x);
@@ -4567,14 +4569,14 @@ InstructionInfo analyze(uint32_t instr, uint32_t cia) {
 }
 
 template void ppu_dasm<DasmMode::Print, std::string>(
-    void* instr, uint64_t cia, std::string* state);
+    const void* instr, uint64_t cia, std::string* state);
 
 template void ppu_dasm<DasmMode::Name, std::string>(
-    void* instr, uint64_t cia, std::string* name);
+    const void* instr, uint64_t cia, std::string* name);
 
 template void ppu_dasm<DasmMode::Rewrite, std::string>(
-    void* instr, uint64_t cia, std::string* name);
+    const void* instr, uint64_t cia, std::string* name);
 
 template void ppu_dasm<DasmMode::Emulate, PPUThread>(
-    void* instr, uint64_t cia, PPUThread* th);
+    const void* instr, uint64_t cia, PPUThread* th);
 #endif

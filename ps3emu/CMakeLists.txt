@@ -11,6 +11,7 @@ set(SRC
     ppu/ppu_dasm_forms.h
     exports/ncall.cpp
     exports/syscall.cpp
+    exports/splicer.cpp
     utils.h
     utils.cpp
     MainMemory.h
@@ -90,9 +91,10 @@ set(SRC
     libs/trophy.cpp
     libs/savedata/savedata.cpp
     libs/savedata/SfoDb.cpp
-    libs/spurs.cpp
     libs/memoryContainer.cpp
     libs/perf.cpp
+    libs/libnet.cpp
+    libs/libnetctl.cpp
 )
 
 add_library(ps3emu SHARED ${SRC})

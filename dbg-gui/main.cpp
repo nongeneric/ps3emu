@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
                  (g_config.config().LogRsx ? log_rsx : 0) |
                  (g_config.config().LogLibs ? log_libs : 0)
                  | log_debugger,
-             log_trace | log_cache,
+             log_trace | log_cache | (g_config.config().LogSync ? log_sync : 0),
              g_config.config().LogDates ? log_date : log_simple);
     log_set_thread_name("dbg_main");
     if (g_config.config().EnableSpursTrace) {

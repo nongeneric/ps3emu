@@ -106,11 +106,13 @@ struct ReadPrxParser : CommandParser<ReadPrxCommand> {
     void init() override {
         desc.add_options()
             ("elf", value<std::string>(&command.elf)->required(), "elf file")
-            ("script", "write Ida script");
+            ("script", "write Ida script")
+            ("prx", "prx module");
     }
     
     void parse(variables_map& vm) override {
         command.writeIdaScript = vm.count("script");
+        command.prx = vm.count("prx");
     }
 };
 

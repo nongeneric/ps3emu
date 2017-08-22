@@ -28,20 +28,20 @@ ELFLoader* Process::elfLoader() {
     return _elf.get();
 }
 
-boost::optional<fdescr> Process::findExport(MainMemory* mm, ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva) {
+boost::optional<fdescr> Process::findExport(ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva) {
     prx_export_t* exports;
     int count;
-    std::tie(exports, count) = prx->exports(mm);
+    std::tie(exports, count) = prx->exports();
     for (auto i = 0; i < count; ++i) {
-        auto fnids = (big_uint32_t*)mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
-        auto stubs = (big_uint32_t*)mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
+        auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
+        auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
         for (auto j = 0; j < exports[i].functions; ++j) {
             if (fnids[j] == eid) {
                 if (fdescrva) {
                     *fdescrva = stubs[j];
                 }
                 fdescr descr;
-                mm->readMemory(stubs[j], &descr, sizeof(descr));
+                g_state.mm->readMemory(stubs[j], &descr, sizeof(descr));
                 return descr;
             }
         }
@@ -49,7 +49,7 @@ boost::optional<fdescr> Process::findExport(MainMemory* mm, ELFLoader* prx, uint
     return {};
 }
 
-uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name) {
+uint32_t findExportedModuleFunction(uint32_t imageBase, const char* fname) {
     auto& segments = g_state.proc->getSegments();
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
     if (segment == end(segments)) {
@@ -62,14 +62,17 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name) {
                       "libsysutil.sprx.elf",
                       "libsysutil_np_trophy.sprx.elf",
                       "libsysutil_game.sprx.elf",
+                      "libsysutil_np.sprx.elf",
+                      "libnetctl.sprx.elf",
+                      "libnet.sprx.elf",
                       "libresc.sprx.elf"}) {
         if (name == elfName) {
-            INFO(libs) << ssnprintf("ignoring function %s for module %s", name, elfName);
+            INFO(libs) << ssnprintf("ignoring function %s for module %s", fname, elfName);
             return 0;
         }
     }
     ps3_uintptr_t fdescrva;
-    if (g_state.proc->findExport(g_state.mm, segment->elf.get(), calcEid(name), &fdescrva))
+    if (g_state.proc->findExport(segment->elf.get(), calcEid(fname), &fdescrva))
         return fdescrva;
     return 0;
 }
@@ -90,7 +93,7 @@ int32_t executeExportedFunction(uint32_t imageBase,
             return CELL_OK;
         }
     }
-    auto func = g_state.proc->findExport(g_state.mm, segment->elf.get(), calcEid(name));
+    auto func = g_state.proc->findExport(segment->elf.get(), calcEid(name));
     if (!func) {
         INFO(libs) << ssnprintf("module %08x has no %s function", imageBase, name);
         return CELL_OK;
@@ -155,7 +158,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     g_state.heapalloc = _heapMemoryManager.get();
     
     _threads.emplace_back(std::make_unique<PPUThread>(
-        [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, true));
+        [=](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); }, true));
     _rsx.reset(new Rsx());
     _elf.reset(new ELFLoader());
     _elf->load(elfPath);
@@ -175,7 +178,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _contentManager.reset(new ContentManager());
     _contentManager->setElfPath(elfPath);
     _threadInitInfo.reset(new ThreadInitInfo());
-    *_threadInitInfo = _elf->getThreadInitInfo(_mainMemory.get());
+    *_threadInitInfo = _elf->getThreadInitInfo();
     auto thread = _threads.back().get();
     thread->setId(0, "main");
     
@@ -237,10 +240,10 @@ uint32_t Process::loadPrx(std::string path) {
     }, imageBase, x86paths, &_rewriterStore, false);
     std::copy(begin(stolen), end(stolen), std::back_inserter(_stolenInfos));
     for (auto p : _prxs) {
-        p->link(_mainMemory.get(), _prxs);
+        p->link(_prxs);
     }
     if (g_state.th) {
-        g_state.th->raiseModuleLoaded();
+        g_state.th->raiseModuleLoaded(imageBase);
     }
     return imageBase;
 }
@@ -341,7 +344,7 @@ Event Process::run() {
                 }
                 case PPUThreadEvent::Failure: return PPUThreadFailureEvent{ev->thread};
                 case PPUThreadEvent::ModuleLoaded:
-                    return PPUModuleLoadedEvent{ev->thread};
+                    return PPUModuleLoadedEvent{ev->thread, std::any_cast<uint32_t>(ev->payload)};
                 case PPUThreadEvent::Joined:
                     removeThread(ev->thread);
                     break;
@@ -382,7 +385,7 @@ uint64_t Process::createThread(uint32_t stackSize,
                                bool start) {
     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     _threads.emplace_back(std::make_unique<PPUThread>(
-        [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); }, false));
+        [=](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); }, false));
     auto t = _threads.back().get();
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     t->setGPR(3, arg);
@@ -402,7 +405,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
                                         bool start) {
     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     auto t = new InterruptPPUThread(
-        [=](auto t, auto e) { this->ppuThreadEventHandler(t, e); });
+        [=](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); });
     t->setArg(arg);
     t->setEntry(entryPointDescriptorVa);
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
@@ -516,9 +519,9 @@ std::shared_ptr<SPUThread> Process::getSpuThreadBySpuNum(uint32_t spuNum) {
     return *it;
 }
 
-void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event) {
+void Process::ppuThreadEventHandler(PPUThread* thread, PPUThreadEvent event, std::any payload) {
     auto oneTime = std::make_shared<OneTimeEvent>();
-    _eventQueue.enqueue(ThreadEvent{PPUThreadEventInfo{event, thread}, oneTime});
+    _eventQueue.enqueue(ThreadEvent{PPUThreadEventInfo{event, thread, payload}, oneTime});
     oneTime->wait();
 }
 

@@ -84,6 +84,7 @@ void PPUThread::scall() {
         case 107: wrap(sys_cond_wait, this); break;
         case 108: wrap(sys_cond_signal, this); break;
         case 109: wrap(sys_cond_signal_all, this); break;
+        case 110: wrap(sys_cond_signal_to, this); break;
         case 182: wrap(sys_spu_thread_read_ls, this); break;
         case 169: wrap(sys_spu_initialize, this); break;
         case 170: wrap(sys_spu_thread_group_create, this); break;
@@ -94,6 +95,7 @@ void PPUThread::scall() {
         case 165: wrap(sys_spu_thread_get_exit_status, this); break;
         case 160: wrap(sys_raw_spu_create, this); break;
         case 156: wrap(sys_spu_image_open, this); break;
+        case 157: wrap(sys_spu_image_import, this); break;
         case 150: wrap(sys_raw_spu_create_interrupt_tag, this); break;
         case 151: wrap(sys_raw_spu_set_int_mask, this); break;
         case 81: wrap(sys_interrupt_tag_destroy, this); break;
@@ -158,6 +160,8 @@ void PPUThread::scall() {
         case 343: wrap(sys_memory_container_get_size, this); break;
         case 497: wrap(sys_prx_load_module_on_memcontainer, this); break;
         case 962: wrap(sys_perf_insert_cbe_bookmark, this); break;
+        case 174: wrap(sys_spu_thread_group_suspend, this); break;
+        case 175: wrap(sys_spu_thread_group_resume, this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

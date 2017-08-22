@@ -1,31 +1,36 @@
 #include "ps3tool.h"
 #include "ps3emu/ELFLoader.h"
+#include "ps3emu/MainMemory.h"
 #include "ps3emu/utils.h"
+#include "ps3emu/fileutils.h"
+#include "ps3emu/exports/splicer.h"
 #include <boost/endian/arithmetic.hpp>
 #include <iostream>
 #include <fstream>
 
 using namespace boost::endian;
 
+std::string printFnid(uint32_t fnid) {
+    auto name = fnidToName(fnid);
+    if (name)
+        return *name;
+    return ssnprintf("fnid_%08X");
+}
+
 void HandleReadPrx(ReadPrxCommand const& command) {
-    std::ifstream f(command.elf);
-    if (!f.is_open()) {
-        throw std::runtime_error("can't read elf");
-    }
-    f.seekg(0, std::ios_base::end);
-    auto file_size = f.tellg();
-    std::vector<char> elf(file_size);
-    f.seekg(0, std::ios_base::beg);
-    f.read(elf.data(), elf.size());
-
-    auto header = reinterpret_cast<Elf64_be_Ehdr*>(&elf[0]);
-    auto pheader = reinterpret_cast<Elf64_be_Phdr*>(&elf[header->e_phoff]);
-    auto module = reinterpret_cast<module_info_t*>(&elf[pheader->p_paddr]);
-    auto exports = reinterpret_cast<prx_export_t*>(&elf[pheader->p_offset + module->exports_start]);
-    auto imports = reinterpret_cast<prx_import_t*>(&elf[pheader->p_offset + module->imports_start]);
-    auto nexports = (module->exports_end - module->exports_start) / sizeof(prx_export_t);
-    auto nimports = (module->imports_end - module->imports_start) / sizeof(prx_import_t);
-
+    MainMemory mm;
+    g_state.mm = &mm;
+    ELFLoader loader;
+    loader.load(command.elf);
+    auto imageBase = command.prx ? 0x10000 : 0;
+    loader.map([](auto va, auto size, auto index) {}, imageBase, {}, nullptr, false);
+    auto [imports, nimports] = loader.imports();
+    auto [exports, nexports] = loader.exports();
+    auto module = loader.module();
+    auto header = loader.header();
+    auto elf = (uint8_t*)header;
+    auto pheader = reinterpret_cast<Elf64_be_Phdr*>(elf + header->e_phoff);
+    
     std::cout << "from idaapi import *\n"
                 << "\n"
                 << "def make_func(ea, name):\n"
@@ -33,64 +38,67 @@ void HandleReadPrx(ReadPrxCommand const& command) {
                 << "    add_func(ea, -1)\n"
                 << "    set_name(ea, name)\n\n";
     
-    auto tocOrigin = module->toc - 0x8000;
-    auto tocSize = pheader[1].p_vaddr + pheader[1].p_filesz - tocOrigin;
-    std::cout << ssnprintf("# module_info (%08x)\n", pheader->p_paddr)
-              << ssnprintf("#   attributes %04x\n", module->attributes)
-              << ssnprintf("#   minor version %x\n", module->minor_version)
-              << ssnprintf("#   major version %x\n", module->major_version)
-              << ssnprintf("#   name %s\n", module->name)
-              << ssnprintf("#   toc %08x (origin %08x, size %08x)\n", module->toc, tocOrigin, tocSize)
-              << ssnprintf("#   exports start %08x\n", module->exports_start)
-              << ssnprintf("#   exports end %08x\n", module->exports_end)
-              << ssnprintf("#   imports start %08x\n", module->imports_start)
-              << ssnprintf("#   imports end %08x\n", module->imports_end);
+    if (module) {
+        auto tocOrigin = module->toc - 0x8000;
+        auto tocSize = pheader[1].p_vaddr + pheader[1].p_filesz - tocOrigin;
+        std::cout << ssnprintf("# module_info (%08x)\n", pheader->p_paddr)
+                << ssnprintf("#   attributes %04x\n", module->attributes)
+                << ssnprintf("#   minor version %x\n", module->minor_version)
+                << ssnprintf("#   major version %x\n", module->major_version)
+                << ssnprintf("#   name %s\n", module->name)
+                << ssnprintf("#   toc %08x (origin %08x, size %08x)\n", module->toc, tocOrigin, tocSize)
+                << ssnprintf("#   exports start %08x\n", module->exports_start)
+                << ssnprintf("#   exports end %08x\n", module->exports_end)
+                << ssnprintf("#   imports start %08x\n", module->imports_start)
+                << ssnprintf("#   imports end %08x\n", module->imports_end);
+    }
                 
     std::cout << "\n# exports\n";
-    for (auto i = 0u; i < nexports; ++i) {
+    for (auto i = 0; i < nexports; ++i) {
         auto& e = exports[i];
-        auto libname = e.name ? &elf[pheader->p_offset + e.name] : "unknown";
-        auto fnids = reinterpret_cast<big_uint32_t*>(
-            &elf[pheader->p_offset + e.fnid_table]);
-        auto stubs = reinterpret_cast<big_uint32_t*>(
-            &elf[pheader->p_offset + e.stub_table]);
+        std::string libname = "unknown";
+        if (e.name) {
+            readString(g_state.mm, e.name, libname);
+        }
+        auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(e.fnid_table, 1);
+        auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(e.stub_table, 1);
         std::cout << ssnprintf("\n# functions: %d, variables: %d, tls_variables: %d\n\n",
                                e.functions,
                                e.variables,
                                e.tls_variables);
         for (auto i = 0; i < e.functions + e.variables + e.tls_variables; ++i) {
             auto descr =
-                reinterpret_cast<fdescr*>(&elf[pheader->p_offset + stubs[i]]);
+                reinterpret_cast<fdescr*>(g_state.mm->getMemoryPointer(stubs[i], 1));
                 std::cout << ssnprintf("# exported symbol\n")
-                      << ssnprintf("#   lib      %s\n", libname)
-                      << ssnprintf("#   name     fnid_%08X\n", fnids[i])
-                      << ssnprintf("#   fnid     %08X\n", fnids[i])
-                      << ssnprintf("#   stub     %08x\n", stubs[i]);
+                          << ssnprintf("#   lib      %s\n", libname)
+                          << ssnprintf("#   name     %s\n", printFnid(fnids[i]))
+                          << ssnprintf("#   fnid     %08x\n", fnids[i] - imageBase)
+                          << ssnprintf("#   stub     %08x\n", stubs[i] - imageBase);
                 std::cout << ssnprintf(
-                    "make_func(0x%08x, \"%s_fnid_%08X_%d\")\n\n", descr->va, libname, fnids[i], i);
+                    "make_func(0x%08x, \"%s_%s\")\n\n", descr->va - imageBase, libname, printFnid(fnids[i]));
         }
     }
     
     std::cout << "\n# imports\n";
-    for (auto i = 0u; i < nimports; ++i) {
+    for (auto i = 0; i < nimports; ++i) {
         auto& import = imports[i];
-        auto libname = &elf[pheader->p_offset + import.name];
-        auto fnids = (big_uint32_t*)&elf[pheader->p_offset + import.fnids];
-        auto fstubs = (big_uint32_t*)&elf[pheader->p_offset + import.fstubs];
+        std::string libname;
+        readString(g_state.mm, import.name, libname);
+        auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(import.fnids, 1);
+        auto fstubs = (big_uint32_t*)g_state.mm->getMemoryPointer(import.fstubs, 1);
         std::cout << ssnprintf(
             "# fnid table: %08x, stub table: %08x\n", import.fnids, import.fstubs);
         for (auto i = 0u; i < import.functions; ++i) {
             std::cout << ssnprintf("# imported function\n")
                       << ssnprintf("#   lib      %s\n", libname)
-                      << ssnprintf("#   name     fnid_%08X\n", fnids[i])
-                      << ssnprintf("#   fnid     %08X\n", fnids[i])
-                      << ssnprintf("#   fstub    %08x\n", fstubs[i])
-                      << ssnprintf("#   fstubVa  %08x\n", import.fstubs + 4 * i);
-            std::cout << ssnprintf("make_func(0x%08x, \"%s_stub_fnid_%08X_%d\")\n\n",
-                                   fstubs[i],
+                      << ssnprintf("#   name     %s\n", printFnid(fnids[i]))
+                      << ssnprintf("#   fstub    %08x\n", fstubs[i] - imageBase)
+                      << ssnprintf("#   fnid     %08x\n", fnids[i] - imageBase)
+                      << ssnprintf("#   fstubVa  %08x\n", import.fstubs + 4 * i - imageBase);
+            std::cout << ssnprintf("make_func(0x%08x, \"%s_stub_%s\")\n\n",
+                                   fstubs[i] - imageBase,
                                    libname,
-                                   fnids[i],
-                                   i);
+                                   printFnid(fnids[i]));
         }
     }
     

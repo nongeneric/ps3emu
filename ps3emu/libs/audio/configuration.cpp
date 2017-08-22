@@ -98,3 +98,8 @@ int32_t cellAudioOutGetState(uint32_t audioOut,
     state->soundMode.layout = CELL_AUDIO_OUT_SPEAKER_LAYOUT_DEFAULT;
     return 0;
 }
+
+int32_t cellAudioOutGetNumberOfDevice(uint32_t audioOut) {
+    assert(audioOut == CELL_AUDIO_OUT_PRIMARY || audioOut == CELL_AUDIO_OUT_SECONDARY);
+    return 1;
+}

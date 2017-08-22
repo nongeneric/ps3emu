@@ -2804,3 +2804,26 @@ TEST_CASE("performance_tips_advanced_merge_sort") {
         "SPURS task finished\n"
     );
 }
+
+TEST_CASE("spu_thr_embed_img") {
+    test_interpreter_and_rewriter({"./binaries/spu_thr_embed_img/a.elf"},
+        "start=21c80 end=22054 size=3d4\n"
+        "Initializing SPUs\n"
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Starting the SPU thread group.\n"
+        "Waiting for the SPU thread group to be terminated.\n"
+        "All SPU thread exited by sys_spu_thread_exit().\n"
+        "SPU thread 0's exit status = 17\n"
+        "Exiting.\n"
+    );
+}
+
+TEST_CASE("ppu_threads_mutex_cond2") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_mutex_cond2/a.elf"},
+        "test_all: ok=4 timeout=0\n"
+        "test_one: ok=1 timeout=3\n"
+        "test_to_3(ok): e1=0 e2=0 e3=1 e4=0\n"
+    );
+}

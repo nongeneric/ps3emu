@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mutex.h"
+#include "../sys.h"
 #include "../sys_defs.h"
 
 struct sys_cond_attribute_t {
@@ -19,3 +20,4 @@ int32_t sys_cond_destroy(sys_cond_t cond);
 int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout);
 int32_t sys_cond_signal(sys_cond_t cond);
 int32_t sys_cond_signal_all(sys_cond_t cond);
+int32_t sys_cond_signal_to(sys_cond_t cond, sys_ppu_thread_t ppu_thread_id);

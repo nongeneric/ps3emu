@@ -31,6 +31,8 @@ ENUM(CellAudioOutCopyControl,
 
 int32_t cellAudioInit();
 int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam, big_uint32_t* portNum);
+int32_t cellAudioPortStop(uint32_t portNum);
+int32_t cellAudioPortClose(uint32_t portNum);
 int32_t cellAudioGetPortConfig(uint32_t portNum, CellAudioPortConfig* portConfig);
 int32_t cellAudioPortStart(uint32_t portNum);
 int32_t cellAudioSetNotifyEventQueueEx(sys_ipc_key_t key, uint32_t iFlags);
@@ -40,3 +42,4 @@ int32_t cellAudioCreateNotifyEventQueue(sys_event_queue_t *id, sys_ipc_key_t *ke
 int32_t cellAudioGetPortBlockTag(uint32_t portNum, uint64_t index, big_uint64_t *frameTag);
 int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint64_t *timeStamp);
 int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume);
+int32_t cellAudioSetPortLevel(uint32_t portNum, float level);

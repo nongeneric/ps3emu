@@ -59,6 +59,7 @@ class DebuggerModel : public QWidget {
     ConcurrentBoundedQueue<DebugCommand> _debugThreadQueue;
     bool _elfLoaded = false;
     bool _paused = false;
+    std::string _moduleToWait;
     void log(std::string str);
     void traceTo(ps3_uintptr_t va);
     void spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts);
@@ -81,6 +82,7 @@ class DebuggerModel : public QWidget {
     void dumpMutexes(bool lw);
     void changeThread(uint32_t index);
     std::string printSegment(uint32_t ea);
+    uint32_t findLibFunc(std::string name);
     void execSingleCommand(QString command);
     void dbgLoop();
     void loadElfHandler(LoadElfCommand command);

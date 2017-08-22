@@ -20,7 +20,7 @@ using namespace boost::endian;
 #define dbgpause(value)
 #endif
 
-PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent)> eventHandler,
+PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent, std::any)> eventHandler,
                      bool primaryThread)
     : _eventHandler(eventHandler),
       _init(false),
@@ -62,7 +62,7 @@ void PPUThread::innerLoop() {
     for (;;) {
 #ifdef DEBUGPAUSE
         if (_singleStep) {
-            _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint);
+            _eventHandler(this, PPUThreadEvent::SingleStepBreakpoint, {});
         }
         
         while (_dbgPaused) {
@@ -86,17 +86,17 @@ void PPUThread::innerLoop() {
             }
         } catch (BreakpointException& e) {
             setNIP(cia);
-            _eventHandler(this, PPUThreadEvent::Breakpoint);
+            _eventHandler(this, PPUThreadEvent::Breakpoint, {});
         } catch (IllegalInstructionException& e) {
             setNIP(cia);
-            _eventHandler(this, PPUThreadEvent::InvalidInstruction);
+            _eventHandler(this, PPUThreadEvent::InvalidInstruction, {});
             break;
         } catch (MemoryAccessException& e) {
             setNIP(cia);
-            _eventHandler(this, PPUThreadEvent::MemoryAccessError);
+            _eventHandler(this, PPUThreadEvent::MemoryAccessError, {});
             break;
         } catch (ProcessFinishedException& e) {
-            _eventHandler(this, PPUThreadEvent::ProcessFinished);
+            _eventHandler(this, PPUThreadEvent::ProcessFinished, {});
             return;
         } catch (ThreadFinishedException& e) {
             _exitCode = e.errorCode();
@@ -106,11 +106,11 @@ void PPUThread::innerLoop() {
             auto message = ssnprintf("thread exception: %s", e.what());
             ERROR(libs) << message;
             setNIP(cia);
-            _eventHandler(this, PPUThreadEvent::Failure);
+            _eventHandler(this, PPUThreadEvent::Failure, {});
             break;
         }
     }
-    _eventHandler(this, PPUThreadEvent::Finished);
+    _eventHandler(this, PPUThreadEvent::Finished, {});
 }
 
 void PPUThread::loop() {
@@ -127,7 +127,7 @@ void PPUThread::loop() {
         _cvRunning.notify_all();
     }
     
-    _eventHandler(this, PPUThreadEvent::Started);
+    _eventHandler(this, PPUThreadEvent::Started, {});
     
     innerLoop();
     
@@ -179,7 +179,7 @@ uint32_t PPUThread::getStackSize() {
 
 uint64_t PPUThread::join(bool unique) {
     _thread.join();
-    _eventHandler(this, PPUThreadEvent::Joined);
+    _eventHandler(this, PPUThreadEvent::Joined, {});
     if (_threadFinishedGracefully)
         return _exitCode;
     if (unique)
@@ -251,8 +251,8 @@ std::string PPUThread::getName() {
     return _name;
 }
 
-void PPUThread::raiseModuleLoaded() {
-    _eventHandler(this, PPUThreadEvent::ModuleLoaded);
+void PPUThread::raiseModuleLoaded(uint32_t imageBase) {
+    _eventHandler(this, PPUThreadEvent::ModuleLoaded, imageBase);
 }
 
 unsigned PPUThread::getTid() {

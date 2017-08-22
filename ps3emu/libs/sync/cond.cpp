@@ -3,13 +3,19 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/IDMap.h"
 #include "ps3emu/log.h"
+#include "ps3emu/ppu/PPUThread.h"
 #include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 namespace {
     struct cv_info_t {
         pthread_cond_t cv;
         PthreadMutexInfo* m;
         std::string name;
+        std::vector<sys_ppu_thread_t> waiters;
+        std::vector<sys_ppu_thread_t> next;
+        boost::mutex waitersMutex;
     };
     
     ThreadSafeIDMap<sys_cond_t, std::shared_ptr<cv_info_t>, CondIdBase> cvs;
@@ -31,45 +37,121 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
 
 int32_t sys_cond_destroy(sys_cond_t cond) {
     INFO(libs) << ssnprintf("sys_cond_destroy(%x)", cond);
-    // TODO: error handling
-    auto info = cvs.get(cond);
+    auto optinfo = cvs.try_get(cond);
+    if (!optinfo)
+        return CELL_ESRCH;
+    auto& info = *optinfo;
     pthread_cond_destroy(&info->cv);
     cvs.destroy(cond);
     return CELL_OK;
 }
 
 int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
-    assert(timeout == 0);
-    auto info = cvs.get(cond);
-    INFO(libs, sync) << ssnprintf("sys_cond_wait(%x) c:%s m:%s",
+    auto optinfo = cvs.try_get(cond);
+    if (!optinfo)
+        return CELL_ESRCH;
+    auto& info = *optinfo;
+    INFO(libs, sync) << ssnprintf("sys_cond_wait(%x) c:%s m:%x(%s)",
                             cond,
                             info->name,
+                            info->m->id,
                             info->m->name);
-    // TODO: error handling
-    pthread_cond_wait(&info->cv, &info->m->mutex);
+    auto id = g_state.th->getId();
+    {
+        boost::lock_guard<boost::mutex> lock(info->waitersMutex);
+        info->waiters.push_back(id);
+    }
+    auto check = [&] {
+        boost::lock_guard<boost::mutex> lock(info->waitersMutex);
+        auto it = std::find(begin(info->next), end(info->next), id);
+        if (it == end(info->next))
+            return false;
+        info->next.erase(it);
+        it = std::find(begin(info->waiters), end(info->waiters), id);
+        assert(it != end(info->waiters));
+        info->waiters.erase(it);
+        return true;
+    };
+    if (timeout == 0) {
+        for (;;) {
+            auto res = pthread_cond_wait(&info->cv, &info->m->mutex);
+            if (res == EPERM)
+                return CELL_EPERM;
+            assert(res == 0);
+            if (check())
+                return CELL_OK;
+        }
+    } else {
+        timespec abs_time;
+        clock_gettime(CLOCK_REALTIME, &abs_time);
+        auto ns = abs_time.tv_sec * 1000000000 + abs_time.tv_nsec + timeout * 1000;
+        abs_time.tv_sec = ns / 1000000000;
+        abs_time.tv_nsec = ns % 1000000000;
+        for (;;) {
+            auto res = pthread_cond_timedwait(&info->cv, &info->m->mutex, &abs_time);
+            if (res == ETIMEDOUT)
+                return CELL_ETIMEDOUT;
+            if (res == EPERM)
+                return CELL_EPERM;
+            assert(res == 0);
+            if (check())
+                return CELL_OK;
+        }
+    }
     return CELL_OK;
 }
 
 int32_t sys_cond_signal(sys_cond_t cond) {
-    auto info = cvs.try_get(cond);
-    if (!info) // noop
-        return CELL_OK;
-    INFO(libs, sync) << ssnprintf("sys_cond_signal(%x) c:%s m:%s",
+    auto optinfo = cvs.try_get(cond);
+    if (!optinfo)
+        return CELL_ESRCH;
+    auto& info = *optinfo;
+    INFO(libs, sync) << ssnprintf("sys_cond_signal(%x) c:%s m:%x(%s)",
                             cond,
-                            (*info)->name,
-                            (*info)->m->name);
-    // TODO: error handling
-    pthread_cond_signal(&(*info)->cv);
+                            info->name,
+                            info->m->id,
+                            info->m->name);
+    boost::lock_guard<boost::mutex> lock(info->waitersMutex);
+    if (info->waiters.empty())
+        return CELL_OK;
+    info->next.push_back(info->waiters.back());
+    pthread_cond_broadcast(&info->cv);
     return CELL_OK;
 }
 
 int32_t sys_cond_signal_all(sys_cond_t cond) {
-    auto info = cvs.get(cond);
-    INFO(libs, sync) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%s",
+    auto optinfo = cvs.try_get(cond);
+    if (!optinfo)
+        return CELL_ESRCH;
+    auto& info = *optinfo;
+    INFO(libs, sync) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%x(%s)",
                             cond,
                             info->name,
+                            info->m->id,
                             info->m->name);
-    // TODO: error handling
+    boost::lock_guard<boost::mutex> lock(info->waitersMutex);
+    for (auto waiter : info->waiters)
+        info->next.push_back(waiter);
+    pthread_cond_broadcast(&info->cv);
+    return CELL_OK;
+}
+
+int32_t sys_cond_signal_to(sys_cond_t cond, sys_ppu_thread_t ppu_thread_id) {
+    auto optinfo = cvs.try_get(cond);
+    if (!optinfo)
+        return CELL_ESRCH;
+    auto& info = *optinfo;
+    INFO(libs, sync) << ssnprintf("sys_cond_signal_to(%x, %x) c:%s m:%x(%s)",
+                            cond,
+                            ppu_thread_id,
+                            info->name,
+                            info->m->id,
+                            info->m->name);
+    boost::lock_guard<boost::mutex> lock(info->waitersMutex);
+    auto it = std::find(begin(info->waiters), end(info->waiters), ppu_thread_id);
+    if (it == end(info->waiters))
+        return CELL_EPERM;
+    info->next.push_back(ppu_thread_id);
     pthread_cond_broadcast(&info->cv);
     return CELL_OK;
 }

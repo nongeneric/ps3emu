@@ -114,6 +114,7 @@ uint32_t cellGcmGetTileInfo();
 uint32_t cellGcmGetZcullInfo();
 uint32_t cellGcmGetLastFlipTime(Process* proc);
 uint64_t cellGcmGetTimeStamp(uint32_t index);
+uint32_t cellGcmGetReport(uint32_t type, uint32_t index);
 emu_void_t cellGcmSetSecondVFrequency(uint32_t freq);
 emu_void_t cellGcmSetUserHandler(uint32_t handler);
 emu_void_t cellGcmSetVBlankHandler(uint32_t handler, Process* proc);

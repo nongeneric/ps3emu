@@ -10,6 +10,7 @@
 #include "Config.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/execmap/InstrDb.h"
+#include "ps3emu/exports/splicer.h"
 #include "InternalMemoryManager.h"
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
@@ -105,6 +106,10 @@ module_info_t* ELFLoader::module() {
     return _module;
 }
 
+Elf64_be_Ehdr* ELFLoader::header() {
+    return _header;
+}
+
 struct vdescr {
     big_uint32_t size;
     big_uint32_t toc;
@@ -116,40 +121,6 @@ struct Replacement {
     std::string proxy;
 };
 
-std::map<uint32_t, uint32_t> branchMap;
-
-struct ProxyStub {
-    uint32_t lr;
-    uint32_t ncall_proxy_enter;
-    uint32_t ncall;
-    uint32_t ncall_proxy_exit;
-    uint32_t stolen1;
-    uint32_t ncall_abs_branch;
-};
-
-uint64_t emuProxyEnter() {
-    auto nip = g_state.th->getEMUREG(0);
-    auto stub = (ProxyStub*)g_state.mm->getMemoryPointer(nip - 8, sizeof(ProxyStub));
-    stub->lr = g_state.th->getLR();
-    g_state.th->setLR(nip + 4);
-    g_state.th->setNIP(nip);
-    return g_state.th->getGPR(3);
-}
-
-uint64_t emuProxyExit() {
-    auto nip = g_state.th->getEMUREG(0);
-    auto stub = (ProxyStub*)g_state.mm->getMemoryPointer(nip - 16, sizeof(ProxyStub));
-    g_state.th->setLR(stub->lr);
-    g_state.th->setNIP(nip);
-    return g_state.th->getGPR(3);
-}
-
-uint64_t emuBranch() {
-    auto nip = g_state.th->getEMUREG(0) - 4;
-    g_state.th->setNIP(branchMap[nip]);
-    return g_state.th->getGPR(3);
-}
-
 std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                                            ps3_uintptr_t imageBase,
                                            std::vector<std::string> x86paths,
@@ -159,8 +130,9 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type != PT_LOAD && ph->p_type != PT_TLS)
             continue;
-        if (ph->p_vaddr % ph->p_align != 0)
-            throw std::runtime_error("complex alignment not supported");
+        if (ph->p_vaddr % ph->p_align != 0) {
+            WARNING(libs) << "complex alignment not supported";
+        }
         if (ph->p_memsz == 0)
             continue;
         
@@ -256,6 +228,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
             g_state.mm->store16(offset, hi(val));
         } else if (type == R_PPC64_ADDR16_HA) {
             g_state.mm->store16(offset, ha(val));
+        } else if (type == R_PPC64_ADDR16_LO_DS) {
+            g_state.mm->store16(offset, lo(val) >> 2);
         } else {
             throw std::runtime_error("unimplemented reloc type");
         }
@@ -300,73 +274,60 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         encodeNCall(g_state.mm, codeVa, index);
     }
     
+    // install logging proxies
     if (!rewriter) {
-        std::vector<Replacement> proxies = {
-//             { "cellSpurs", "_cellSpursTaskAttribute2Initialize", "_cellSpursTaskAttribute2Initialize_proxy" },
-//             { "cellSpurs", "cellSpursCreateTaskset2", "cellSpursCreateTaskset2_proxy" },
-//             { "cellSpurs", "cellSpursCreateTaskset", "cellSpursCreateTaskset2_proxy" },
-//             { "cellSpurs", "cellSpursCreateTask2", "cellSpursCreateTask2_proxy" },
-//             { "cellSpurs", "cellSpursCreateTask", "cellSpursCreateTask2_proxy" },
-//             { "cellSpurs", "cellSpursCreateTaskWithAttribute", "cellSpursCreateTaskWithAttribute_proxy" },
-//             { "cellSpurs", "cellSpursEventFlagAttachLv2EventQueue", "cellSpursEventFlagAttachLv2EventQueue_proxy" },
-//             { "cellSpurs", "_cellSpursEventFlagInitialize", "_cellSpursEventFlagInitialize_proxy" },
-//             { "cellSpurs", "_cellSpursQueueInitialize", "_cellSpursQueueInitialize_proxy" },
-//             { "cellSpurs", "cellSpursEventFlagWait", "cellSpursEventFlagWait_proxy" },
-//             { "cellSpurs", "_cellSpursAttributeInitialize", "_cellSpursAttributeInitialize_proxy" },
-//             { "cellSpurs", "cellSpursAttributeSetSpuThreadGroupType", "cellSpursAttributeSetSpuThreadGroupType_proxy" },
-//             { "cellSync", "cellSyncQueueInitialize", "cellSyncQueueInitialize_proxy" },
-        };
-        
-        for (auto&& repl : proxies) {
-            auto fnid = calcFnid(repl.name.c_str());
-            auto exportStub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
-            if (exportStub == 0)
-                continue;
-            auto codeVa = g_state.mm->load32(exportStub);
-            
-            uint32_t enterIndex, exitIndex, branchIndex, index;
-            findNCallEntry(calcFnid("emuProxyEnter"), enterIndex, true);
-            findNCallEntry(calcFnid("emuProxyExit"), exitIndex, true);
-            findNCallEntry(calcFnid("emuBranch"), branchIndex, true);
-            findNCallEntry(calcFnid(repl.proxy.c_str()), index, true);
-            
-            uint32_t stubVa;
-            g_state.memalloc->internalAlloc<4, ProxyStub>(&stubVa);
-            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_enter), enterIndex);
-            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall), index);
-            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_proxy_exit), exitIndex);
-            g_state.mm->store32(stubVa + offsetof(ProxyStub, stolen1), g_state.mm->load32(codeVa));
-            encodeNCall(g_state.mm, stubVa + offsetof(ProxyStub, ncall_abs_branch), branchIndex);
-            branchMap[stubVa + offsetof(ProxyStub, ncall_abs_branch)] = codeVa + 4;
-            
-            encodeNCall(g_state.mm, codeVa, branchIndex);
-            branchMap[codeVa] = stubVa + offsetof(ProxyStub, ncall_proxy_enter);
+        auto [exports, nexports] = this->exports();
+        for (auto i = 0; i < nexports; ++i) {
+            auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(exports[i].fnid_table, 4 * exports[i].functions);
+            auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
+            for (auto j = 0; j < exports[i].functions; ++j) {
+                auto fnidName = fnidToName(fnids[j]);
+                auto name = fnidName ? *fnidName : ssnprintf("fnid_%08X", fnids[j]);
+                std::string libname;
+                readString(g_state.mm, exports[i].name, libname);
+                auto replacement = std::find_if(begin(replacements), end(replacements), [&](auto& r) {
+                    return r.name == name && r.lib == libname;
+                });
+                if (replacement != end(replacements))
+                    continue;
+                auto codeVa = g_state.mm->load32(stubs[j]);
+                auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
+                              name == "cellSyncMutexTryLock";
+                spliceFunction(codeVa, [=] {
+                    auto message = ssnprintf("proxy %s.%s", libname, name);
+                    if (isSync) {
+                        INFO(libs, sync) << message;
+                    } else {
+                        INFO(libs) << message;
+                    }
+                });
+            }
         }
     }
     
     return stolenInfos;
 }
 
-std::tuple<prx_import_t*, int> ELFLoader::prxImports(MainMemory* mm) {
+std::tuple<prx_import_t*, int> ELFLoader::prxImports() {
     auto count = _module->imports_end - _module->imports_start;
     return std::make_tuple(
-        (prx_import_t*)mm->getMemoryPointer(_module->imports_start, count),
+        (prx_import_t*)g_state.mm->getMemoryPointer(_module->imports_start, count),
         count / sizeof(prx_import_t));
 }
 
-std::tuple<prx_import_t*, int> ELFLoader::imports(MainMemory* mm) {
+std::tuple<prx_import_t*, int> ELFLoader::imports() {
     if (_module)
-        return prxImports(mm);
-    return elfImports(mm);
+        return prxImports();
+    return elfImports();
 }
 
-std::tuple<prx_export_t*, int> ELFLoader::exports(MainMemory* mm) {
+std::tuple<prx_export_t*, int> ELFLoader::exports() {
     if (!_module)
         return {nullptr, 0};
     
     auto count = _module->exports_end - _module->exports_start;
     return std::make_tuple(
-        (prx_export_t*)mm->getMemoryPointer(_module->exports_start, count),
+        (prx_export_t*)g_state.mm->getMemoryPointer(_module->exports_start, count),
         count / sizeof(prx_export_t));
 }
 
@@ -387,14 +348,15 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libio.sprx.elf" ||
         name == "libaudio.sprx.elf" || name == "libfs.sprx.elf" ||
-        name == "libsysutil_np_trophy.sprx.elf") {
+        name == "libsysutil_np_trophy.sprx.elf" || name == "libsysutil_np.sprx.elf" ||
+        name == "libnetctl.sprx.elf" || name == "libnet.sprx.elf") {
         return false;
     }
     return true;
 }
 
 uint32_t findExportedEmuFunction(uint32_t id) {
-    static auto curUnknownNcall = 2000;
+    static auto curUnknownNcall = 20000;
     static uint32_t ncallDescrVa = 0;
     if (ncallDescrVa == 0) {
         g_state.memalloc->allocInternalMemory(&ncallDescrVa, 1u << 20u, 4);
@@ -403,8 +365,9 @@ uint32_t findExportedEmuFunction(uint32_t id) {
     auto ncallEntry = findNCallEntry(id, index);
     std::string name;
     if (!ncallEntry) {
+        auto resolved = fnidToName(id);
         index = curUnknownNcall--;
-        name = ssnprintf("(!) fnid_%08X", id);
+        name = ssnprintf("(!) fnid_%08X%s", id, resolved ? " " + *resolved : "");
     } else {
         name = ncallEntry->name;
     }
@@ -422,9 +385,7 @@ uint32_t findExportedSymbol(std::vector<ELFLoader*> const& prxs,
                             std::string library,
                             prx_symbol_type_t type) {
     for (auto prx : prxs) {
-        prx_export_t* exports;
-        int nexports;
-        std::tie(exports, nexports) = prx->exports(g_state.mm);
+        auto [exports, nexports] = prx->exports();
         for (auto i = 0; i < nexports; ++i) {
             if (!exports[i].name)
                 continue;
@@ -475,7 +436,7 @@ Elf64_be_Shdr* ELFLoader::findSectionByName(std::string name) {
     return nullptr;
 }
 
-std::tuple<prx_import_t*, int> ELFLoader::elfImports(MainMemory* mm) {
+std::tuple<prx_import_t*, int> ELFLoader::elfImports() {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
     });
@@ -483,37 +444,34 @@ std::tuple<prx_import_t*, int> ELFLoader::elfImports(MainMemory* mm) {
     if (phprx == _pheaders + _header->e_phnum)
         throw std::runtime_error("PRXINFO segment not present");
     
-    auto prxInfo = (sys_process_prx_info*)mm->getMemoryPointer(phprx->p_vaddr, sizeof(sys_process_prx_info));
+    auto prxInfo = (sys_process_prx_info*)g_state.mm->getMemoryPointer(phprx->p_vaddr, sizeof(sys_process_prx_info));
     auto count = prxInfo->imports_end - prxInfo->imports_start;
     return std::make_tuple(
-        (prx_import_t*)mm->getMemoryPointer(prxInfo->imports_start, count),
+        (prx_import_t*)g_state.mm->getMemoryPointer(prxInfo->imports_start, count),
         count / sizeof(prx_import_t));
 }
 
-void ELFLoader::link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs) {
+void ELFLoader::link(std::vector<std::shared_ptr<ELFLoader>> prxs) {
     INFO(libs) << ssnprintf("linking prx %s", elfName());
-    prx_import_t* imports;
-    int count;
-    std::tie(imports, count) = this->imports(mm);
+    auto [imports, count] = this->imports();
     for (auto i = 0; i < count; ++i) {
         std::string library;
-        readString(mm, imports[i].name, library);
-        auto vstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].vstubs, 4 * imports[i].variables);
-        auto vnids = (big_uint32_t*)mm->getMemoryPointer(imports[i].vnids, 4 * imports[i].variables);
+        readString(g_state.mm, imports[i].name, library);
+        auto vstubs = (big_uint32_t*)g_state.mm->getMemoryPointer(imports[i].vstubs, 4 * imports[i].variables);
+        auto vnids = (big_uint32_t*)g_state.mm->getMemoryPointer(imports[i].vnids, 4 * imports[i].variables);
         for (auto j = 0; j < imports[i].variables; ++j) {
-            auto descr = (vdescr*)mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
+            auto descr = (vdescr*)g_state.mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
             auto symbol = findExportedSymbol(prxs, vnids[j], library, prx_symbol_type_t::variable);
-            mm->store32(descr->toc, symbol);
+            g_state.mm->store32(descr->toc, symbol);
         }
-        auto fstubs = (big_uint32_t*)mm->getMemoryPointer(imports[i].fstubs, imports[i].functions);
-        auto fnids = (big_uint32_t*)mm->getMemoryPointer(imports[i].fnids, imports[i].functions);
+        auto fstubs = (big_uint32_t*)g_state.mm->getMemoryPointer(imports[i].fstubs, imports[i].functions);
+        auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(imports[i].fnids, imports[i].functions);
         for (auto j = 0; j < imports[i].functions; ++j) {
             auto symbol = findExportedSymbol(prxs, fnids[j], library, prx_symbol_type_t::function);
             if (!symbol) {
                 symbol = findExportedEmuFunction(fnids[j]);
             }
             fstubs[j] = symbol;
-            
         }
     }
 }
@@ -579,7 +537,7 @@ struct sys_process_param_t {
     big_uint32_t crash_dump_param_addr;
 };
 
-ThreadInitInfo ELFLoader::getThreadInitInfo(MainMemory* mm) {
+ThreadInitInfo ELFLoader::getThreadInitInfo() {
     ThreadInitInfo info;
     info.primaryStackSize = DefaultStackSize;
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {

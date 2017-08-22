@@ -27,7 +27,7 @@ public:
 };
 
 struct NCallEntry {
-    const char* name;
+    std::string name;
     uint32_t fnid;
     std::function<void(PPUThread*)> stub;
 };
@@ -237,5 +237,6 @@ uint32_t calcFnid(const char* name);
 uint32_t calcEid(const char* name);
 uint32_t encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index);
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound = false);
+const NCallEntry* findNCallEntryByIndex(uint32_t index);
 uint32_t addNCallEntry(NCallEntry entry);
 void readString(MainMemory* mm, uint32_t va, std::string& str);

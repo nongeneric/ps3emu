@@ -11,6 +11,7 @@ struct DbgConfig {
     bool CaptureRsx = true;
     bool EnableSpursTrace = true;
     bool LogDates = false;
+    bool LogSync = false;
     
     template<class Archive>
     void serialize(Archive& ar) {
@@ -23,7 +24,8 @@ struct DbgConfig {
            LogCache,
            CaptureRsx,
            EnableSpursTrace,
-           LogDates);
+           LogDates,
+           LogSync);
     }
 };
 

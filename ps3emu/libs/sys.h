@@ -52,8 +52,6 @@ void init_sys_lib();
 
 int sys_memory_get_user_memory_size(sys_memory_info_t * mem_info);
 int sys_memory_get_page_attribute(uint32_t addr, sys_page_attr_t* attr);
-
-extern cell_system_time_t sys_time_get_system_time(PPUThread* thread);
 extern int _sys_process_atexitspawn();
 extern int _sys_process_at_Exitspawn();
 
@@ -74,10 +72,14 @@ struct sys_prx_load_module_option_t {
 
 int sys_prx_exitspawn_with_level(uint64_t level);
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc);
-sys_prx_id_t sys_prx_load_module_on_memcontainer(
-    cstring_ptr_t path,
-    uint32_t mem_container,
-    uint64_t flags,
+sys_prx_id_t sys_prx_load_module_on_memcontainer(
+
+    cstring_ptr_t path,
+
+    uint32_t mem_container,
+
+    uint64_t flags,
+
     uint32_t pOpt);
 
 ENUM(prx_module_mode,
@@ -118,8 +120,8 @@ int sys_timer_usleep(usecond_t sleep_time);
 int sys_timer_sleep(second_t sleep_time);
 
 uint32_t sys_time_get_timebase_frequency(PPUThread* thread);
-uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec);
-uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime);
+uint32_t sys_time_get_current_time(big_int64_t* sec, big_int64_t* nsec);
+uint32_t sys_time_get_timezone(big_uint32_t* timezone, big_uint32_t* summertime);
 
 typedef struct {
     big_uint32_t pst_addr;

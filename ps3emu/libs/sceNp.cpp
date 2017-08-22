@@ -51,3 +51,21 @@ int32_t sceNpDrmVerifyUpgradeLicense2(cstring_ptr_t content_id) {
     INFO(libs) << ssnprintf("sceNpDrmVerifyUpgradeLicense2(%s)", content_id.str);
     return CELL_OK;
 }
+
+int32_t sceNpManagerRegisterCallback(uint32_t callback, uint32_t arg) {
+    WARNING(libs) << "sceNpManagerRegisterCallback: not implemented";
+    return CELL_OK;
+}
+
+int32_t sceNpBasicRegisterContextSensitiveHandler(
+    const SceNpCommunicationId* context, uint32_t handler, uint32_t arg) {
+    WARNING(libs) << "sceNpBasicRegisterContextSensitiveHandler: not implemented";
+    return CELL_OK;
+}
+
+#define SCE_NP_MANAGER_STATUS_OFFLINE (-1)
+
+int32_t sceNpManagerGetStatus(big_int32_t* status) {
+    *status = SCE_NP_MANAGER_STATUS_OFFLINE;
+    return CELL_OK;
+}

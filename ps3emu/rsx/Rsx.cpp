@@ -343,7 +343,7 @@ void Rsx::ViewportOffset(float offset0,
           scale2,
           scale3);
     assert(offset3 == 0);
-    assert(scale3 == 0);
+    //assert(scale3 == 0);
     _context->viewPort.offset[0] = offset0;
     _context->viewPort.offset[1] = offset1;
     _context->viewPort.offset[2] = offset2;
@@ -597,8 +597,7 @@ void Rsx::invokeHandler(uint32_t descrEa, uint32_t arg) {
     fdescr descr;
     g_state.mm->readMemory(descrEa, &descr, sizeof(descr));
     assert(_callbackThread);
-    auto future = _callbackThread->schedule({arg}, descr.tocBase, descr.va);
-    future.get();
+    _callbackThread->schedule({arg}, descr.tocBase, descr.va);
 }
 
 void Rsx::resetContext() {
@@ -1856,6 +1855,9 @@ void Rsx::OffsetIn_9(uint32_t inOffset,
                      uint8_t inFormat, 
                      uint8_t outFormat, 
                      uint32_t notify) {
+    if (_mode == RsxOperationMode::RunCapture) {
+        updateOffsetTableForReplay();
+    }
     TRACE(OffsetIn_9,
           inOffset, 
           outOffset, 

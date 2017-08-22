@@ -24,6 +24,7 @@ struct RestoreElfCommand {
 
 struct ReadPrxCommand {
     std::string elf;
+    bool prx;
     bool writeIdaScript;
 };
 

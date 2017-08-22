@@ -11,13 +11,13 @@
 #include "../IDMap.h"
 #include "ps3emu/HeapMemoryAlloc.h"
 #include "ps3emu/EmuCallbacks.h"
-#include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/range/algorithm.hpp>
 #include "../log.h"
 #include "../state.h"
 #include "ps3emu/libs/fs.h"
+#include <time.h>
 #include <memory>
 #include <map>
 
@@ -30,12 +30,6 @@ int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     mem_info->total_user_memory = 221249536;
     mem_info->available_user_memory = 0.9 * mem_info->total_user_memory; // TODO: handle alloc/dealloc
     return CELL_OK;
-}
-
-cell_system_time_t sys_time_get_system_time(PPUThread* thread) {
-    INFO(libs) << __FUNCTION__;
-    auto sec = (float)g_state.proc->getTimeBase() / (float)g_state.proc->getFrequency();
-    return sec * 1000000;
 }
 
 int _sys_process_atexitspawn() {
@@ -269,16 +263,15 @@ uint32_t sys_time_get_timebase_frequency(PPUThread* thread) {
     return g_state.proc->getFrequency();
 }
 
-uint32_t sys_time_get_current_time(int64_t* sec, int64_t* nsec) {
-    auto now = boost::chrono::high_resolution_clock::now();
-    auto duration = now.time_since_epoch();
-    auto ns = boost::chrono::duration_cast<boost::chrono::nanoseconds>(duration).count();
-    *sec = ns / 1000000000;
-    *nsec = ns % 1000000000;
+uint32_t sys_time_get_current_time(big_int64_t* sec, big_int64_t* nsec) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    *sec = ts.tv_sec;
+    *nsec = ts.tv_nsec;
     return CELL_OK;
 }
 
-uint32_t sys_time_get_timezone(uint32_t* timezone, uint32_t* summertime) {
+uint32_t sys_time_get_timezone(big_uint32_t* timezone, big_uint32_t* summertime) {
     *timezone = 40; // us eastern time
     *summertime = 0;
     return CELL_OK;
@@ -466,7 +459,7 @@ sys_prx_id_t sys_prx_get_module_id_by_name(cstring_ptr_t name,
     for (auto& s : g_state.proc->getSegments()) {
         prx_export_t* exports;
         int nexports;
-        std::tie(exports, nexports) = s.elf->exports(g_state.mm);
+        std::tie(exports, nexports) = s.elf->exports();
         for (auto i = 0; i < nexports; ++i) {
             if (exports[i].name) {
                 std::string exportName;

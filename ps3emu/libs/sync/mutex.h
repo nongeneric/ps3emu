@@ -13,7 +13,7 @@ struct PthreadMutexInfo {
     pthread_mutex_t mutex;
     pthread_mutexattr_t attr;
     std::string name;
-    
+    uint32_t id;
     std::string typestr();
     int type();
 };

@@ -138,6 +138,7 @@ struct InstructionInfo {
     bool ncall = 0;
 };
 
+#define NCALL_OPCODE 1
 #define BB_CALL_OPCODE 0b111101
 #define SPU_BB_CALL_OPCODE 0b100100
 

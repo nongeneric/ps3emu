@@ -28,4 +28,4 @@ bool isTaken(uint32_t branchInstr, uint32_t cia, PPUThread* thread);
 uint64_t getTargetAddress(uint32_t branchInstr, uint32_t cia);
 
 template <DasmMode M, typename S>
-void ppu_dasm(void* instr, uint64_t cia, S* state);
+void ppu_dasm(const void* instr, uint64_t cia, S* state);

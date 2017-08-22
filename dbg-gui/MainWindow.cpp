@@ -15,7 +15,7 @@
 MainWindow::~MainWindow() { }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    resize(1200, 900);
+    resize(1400, 1200);
     setupMenu();
     setupDocks();
     setupStatusBar();
@@ -77,7 +77,7 @@ void MainWindow::setupDocks() {
     dasmGrid->setColumnWidth(0, 9);
     dasmGrid->setColumnWidth(1, 12);
     dasmGrid->setColumnWidth(2, 12);
-    dasmGrid->setColumnWidth(3, 30);
+    dasmGrid->setColumnWidth(3, 50);
     dasmGrid->setColumnWidth(4, 100);
     dasmGrid->setArrowsColumn(2);
     dasmGrid->setScrollable(true);
@@ -232,6 +232,16 @@ void MainWindow::setupMenu() {
         action->setChecked(g_config.config().LogDates);
         connect(action, &QAction::triggered, this, [=]() {
             g_config.config().LogDates = action->isChecked();
+            g_config.save();
+        });
+        settings->addAction(action);
+    }
+    {
+        auto action = new QAction("Log Sync", this);
+        action->setCheckable(true);
+        action->setChecked(g_config.config().LogSync);
+        connect(action, &QAction::triggered, this, [=]() {
+            g_config.config().LogSync = action->isChecked();
             g_config.save();
         });
         settings->addAction(action);

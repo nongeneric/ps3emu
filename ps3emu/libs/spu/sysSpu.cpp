@@ -148,26 +148,31 @@ int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu) {
 
 int32_t sys_spu_image_import(sys_spu_image_t* img,
                              ps3_uintptr_t src,
-                             uint32_t type,
-                             PPUThread* th) {
+                             uint32_t size,
+                             uint32_t flags) {
     INFO(libs) << __FUNCTION__;
+    EMU_ASSERT(flags == 0);
     
-    assert(type == SYS_SPU_IMAGE_DIRECT);
+    uint32_t elfVa;
+    auto elf = g_state.memalloc->allocInternalMemory(&elfVa, size, 16);
+    g_state.mm->readMemory(src, elf, size, true);
     
 #if DEBUG
     FILE* f = fopen("/tmp/ps3emu_lastSpuImage.elf", "w");
     assert(f);
-    std::vector<char> bytes(1 << 20);
-    g_state.mm->readMemory(src, &bytes[0], bytes.size(), true);
-    fwrite(&bytes[0], 1, bytes.size(), f);
+    fwrite(elf, 1, size, f);
     fclose(f);
 #endif
     
-    spuImageInit(g_state.mm, g_state.memalloc, img, src, true);
+    img->type = SYS_SPU_IMAGE_TYPE_KERNEL;
+    img->nsegs = 0;
+    img->segs = 0;
+    img->entry_point = elfVa;
+    
     return CELL_OK;
 }
 
-int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path, Process* proc) {
+int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path) {
     INFO(libs) << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
     auto hostPath = g_state.content->toHost(path.str.c_str());
     auto elfPath = hostPath;
@@ -216,6 +221,16 @@ int32_t sys_spu_image_get_modules(const sys_spu_image_t *img, ps3_uintptr_t buf,
 
 int32_t sys_spu_image_close(sys_spu_image_t* img) {
     g_state.memalloc->free(img->entry_point);
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_group_suspend(sys_spu_thread_group_t id) {
+    WARNING(libs) << "sys_spu_thread_group_suspend not implemented";
+    return CELL_OK;
+}
+
+int32_t sys_spu_thread_group_resume(sys_spu_thread_group_t id) {
+    WARNING(libs) << "sys_spu_thread_group_resume not implemented";
     return CELL_OK;
 }
 
@@ -378,7 +393,7 @@ int32_t sys_raw_spu_image_load(sys_raw_spu_t id, sys_spu_image_t* img, PPUThread
 int32_t sys_raw_spu_load(sys_raw_spu_t id, cstring_ptr_t path, big_uint32_t* entry, Process* proc) {
     auto rawSpu = rawSpus.get(id);
     sys_spu_image_t img;
-    sys_spu_image_open(&img, path, proc);
+    sys_spu_image_open(&img, path);
     *entry = img.entry_point;
     initThread(g_state.mm, rawSpu->thread.get(), &img);
     return CELL_OK;

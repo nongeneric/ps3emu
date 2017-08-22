@@ -51,15 +51,16 @@ if args.find:
 if args.makedb:
     c.execute('create table if not exists fnids (str text, fnid int)')
     c.execute('create index if not exists fnid_index on fnids (fnid)')
-    for path in glob.glob(args.makedb + "/*.a"):
+    files = []
+    files += glob.glob(args.makedb + "/**/*.h", recursive=True)
+    files += glob.glob(args.makedb + "/**/*.a", recursive=True)
+    for path in files:
         print("working on", path)
-        line = "strings " + path + " > /tmp/fnid"
-        subprocess.check_output(line, shell=True)
-        with open("/tmp/fnid") as f:
-            strings = [s.strip() for s in f]
-            for s in strings:
-                c.execute("insert into fnids values (?, ?)", (s, calcfnid(s, fn_suffix)))
-                c.execute("insert into fnids values (?, ?)", (s, calcfnid(s, export_suffix)))
+        with open(path, encoding='latin-1') as f:
+            for line in f.readlines():
+                for s in re.findall("[_a-zA-Z]+[_0-9a-zA-Z]{3,}", line):
+                    c.execute("insert into fnids values (?, ?)", (s, calcfnid(s, fn_suffix)))
+                    c.execute("insert into fnids values (?, ?)", (s, calcfnid(s, export_suffix)))
         c.commit()
     for path in glob.glob(args.makedb + "/*.h"):
         print("working on", path)
@@ -84,4 +85,3 @@ if args.patch:
             v = r[1]
             text = text[:s] + v + text[e:]
         print(text)
-    

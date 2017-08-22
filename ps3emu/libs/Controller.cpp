@@ -96,13 +96,15 @@ int32_t cellPadEnd() {
 #define CELL_PAD_ERROR_NO_DEVICE 0x80121107
 #define SUINT2UCHAR(x) (uint16_t(x + 0x8000) >> 8)
 
+CellPadData oldData = {0};
+
 int32_t cellPadGetData(uint32_t port_no, CellPadData* data) {
     SDL_GameControllerUpdate();
     auto handle = SDL_GameControllerOpen(port_no);
     
     memset(data->button, 0, sizeof(CellPadData));
     
-    data->len = 8;
+    data->len = 15;
     data->button[0] = 0;
     data->button[1] = (7 << 4) | (data->len / 2);
     data->button[CELL_PAD_BTN_OFFSET_DIGITAL1] =
@@ -131,6 +133,28 @@ int32_t cellPadGetData(uint32_t port_no, CellPadData* data) {
         SUINT2UCHAR(SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX));
     data->button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_Y] =
         SUINT2UCHAR(SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY));
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_RIGHT] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_LEFT] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_DPAD_LEFT) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_UP] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_DPAD_UP) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_DOWN] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_DPAD_DOWN) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_TRIANGLE] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_Y) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_CIRCLE] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_B) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_CROSS] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_A) ? 0xff : 0);
+    data->button[CELL_PAD_BTN_OFFSET_PRESS_SQUARE] = 
+        (SDL_GameControllerGetButton(handle, SDL_CONTROLLER_BUTTON_X) ? 0xff : 0);
+        
+        
+    if (!memcmp(&oldData, data, 4 + data->len)) {
+        data->len = 0;
+    }
+    memcpy(&oldData, data, 4 + data->len);
         
     return CELL_OK;
 }

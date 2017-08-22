@@ -194,8 +194,8 @@ class ELFLoader {
     Elf64_be_Shdr* findSectionByName(std::string name);
     void foreachGlobalSymbol(std::function<void(Elf64_be_Sym*)> action);
     module_info_t* _module = nullptr;
-    std::tuple<prx_import_t*, int> elfImports(MainMemory* mm);
-    std::tuple<prx_import_t*, int> prxImports(MainMemory* mm);
+    std::tuple<prx_import_t*, int> elfImports();
+    std::tuple<prx_import_t*, int> prxImports();
     
 public:
     ELFLoader();
@@ -211,20 +211,17 @@ public:
                                     std::vector<std::string> x86paths,
                                     RewriterStore* store,
                                     bool rewriter);
-    void link(MainMemory* mm, std::vector<std::shared_ptr<ELFLoader>> prxs);
-    ThreadInitInfo getThreadInitInfo(MainMemory* mm);
+    void link(std::vector<std::shared_ptr<ELFLoader>> prxs);
+    ThreadInitInfo getThreadInitInfo();
     std::string elfName();
     std::string shortName();
     module_info_t* module();
-    std::tuple<prx_export_t*, int> exports(MainMemory* mm);
-    std::tuple<prx_import_t*, int> imports(MainMemory* mm);
+    Elf64_be_Ehdr* header();
+    std::tuple<prx_export_t*, int> exports();
+    std::tuple<prx_import_t*, int> imports();
 };
 
 uint32_t findExportedSymbol(std::vector<std::shared_ptr<ELFLoader>> const& prxs,
                             uint32_t id,
                             std::string library,
                             prx_symbol_type_t type);
-
-uint64_t emuProxyEnter();
-uint64_t emuProxyExit();
-uint64_t emuBranch();

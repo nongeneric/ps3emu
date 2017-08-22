@@ -259,10 +259,7 @@ void encodeFlipCommand(uint32_t contextEa,
         contextEa, sizeof(TargetCellGcmContextData));
     constexpr auto waitLabelSize = 0x5cu;
     auto size = waitLabel ? waitLabelSize : 0x4cu;
-    if (context->current + size >= context->end) {
-        ERROR(rsx) << "not enough space for EmuFlip in the buffer";
-        exit(1);
-    }
+    EMU_ASSERT(context->current + size <= context->end);
     big_uint32_t buf[waitLabelSize];
     auto i = 0u;
     buf[i++] = CELL_GCM_METHOD(CELL_GCM_DRIVER_QUEUE, 1);
@@ -376,18 +373,17 @@ emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
 }
 
 uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) {
-    uint32_t k32 = 32 * 1024;
-    //assert(emuGcmState.defaultCommandBufferSize % k32 == 0);
+    uint32_t kb8 = 8 * 1024;
+    assert(count < kb8 - 4);
     auto ioBase = emuGcmState.offsetTable->offsetToEa(0);
     uint32_t nextBuffer = data->end + 4;
-    uint32_t nextSize;
-    if (nextBuffer - ioBase >= emuGcmState.defaultCommandBufferSize) {
-        nextSize = k32 - gcmResetCommandsSize;
+    uint32_t nextSize = kb8;
+    if (nextBuffer + nextSize - ioBase >= emuGcmState.defaultCommandBufferSize) {
+        nextSize = kb8 - gcmResetCommandsSize;
         nextBuffer = ioBase + gcmResetCommandsSize;
-    } else {
-        nextBuffer = data->end + 4;
-        nextSize = k32;
     }
+    
+    assert(nextBuffer != data->begin);
     
     g_state.rsx->setPut(data->current - ioBase);
     while (data->current - ioBase != g_state.rsx->getGet()) {
@@ -397,13 +393,14 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     g_state.rsx->encodeJump(data->current, nextBuffer - ioBase);
     
     INFO(rsx) << ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, "
-                           "jump = %x, dest = %x, defsize = %x, count = %x)",
+                           "jump = %x, end = %x, defsize = %x, count = %x, get = %x)",
                            nextSize,
                            nextBuffer - ioBase,
                            data->current - ioBase,
-                           nextBuffer - ioBase,
+                           data->end - ioBase,
                            emuGcmState.defaultCommandBufferSize,
-                           count);
+                           count,
+                           g_state.rsx->getGet());
     
     data->begin = nextBuffer;
     data->current = nextBuffer;
@@ -526,7 +523,7 @@ uint32_t cellGcmGetZcullInfo() {
 }
 
 int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
-    //assert(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
+    assert(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
     return CELL_OK;
 }
 
@@ -538,6 +535,12 @@ uint64_t cellGcmGetTimeStamp(uint32_t index) {
     const auto valueOffset = 0;
     auto ea = getReportDataAddressLocation(index, MemoryLocation::Local);
     return g_state.mm->load64(ea + valueOffset);
+}
+
+uint32_t cellGcmGetReport(uint32_t type, uint32_t index) {
+    const auto valueOffset = 8;
+    auto ea = getReportDataAddressLocation(index, MemoryLocation::Local);
+    return g_state.mm->load32(ea + valueOffset);
 }
 
 emu_void_t cellGcmSetUserHandler(uint32_t handler) {
