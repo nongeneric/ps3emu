@@ -43,3 +43,5 @@ int32_t cellAudioGetPortBlockTag(uint32_t portNum, uint64_t index, big_uint64_t 
 int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint64_t *timeStamp);
 int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume);
 int32_t cellAudioSetPortLevel(uint32_t portNum, float level);
+int32_t cellAudioAdd2chData(uint32_t portNum, uint32_t src, uint32_t samples, float volume);
+int32_t cellAudioAdd6chData(uint32_t portNum, uint32_t src, float volume);

@@ -616,7 +616,7 @@ void Rsx::resetContext() {
     }
 }
 
-uint32_t Rsx::getLastFlipTime() {
+int64_t Rsx::getLastFlipTime() {
     return _lastFlipTime;
 }
 

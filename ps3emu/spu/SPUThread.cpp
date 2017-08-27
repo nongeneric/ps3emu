@@ -393,3 +393,9 @@ void set_mxcsr_for_spu() {
     mxcsr |= _MM_DENORMALS_ZERO_ON;
     _mm_setcsr(mxcsr);
 }
+
+void SPUThread::suspend() {
+}
+
+void SPUThread::resume() {
+}

@@ -224,6 +224,7 @@ std::vector<NCallEntry> ncallTable {
     ENTRY(cellGcmGetReportDataAddressLocation),
     ENTRY(cellGcmGetLastFlipTime),
     ENTRY(cellAudioOutGetSoundAvailability),
+    ENTRY(cellAudioOutGetSoundAvailability2),
     ENTRY(cellAudioOutConfigure),
     ENTRY(cellAudioOutGetState),
     ENTRY(cellAudioInit),
@@ -292,6 +293,9 @@ std::vector<NCallEntry> ncallTable {
     ENTRY(cellAudioSetPortLevel),
     ENTRY(cellAudioOutGetNumberOfDevice),
     ENTRY(sceNpManagerGetStatus),
+    ENTRY(cellVideoOutGetNumberOfDevice),
+    ENTRY(cellAudioAdd2chData),
+    ENTRY(cellAudioAdd6chData),
 };
 
 void PPUThread::ncall(uint32_t index) {

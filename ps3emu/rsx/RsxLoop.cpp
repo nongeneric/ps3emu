@@ -9,6 +9,7 @@
 #include "ps3emu/state.h"
 #include <vector>
 #include <map>
+#include <assert.h>
 
 using namespace boost::chrono;
 
@@ -1060,7 +1061,9 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
                 ColorFormat_2(format, destPitch);
             } else {
                 assert(count == 4);
-                assert(readarg(3) == 0);
+                if (readarg(3)) {
+                    assert(false);
+                }
                 ColorFormat_3(format, destPitch, readarg(4));
             }
             break;

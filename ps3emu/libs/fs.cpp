@@ -148,13 +148,14 @@ FILE* openFile(const char* path, int flags) {
 
 CellFsErrno cellFsOpen(cstring_ptr_t path, int32_t flags, big_int32_t* fd, uint64_t, uint64_t) {
     auto hostPath = g_state.content->toHost(path.str.c_str());
-    INFO(libs) << ssnprintf("cellFsOpen(%s (%s), %x, ...)", path.str, hostPath, flags);
     auto f = openFile(hostPath.c_str(), flags);
-    if (!f) {
-        return toCellErrno(errno);
+    if (f) {
+        *fd = fileMap.create(f);
+        INFO(libs) << ssnprintf("cellFsOpen(%s (%s), %x, ...) %d", path.str, hostPath, flags, (uint32_t)*fd);
+        return CELL_OK;
     }
-    *fd = fileMap.create(f);
-    return CELL_OK;
+    INFO(libs) << ssnprintf("cellFsOpen(%s (%s), %x, ...) FAILED", path.str, hostPath, flags);
+    return toCellErrno(errno);
 }
 
 CellFsErrno cellFsSdataOpen(cstring_ptr_t path,
@@ -264,8 +265,8 @@ CellFsErrno cellFsUnlink(const char* path, Process* proc) {
 #define CELL_FS_TYPE_SYMLINK   3
 
 CellFsErrno cellFsOpendir(const char* path, big_int32_t* fd, Process* proc) {
-    INFO(libs) << ssnprintf("cellFsOpendir(%s, ...)", path);
     auto host = g_state.content->toHost(path);
+    INFO(libs) << ssnprintf("cellFsOpendir(%s, ...) %s", path, host);
     auto dir = opendir(host.c_str());
     if (!dir)
         return toCellErrno(errno);

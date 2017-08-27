@@ -190,6 +190,8 @@ public:
     SPUChannels* channels();
     void groupExit();
     void setGroup(std::function<std::vector<uint32_t>()> getThreads);
+    void suspend();
+    void resume();
     
     // ISPUChannelsThread
     inline uint8_t* ls(uint32_t i) override { return ptr(i); }

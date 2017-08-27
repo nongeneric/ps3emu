@@ -2827,3 +2827,29 @@ TEST_CASE("ppu_threads_mutex_cond2") {
         "test_to_3(ok): e1=0 e2=0 e3=1 e4=0\n"
     );
 }
+
+TEST_CASE("ppu_threads_event_queue") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_event_queue/a.elf"},
+        "done\n"
+    );
+}
+
+TEST_CASE("ppu_threads_event_queue2") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_event_queue2/a.elf"},
+        "done 0: 1317 1 2 3\n"
+        "done 0: expected=1 1 2 3\n"
+    );
+}
+
+TEST_CASE("ppu_threads_event_queue3") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_event_queue3/a.elf"},
+        "ret=0\n"
+        "ret=0\n"
+        "ret=0\n"
+        "ret=8001000a\n"
+        "ret=8001000a\n"
+        "ret=8001000a\n"
+        "ret=0 (drain)\n"
+        "ret=0\n"
+    );
+}

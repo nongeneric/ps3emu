@@ -527,7 +527,7 @@ int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
     return CELL_OK;
 }
 
-uint32_t cellGcmGetLastFlipTime(Process* proc) {
+int64_t cellGcmGetLastFlipTime() {
     return g_state.rsx->getLastFlipTime();
 }
 

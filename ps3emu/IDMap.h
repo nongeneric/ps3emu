@@ -26,7 +26,7 @@ public:
     
     T& get(ID id) {
         auto v = try_get(id);
-        assert(v);
+        assert(!!v);
         return v.value();
     }
     
@@ -67,7 +67,8 @@ public:
         return _map.try_get(id);
     }   
     
-    std::map<ID, T>& map() {
+    std::map<ID, T> map() {
+        boost::lock_guard<boost::mutex> lock(_m);
         return _map.map();
     }
     

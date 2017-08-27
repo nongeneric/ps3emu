@@ -112,7 +112,7 @@ uint32_t cellGcmGetReportDataAddressLocation(uint32_t index, uint32_t location);
 int32_t cellGcmInitDefaultFifoMode(int32_t mode);
 uint32_t cellGcmGetTileInfo();
 uint32_t cellGcmGetZcullInfo();
-uint32_t cellGcmGetLastFlipTime(Process* proc);
+int64_t cellGcmGetLastFlipTime();
 uint64_t cellGcmGetTimeStamp(uint32_t index);
 uint32_t cellGcmGetReport(uint32_t type, uint32_t index);
 emu_void_t cellGcmSetSecondVFrequency(uint32_t freq);

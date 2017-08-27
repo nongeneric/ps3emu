@@ -1,6 +1,7 @@
 #include "queue.h"
 
 #include "../ConcurrentQueue.h"
+#include "ps3emu/libs/sys.h"
 #include "ps3emu/IDMap.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/ContentManager.h"
@@ -133,15 +134,18 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
     info->queue->tryReceive(&vec[0], vec.size(), &num);
     *number = num;
     g_state.mm->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
-    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%s[%x])", info->name, equeue_id);
+    INFO(libs) << ssnprintf("completed sys_event_queue_tryreceive(%s[%x], num=%d)", info->name, equeue_id, num);
     return CELL_OK;
 }
 
 int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uint64_t name) {
     auto port = std::make_shared<queue_port_t>();
+    *eport_id = ports.create(port);
+    if (name == SYS_EVENT_PORT_NO_NAME) {
+        name = ((uint64_t)sys_process_getpid() << 32) | (uint32_t)*eport_id;
+    }
     port->name = name;
     port->type = port_type;
-    *eport_id = ports.create(port);
     INFO(libs) << ssnprintf("sys_event_port_create(id = %d, name = %llx)", *eport_id, name);
     return CELL_OK;
 }
@@ -177,8 +181,8 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
             data2,
             data3);
     }
-    port->queue->queue->send({ port->name, data1, data2, data3 });
-    return CELL_OK;
+    auto ret = port->queue->queue->send({ port->name, data1, data2, data3 }, true);
+    return ret ? CELL_OK : CELL_EBUSY;
 }
 
 int32_t sys_event_queue_drain(sys_event_queue_t equeue_id) {

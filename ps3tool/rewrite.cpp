@@ -53,7 +53,7 @@ void trace_init() {
         spuf = fopen(sputracefile.c_str(), "w");
     }
     if (g_state.th) {
-        auto tracefile = "/tmp/ps3trace-rewriter" + g_state.th->getName();
+        auto tracefile = "/tmp/ps3trace_rewriter_" + g_state.th->getName();
         f = fopen(tracefile.c_str(), "w");
     }
 }
@@ -69,12 +69,12 @@ void log(uint32_t nip, PPUThread* thread) {
     }
     fprintf(f, "r%d:%08x%08x;", 32, 0, (uint32_t)thread->getLR());
     for (auto i = 0u; i < 32; ++i) {
-        auto v = thread->getV(i);
+        auto r = thread->r(i);
         fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
-                (uint32_t)(v >> 96),
-                (uint32_t)(v >> 64),
-                (uint32_t)(v >> 32),
-                (uint32_t)v);
+                (uint32_t)r.w(0),
+                (uint32_t)r.w(1),
+                (uint32_t)r.w(2),
+                (uint32_t)r.w(3));
     }
     fprintf(f, "\n");
     fflush(f);

@@ -98,7 +98,7 @@ void CallbackThread::ps3callInit(std::string_view name) {
     assert(segments.size() > 2);
     auto& lv2segment = segments[2];
     auto func = g_state.proc->findExport(lv2segment.elf.get(), calcFnid("sys_ppu_thread_create"));
-    assert(func);
+    assert(!!func);
     g_state.th->setGPR(2, func->tocBase);
     g_state.th->setGPR(3, _initInfoVa + offsetof(CallbackThreadInitInfo, threadId));
     g_state.th->setGPR(4, _initInfoVa + offsetof(CallbackThreadInitInfo, descr));

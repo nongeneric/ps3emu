@@ -6,6 +6,7 @@
 #include "ppu_dasm_forms.h"
 #include "../utils.h"
 #include "ps3emu/state.h"
+#include "ps3emu/utils/asm.h"
 
 #include <boost/type_traits.hpp>
 #include <boost/endian/conversion.hpp>
@@ -1949,6 +1950,26 @@ PRINT(SRAWI, XForm_10) {
         update_CR0(ra, TH); \
 }
 EMU_REWRITE(SRAWI, XForm_10, i->SH.u(), i->RS.u(), i->RA.u(), i->Rc.u())
+
+PRINT(SRAD, XForm_6) {
+    *result = format_nnn(i->Rc.u() ? "srad." : "srad", i->RA, i->RS, i->RB);
+}
+
+#define _SRAD(_rb, _rs, _ra, _rc) { \
+    auto rb = TH->getGPR(_rb); \
+    auto n = rb & 0b111111; \
+    auto rs = TH->getGPR(_rs); \
+    auto r = rol<uint64_t>(rs, 64 - n); \
+    uint64_t m = (rb & 0b1000000) == 0 ? mask<64>(n, 63) : 0; \
+    auto s = bit_test(rs, 64, 0); \
+    auto ra = (r & m) | ((s ? -1ull : 0ull) & ~m); \
+    auto ca = s & (((r & ~m)) != 0); \
+    TH->setGPR(_ra, ra); \
+    TH->setCA(ca); \
+    if (_rc) \
+        update_CR0(ra, TH); \
+}
+EMU_REWRITE(SRAD, XForm_6, i->RB.u(), i->RS.u(), i->RA.u(), i->Rc.u())
 
 
 PRINT(SRAW, XForm_6) {
@@ -4302,6 +4323,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                 case 1014: invoke(DCBZ);
                 case 246: invoke(DCBTST);
                 case 792: invoke(SRAW);
+                case 794: invoke(SRAD);
                 default: throw IllegalInstructionException();
             }
             break;

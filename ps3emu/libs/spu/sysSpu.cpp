@@ -225,11 +225,21 @@ int32_t sys_spu_image_close(sys_spu_image_t* img) {
 }
 
 int32_t sys_spu_thread_group_suspend(sys_spu_thread_group_t id) {
+    auto group = groups.get(id);
+    for (auto id : group->threads) {
+        auto th = g_state.proc->getSpuThread(id);
+        th->suspend();
+    }
     WARNING(libs) << "sys_spu_thread_group_suspend not implemented";
     return CELL_OK;
 }
 
 int32_t sys_spu_thread_group_resume(sys_spu_thread_group_t id) {
+    auto group = groups.get(id);
+    for (auto id : group->threads) {
+        auto th = g_state.proc->getSpuThread(id);
+        th->resume();
+    }
     WARNING(libs) << "sys_spu_thread_group_resume not implemented";
     return CELL_OK;
 }

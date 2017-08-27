@@ -25,8 +25,8 @@ MountPoint splitPathImpl(const char* path, const char** point, const char** rela
     if (memcmp(str, path, strlen(str)) == 0) { \
         *point = str; \
         *relative = path + strlen(str); \
-        if (**relative == '/') \
-            relative++; \
+        while (**relative == '/') \
+            (*relative)++; \
         return type; \
     }
     check("/dev_hdd0", MountPoint::GameData);

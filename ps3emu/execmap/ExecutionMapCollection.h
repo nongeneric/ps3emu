@@ -10,7 +10,7 @@
 
 struct ExecutionMapCollection {
     std::atomic<bool> enabled;
-    ExecutionMap<20u << 20u> ppu;
+    ExecutionMap<100u << 20u> ppu;
     std::vector<std::tuple<InstrDbEntry, ExecutionMap<LocalStorageSize>>> spu;
     ExecutionMapCollection();
 };

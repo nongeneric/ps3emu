@@ -15,6 +15,11 @@ typedef enum CellAudioOut {
     CELL_AUDIO_OUT_SECONDARY
 } CellAudioOut;
 
+typedef enum CellVideoOut {
+    CELL_VIDEO_OUT_PRIMARY,
+    CELL_VIDEO_OUT_SECONDARY
+} CellVideoOut;
+
 typedef enum CellAudioOutCodingType {
         CELL_AUDIO_OUT_CODING_TYPE_LPCM = 0,
         CELL_AUDIO_OUT_CODING_TYPE_AC3,
@@ -64,10 +69,16 @@ int32_t cellAudioOutGetSoundAvailability(uint32_t audioOut,
                                          uint32_t type,
                                          uint32_t fs,
                                          uint32_t option) {
+    return cellAudioOutGetSoundAvailability2(audioOut, type, fs, 2, option);
+}
+
+int32_t cellAudioOutGetSoundAvailability2(
+    uint32_t audioOut, uint32_t type, uint32_t fs, uint32_t ch, uint32_t option) {
     assert(fs == CELL_AUDIO_OUT_FS_48KHZ);
     assert(option == 0);
     if (audioOut == CELL_AUDIO_OUT_PRIMARY &&
-        type == CELL_AUDIO_OUT_CODING_TYPE_LPCM)
+        type == CELL_AUDIO_OUT_CODING_TYPE_LPCM &&
+        ch == 2)
         return 2;
     return 0;
 }
@@ -101,5 +112,10 @@ int32_t cellAudioOutGetState(uint32_t audioOut,
 
 int32_t cellAudioOutGetNumberOfDevice(uint32_t audioOut) {
     assert(audioOut == CELL_AUDIO_OUT_PRIMARY || audioOut == CELL_AUDIO_OUT_SECONDARY);
+    return 1;
+}
+
+int32_t cellVideoOutGetNumberOfDevice(uint32_t videoOut) {
+    assert(videoOut == CELL_AUDIO_OUT_PRIMARY);
     return 1;
 }

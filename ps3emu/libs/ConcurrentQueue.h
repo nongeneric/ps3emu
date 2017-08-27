@@ -12,7 +12,7 @@
 template <typename T>
 struct IConcurrentQueue {
     virtual ~IConcurrentQueue() = default;
-    virtual void send(T const& t) = 0;
+    virtual bool send(T const& t, bool nowait = false) = 0;
     virtual T receive(unsigned priority) = 0;
     virtual void tryReceive(T* arr, size_t size, size_t* number) = 0;
     virtual void drain() = 0;
@@ -39,11 +39,14 @@ class ConcurrentQueue : public IConcurrentQueue<T> {
 public:
     ConcurrentQueue(uint32_t size = 1000) : _size(size) { }
     
-    void send(T const& t) override {
+    bool send(T const& t, bool nowait = false) override {
         boost::unique_lock<boost::mutex> lock(_mutex);
+        if (nowait && _values.size() == _size)
+            return false;
         _cv.wait(lock, [&] { return _values.size() < _size; });
         _values.push(t);
         _cv.notify_all();
+        return true;
     }
     
     T receive(unsigned priority) override {
@@ -65,12 +68,14 @@ public:
             *arr++ = _values.front();
             _values.pop();
         }
+        _cv.notify_all();
     }
     
     void drain() override {
         boost::lock_guard<boost::mutex> lock(_mutex);
         while (!_values.empty())
             _values.pop();
+        _cv.notify_all();
     }
     
     unsigned size() {

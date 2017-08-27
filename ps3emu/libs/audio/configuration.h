@@ -29,6 +29,8 @@ int32_t cellAudioOutGetSoundAvailability(uint32_t audioOut,
                                          uint32_t type,
                                          uint32_t fs,
                                          uint32_t option);
+int32_t cellAudioOutGetSoundAvailability2(
+    uint32_t audioOut, uint32_t type, uint32_t fs, uint32_t ch, uint32_t option);
 int32_t cellAudioOutConfigure(uint32_t audioOut,
                               const CellAudioOutConfiguration* config,
                               ps3_uintptr_t option,
@@ -37,3 +39,4 @@ int32_t cellAudioOutGetState(uint32_t audioOut,
                              uint32_t deviceIndex,
                              CellAudioOutState* state);
 int32_t cellAudioOutGetNumberOfDevice(uint32_t audioOut);
+int32_t cellVideoOutGetNumberOfDevice(uint32_t videoOut);

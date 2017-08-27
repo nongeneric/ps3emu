@@ -233,7 +233,7 @@ class Rsx {
     uint32_t _ref = 0;
     uint32_t _ret = 0;
     std::atomic<bool> _isFlipInProgress;
-    std::atomic<uint32_t> _lastFlipTime;
+    std::atomic<int64_t> _lastFlipTime;
     bool _shutdown = false;
     bool _initialized = false;
     mutable SpinLock _mutex;
@@ -553,7 +553,7 @@ public:
     bool receiveCommandCompletion();
     RsxContext* context();
     GLPersistentCpuBuffer* getBuffer(MemoryLocation location);
-    uint32_t getLastFlipTime();
+    int64_t getLastFlipTime();
     void captureFrames();
     void resetContext();
     int64_t interpret(uint32_t get, std::function<uint32_t(uint32_t)> read);
