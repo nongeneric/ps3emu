@@ -85,7 +85,7 @@ Trophy& platinum() {
 
 }
 
-boost::optional<path> emuDir() {
+std::optional<path> emuDir() {
     auto trophyDir = g_state.content->toHost(g_state.content->contentDir() + "/TROPDIR");
     if (!exists(trophyDir))
         return {};

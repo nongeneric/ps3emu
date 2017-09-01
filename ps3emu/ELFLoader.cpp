@@ -12,6 +12,7 @@
 #include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/exports/splicer.h"
 #include "InternalMemoryManager.h"
+#include "ps3emu/BBCallMap.h"
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
 #include <map>
@@ -173,7 +174,12 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
             info->init();
             int segmentNumber = 0;
             for (auto& segment : info->segments) {
-                auto index = store->add(&segment);
+                int index = 0;
+                if (segment.spuEntryPoint) {
+                    index = store->addSPU(&segment);
+                } else {
+                    index = store->addPPU(&segment);
+                }
                 INFO(libs) << ssnprintf("loading %s:%s with %d blocks",
                                         x86path,
                                         segment.description,
@@ -183,10 +189,14 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                         segment.spuEntryPoint ? SPU_BB_CALL_OPCODE : BB_CALL_OPCODE, index, i);
                     auto va = (*segment.blocks)[i].va;
                     bbBytes[va] = g_state.mm->load32(va);
-                    g_state.mm->store32(va, instr);
+                    if (segment.spuEntryPoint) {
+                        g_state.mm->store32(va, instr);
+                    } else {
+                        g_state.bbcallMap->set(va, instr);
+                    }
                 }
                 auto entry = db.findSpuEntry(_elfName, segmentNumber);
-                if (entry && segment.spuEntryPoint && x86path.find("libsre") == std::string::npos) {
+                if (entry && segment.spuEntryPoint) {
                     g_state.executionMaps->spu.emplace_back(*entry, ExecutionMap<LocalStorageSize>());
                     segmentNumber++;
                 }
@@ -272,6 +282,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         findNCallEntry(fnid, index, true);
         stolenInfos.push_back({codeVa, stub, g_state.mm->load32(codeVa), index});
         encodeNCall(g_state.mm, codeVa, index);
+        g_state.bbcallMap->set(codeVa, 0);
     }
     
     // install logging proxies
@@ -563,6 +574,10 @@ std::string ELFLoader::elfName() {
 
 std::string ELFLoader::shortName() {
     return boost::filesystem::path(_elfName).filename().string();
+}
+
+Elf64_be_Phdr* ELFLoader::pheaders() {
+    return _pheaders;
 }
 
 ELFLoader::ELFLoader() {}

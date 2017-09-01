@@ -177,7 +177,7 @@ void SPUChannels::command(uint32_t word) {
             break;
         }
         case MFC_PUTLLC_CMD: {
-            assert(size == 0x80);
+            EMU_ASSERT(size == 0x80);
             auto stored = _mm->writeCond<128>(eal, lsa);
             _channels[MFC_RdAtomicStat] |= !stored; // S
             logAtomic(stored);
@@ -185,7 +185,7 @@ void SPUChannels::command(uint32_t word) {
         }
         case MFC_PUTLLUC_CMD:
         case MFC_PUTQLLUC_CMD: {
-            assert(opcode != MFC_PUTQLLUC_CMD);
+            EMU_ASSERT(opcode != MFC_PUTQLLUC_CMD);
             _channels[MFC_RdAtomicStat] |= 0b010; // U
             _mm->writeCond<128, true>(eal, lsa);
             log();
@@ -235,8 +235,8 @@ void SPUChannels::command(uint32_t word) {
             }
             log();
             break;
-        }   
-        default: assert(false); throw std::runtime_error("not implemented");
+        }
+        EMU_ASSERT(false);
     }
 }
 

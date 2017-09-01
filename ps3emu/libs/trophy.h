@@ -1,7 +1,7 @@
 #pragma once
 
 #include "sys.h"
-#include <boost/optional.hpp>
+#include <optional>
 #include <array>
 
 typedef big_int32_t SceNpTrophyId;

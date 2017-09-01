@@ -69,6 +69,10 @@ struct TraceVizCommand {
     bool spu;
 };
 
+struct DasmCommand {
+    std::string elf;
+};
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
@@ -81,3 +85,4 @@ void HandleFindSpuElfs(FindSpuElfsCommand const& command);
 void HandleDumpInstrDb(DumpInstrDbCommand const& command);
 void HandlePrintGcmVizTrace(PrintGcmVizTraceCommand const& command);
 void HandleTraceViz(TraceVizCommand const& command);
+void HandleDasm(DasmCommand const& command);

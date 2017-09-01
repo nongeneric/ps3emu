@@ -6,6 +6,7 @@
 #include "ps3emu/exports/exports.h"
 #include "ps3emu/utils.h"
 #include "ps3emu/utils/sqlitedb.h"
+#include "ps3emu/BBCallMap.h"
 #include <cstdlib>
 
 namespace {
@@ -34,11 +35,13 @@ void spliceFunction(uint32_t ea, std::function<void()> handler) {
     auto opcode = endian_reverse(instr) >> 26;
     if (opcode == NCALL_OPCODE)
         return;
-    uint32_t segment = 0, label = 0;
-    auto isBBCall = dasm_bb_call(BB_CALL_OPCODE, endian_reverse(instr), segment, label);
+    auto bbcall = g_state.bbcallMap->get(ea);
+    uint32_t segment, label;
+    bbcallmap_dasm(bbcall, segment, label);
+    g_state.bbcallMap->set(ea, 0);
     auto index = addNCallEntry({ssnprintf("spliced_%x", ea), 0, [=](auto th) {
         handler();
-        if (isBBCall) {
+        if (bbcall) {
             g_state.proc->bbcall(segment, label);
         } else {
             th->setNIP(ea + 4);

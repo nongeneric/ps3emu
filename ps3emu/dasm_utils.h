@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <tuple>
 
 enum class DasmMode {
     Print, Emulate, Name, Rewrite
@@ -131,11 +132,29 @@ void invoke_impl(const char* name, P* phandler, E* ehandler, R* rhandler, void* 
         rhandler(reinterpret_cast<F>(instr), cia, reinterpret_cast<RS>(s));
 }
 
+enum class OperandType {
+    none, imm, ppu_r, ppu_v, spu_r
+};
+
+struct OperandInfo {
+    OperandType type;
+    uint32_t num = 0;
+    uint32_t imm = 0;
+};
+
+inline bool operator<(OperandInfo const& left, OperandInfo const& right) {
+    return std::tie(left.type, left.num, left.imm) <
+           std::tie(right.type, right.num, right.imm);
+}
+
 struct InstructionInfo {
     bool flow = false;
     bool passthrough = false;
     std::optional<uint32_t> target;
     bool ncall = 0;
+    bool extInfo = false; // TODO: provide extended info for all instructions
+    std::vector<OperandInfo> inputs;
+    std::vector<OperandInfo> outputs;
 };
 
 #define NCALL_OPCODE 1
@@ -145,8 +164,8 @@ struct InstructionInfo {
 union BBCallForm {
     uint32_t val;
     BitField<0, 6> OPCD;
-    BitField<6, 14> Segment;
-    BitField<14, 32> Label;
+    BitField<6, 15> Segment;
+    BitField<15, 32> Label;
 };
 
 inline uint32_t asm_bb_call(unsigned opcode, uint32_t segment, uint32_t label) {

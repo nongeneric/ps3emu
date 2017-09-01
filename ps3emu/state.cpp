@@ -3,6 +3,7 @@
 #include "ps3emu/EmuCallbacks.h"
 #include "ps3emu/Config.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
+#include "ps3emu/BBCallMap.h"
 
 g_state_t::g_state_t()
     : proc(nullptr),
@@ -14,7 +15,8 @@ g_state_t::g_state_t()
       elf(nullptr),
       callbacks(new EmuCallbacks()),
       config(new Config()),
-      executionMaps(new ExecutionMapCollection()) {}
+      executionMaps(new ExecutionMapCollection()),
+      bbcallMap(new BBCallMap()) {}
 
 g_state_t g_state;
 thread_local PPUThread* g_state_t::th = nullptr;

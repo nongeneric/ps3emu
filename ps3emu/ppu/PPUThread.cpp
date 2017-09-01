@@ -7,6 +7,7 @@
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
+#include "ps3emu/BBCallMap.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -40,13 +41,17 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent, std::any)> e
 }
 
 void PPUThread::vmenter(uint32_t to) {
+    auto bbcalls = g_state.bbcallMap->base();
+    
     for (;;) {
         auto cia = getNIP();
-        auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
-        uint32_t segment, label;
-        if (dasm_bb_call(BB_CALL_OPCODE, instr, segment, label)) {
+        auto bbcall = bbcalls[cia / 4];
+        if (bbcall) {
+            uint32_t segment, label;
+            bbcallmap_dasm(bbcall, segment, label);
             g_state.proc->bbcall(segment, label);
         } else {
+            auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
 #ifdef EXECMAP_ENABLED
             g_state.executionMaps->ppu.mark(cia);
 #endif
@@ -59,6 +64,8 @@ void PPUThread::vmenter(uint32_t to) {
 void PPUThread::innerLoop() {
     assert(getNIP());
 
+    auto bbcalls = g_state.bbcallMap->base();
+    
     for (;;) {
 #ifdef DEBUGPAUSE
         if (_singleStep) {
@@ -73,11 +80,13 @@ void PPUThread::innerLoop() {
         uint32_t cia;
         try {
             cia = getNIP();
-            auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
-            uint32_t segment, label;
-            if (dasm_bb_call(BB_CALL_OPCODE, instr, segment, label)) {
+            auto bbcall = bbcalls[cia / 4];
+            if (bbcall) {
+                uint32_t segment, label;
+                bbcallmap_dasm(bbcall, segment, label);
                 g_state.proc->bbcall(segment, label);
             } else {
+                auto instr = *(big_uint32_t*)g_state.mm->getMemoryPointer(cia, 4);
 #ifdef EXECMAP_ENABLED
                 g_state.executionMaps->ppu.mark(cia);
 #endif

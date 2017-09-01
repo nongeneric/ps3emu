@@ -26,6 +26,7 @@ typedef boost::variant<NoneCommand,
                        FindSpuElfsCommand,
                        DumpInstrDbCommand,
                        TraceVizCommand,
+                       DasmCommand,
                        PrintGcmVizTraceCommand>
     Command;
 
@@ -229,6 +230,20 @@ struct TraceVizParser : CommandParser<TraceVizCommand> {
         command.spu = vm["spu"].as<bool>();
     }
 };
+
+struct DasmParser : CommandParser<DasmCommand> {
+    DasmParser() : CommandParser<DasmCommand>("dasm") {}
+    
+    std::string _offsetStr;
+    
+    void init() override {
+        desc.add_options()
+            ("elf", value<std::string>(&command.elf)->required(), "elf path")
+            ;
+    }
+    
+    void parse(variables_map& vm) override { }
+};
     
 Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
@@ -264,7 +279,8 @@ Command ParseOptions(int argc, const char *argv[]) {
         FindSpuElfsParser(),
         DumpInstrDbParser(),
         PrintGcmVizTraceParser(),
-        TraceVizParser()
+        TraceVizParser(),
+        DasmParser()
     );
     
     if (commandName == "") {
@@ -343,6 +359,10 @@ public:
     
     void operator()(TraceVizCommand& command) const {
         HandleTraceViz(command);
+    }
+    
+    void operator()(DasmCommand& command) const {
+        HandleDasm(command);
     }
 };
 

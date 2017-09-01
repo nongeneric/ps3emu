@@ -133,14 +133,6 @@ void playbackLoop() {
             } else {
                 memcpy(dest, src, toWrite);
             }
-            
-            for (auto i = 0u; i < CELL_AUDIO_BLOCK_SAMPLES * 2; ++i) {
-                auto wptr = (big_uint32_t*)&tempDest[i * 4];
-                auto f = union_cast<uint32_t, float>(*wptr);
-                if (std::abs(f) > 1.f) {
-                    *wptr = union_cast<float, uint32_t>(f / 32767.5f);
-                }
-            }
          
 #if TESTS
             port->pcmFile.write((char*)dest, tempDest.size());

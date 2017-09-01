@@ -1,7 +1,7 @@
 #pragma once
 
 #include "sys.h"
-#include <boost/optional.hpp>
+#include <optional>
 
 int32_t cellMsgDialogOpen2(uint32_t type,
                            cstring_ptr_t msgString,

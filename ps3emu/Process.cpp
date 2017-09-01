@@ -17,7 +17,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/optional.hpp>
+#include <optional>
 #include "log.h"
 #include <set>
 #include <cstdlib>
@@ -28,7 +28,7 @@ ELFLoader* Process::elfLoader() {
     return _elf.get();
 }
 
-boost::optional<fdescr> Process::findExport(ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva) {
+std::optional<fdescr> Process::findExport(ELFLoader* prx, uint32_t eid, ps3_uintptr_t* fdescrva) {
     prx_export_t* exports;
     int count;
     std::tie(exports, count) = prx->exports();
@@ -196,7 +196,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threadIds.create(std::move(thread));
 }
 
-boost::optional<SysPrxInfo> getSysPrxInfo(std::string prxPath) {
+std::optional<SysPrxInfo> getSysPrxInfo(std::string prxPath) {
     auto& infos = g_state.config->sysPrxInfos;
     auto it = std::find_if(begin(infos), end(infos), [&](auto& info) {
         return info.name == path(prxPath).filename().string();

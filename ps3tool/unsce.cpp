@@ -7,7 +7,7 @@
 #include <zlib.h>
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
-#include <boost/optional.hpp>
+#include <optional>
 #include <boost/algorithm/string.hpp>
 
 #include <fstream>

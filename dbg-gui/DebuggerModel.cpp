@@ -415,7 +415,7 @@ public:
                 }
                 return QString::fromStdString(str);
             } catch(...) {
-                return "<error>";
+                return "";
             }
         }
         return "";
@@ -1321,7 +1321,7 @@ void DebuggerModel::dumpExecutionMap() {
 
 void DebuggerModel::dumpSpuExecutionMaps() {
     InstrDb db;
-    db.open();
+    db.open("/tmp/instr.db");
     for (auto& [entry, map] : g_state.executionMaps->spu) {
         db.deleteEntry(entry.id);
         auto leads = map.dump(0, LocalStorageSize);
@@ -1331,6 +1331,7 @@ void DebuggerModel::dumpSpuExecutionMaps() {
                  leads.size(),
                  entry.elfPath);
     }
+    messagef("spu execmap is broken, the results lead to crash, entries are added to the unused db at /tmp/instr.db");
 }
 
 void DebuggerModel::captureFrames() {

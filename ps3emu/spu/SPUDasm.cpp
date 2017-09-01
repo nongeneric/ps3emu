@@ -1285,7 +1285,7 @@ PRINT(xorbi) {
 }
 
 #define _xorbi(_ra, _rt, _i10) { \
-    auto mask = _mm_set1_epi8(_i10); \
+    auto mask = _mm_set1_epi8((uint8_t)_i10); \
     auto a = th->r(_ra).xmm(); \
     th->r(_rt).set_xmm(a ^ mask); \
 }
@@ -2327,7 +2327,7 @@ PRINT(brasl) {
     th->r(_rt).set_xmm(t); \
     SPU_SET_NIP(_dest); \
 }
-EMU_REWRITE(brasl, i->I16.s(), i->RT.u(), cia, (signed_lshift32(i->I16.s(), 2) + cia) & LSLR)
+EMU_REWRITE(brasl, i->I16.s(), i->RT.u(), cia, signed_lshift32(i->I16.s(), 2) & LSLR)
 
 
 PRINT(bi) {
@@ -2972,7 +2972,15 @@ EMU_REWRITE(fscrrd, i->RT.u())
 
 
 PRINT(stop) {
-    *result = format_n("stop", i->StopAndSignalType);
+    auto type = i->StopAndSignalType.u();
+    auto valid = type == SYS_SPU_THREAD_STOP_YIELD ||
+                 type == SYS_SPU_THREAD_STOP_GROUP_EXIT ||
+                 type == SYS_SPU_THREAD_STOP_THREAD_EXIT ||
+                 type == SYS_SPU_THREAD_STOP_RECEIVE_EVENT ||
+                 type == SYS_SPU_THREAD_STOP_TRY_RECEIVE_EVENT;
+    if (!valid)
+        throw IllegalInstructionException();
+    *result = format_u("stop", type);
 }
 
 #define _stop(_sast, _cia) { \
@@ -3065,8 +3073,8 @@ EMU_REWRITE(wrch, i->CA.u(), i->RT.u(), cia)
 
 #if !defined(EMU_REWRITER)
 template <DasmMode M, typename S>
-void SPUDasm(void* instr, uint32_t cia, S* state) {
-    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<uint32_t*>(instr));
+void SPUDasm(const void* instr, uint32_t cia, S* state) {
+    uint32_t x = big_to_native<uint32_t>(*reinterpret_cast<const uint32_t*>(instr));
     auto i = reinterpret_cast<SPUForm*>(&x);
     switch (i->OP11.u()) {
         case 0b00111000100: INVOKE(lqx);
@@ -3283,16 +3291,16 @@ void SPUDasm(void* instr, uint32_t cia, S* state) {
 }
 
 template void SPUDasm<DasmMode::Print, std::string>(
-    void* instr, uint32_t cia, std::string* state);
+    const void* instr, uint32_t cia, std::string* state);
 
 template void SPUDasm<DasmMode::Emulate, SPUThread>(
-    void* instr, uint32_t cia, SPUThread* th);
+    const void* instr, uint32_t cia, SPUThread* th);
 
 template void SPUDasm<DasmMode::Rewrite, std::string>(
-    void* instr, uint32_t cia, std::string* th);
+    const void* instr, uint32_t cia, std::string* th);
 
 template void SPUDasm<DasmMode::Name, std::string>(
-    void* instr, uint32_t cia, std::string* name);
+    const void* instr, uint32_t cia, std::string* name);
 
 InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
     auto i = reinterpret_cast<SPUForm*>(&instr);
@@ -3302,6 +3310,10 @@ InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
 
     switch (i->OP11.u()) {
         case 0b00110101000: // bi
+            info.extInfo = true;
+            info.inputs = {{OperandType::spu_r, i->RA.u(), 0}};
+            info.flow = true;
+            break;
         case 0b00110101010: // iret
             info.flow = true;
             break;
@@ -3314,6 +3326,16 @@ InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
         case 0b00100101010: // bihz
         case 0b00100101011: // bihnz
             info.passthrough = true;
+            info.flow = true;
+            break;
+        case 0b00000000000: { // stop
+            auto type = i->StopAndSignalType.u();
+            info.extInfo = true;
+            info.inputs = {{OperandType::imm, 0, type}};
+            info.flow = type == SYS_SPU_THREAD_STOP_GROUP_EXIT ||
+                        type == SYS_SPU_THREAD_STOP_THREAD_EXIT;
+        } break;
+        case 0b00101000000:  // stopd
             info.flow = true;
             break;
     }
@@ -3341,8 +3363,39 @@ InstructionInfo analyzeSpu(uint32_t instr, uint32_t cia) {
             info.passthrough = true;
             info.flow = true;
         } break;
+        case 0b001100001:   // lqa
+        case 0b001000001: { // stqa
+            info.extInfo = true;
+            info.inputs = {{OperandType::imm, 0, abs_lsa(i->I16)}};
+            info.outputs = {{OperandType::spu_r, i->RT.u(), 0}};
+        } break;
+        case 0b001100111:   // lqr
+        case 0b001000111: { // stqr
+            info.extInfo = true;
+            info.inputs = {{OperandType::imm, 0, cia_lsa(i->I16, cia)}};
+            info.outputs = {{OperandType::spu_r, i->RT.u(), 0}};
+        } break;
+        
     }
-
+    
+    switch (i->OP7.u()) {
+        case 0b0100001: { // ila
+            info.extInfo = true;
+            info.inputs = {{OperandType::imm, 0, i->I18.u()}};
+            info.outputs = {{OperandType::spu_r, i->RT.u(), 0}};
+        } break;
+    }
+    
+    switch (i->OP4.u()) {
+        case 0b1000: { // selb
+            info.extInfo = true;
+            info.inputs = {{OperandType::spu_r, i->RA.u(), 0},
+                           {OperandType::spu_r, i->RB.u(), 0},
+                           {OperandType::spu_r, i->RC.u(), 0}};
+            info.outputs = {{OperandType::spu_r, i->RT_ABC.u(), 0}};
+        } break;
+    }
+    
     return info;
 }
 #endif

@@ -168,20 +168,26 @@ struct StolenFuncInfo {
 };
 
 class RewriterStore {
-    std::vector<RewrittenSegment> _modules;
+    std::vector<RewrittenSegment> _ppuModules;
+    std::vector<RewrittenSegment> _spuModules;
     
 public:
-    inline unsigned add(const RewrittenSegment *segment) {
-        _modules.push_back(*segment);
-        return _modules.size() - 1;
+    inline unsigned addPPU(const RewrittenSegment *segment) {
+        _ppuModules.push_back(*segment);
+        return _ppuModules.size() - 1;
+    }
+    
+    inline unsigned addSPU(const RewrittenSegment *segment) {
+        _spuModules.push_back(*segment);
+        return _spuModules.size() - 1;
     }
     
     inline void invokePPU(unsigned index, unsigned label) {
-        _modules[index].ppuEntryPoint(g_state.th, label);
+        _ppuModules[index].ppuEntryPoint(g_state.th, label);
     }
     
     inline void invokeSPU(unsigned index, unsigned label, uint32_t cia) {
-        _modules[index].spuEntryPoint(g_state.sth, label, cia);
+        _spuModules[index].spuEntryPoint(g_state.sth, label, cia);
     }
 };
 
@@ -217,6 +223,7 @@ public:
     std::string shortName();
     module_info_t* module();
     Elf64_be_Ehdr* header();
+    Elf64_be_Phdr* pheaders();
     std::tuple<prx_export_t*, int> exports();
     std::tuple<prx_import_t*, int> imports();
 };

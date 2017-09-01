@@ -13,6 +13,7 @@ class Config;
 struct ReservationGranule;
 struct ExecutionMapCollection;
 class HeapMemoryAlloc;
+class BBCallMap;
 
 struct g_state_t {
     g_state_t();
@@ -28,6 +29,7 @@ struct g_state_t {
     EmuCallbacks* callbacks;
     Config* config;
     ExecutionMapCollection* executionMaps;
+    BBCallMap* bbcallMap;
     thread_local static PPUThread* th;
     thread_local static SPUThread* sth;
     thread_local static bool rewriter_ncall;

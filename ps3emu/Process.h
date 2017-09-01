@@ -195,9 +195,9 @@ public:
     void unloadSegment(uint32_t va);
     std::vector<std::shared_ptr<ELFLoader>> loadedModules();
     StolenFuncInfo getStolenInfo(uintptr_t ncallIndex);
-    boost::optional<fdescr> findExport(ELFLoader* prx,
-                                       uint32_t eid,
-                                       ps3_uintptr_t* fdescrva = nullptr);
+    std::optional<fdescr> findExport(ELFLoader* prx,
+                                     uint32_t eid,
+                                     ps3_uintptr_t* fdescrva = nullptr);
     void dbgPause(bool pause);
     
     inline void bbcall(unsigned index, unsigned label) {

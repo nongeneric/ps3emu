@@ -7,7 +7,7 @@ import sys
 import subprocess
 import concurrent.futures as cf
 
-NJobs = 4
+NJobs = 3
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str)
@@ -63,10 +63,6 @@ async def speak_async():
     futures = set()
     completed = 0
     failed = 0
-    for name in serial:
-        completed += 1
-        if not report_test(None, await run_test(name)):
-            failed += 1
     while True:
         while len(parallel) > 0 and len(futures) < NJobs:
             name = parallel[0]
@@ -79,6 +75,10 @@ async def speak_async():
             completed += 1
             if not report_test(future.exception(), future.result()):
                 failed += 1
+    for name in serial:
+        completed += 1
+        if not report_test(None, await run_test(name)):
+            failed += 1
     print('')
     print(completed, 'tests completed;', failed, 'tests failed')
 
