@@ -29,6 +29,9 @@ public:
     inline void useShader(FragmentShader& shader) {
         glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader.handle());
     }
+    inline void useShader(GeometryShader& shader) {
+        glUseProgramStages(handle(), GL_GEOMETRY_SHADER_BIT, shader.handle());
+    }
     inline void validate() {
         glValidateProgramPipeline(handle());
         GLint status;

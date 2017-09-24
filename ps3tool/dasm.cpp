@@ -16,8 +16,6 @@ void HandleDasm(DasmCommand const& command) {
     std::cout << "program headers\n";
     std::cout << "  Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Align\n";
     for (auto i = 0u; i < header->e_phnum; ++i) {
-        if (pheaders[i].p_type != SYS_SPU_SEGMENT_TYPE_COPY)
-            continue;
         std::cout << ssnprintf("  0x%06x 0x%08x 0x%08x 0x%05x 0x%05x 0x%x\n",
                                pheaders[i].p_offset,
                                pheaders[i].p_vaddr,

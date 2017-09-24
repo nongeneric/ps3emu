@@ -7,6 +7,7 @@
 #include "ps3emu/ReservationMap.h"
 #include "ps3emu/enum.h"
 #include "ps3emu/utils/debug.h"
+#include "ps3emu/OneTimeEvent.h"
 #include "SPUChannels.h"
 #include "R128.h"
 #include <boost/thread.hpp>
@@ -22,8 +23,18 @@
 #include <vector>
 #include <optional>
 #include <x86intrin.h>
+#include <signal.h>
 
 static constexpr uint32_t LSLR = 0x3ffff;
+
+class DisableSuspend {
+    bool _detach;
+    SPUThread* _sth;
+    
+public:
+    DisableSuspend(SPUThread* sth, bool detach = false);
+    ~DisableSuspend();
+};
 
 class StopSignalException : public virtual std::runtime_error {
     uint32_t _type;
@@ -81,13 +92,15 @@ struct EventQueueInfo {
     std::shared_ptr<IConcurrentQueue<sys_event_t>> queue;
 };
 
+struct ThreadGroup;
+
 class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     uint32_t _nip;
     R128 _rs[128];
     R128 _fpscr;
     uint8_t _ls[LocalStorageSize];
     uint32_t _srr0;
-    uint32_t _spu;
+    uint32_t _spu = -1u;
     std::string _name;
     boost::thread _thread;
     SPUChannels _channels;
@@ -106,17 +119,20 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     boost::mutex _eventQueuesMutex;
     std::vector<EventQueueInfo> _eventQueuesToPPU;
     std::vector<EventQueueInfo> _eventQueuesToSPU;
-    void loop();
+    void loop(OneTimeEvent* started);
     void handleInterrupt(uint32_t interruptValue);
     void handleReceiveEvent();
     bool _hasStarted;
-    
-    boost::mutex _groupExitMutex;
-    boost::condition_variable _groupExitCv;
-    bool _groupExitPending = false;
-    std::function<std::vector<uint32_t>()> _getGroupThreads;
     ReservationGranule _granule;
-    void markExecMap(uint32_t va);
+    std::atomic<bool> _suspended = false;
+    boost::mutex _suspendMutex;
+    boost::condition_variable _suspendCv;
+    bool _needsJoin = false;
+    pthread_t _pthread;
+    ThreadGroup* _group;
+    bool _suspendEnabled = true;
+    
+    friend void suspend_handler(int);
 
 public:
     SPUThread(std::string name,
@@ -154,7 +170,7 @@ public:
     }
     
     inline void setSpu(uint32_t num) {
-        EMU_ASSERT(num <= 255);
+        EMU_ASSERT(num != -1u && num <= 255);
         _spu = num;
     }
     
@@ -163,13 +179,14 @@ public:
     }
     
     inline uint32_t getSpu() {
+        EMU_ASSERT(_spu != -1u && _spu <= 255);
         return _spu;
     }
     
     void singleStepBreakpoint(bool value);
     void dbgPause(bool val);
     bool dbgIsPaused();
-    void run() override;
+    void run(bool suspended = false) override;
     void cancel();
     SPUThreadExitInfo tryJoin(unsigned ms);
     SPUThreadExitInfo join();
@@ -188,10 +205,14 @@ public:
     bool isQueuePortAvailableToConnect(uint32_t portNumber);
     std::string getName();
     SPUChannels* channels();
-    void groupExit();
-    void setGroup(std::function<std::vector<uint32_t>()> getThreads);
     void suspend();
     void resume();
+    bool suspended();
+    void disableSuspend();
+    void enableSuspend();
+    void waitSuspended();
+    void setGroup(ThreadGroup* group);
+    ThreadGroup* group();
     
     // ISPUChannelsThread
     inline uint8_t* ls(uint32_t i) override { return ptr(i); }

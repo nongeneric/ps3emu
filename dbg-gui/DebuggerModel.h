@@ -78,6 +78,7 @@ class DebuggerModel : public QWidget {
     void switchThread(SPUThread* spu);
     void dumpSegments();
     void dumpImports();
+    void dumpGroups();
     void dumpThreads();
     void dumpMutexes(bool lw);
     void changeThread(uint32_t index);

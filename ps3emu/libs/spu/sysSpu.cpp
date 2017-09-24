@@ -226,22 +226,12 @@ int32_t sys_spu_image_close(sys_spu_image_t* img) {
 
 int32_t sys_spu_thread_group_suspend(sys_spu_thread_group_t id) {
     auto group = groups.get(id);
-    for (auto id : group->threads) {
-        auto th = g_state.proc->getSpuThread(id);
-        th->suspend();
-    }
-    WARNING(libs) << "sys_spu_thread_group_suspend not implemented";
-    return CELL_OK;
+    return g_state.spuGroupManager->suspend(group.get());
 }
 
 int32_t sys_spu_thread_group_resume(sys_spu_thread_group_t id) {
     auto group = groups.get(id);
-    for (auto id : group->threads) {
-        auto th = g_state.proc->getSpuThread(id);
-        th->resume();
-    }
-    WARNING(libs) << "sys_spu_thread_group_resume not implemented";
-    return CELL_OK;
+    return g_state.spuGroupManager->resume(group.get());
 }
 
 int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
@@ -253,8 +243,11 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
     //assert(attr->type == SYS_SPU_THREAD_GROUP_TYPE_NORMAL);
     auto group = std::make_shared<ThreadGroup>();
     group->name.resize(attr->nsize);
+    group->priority = prio;
     mm->readMemory(attr->name, &group->name[0], attr->nsize);
     *id = groups.create(group);
+    group->id = *id;
+    g_state.spuGroupManager->add(group.get());
     return CELL_OK;
 }
 
@@ -283,37 +276,29 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     name.resize(attr->nsize);
     g_state.mm->readMemory(attr->name, &name[0], attr->nsize);
     auto id = proc->createSpuThread(name);
-    group->threads.push_back(id);
+    auto th = proc->getSpuThread(id).get();
+    group->threads.push_back(th);
     *thread_id = id;
     auto argcopy = *arg;
     auto imgcopy = *img;
-    group->initializers[*thread_id] = [=] {
-        auto thread = proc->getSpuThread(id);
-        thread->setSpu(spu_num);
-        initThread(g_state.mm, thread.get(), &imgcopy);
-        thread->r(3).set_dw(0, argcopy.arg1);
-        thread->r(4).set_dw(0, argcopy.arg2);
-        thread->r(5).set_dw(0, argcopy.arg3);
-        thread->r(6).set_dw(0, argcopy.arg4);
-        thread->setGroup([=] { return group->threads; });
+    group->initializers[th] = [=] {
+        th->setSpu(spu_num);
+        initThread(g_state.mm, th, &imgcopy);
+        th->r(3).set_dw(0, argcopy.arg1);
+        th->r(4).set_dw(0, argcopy.arg2);
+        th->r(5).set_dw(0, argcopy.arg3);
+        th->r(6).set_dw(0, argcopy.arg4);
     };
+    th->setGroup(group.get());
     return CELL_OK;
 }
 
 int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id, Process* proc) {
     auto group = groups.get(id);
     INFO(libs) << ssnprintf("sys_spu_thread_group_start(%s)", group->name);
-    for (auto id : group->threads) {
-        auto th = proc->getSpuThread(id);
-        group->initializers[id]();
-        th->run();
-    }
+    g_state.spuGroupManager->start(group.get());
     return CELL_OK;
 }
-
-#define SYS_SPU_THREAD_GROUP_JOIN_GROUP_EXIT            0x0001
-#define SYS_SPU_THREAD_GROUP_JOIN_ALL_THREADS_EXIT      0x0002
-#define SYS_SPU_THREAD_GROUP_JOIN_TERMINATED            0x0004
 
 int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
                                   big_int32_t* cause,
@@ -321,38 +306,15 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
                                   Process* proc) {
     auto group = groups.get(gid);
     INFO(libs) << ssnprintf("sys_spu_thread_group_join(%s)", group->name);
-    bool groupExit = false;
-    bool threadExit = true;
-    bool groupTerminate = false;
-    int32_t terminateStatus;
-    int32_t groupExitStatus;
-    for (auto id : group->threads) {
-        auto th = proc->getSpuThread(id);
-        auto info = th->join();
-        groupExit |= info.cause == SPUThreadExitCause::GroupExit;
-        groupTerminate |= info.cause == SPUThreadExitCause::GroupTerminate;
-        threadExit &= info.cause == SPUThreadExitCause::Exit;
-        if (groupTerminate) {
-            terminateStatus = info.status;
-        }
-        if (groupExit) {
-            groupExitStatus = info.status;
-        }
-        group->errorCodes[id] = info.status;
-    }
-    if (groupTerminate) {
-        *cause = SYS_SPU_THREAD_GROUP_JOIN_TERMINATED;
-        *status = terminateStatus;
-    } else if (groupExit) {
-        *cause = SYS_SPU_THREAD_GROUP_JOIN_GROUP_EXIT;
-        *status = groupExitStatus;
-    } else if (threadExit) {
-        *cause = SYS_SPU_THREAD_GROUP_JOIN_ALL_THREADS_EXIT;
-    }
+    auto [c, s] = g_state.spuGroupManager->join(group.get());
+    *cause = c;
+    *status = s;
     return CELL_OK;
 }
 
 int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc) {
+    auto group = groups.get(id);
+    g_state.spuGroupManager->destroy(group.get());
     groups.destroy(id);
     return CELL_OK;
 }
@@ -360,9 +322,10 @@ int32_t sys_spu_thread_group_destroy(sys_spu_thread_group_t id, Process* proc) {
 int32_t sys_spu_thread_get_exit_status(sys_spu_thread_t id,
                                        big_int32_t* status,
                                        Process* proc) {
+    auto th = g_state.proc->getSpuThread(id);
     for (auto& groupPair : groups.map()) {
         for (auto& threadPair : groupPair.second->errorCodes) {
-            if (threadPair.first == id) {
+            if (threadPair.first == th.get()) {
                 *status = threadPair.second;
                 return CELL_OK;
             }
@@ -577,6 +540,14 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
         return g_state.th->getGPR(3);
     });
     return g_state.th->getGPR(3);
+}
+
+std::vector<std::shared_ptr<ThreadGroup>> getThreadGroups() {
+    std::vector<std::shared_ptr<ThreadGroup>> res;
+    for (auto& g : groups.map()) {
+        res.push_back(g.second);
+    }
+    return res;
 }
 
 int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va, uint32_t attr_va) {

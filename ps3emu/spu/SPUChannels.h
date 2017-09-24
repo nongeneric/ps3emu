@@ -161,7 +161,7 @@ public:
 
 class ISPUChannelsThread {
 public:
-    virtual void run() = 0;
+    virtual void run(bool suspended) = 0;
     virtual void setNip(uint32_t) = 0;
     virtual uint8_t* ls(uint32_t i) = 0;
     virtual ~ISPUChannelsThread() = default;
@@ -203,9 +203,11 @@ public:
 };
 
 class MainMemory;
+class SPUThread;
 class SPUChannels {
     MainMemory* _mm;
     ISPUChannelsThread* _thread;
+    SPUThread* _sthread;
     ConcurrentBoundedQueue<uint32_t> _outboundMailbox;
     ConcurrentBoundedQueue<uint32_t> _outboundInterruptMailbox;
     ConcurrentBoundedQueue<uint32_t> _inboundMailbox;
@@ -217,7 +219,7 @@ class SPUChannels {
     void command(uint32_t word);
     
 public:
-    SPUChannels(MainMemory* mm, ISPUChannelsThread* thread);
+    SPUChannels(MainMemory* mm, ISPUChannelsThread* thread, SPUThread* sthread = nullptr);
     void write(unsigned channel, uint32_t data);
     uint32_t read(unsigned channel);
     unsigned readCount(unsigned channel);

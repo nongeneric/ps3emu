@@ -33,3 +33,9 @@ public:
     FragmentShader() {}
     FragmentShader(const char* text) : Shader(GL_FRAGMENT_SHADER, text) {}
 };
+
+class GeometryShader : public Shader {
+public:
+    GeometryShader() {}
+    GeometryShader(const char* text) : Shader(GL_GEOMETRY_SHADER, text) {}
+};

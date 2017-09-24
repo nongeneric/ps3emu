@@ -469,14 +469,15 @@ void main(void) {
             a[6] = 0;
             a[7] = 0xff;
         }
-        for (int i = 15; i >= 6; i--) {
-            colors[i].a = a[w1 & 5];
-            w1 >>= 3;
+        uint index = w1;
+        for (int i = 9; i <= 0; i--) {
+            colors[i].a = a[index & 7];
+            index >>= 3;
         }
-        uint indexes = (w0 << 1) | w1;
-        for (int i = 5; i > 0; i--) {
-            colors[i].a = a[indexes & 5];
-            indexes >>= 3;
+        index = (w0 << 2) | index;
+        for (int i = 15; i < 9; i--) {
+            colors[i].a = a[index & 7];
+            index >>= 3;
         }
         uint w2 = read_aligned_le_32(blockOffset + 8);
         uint w3 = read_aligned_le_32(blockOffset + 12);
@@ -712,10 +713,6 @@ void RsxTextureReader::loadTexture(RsxTextureInfo const& info,
         glDispatchCompute((info.width / 4 + 31) / 32,
                           (info.height * 2 / 4 + 10 + 31) / 32,
                           layers);
-        if (info.format == GcmTextureFormat::COMPRESSED_DXT45) {
-            ERROR(rsx) << ssnprintf("format untested! %s", to_string(info.format));
-            exit(1);
-        }
     } else {
         glUseProgram(_destFirstShader.handle());
         // twice the height to take into account all mipmap levels

@@ -154,23 +154,6 @@ struct SegmentInfo {
     std::vector<BasicBlockInfo> blocks;
 };
 
-std::vector<uint32_t> updateSignatureOffsets(std::vector<BasicBlock>& blocks) {
-    assert(!blocks.empty());
-    std::vector<uint32_t> offsets;
-    if (offsets.empty()) {
-        std::default_random_engine random(13);
-        while (offsets.size() < 20) {
-            auto& block = blocks[random() % blocks.size()];
-            if (block.len < 8) // don't hash bbcalls
-                continue;
-            // first instruction is a bbcall, always skip it
-            auto offset = block.start + 4 + ((random() << 2) % (block.len - 4));
-            offsets.push_back(offset);
-        }
-    }
-    return offsets;
-}
-
 std::tuple<std::optional<uint32_t>, uint32_t> outOfPartTargets(
     BasicBlock const& block, std::vector<BasicBlock> const& part, auto analyze)
 {
@@ -333,47 +316,6 @@ std::tuple<uint32_t, std::vector<EmbeddedElfInfo>> mapEmbeddedElfs(
     return {vaBase, elfs};
 }
 
-void handleSpuSignature(std::vector<BasicBlock>& blocks,
-                        uint32_t segmentStartVa,
-                        int segmentNumber,
-                        std::string elfName,
-                        std::function<uint32_t(uint32_t)> spuElfVaToParentElfVa)
-{
-    auto offsets = updateSignatureOffsets(blocks);
-    auto startVa = spuElfVaToParentElfVa(segmentStartVa);
-    auto start = (big_uint32_t*)g_state.mm->getMemoryPointer(startVa, 0);
-    if ((start[0] >> 24u) == 0x43 && (start[1] >> 24u) == 0x42 &&
-        (start[2] >> 24u) == 0x43 && (start[3] >> 24u) == 0x42) {
-        offsets.push_back(segmentStartVa);
-        offsets.push_back(segmentStartVa + 4);
-        offsets.push_back(segmentStartVa + 8);
-        offsets.push_back(segmentStartVa + 12);
-    }
-    std::vector<uint32_t> bytes;
-    for (auto offset : offsets) {
-        bytes.push_back(g_state.mm->load32(spuElfVaToParentElfVa(offset)));
-    }
-    
-    InstrDb db;
-    db.open();
-    auto entry = db.findSpuEntry(elfName, segmentNumber);
-    if (entry) {
-        db.deleteEntry(entry->id);
-        entry->offsets = offsets;
-        entry->offsetBytes = bytes;
-        assert(entry->segment == segmentNumber);
-        db.insertEntry(*entry);
-    } else {
-        InstrDbEntry entry;
-        entry.offsets = offsets;
-        entry.offsetBytes = bytes;
-        entry.elfPath = elfName;
-        entry.segment = segmentNumber;
-        entry.isPPU = false;
-        db.insertEntry(entry);
-    }
-}
-
 std::vector<BasicBlock> CollectSpuSegmentBasicBlocks(
     std::vector<uint32_t> const& leads,
     Elf32_be_Phdr const& segment,
@@ -421,9 +363,8 @@ std::vector<BasicBlock> CollectSpuSegmentBasicBlocks(
               spu_elf_3:   segment_3_1
               
     segments are elf sections, that can overlap
-    each segment has its own signature
 
- */
+*/
 std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream& log) {
     std::vector<uint8_t> body;
     auto [vaBase, elfs] = mapEmbeddedElfs(command.elf, command.imageBase, body);
@@ -437,6 +378,8 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
         auto elfSegment = (Elf32_be_Phdr*)&body[elf.startOffset + elf.header->e_phoff];
         for (auto i = 0u; i < elf.header->e_phnum; ++i) {
             if (elfSegment[i].p_type != SYS_SPU_SEGMENT_TYPE_COPY)
+                continue;
+            if ((elfSegment[i].p_flags & PF_X) == 0)
                 continue;
             copySegments.push_back(elfSegment[i]);
         }
@@ -481,10 +424,6 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                     }
                 }
             }
-            
-            handleSpuSignature(blocks, segment.p_vaddr, totalSegmentNumber, command.elf, [&](auto va) {
-                return spuElfVaToParentVaInCurrentSegment(va, segment);
-            });
                 
             auto analyzeFunc = [&](uint32_t cia) { 
                 auto elfVa = spuElfVaToParentVaInCurrentSegment(cia, segment);

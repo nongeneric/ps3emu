@@ -27,6 +27,7 @@ set(SRC
     spu/SPUThread.cpp
     spu/SPUDasm.cpp
     spu/SPUChannels.cpp
+    spu/SPUGroupManager.cpp
     ppu/PPUThread.h
     ppu/PPUThread.cpp
     ppu/InterruptPPUThread.h
@@ -58,12 +59,14 @@ set(SRC
     rsx/DXT.cpp
     rsx/RsxTextureReader.cpp
     rsx/GLShader.cpp
+    rsx/TextRenderer.cpp
     gcmviz/GcmDatabase.cpp
     TimedCounter.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp
     execmap/InstrDb.cpp
     HeapMemoryAlloc.cpp
+    AffinityManager.cpp
     
     libs/sys.cpp
     libs/fs.cpp
@@ -107,6 +110,7 @@ target_link_libraries(ps3emu
     ${ZLIB_LIBRARIES}
     ${FREETYPE2_LIBRARIES}
     ${PULSEAUDIO_LIBRARIES}
+    ${ICUUC_LIBRARIES}
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvimage/libnvimage.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc7/libbc7.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc6h/libbc6h.a

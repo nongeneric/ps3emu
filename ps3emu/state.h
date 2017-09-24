@@ -14,6 +14,7 @@ struct ReservationGranule;
 struct ExecutionMapCollection;
 class HeapMemoryAlloc;
 class BBCallMap;
+class SPUGroupManager;
 
 struct g_state_t {
     g_state_t();
@@ -30,6 +31,7 @@ struct g_state_t {
     Config* config;
     ExecutionMapCollection* executionMaps;
     BBCallMap* bbcallMap;
+    SPUGroupManager* spuGroupManager;
     thread_local static PPUThread* th;
     thread_local static SPUThread* sth;
     thread_local static bool rewriter_ncall;

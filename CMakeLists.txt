@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 
-project(root)
+project(ps3emu-root)
 include_directories(${root_SOURCE_DIR})
 
 set(CMAKE_CXX_STANDARD 17)
@@ -23,6 +23,7 @@ pkg_search_module(PNG REQUIRED libpng)
 pkg_search_module(ZLIB REQUIRED zlib)
 pkg_search_module(FREETYPE2 REQUIRED freetype2)
 pkg_search_module(PULSEAUDIO REQUIRED libpulse)
+pkg_search_module(ICUUC REQUIRED icu-uc)
 
 set(CMAKE_AR gcc-ar)
 set(CMAKE_RANLIB gcc-ranlib)

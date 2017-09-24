@@ -23,6 +23,7 @@
 #include "ps3emu/libs/graphics/graphics.h"
 #include "ps3emu/libs/message.h"
 #include "ps3emu/fileutils.h"
+#include "ps3emu/AffinityManager.h"
 
 #include "RsxContext.h"
 #include "TextureRenderer.h"
@@ -648,6 +649,7 @@ void Rsx::DriverFlip(uint32_t value) {
     if (tex) {
         _context->textureRenderer->render(tex);
         emuMessageDraw(tex->width(), tex->height());
+        drawStats();
     }
     _context->pipeline.bind();
     
@@ -695,47 +697,48 @@ void Rsx::DriverFlip(uint32_t value) {
     }
     
     resetContext();
-    
-    if (log_should(log_warning, log_rsx, log_perf)) {
-        _context->fpsCounter.report();
-        if (_context->fpsCounter.hasWrapped()) {
-            _context->uTextureUpdateDuration = 0;
-            
-            static std::vector<PerfMapEntry> vec;
-            vec.resize(0);
-            decltype(PerfMapEntry::time) total = {};
-            for (auto& [offset, entry] : _perfMap) {
-                entry.offset = offset;
-                vec.push_back(entry);
-                total += entry.time;
-                entry.time = {};
-                entry.count = 0;
-            }
-            
-            static std::string line;
-            line.resize(0);
-            line = ssnprintf("FPS: %d, texture update time: %lld, total = %d us\n",
-                             _context->fpsCounter.elapsed(),
-                             _context->uTextureUpdateDuration / 1000,
-                             duration_cast<microseconds>(total).count());
-            
-            std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
-                return a.time > b.time;
-            });
-            int i = 0;
-            for (auto& entry : vec) {
-                auto us = duration_cast<microseconds>(entry.time).count();
-                line += ssnprintf("%-8x %-4d %-8d %-1.4f\n",
-                                  entry.offset,
-                                  entry.count,
-                                  us,
-                                  (float)us / (float)duration_cast<microseconds>(total).count());
-                if (i++ == 10)
-                    break;
-            }
-            WARNING(rsx, perf) << line;
+}
+
+void Rsx::drawStats() {
+    _context->fpsCounter.report();
+    if (_context->fpsCounter.hasWrapped()) {
+        _context->statText.clear();
+        _context->uTextureUpdateDuration = 0;
+
+        static std::vector<PerfMapEntry> vec;
+        vec.resize(0);
+        decltype(PerfMapEntry::time) total = {};
+        for (auto& [offset, entry] : _perfMap) {
+            entry.offset = offset;
+            vec.push_back(entry);
+            total += entry.time;
+            entry.time = {};
+            entry.count = 0;
+        }
+
+        auto line = ssnprintf("FPS: %d, texture update time: %lld, total = %d us",
+                              _context->fpsCounter.elapsed(),
+                              _context->uTextureUpdateDuration / 1000,
+                              duration_cast<microseconds>(total).count());
+        _context->statText.line(0, 0, line);
+
+        std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
+            return a.time > b.time;
+        });
+        int i = 0;
+        for (auto& entry : vec) {
+            auto us = duration_cast<microseconds>(entry.time).count();
+            line = ssnprintf("%-8x %-4d %-8d %-1.4f",
+                             entry.offset,
+                             entry.count,
+                             us,
+                             (float)us / (float)duration_cast<microseconds>(total).count());
+            _context->statText.line(line);
+            if (i++ == 10)
+                break;
         }
     }
+    _context->statText.render(_window.width(), _window.height());
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count) {
@@ -1042,7 +1045,7 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
 //             std::vector<uint8_t> buf(size);
 //             g_state.mm->readMemory(va, &buf[0], size);
 //             t->update(buf);
-            INFO(rsx, cache) << ssnprintf("updating texture %x, %x", va, size);
+            INFO(libs, cache) << ssnprintf("updating texture %x, %x", va, size);
             auto buffer = this->getBuffer(info.location);
             _textureReader->loadTexture(info, buffer->handle(), t->levelHandles());
             this->_context->uTextureUpdateDuration +=
@@ -1203,6 +1206,7 @@ void Rsx::init() {
     
     boost::unique_lock<boost::mutex> lock(_initMutex);
     _thread.reset(new boost::thread([=]{ loop(); }));
+    assignAffinity(_thread->native_handle(), AffinityGroup::PPUHost);
     _initCv.wait(lock, [=] { return _initialized; });
     
     INFO(rsx) << "rsx loop completed initialization";
@@ -2419,3 +2423,5 @@ void Rsx::PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex) {
     _context->pointSpriteControl.rmode = rmode;
     _context->pointSpriteControl.tex = tex;
 }
+
+RsxContext::RsxContext() : statText(20) {}

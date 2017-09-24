@@ -27,11 +27,11 @@ void emulate(std::string path, std::vector<std::string> args) {
 
 void sigsegv_handler(int sig) {
     ERROR(libs) << ssnprintf("crash (signal %d):\n%s", sig, print_backtrace());
-    exit(1);
+    _exit(1);
 }
 
 void sigint_handler(int sig) {
-    exit(0);
+    _exit(0);
 }
 
 int main(int argc, char* argv[]) {
@@ -91,6 +91,7 @@ int main(int argc, char* argv[]) {
         boost::split(argvec, elfArgs, boost::is_any_of(" "), boost::token_compress_on);
         emulate(elfPath, argvec);
     } catch(std::exception& e) {
+        ERROR(libs) << e.what();
         return 1;
     }
     return 0;

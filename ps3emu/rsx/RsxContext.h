@@ -6,6 +6,7 @@
 #include "GLProgramPipeline.h"
 #include "GLTexture.h"
 #include "GLFramebuffer.h"
+#include "TextRenderer.h"
 #include "Cache.h"
 #include "Rsx.h"
 #include "ps3emu/TimedCounter.h"
@@ -284,8 +285,11 @@ struct RsxContext {
     InlineSettings inline2d;
     
     std::set<SurfaceToFramebufferLink> surfaceLinks;
+    TextRenderer statText;
     
     inline void trace(CommandId id, std::vector<GcmCommandArg> const& args) {
         tracer.trace(frame, commandNum++, id, args);
     }
+
+    RsxContext();
 };

@@ -55,33 +55,36 @@ def report_test(exception, result):
 def run_test(name):
     return read_output(['-d', 'yes', '"' + name + '"'])
 
-async def speak_async():
+async def run_tests():
     output, code = await read_output(['--list-tests'])
     serial, parallel = parse_test_list(output)
     print(len(serial), 'serial tests found')
     print(len(parallel), 'parallel tests found')
     futures = set()
     completed = 0
-    failed = 0
+    failed = []
     while True:
         while len(parallel) > 0 and len(futures) < NJobs:
             name = parallel[0]
             parallel = parallel[1:]
-            futures.add(run_test(name))
+            async def f(): return (name, await run_test(name))
+            futures.add(f())
         if len(futures) == 0:
             break;
         done, futures = await asyncio.wait(futures, return_when=cf.FIRST_COMPLETED)
         for future in done:
             completed += 1
-            if not report_test(future.exception(), future.result()):
-                failed += 1
+            name, result = future.result()
+            if not report_test(future.exception(), result):
+                failed.append(name)
     for name in serial:
         completed += 1
         if not report_test(None, await run_test(name)):
-            failed += 1
+            failed.append(name)
     print('')
-    print(completed, 'tests completed;', failed, 'tests failed')
+    print(completed, 'tests completed;', len(failed), 'tests failed')
+    print('failed list:', ','.join(failed))
 
 loop = asyncio.get_event_loop()  
-loop.run_until_complete(speak_async())  
+loop.run_until_complete(run_tests())  
 loop.close()  

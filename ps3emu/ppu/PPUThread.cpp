@@ -8,6 +8,7 @@
 #include "ps3emu/state.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/BBCallMap.h"
+#include "ps3emu/AffinityManager.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -165,6 +166,7 @@ void PPUThread::run() {
     boost::unique_lock<boost::mutex> lock(_mutexRunning);
     if (!_init) {
         _thread = boost::thread([=] { loop(); });
+        assignAffinity(_thread.native_handle(), AffinityGroup::PPUEmu);
         _init = true;
         _cvRunning.wait(lock, [&] { return _running; });
     }

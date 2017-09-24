@@ -46,6 +46,17 @@ int32_t sys_cond_destroy(sys_cond_t cond) {
     return CELL_OK;
 }
 
+int pthread_cond_timedwait2(pthread_cond_t* cond,
+                            pthread_mutex_t* mutex,
+                            usecond_t timeout) {
+    timespec abs_time;
+    clock_gettime(CLOCK_REALTIME, &abs_time);
+    auto ns = abs_time.tv_sec * 1000000 + abs_time.tv_nsec + timeout * 1000;
+    abs_time.tv_sec = ns / 1000000;
+    abs_time.tv_nsec = ns % 1000000;
+    return pthread_cond_timedwait(cond, mutex, &abs_time);
+}
+
 int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
     auto optinfo = cvs.try_get(cond);
     if (!optinfo)
@@ -74,10 +85,20 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
     };
     if (timeout == 0) {
         for (;;) {
-            auto res = pthread_cond_wait(&info->cv, &info->m->mutex);
+            // there is a race condition:
+            //   this thread:  add to waiters
+            //   other thread: change condition and notify (add to next)
+            //   this thread:  wait
+            // this sequence leads to this thread ignoring a notification
+            // and waiting indefinitely
+            // to mitigate this race, introduce a timed wait and verify that
+            // no notification has been sent in between adding to waiters and wait
+            auto res = pthread_cond_timedwait2(&info->cv, &info->m->mutex, 2);
             if (res == EPERM)
                 return CELL_EPERM;
-            assert(res == 0);
+            if (res == ETIMEDOUT)
+                return CELL_OK;
+            assert(res == 0 || res == ETIMEDOUT);
             if (check())
                 return CELL_OK;
         }

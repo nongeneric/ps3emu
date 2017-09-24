@@ -11,7 +11,7 @@ public:
     bool _run = false;
     uint32_t _nip = 0;
     std::array<uint8_t, LocalStorageSize> _ls;
-    void run() override { _run = true; }
+    void run(bool suspended) override { _run = true; }
     void setNip(uint32_t nip) override { _nip = nip; }
     uint8_t* ls(uint32_t i) override { return &_ls[i]; }
 };

@@ -3,6 +3,7 @@
 #include "MainMemory.h"
 #include "ps3emu/rewriter.h"
 #include "ps3emu/state.h"
+#include "ps3emu/dasm_utils.h"
 #include <stdint.h>
 #include <elf.h>
 #include <string>
@@ -168,18 +169,24 @@ struct StolenFuncInfo {
 };
 
 class RewriterStore {
-    std::vector<RewrittenSegment> _ppuModules;
-    std::vector<RewrittenSegment> _spuModules;
+    unsigned _ppuModule = 0;
+    unsigned _spuModule = 0;
+    std::array<RewrittenSegment, 1u << decltype(BBCallForm::Segment)::W> _ppuModules;
+    std::array<RewrittenSegment, 1u << decltype(BBCallForm::Segment)::W> _spuModules;
     
 public:
     inline unsigned addPPU(const RewrittenSegment *segment) {
-        _ppuModules.push_back(*segment);
-        return _ppuModules.size() - 1;
+        assert(_ppuModule < _ppuModules.size());
+        _ppuModules[_ppuModule] = *segment;
+        _ppuModule++;
+        return _ppuModule - 1;
     }
     
     inline unsigned addSPU(const RewrittenSegment *segment) {
-        _spuModules.push_back(*segment);
-        return _spuModules.size() - 1;
+        assert(_spuModule < _spuModules.size());
+        _spuModules[_spuModule] = *segment;
+        _spuModule++;
+        return _spuModule - 1;
     }
     
     inline void invokePPU(unsigned index, unsigned label) {

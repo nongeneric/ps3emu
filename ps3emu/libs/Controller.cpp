@@ -80,6 +80,11 @@ int32_t cellKbGetInfo(CellKbInfo* info) {
     return CELL_KB_OK;
 }
 
+int32_t cellKbSetReadMode(uint32_t port_no, uint32_t rmode) {
+    WARNING(libs) << "cellKbSetReadMode not implemented";
+    return CELL_OK;
+}
+
 int32_t cellMouseGetInfo(CellMouseInfo* info) {
     info->max_connect = 1;
     info->max_connect = 0;

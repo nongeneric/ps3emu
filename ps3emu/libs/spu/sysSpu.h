@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ps3emu/Process.h"
+#include "ps3emu/spu/SPUGroupManager.h"
 #include "../sys_defs.h"
 
 using sys_spu_thread_t = big_uint32_t;
@@ -59,13 +60,6 @@ struct sys_spu_thread_argument_t {
     big_uint64_t arg2;
     big_uint64_t arg3;
     big_uint64_t arg4;
-};
-
-struct ThreadGroup {
-    std::vector<uint32_t> threads;
-    std::string name;
-    std::map<uint32_t, int32_t> errorCodes;
-    std::map<uint32_t, std::function<void()>> initializers;
 };
 
 int32_t sys_spu_initialize(uint32_t max_usable_spu, uint32_t max_raw_spu);
@@ -140,6 +134,7 @@ int32_t sys_spu_thread_group_resume(sys_spu_thread_group_t id);
 
 std::shared_ptr<SPUThread> findRawSpuThread(sys_raw_spu_t id);
 std::shared_ptr<ThreadGroup> findThreadGroup(sys_spu_thread_group_t id);
+std::vector<std::shared_ptr<ThreadGroup>> getThreadGroups();
 
 class MainMemory;
 class InternalMemoryManager;

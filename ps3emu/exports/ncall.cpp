@@ -296,6 +296,9 @@ std::vector<NCallEntry> ncallTable {
     ENTRY(cellVideoOutGetNumberOfDevice),
     ENTRY(cellAudioAdd2chData),
     ENTRY(cellAudioAdd6chData),
+    ENTRY(cellGcmGetDefaultCommandWordSize),
+    ENTRY(cellGcmGetDefaultSegmentWordSize),
+    ENTRY(cellKbSetReadMode),
 };
 
 void PPUThread::ncall(uint32_t index) {

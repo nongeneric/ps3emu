@@ -7,16 +7,21 @@
 #include "ps3emu/state.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/RewriterUtils.h"
+#include "ps3emu/spu/SPUGroupManager.h"
+#include "ps3emu/AffinityManager.h"
 #include "SPUDasm.h"
 #include <boost/range/algorithm.hpp>
 #include <stdio.h>
-#include <signal.h>
 #include <xmmintrin.h>
 
-void SPUThread::run() {
-    assert(!_hasStarted);
-    _hasStarted = true;
-    _thread = boost::thread([=] { loop(); });
+void SPUThread::run(bool suspended) {
+    assert(!_needsJoin);
+    OneTimeEvent event;
+    _thread = boost::thread([&] { loop(&event); });
+    assignAffinity(_thread.native_handle(), AffinityGroup::SPUEmu);
+    _suspended = suspended;
+    event.wait();
+    _needsJoin = true;
 }
 
 #define STOP_TYPE_MASK 0x3f00
@@ -27,23 +32,42 @@ void SPUThread::run() {
 #define STOP_TYPE_SYSTEM 0x1000
 #define STOP_TYPE_RESERVE 0x2000
 
-void SPUThread::loop() {
+void suspend_handler(int num, siginfo_t* info, void*) {
+    assert(num == SIGUSR1);
+    assert(info->si_value.sival_ptr);
+    auto th = (SPUThread*)info->si_value.sival_ptr;
+    th->waitSuspended();
+}
+
+void SPUThread::loop(OneTimeEvent* event) {
     g_state.sth = this;
     g_state.granule = &_granule;
     _granule.dbgName = ssnprintf("spu_%d", _id);
     log_set_thread_name(_granule.dbgName);
     INFO(spu) << ssnprintf("spu thread loop started");
-    _eventHandler(this, SPUThreadEvent::Started);
-    
-#ifndef NDEBUG
-    auto f = fopen(ssnprintf("/tmp/spu_ls_dump_%x.bin", getNip()).c_str(), "w");
-    assert(f);
-    fwrite(ptr(0), LocalStorageSize, 1, f);
-    fclose(f);
-#endif
 
+    struct sigaction s;
+    s.sa_handler = nullptr;
+    s.sa_sigaction = suspend_handler;
+    sigemptyset(&s.sa_mask);
+    s.sa_flags = SA_SIGINFO;
+    s.sa_restorer = nullptr;
+    sigaction(SIGUSR1, &s, nullptr);
+    
+    
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, nullptr);
     set_mxcsr_for_spu();
+    _pthread = pthread_self();
+    
+    event->signal();
+    
+    {
+        auto disable = DisableSuspend(this);
+        _eventHandler(this, SPUThreadEvent::Started);
+    }
+
+    waitSuspended();
     
 //     auto traceFilePath = ssnprintf("/tmp/spu_trace_%s", _name);
 //     auto tf = fopen(traceFilePath.c_str(), "w");
@@ -95,10 +119,7 @@ void SPUThread::loop() {
             uint32_t segment, label;
             if (dasm_bb_call(SPU_BB_CALL_OPCODE, instr, segment, label)) {
                 g_state.proc->bbcallSpu(segment, label, cia);
-            } else {
-#ifdef EXECMAP_ENABLED
-                markExecMap(cia);
-#endif                
+            } else {  
                 setNip(cia + 4);
                 SPUDasm<DasmMode::Emulate>(&instr, cia, this);
             }
@@ -110,10 +131,12 @@ void SPUThread::loop() {
             _eventHandler(this, SPUThreadEvent::InvalidInstruction);
             break;
         } catch (SPUThreadFinishedException& e) {
+            auto disable = DisableSuspend(this, true);
             _exitCode = e.errorCode();
             _cause = e.cause();
             break;
         } catch (StopSignalException& e) {
+            auto disable = DisableSuspend(this, true);
             if (e.type() == SYS_SPU_THREAD_STOP_RECEIVE_EVENT) {
                 handleReceiveEvent();
             } else if (e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT ||
@@ -124,14 +147,7 @@ void SPUThread::loop() {
                 _cause = e.type() == SYS_SPU_THREAD_STOP_GROUP_EXIT
                              ? SPUThreadExitCause::GroupExit
                              : SPUThreadExitCause::Exit;
-                if (_cause == SPUThreadExitCause::GroupExit) {
-                    boost::unique_lock<boost::mutex> lock(_groupExitMutex);
-                    for (auto th : _getGroupThreads()) {
-                        if (th == _id)
-                            continue;
-                        g_state.proc->getSpuThread(th)->groupExit();
-                    }
-                }
+                g_state.spuGroupManager->notifyThreadStopped(this, _cause);
                 break;
             } else if (e.type() == STOP_TYPE_RESERVE) { // raw spu
                 break;
@@ -141,6 +157,7 @@ void SPUThread::loop() {
                 break;
             }
         } catch (SPUThreadInterruptException& e) {
+            auto disable = DisableSuspend(this);
             if (_interruptHandler && (_interruptHandler->mask2 & _channels.interrupt())) {
                 _channels.silently_write_interrupt_mbox(e.imboxValue());
                 _interruptHandler->handler();
@@ -148,12 +165,10 @@ void SPUThread::loop() {
                 handleInterrupt(e.imboxValue());
             }
         } catch (InfiniteLoopException& e) {
-            boost::unique_lock<boost::mutex> lock(_groupExitMutex);
-            _groupExitCv.wait(lock, [&] { return _groupExitPending; });
-            _groupExitPending = false;
+            auto disable = DisableSuspend(this, true);
             SPU_Status_SetStopCode(_channels.spuStatus(), SYS_SPU_THREAD_STOP_GROUP_EXIT);
-            //_exitCode = _channels.mmio_read(SPU_Out_MBox);
-            _cause = SPUThreadExitCause::GroupExit;
+            _cause = SPUThreadExitCause::Exit;
+            g_state.spuGroupManager->notifyThreadStopped(this, _cause);
             break;
         } catch (std::exception& e) {
             INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
@@ -163,9 +178,9 @@ void SPUThread::loop() {
         }
     }
     
+    auto disable = DisableSuspend(this, true);
     INFO(spu) << ssnprintf("spu thread loop finished, cause %s", to_string(_cause));
     _eventHandler(this, SPUThreadEvent::Finished);
-    _hasStarted = false;
 }
 
 #ifdef DEBUGPAUSE
@@ -185,12 +200,10 @@ bool SPUThread::dbgIsPaused() {
 SPUThread::SPUThread(std::string name,
                      std::function<void(SPUThread*, SPUThreadEvent)> eventHandler)
     : _name(name),
-      _channels(g_state.mm, this),
+      _channels(g_state.mm, this, this),
       _eventHandler(eventHandler),
-#ifdef DEBUGPAUSE
       _dbgPaused(false),
       _singleStep(false),
-#endif
       _exitCode(0),
       _cause(SPUThreadExitCause::StillRunning),
       _hasStarted(false) {
@@ -203,14 +216,16 @@ SPUThread::SPUThread(std::string name,
 }
 
 SPUThreadExitInfo SPUThread::tryJoin(unsigned ms) {
-    if (_thread.try_join_for( boost::chrono::milliseconds(ms) )) {
+    if (!_thread.try_join_for( boost::chrono::milliseconds(ms) )) {
         return SPUThreadExitInfo{ SPUThreadExitCause::StillRunning, 0 };
     }
+    _needsJoin = false;
     return SPUThreadExitInfo{_cause, _exitCode};
 }
 
 SPUThreadExitInfo SPUThread::join() {
     _thread.join();
+    _needsJoin = false;
     return SPUThreadExitInfo{_cause, _exitCode};
 }
 
@@ -345,40 +360,9 @@ SPUChannels* SPUThread::channels() {
     return &_channels;
 }
 
-void SPUThread::groupExit() {
-    boost::unique_lock<boost::mutex> lock(_groupExitMutex);
-    _groupExitPending = true;
-    _groupExitCv.notify_all();
-}
-
-void SPUThread::setGroup(std::function<std::vector<uint32_t>()> getThreads) {
-    boost::unique_lock<boost::mutex> lock(_groupExitMutex);
-    _getGroupThreads = getThreads;
-}
-
 #if TESTS
 SPUThread::SPUThread() : _channels(g_state.mm, this) {}
 #endif
-
-void SPUThread::markExecMap(uint32_t va) {
-    if (!g_state.executionMaps->enabled)
-        return;
-    for (auto& [entry, map] : g_state.executionMaps->spu) {
-        bool match = true;
-        for (auto i = 0u; i < entry.offsets.size(); ++i) {
-            auto offset = entry.offsets[i];
-            auto bytes = entry.offsetBytes[i];
-            if (bytes != *(big_uint32_t*)ptr(offset)) {
-                match = false;
-                break;
-            }
-        }
-        if (match) {
-            map.mark(va);
-        }
-    }
-    WARNING(spu, perf) << "unknown spu image executed";
-}
 
 void set_mxcsr_for_spu() {
     auto mxcsr = _mm_getcsr();
@@ -390,7 +374,58 @@ void set_mxcsr_for_spu() {
 }
 
 void SPUThread::suspend() {
+    assert(_needsJoin);
+    if (_suspended)
+        return;
+    _suspended = true;
+    sigval val;
+    val.sival_ptr = this;
+    pthread_sigqueue(_pthread, SIGUSR1, val);
 }
 
 void SPUThread::resume() {
+    _suspended = false;
+}
+
+bool SPUThread::suspended() {
+    return _suspended;
+}
+
+void SPUThread::setGroup(ThreadGroup* group) {
+    _group = group;
+}
+
+ThreadGroup* SPUThread::group() {
+    return _group;
+}
+
+void SPUThread::disableSuspend() {
+    _suspendEnabled = false;
+}
+
+void SPUThread::enableSuspend() {
+    _suspendEnabled = true;
+}
+
+void SPUThread::waitSuspended() {
+    if (!_suspendEnabled)
+        return;
+    while (_suspended) {
+        struct timespec t { 0, 1 };
+        nanosleep(&t, &t);
+        //sched_yield();
+    }
+}
+
+DisableSuspend::DisableSuspend(SPUThread* sth, bool detach) : _detach(detach), _sth(sth) {
+    if (sth) {
+        sth->disableSuspend();
+    }
+}
+
+DisableSuspend::~DisableSuspend() {
+    if (!_detach && _sth) {
+        _sth->enableSuspend();
+        _sth->waitSuspended();
+    }
 }

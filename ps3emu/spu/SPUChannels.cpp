@@ -105,9 +105,10 @@ void SpuSignal::set(unsigned value) {
     _cv.notify_all();
 }
 
-SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread)
+SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread, SPUThread* sthread)
     : _mm(mm),
       _thread(thread),
+      _sthread(sthread),
       _outboundMailbox(1),
       _outboundInterruptMailbox(1),
       _inboundMailbox(4),
@@ -122,6 +123,7 @@ SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread)
 #define LEAL(x) (x & 0xfffffffful)
 
 void SPUChannels::command(uint32_t word) {
+    auto disable = DisableSuspend(_sthread);
     union {
         uint32_t val;
         BitField<0, 8> tid;
@@ -131,7 +133,7 @@ void SPUChannels::command(uint32_t word) {
     assert(cmd.tid.u() == 0);
     assert(cmd.rid.u() == 0);
     auto eal = _channels[MFC_EAL].load();
-    assert(_channels[MFC_EAH] == 0);
+    EMU_ASSERT(_channels[MFC_EAH] == 0);
     auto lsaVa = _channels[MFC_LSA].load() & LSLR;
     auto size = _channels[MFC_Size].load();
     EMU_ASSERT(subset<uint32_t>(lsaVa, size, 0, LocalStorageSize));
@@ -241,6 +243,7 @@ void SPUChannels::command(uint32_t word) {
 }
 
 unsigned SPUChannels::readCount(unsigned ch) {
+    auto disable = DisableSuspend(_sthread);
     auto count = ([ch, this] {
         switch (ch) {
             case SPU_RdEventStat: return _event.count();
@@ -280,6 +283,7 @@ unsigned SPUChannels::readCount(unsigned ch) {
 }
 
 void SPUChannels::write(unsigned ch, uint32_t data) {
+    auto disable = DisableSuspend(_sthread);
     EMU_ASSERT(ch <= SPU_WrOutIntrMbox || ch == SPU_PerfBookmark);
     if (ch == SPU_WrEventMask) {
         _event.setMask(data);
@@ -320,6 +324,7 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
 }
 
 uint32_t SPUChannels::read(unsigned ch) {
+    auto disable = DisableSuspend(_sthread);
     assert(ch <= SPU_WrOutIntrMbox);
     auto data = ([&] {
         if (ch == SPU_RdSigNotify1) {
@@ -361,13 +366,14 @@ uint32_t SPUChannels::read(unsigned ch) {
 }
 
 void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
+    auto disable = DisableSuspend(_sthread);
     INFO(spu) << ssnprintf("ppu writes %x via mmio to spu %d tag %s",
                            data,
                            -1,
                            tagToString((TagClassId)offset));
 
     if (offset == TagClassId::SPU_RunCntl && data == 1) {
-        _thread->run();
+        _thread->run(false);
         _spuStatus |= SPU_Status_R;
         return;
     }
@@ -422,6 +428,7 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
 }
 
 uint32_t SPUChannels::mmio_read(unsigned offset) {
+    auto disable = DisableSuspend(_sthread);
     INFO(spu) << "reading mmio";
     auto res = [&] {
         switch (offset) {
@@ -450,6 +457,7 @@ uint32_t SPUChannels::mmio_read(unsigned offset) {
 }
 
 unsigned SPUChannels::mmio_readCount(unsigned offset) {
+    auto disable = DisableSuspend(_sthread);
     if (offset == TagClassId::SPU_Out_MBox) {
         return _outboundMailbox.size();
     }
@@ -463,9 +471,11 @@ unsigned SPUChannels::mmio_readCount(unsigned offset) {
 }
 
 void SPUChannels::setEvent(unsigned flags) {
+    auto disable = DisableSuspend(_sthread);
     _event.set_or(flags);
 }
 
 void SPUChannels::silently_write_interrupt_mbox(uint32_t value) {
+    auto disable = DisableSuspend(_sthread);
     _outboundInterruptMailbox.enqueue(value);
 }

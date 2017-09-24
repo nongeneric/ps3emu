@@ -2597,6 +2597,20 @@ PRINT(FRSQRTES, AForm_4) {
 }
 EMU_REWRITE(FRSQRTES, AForm_4, i->FRB.u(), i->FRT.u(), i->Rc.u())
 
+PRINT(FSEL, AForm_1) {
+    *result = format_nnnn(i->Rc.u() ? "fsel." : "fsel", i->FRT, i->FRA, i->FRC, i->FRB);
+}
+
+#define _FSEL(_frt, _fra, _frc, _frb, _rc) { \
+    auto ra = TH->getFPRd(_fra); \
+    auto rc = TH->getFPRd(_frc); \
+    auto rb = TH->getFPRd(_frb); \
+    auto res = ra > 0.f ? rc : rb; \
+    TH->setFPRd(_frt, res); \
+    if (_rc) \
+        update_CRFSign<1>(res, TH); \
+}
+EMU_REWRITE(FSEL, AForm_1, i->FRT.u(), i->FRA.u(), i->FRC.u(), i->FRB.u(), i->Rc.u())
 
 namespace FPRF {
     enum t {
@@ -4411,6 +4425,8 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                 invoke(FRE);
             } else if (aform->XO.u() == 26) {
                 invoke(FRSQRTE);
+            } else if (aform->XO.u() == 23) {
+                invoke(FSEL);
             } else
             switch (xform->XO.u()) {
                 case 72: invoke(FMR);

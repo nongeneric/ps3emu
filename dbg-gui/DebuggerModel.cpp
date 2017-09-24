@@ -15,6 +15,8 @@
 #include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/fileutils.h"
 #include "ps3emu/exports/splicer.h"
+#include "ps3emu/spu/SPUGroupManager.h"
+#include "ps3emu/BBCallMap.h"
 #include "ps3tool-core/Rewriter.h"
 #include "Config.h"
 #include <QStringList>
@@ -407,6 +409,8 @@ public:
                 auto isSpuElf = isSpuElfAddress(row);
                 if (ppu && !isSpuElf) {
                     ppu_dasm<DasmMode::Print>(&instr, row, &str);
+                    auto bbcall = g_state.bbcallMap->get(row);
+                    str = ssnprintf("%s%s", bbcall ? "." : " ", str);
                 } else {
                     SPUDasm<DasmMode::Print>(&instr, row, &str);
                 }
@@ -683,6 +687,9 @@ void DebuggerModel::execSingleCommand(QString command) {
     } else if (name == "imports") {
         dumpImports();
         return;
+    } else if (name == "groups") {
+        dumpGroups();
+        return;
     } else if (name == "threads") {
         dumpThreads();
         return;
@@ -911,8 +918,12 @@ void DebuggerModel::dumpMutexes(bool lw) {
     }
 }
 
+void DebuggerModel::dumpGroups() {
+    messagef("%s", g_state.spuGroupManager->dbgDumpGroups());
+}
+
 void DebuggerModel::dumpThreads() {
-    unsigned i = 0;
+    auto i = 0u;
     emit message("PPU Threads (id, nip, state)");
     for (auto th : _proc->dbgPPUThreads()) {
         auto current = th == _activeThread;
@@ -925,18 +936,44 @@ void DebuggerModel::dumpThreads() {
                                        th->getName().c_str()));
         i++;
     }
-    emit message("SPU Threads (id, nip, source, name)");
-    for (auto th : _proc->dbgSPUThreads()) {
-        auto current = th == _activeSPUThread;
-        emit message(QString::asprintf("[%03d]%s %08x  %08x  %08x  %s  %s",
-                                       i,
-                                       current ? "*" : " ",
-                                       (uint32_t)th->getId(),
-                                       th->getNip(),
-                                       th->getElfSource(),
-                                       th->dbgIsPaused() ? "PAUSED" : "RUNNING",
-                                       th->getName().c_str()));
+    auto printSpuThread = [&](auto i, auto th, auto prefix) {
+        auto state = th->suspended() ? "SUSPENDED"
+                   : th->dbgIsPaused() ? "PAUSED" 
+                   : "RUNNING";
+        emit messagef("%s[%03d]%s %08x  %08x  %08x  %s  %s",
+                      prefix,
+                      i,
+                      th == _activeSPUThread ? "*" : " ",
+                      (uint32_t)th->getId(),
+                      th->getNip(),
+                      th->getElfSource(),
+                      state,
+                      th->getName().c_str());
+    };
+    emit message("SPU Threads (id, nip, source, name) by ID");
+    auto allSpuThreads = _proc->dbgSPUThreads();
+    for (auto th : allSpuThreads) {
+        printSpuThread(i, th, "");
         i++;
+    }
+    
+    std::set<uint32_t> printed;
+    for (auto& group : getThreadGroups()) {
+        i = 0u;
+        emit messagef("\nGroup (prio %d) %s", group->priority, group->name);
+        for (auto& th : group->threads) {
+            printSpuThread(i, th, "  ");
+            printed.insert(th->getId());
+            i++;
+        }
+    }
+    
+    i = 0u;
+    emit messagef("No group");
+    for (auto& th : allSpuThreads) {
+        if (printed.find(th->getId()) != end(printed))
+            continue;
+        printSpuThread(i, th, "  ");
     }
 }
 

@@ -6,6 +6,7 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/TimedCounter.h"
 #include "ps3emu/HeapMemoryAlloc.h"
+#include "ps3emu/AffinityManager.h"
 #include <boost/chrono.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -99,7 +100,7 @@ void noop(void* p) { }
 
 void playbackLoop() {
     static std::vector<uint8_t> tempDest;
-    
+
     for (;;) {
         {
             boost::unique_lock<boost::mutex> lock(context.streamStartedMutex);
@@ -110,6 +111,8 @@ void playbackLoop() {
         
         sys_event_port_send(context.notifyQueuePort, 0, 0, 0);
         
+//        boost::this_thread::sleep_for(microseconds(5600));
+//        continue;
         for (auto [portnum, port] : context.ports.map()) {
             (void)portnum;
             if (port->portStatus != CELL_AUDIO_STATUS_RUN)
@@ -135,8 +138,8 @@ void playbackLoop() {
             }
          
 #if TESTS
-            port->pcmFile.write((char*)dest, tempDest.size());
-            port->pcmFile.flush();
+            //port->pcmFile.write((char*)dest, tempDest.size());
+            //port->pcmFile.flush();
 #endif
             
             microseconds wait(0);
@@ -207,6 +210,7 @@ int32_t cellAudioInit() {
     auto api = pa_threaded_mainloop_get_api(context.pulseMainLoop);
     context.pulseContext = pa_context_new(api, "ps3emu");
     context.playbackThread = boost::thread(playbackLoop);
+    assignAffinity(context.playbackThread.native_handle(), AffinityGroup::PPUHost);
     auto res = pa_context_connect(context.pulseContext, NULL, PA_CONTEXT_NOFLAGS, NULL);
     if (res != PA_OK) {
         ERROR(libs) << ssnprintf("context connection failed %s", pa_strerror(res));
@@ -232,7 +236,6 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     INFO(libs) << "cellAudioPortOpen";
     
     auto info = std::make_shared<PortInfo>();
-    *portNum = context.ports.create(info);
     
     if (audioParam->attr & CELL_AUDIO_PORTATTR_INITLEVEL) {
         auto volume = union_cast<big_uint32_t, float>(audioParam->float_level);
@@ -270,6 +273,8 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     }
     
     pa_stream_set_overflow_callback(info->pulseStream, overflow_handler, nullptr);
+    
+    *portNum = context.ports.create(info);
     
 #if TESTS
     info->pcmFile = std::ofstream(ssnprintf("/tmp/ps3emu_pcm_%d", (uint32_t)*portNum));

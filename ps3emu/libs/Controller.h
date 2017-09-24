@@ -86,6 +86,7 @@ int32_t cellKbInit(uint32_t max_connect);
 int32_t cellKbEnd();
 int32_t cellKbSetCodeType(uint32_t port_no, uint32_t type);
 int32_t cellKbGetInfo(CellKbInfo* info);
+int32_t cellKbSetReadMode(uint32_t port_no, uint32_t rmode);
 
 #define CELL_MAX_MICE 127
 typedef struct CellMouseInfo{

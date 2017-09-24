@@ -511,6 +511,7 @@ class Rsx {
     void PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex);
     
     void invokeHandler(uint32_t descrEa, uint32_t arg);
+    void drawStats();
     
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);

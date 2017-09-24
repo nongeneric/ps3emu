@@ -523,7 +523,7 @@ uint32_t cellGcmGetZcullInfo() {
 }
 
 int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
-    assert(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
+    //assert(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
     return CELL_OK;
 }
 
@@ -551,6 +551,14 @@ emu_void_t cellGcmSetUserHandler(uint32_t handler) {
 emu_void_t cellGcmSetSecondVFrequency(uint32_t freq) {
     WARNING(rsx) << "cellGcmSetSecondVFrequency not implemented";
     return emu_void;
+}
+
+uint32_t cellGcmGetDefaultCommandWordSize() {
+    return 4;
+}
+
+uint32_t cellGcmGetDefaultSegmentWordSize() {
+    return 8 * 1024 / 4;
 }
 
 }}

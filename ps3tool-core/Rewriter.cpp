@@ -184,6 +184,23 @@ Graph removeLonelyStops(Graph& graph, name_t name) {
     return removeInvalidVertices(graph);
 }
 
+uint32_t findDataCutoff(uint32_t start, uint32_t len, read_t read) {
+    // an spu segment is split into two halfs: code and data
+    // data always comes second
+    // most of the time code ends with two consecutive zero words
+    // if this is not the case, then at least some point in data can
+    // be identified; code never contains two adjacent zero words
+    auto lastZero = -1u;
+    for (auto i = start; i < start + len; i += 4) {
+        if (!read(i)) {
+            if (lastZero + 4 == i)
+                return i;
+            lastZero = i;
+        }
+    }
+    return start + len;
+}
+
 std::vector<BasicBlock> discoverBasicBlocks(
     uint32_t start,
     uint32_t length,
@@ -198,6 +215,10 @@ std::vector<BasicBlock> discoverBasicBlocks(
     for (auto& lead : leads) {
         if (!subset(lead, 4u, start, length))
             throw std::runtime_error("a lead is outside the segment");
+    }
+    
+    if (read) {
+        length = findDataCutoff(start, length, *read) - start;
     }
     
     auto breaks = DiscoverBreaks(start, length, analyze);
