@@ -17,6 +17,7 @@ void compareLastFrame(const char* expected, int n = 0, int tolerance = 5, int sa
     auto args = QStringList() 
         << "-metric"
         << "AE"
+        << "-alpha" << "opaque"
         << "-fuzz" << QString("%1%%").arg(tolerance)
         << QString::fromStdString(ssnprintf("/tmp/ps3frame_%d_%d.png", id, n)) << expected
         << QString::fromStdString(ssnprintf("/tmp/ps3frame-diff_%d_%d.png", id, n));
