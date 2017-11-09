@@ -374,7 +374,6 @@ void set_mxcsr_for_spu() {
 }
 
 void SPUThread::suspend() {
-    assert(_needsJoin);
     if (_suspended)
         return;
     _suspended = true;
@@ -411,7 +410,7 @@ void SPUThread::waitSuspended() {
     if (!_suspendEnabled)
         return;
     while (_suspended) {
-        struct timespec t { 0, 1 };
+        struct timespec t { 0, 200 };
         nanosleep(&t, &t);
         //sched_yield();
     }

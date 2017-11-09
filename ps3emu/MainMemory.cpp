@@ -42,17 +42,15 @@ bool MainMemory::writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len)
     return false;
 }
 
-bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
+bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf) {
     if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        assert(len == 4);
         *(big_uint32_t*)buf = readRawSpuVa(va);
         return true;
     }
     
     auto GcmControlRegistersSegment = 0x40000000u;
     
-    if ((va & GcmControlRegistersSegment) && coversRsxRegsRange(va, len)) {
-        assert(len == 4);
+    if ((va & GcmControlRegistersSegment) && coversRsxRegsRange(va, 4)) {
         if (va == GcmControlRegisters) {
             *(big_uint32_t*)buf = g_state.rsx->getPut();
             return true;
@@ -67,51 +65,6 @@ bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf, uint len) {
     }
     return false;
 }
-
-#define DEFINE_LOAD_X(x) \
-    uint##x##_t MainMemory::load##x(ps3_uintptr_t va, bool validate) { \
-        uint##x##_t special; \
-        if (readSpecialMemory(va, &special, x / 8)) \
-            return endian_reverse(special); \
-        if (validate) \
-            this->validate(va, x / 8, false); \
-        VirtualAddress split { va }; \
-        auto& page = _pages[split.page.u()]; \
-        auto offset = split.offset.u(); \
-        auto ptr = page.ptr + offset; \
-        return endian_reverse(*(uint##x##_t*)ptr); \
-    }
-
-DEFINE_LOAD_X(8)
-DEFINE_LOAD_X(16)
-DEFINE_LOAD_X(32)
-DEFINE_LOAD_X(64)
-DEFINE_LOAD_X(128)
-
-#define DEFINE_STORE_X(x) \
-    void MainMemory::store##x(ps3_uintptr_t va, uint##x##_t value) { \
-        auto reversed = endian_reverse(value); \
-        if (writeSpecialMemory(va, &reversed, x / 8)) \
-            return; \
-        validate(va, x / 8, false); \
-        VirtualAddress split { va }; \
-        auto pageIndex = split.page.u(); \
-        auto& page = _pages[pageIndex]; \
-        auto offset = split.offset.u(); \
-        auto ptr = page.ptr.load(); \
-        ptr = ptr + offset; \
-        auto line = _rmap.lock<x / 8>(va); \
-        *(uint##x##_t*)ptr = reversed; \
-        _rmap.destroyExcept(line, g_state.granule); \
-        _rmap.unlock(line); \
-        _mmap.mark<x / 8>(va); \
-    }
-
-DEFINE_STORE_X(8)
-DEFINE_STORE_X(16)
-DEFINE_STORE_X(32)
-DEFINE_STORE_X(64)
-DEFINE_STORE_X(128)
 
 void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
     if (writeSpecialMemory(va, buf, len))
@@ -144,7 +97,7 @@ void MainMemory::setMemory(ps3_uintptr_t va, uint8_t value, uint len) {
 }
 
 void MainMemory::readMemory(ps3_uintptr_t va, void* buf, uint len, bool validate) {
-    if (readSpecialMemory(va, &buf, len))
+    if (len == 4 && readSpecialMemory(va, &buf))
         return;
     auto last = va + len;
     auto dest = (char*)buf;
@@ -256,7 +209,7 @@ uint32_t encodeNCall(MainMemory* mm, ps3_uintptr_t va, uint32_t index) {
     assert(index < 0x3ffffff);
     uint32_t ncall = (NCALL_OPCODE << 26) | index;
     if (va) {
-        mm->store32(va, ncall);
+        mm->store32(va, ncall, g_state.granule);
     }
     return ncall;
 }

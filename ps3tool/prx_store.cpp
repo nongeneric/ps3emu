@@ -141,7 +141,7 @@ void rewritePrxStore() {
         "#!/bin/bash",
         "set -e",
         "ninja-build -f rewrite.ninja -t clean",
-        "ninja-build -f rewrite.ninja -j 5",
+        "ninja-build -f rewrite.ninja -j 3",
         "ninja-build -f build.ninja -t clean",
         "ninja-build -f build.ninja"
     }, (relative / "build.sh").string());

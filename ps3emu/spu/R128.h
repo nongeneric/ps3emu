@@ -1,18 +1,9 @@
 #pragma once
 
-#include <x86intrin.h>
 #include "ps3emu/int.h"
 
 namespace {
 
-static const __m128i ENDIAN_SWAP_MASK128 =
-    _mm_set_epi8(
-        0, 1, 2, 3,
-        4, 5, 6, 7,
-        8, 9, 10, 11,
-        12, 13, 14, 15
-    );
-    
 alignas(16) static const __m128i BYTE_SHIFT_LEFT_SHUFFLE_CONTROL[32] {
     _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
     _mm_set_epi8(14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1),

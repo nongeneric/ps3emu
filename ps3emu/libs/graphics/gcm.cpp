@@ -140,7 +140,7 @@ emu_void_t cellGcmGetConfiguration(CellGcmConfig* config) {
 
 void setCurrentCommandBuffer(MainMemory* mm, ps3_uintptr_t va) {
     INFO(rsx) << __FUNCTION__;
-    mm->store32(emuGcmState.gCellGcmCurrentContext, va);
+    mm->store32(emuGcmState.gCellGcmCurrentContext, va, g_state.granule);
 }
 
 uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,

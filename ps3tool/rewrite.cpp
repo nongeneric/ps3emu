@@ -391,7 +391,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
         };
         
         std::vector<uint32_t> leads;
-        leads.push_back(elf.header->e_entry);
+        // entry point might not lead to code for some segments so ignore it competely
                 
         for (auto& segment : copySegments) {
             auto blocks =

@@ -53,7 +53,7 @@ using namespace boost::endian;
 
 #define SET_NIP SET_NIP_INITIAL
 
-#define MM g_state.mm
+#define MM thread->mm()
 #define TH thread
 #define invoke(name) invoke_impl<M>(#name, print##name, emulate##name, rewrite##name, &x, cia, state); break
 #define PRINT(name, form) inline void print##name(form* i, uint64_t cia, std::string* result)
@@ -790,7 +790,7 @@ PRINT(STB, DForm_3) {
 #define _STB(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store8(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STB, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
 
@@ -800,7 +800,7 @@ PRINT(STBX, XForm_8) {
 #define _STBX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store8(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STBX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -809,7 +809,7 @@ PRINT(STBU, DForm_3) {
 }
 #define _STBU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store8(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STBU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
@@ -819,7 +819,7 @@ PRINT(STBUX, XForm_8) {
 }
 #define _STBUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store8(ea, TH->getGPR(_rs)); \
+    MM->store8(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STBUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -831,7 +831,7 @@ PRINT(STH, DForm_3) {
 #define _STH(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store16(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STH, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
 
@@ -841,7 +841,7 @@ PRINT(STHX, XForm_8) {
 #define _STHX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store16(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STHX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -850,7 +850,7 @@ PRINT(STHU, DForm_3) {
 }
 #define _STHU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store16(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STHU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
@@ -860,7 +860,7 @@ PRINT(STHUX, XForm_8) {
 }
 #define _STHUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store16(ea, TH->getGPR(_rs)); \
+    MM->store16(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STHUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -872,7 +872,7 @@ PRINT(STW, DForm_3) {
 #define _STW(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store32(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STW, DForm_3, i->RA.u(), i->D.s(), i->RS.u())
 
@@ -882,7 +882,7 @@ PRINT(STWX, XForm_8) {
 #define _STWX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store32(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STWX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -891,7 +891,7 @@ PRINT(STWU, DForm_3) {
 }
 #define _STWU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store32(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STWU, DForm_3, i->D.s(), i->RA.u(), i->RS.u())
@@ -901,7 +901,7 @@ PRINT(STWUX, XForm_8) {
 }
 #define _STWUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store32(ea, TH->getGPR(_rs)); \
+    MM->store32(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STWUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -914,7 +914,7 @@ PRINT(STD, DSForm_2) {
 #define _STD(_ra, _ds, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
-    MM->store64(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STD, DSForm_2, i->RA.u(), i->DS.native(), i->RS.u())
 
@@ -926,7 +926,7 @@ PRINT(STDX, XForm_8) {
 #define _STDX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store64(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs), TH->granule()); \
 }
 EMU_REWRITE(STDX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -937,7 +937,7 @@ PRINT(STDU, DSForm_2) {
 
 #define _STDU(_ds, _ra, _rs) { \
     auto ea = TH->getGPR(_ra) + _ds; \
-    MM->store64(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STDU, DSForm_2, i->DS.native(), i->RA.u(), i->RS.u())
@@ -949,7 +949,7 @@ PRINT(STDUX, XForm_8) {
 
 #define _STDUX(_ra, _rb, _rs) { \
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
-    MM->store64(ea, TH->getGPR(_rs)); \
+    MM->store64(ea, TH->getGPR(_rs), TH->granule()); \
     TH->setGPR(_ra, ea); \
 }
 EMU_REWRITE(STDUX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
@@ -984,7 +984,7 @@ PRINT(STHBRX, XForm_8) {
 #define _STHBRX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store16(ea, endian_reverse(TH->getGPR(_rs))); \
+    MM->store16(ea, endian_reverse(TH->getGPR(_rs)), TH->granule()); \
 }
 EMU_REWRITE(STHBRX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -994,7 +994,7 @@ PRINT(STWBRX, XForm_8) {
 #define _STWBRX(_ra, _rb, _rs) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    MM->store32(ea, endian_reverse(TH->getGPR(_rs))); \
+    MM->store32(ea, endian_reverse(TH->getGPR(_rs)), TH->granule()); \
 }
 EMU_REWRITE(STWBRX, XForm_8, i->RA.u(), i->RB.u(), i->RS.u())
 
@@ -2353,7 +2353,7 @@ PRINT(STFS, DForm_9) {
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
     auto frs = TH->getFPRd(_frs); \
-    MM->storef(ea, frs); \
+    MM->storef(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFS, DForm_9, i->RA.u(), i->D.s(), i->FRS.u())
 
@@ -2366,7 +2366,7 @@ PRINT(STFSX, XForm_29) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto frs = TH->getFPRd(_frs); \
-    MM->storef(ea, frs); \
+    MM->storef(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFSX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
 
@@ -2379,7 +2379,7 @@ PRINT(STFSU, DForm_9) {
     auto ea = TH->getGPR(_ra) + _ds; \
     auto frs = TH->getFPRd(_frs); \
     TH->setGPR(_ra, ea); \
-    MM->storef(ea, frs); \
+    MM->storef(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFSU, DForm_9, i->D.s(), i->RA.u(), i->FRS.u())
 
@@ -2392,7 +2392,7 @@ PRINT(STFSUX, XForm_29) {
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
     auto frs = TH->getFPRd(_frs); \
     TH->setGPR(_ra, ea); \
-    MM->storef(ea, frs); \
+    MM->storef(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFSUX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
 
@@ -2405,7 +2405,7 @@ PRINT(STFD, DForm_9) {
     auto b = getB(_ra, TH); \
     auto ea = b + _ds; \
     auto frs = TH->getFPRd(_frs); \
-    MM->stored(ea, frs); \
+    MM->stored(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFD, DForm_9, i->RA.u(), i->D.s(), i->FRS.u())
 
@@ -2418,7 +2418,7 @@ PRINT(STFDX, XForm_29) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto frs = TH->getFPRd(_frs); \
-    MM->stored(ea, frs); \
+    MM->stored(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFDX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
 
@@ -2431,7 +2431,7 @@ PRINT(STFDU, DForm_9) {
     auto ea = TH->getGPR(_ra) + _ds; \
     auto frs = TH->getFPRd(_frs); \
     TH->setGPR(_ra, ea); \
-    MM->stored(ea, frs); \
+    MM->stored(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFDU, DForm_9, i->D.s(), i->RA.u(), i->FRS.u())
 
@@ -2444,7 +2444,7 @@ PRINT(STFDUX, XForm_29) {
     auto ea = TH->getGPR(_ra) + TH->getGPR(_rb); \
     auto frs = TH->getFPRd(_frs); \
     TH->setGPR(_ra, ea); \
-    MM->stored(ea, frs); \
+    MM->stored(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFDUX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
 
@@ -2457,7 +2457,7 @@ PRINT(STFIWX, XForm_29) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto frs = (uint32_t)TH->getFPR(_frs); \
-    MM->store32(ea, frs); \
+    MM->store32(ea, frs, TH->granule()); \
 }
 EMU_REWRITE(STFIWX, XForm_29, i->RA.u(), i->RB.u(), i->FRS.u())
 
@@ -3183,9 +3183,7 @@ PRINT(STVX, SIMDForm) {
     auto b = getB(_ra, TH); \
     auto ea = (b + TH->getGPR(_rb)) & 0xfffffff0; \
     auto v = TH->r(_vs).xmm(); \
-    uint128_t u128; \
-    memcpy(&u128, &v, 16); \
-    MM->store128(ea, u128); \
+    MM->store128(ea, v, TH->granule()); \
 }
 EMU_REWRITE(STVX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 
@@ -3207,9 +3205,7 @@ PRINT(LVX, SIMDForm) {
 #define _LVX(_ra, _rb, _vd) { \
     auto b = getB(_ra, TH); \
     auto ea = (b + TH->getGPR(_rb)) & 0xfffffff0; \
-    uint128_t u128 = MM->load128(ea); \
-    __m128i xmm; \
-    memcpy(&xmm, &u128, 16); \
+    auto xmm = MM->load128(ea); \
     TH->r(_vd).set_xmm(xmm); \
 }
 EMU_REWRITE(LVX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
@@ -3293,9 +3289,7 @@ PRINT(LVEWX, SIMDForm) {
 #define _LVEWX(_ra, _rb, _vd) { \
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
-    uint128_t u128 = MM->load128(ea); \
-    __m128i xmm; \
-    memcpy(&xmm, &u128, 16); \
+    auto xmm = MM->load128(ea); \
     TH->r(_vd).set_xmm(xmm); \
 }
 EMU_REWRITE(LVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vD.u())
@@ -3944,7 +3938,7 @@ PRINT(STVEWX, SIMDForm) {
     auto b = getB(_ra, TH); \
     auto ea = b + TH->getGPR(_rb); \
     auto eb = ea & 3; \
-    MM->store32(ea, TH->r(_vs).w(eb)); \
+    MM->store32(ea, TH->r(_vs).w(eb), TH->granule()); \
 }
 EMU_REWRITE(STVEWX, SIMDForm, i->rA.u(), i->rB.u(), i->vS.u())
 

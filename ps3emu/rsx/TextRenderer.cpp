@@ -4,7 +4,6 @@
 #include "GLTexture.h"
 #include "GLBuffer.h"
 #include "GLSampler.h"
-#include <glm/glm.hpp>
 #include "ps3emu/ImageUtils.h"
 
 #include <unicode/utf8.h>
@@ -36,6 +35,7 @@ constexpr auto UniformDataBinding = 20;
 constexpr auto TextureBinding = 21;
 
 struct UniformData {
+    glm::vec4 foreground;
     glm::vec2 screenSize;
 };
 
@@ -77,7 +77,7 @@ struct TextRenderer::impl {
         }
         
         if (FT_New_Face(freetype,
-                        "/usr/share/fonts/gnu-free/FreeSerif.ttf",
+                        "/usr/share/fonts/gnu-free/FreeMono.ttf",
                         0,
                         &face)) {
             ERROR(libs) << "can't initialize font";
@@ -93,7 +93,7 @@ struct TextRenderer::impl {
         FT_UInt glyphIndex;
         auto code = FT_Get_First_Char(face, &glyphIndex);
         for (; glyphIndex != 0; code = FT_Get_Next_Char(face, code, &glyphIndex)) {
-            if (FT_Load_Glyph(face, glyphIndex, FT_LOAD_RENDER))
+            if (FT_Load_Glyph(face, glyphIndex, FT_LOAD_RENDER | FT_LOAD_NO_HINTING))
                 continue;
 
             auto g = face->glyph;
@@ -120,7 +120,7 @@ struct TextRenderer::impl {
         std::vector<uint8_t> buffer(textureWidth * textureHeight);
 
         for (auto& [glyphIndex, slot] : slots) {
-            if (FT_Load_Glyph(face, glyphIndex, FT_LOAD_RENDER))
+            if (FT_Load_Glyph(face, glyphIndex, FT_LOAD_RENDER | FT_LOAD_NO_HINTING))
                 continue;
             auto g = face->glyph;
             for (auto row = 0u; row < g->bitmap.rows; ++row) {
@@ -171,6 +171,7 @@ struct TextRenderer::impl {
             layout (max_vertices = 4) out;
 
             layout (std140, binding = 20) uniform UniformData {
+                vec4 foreground;
                 vec2 screenSize;
             } u;
 
@@ -212,12 +213,16 @@ struct TextRenderer::impl {
             #version 450 core
 
             layout (binding = 21) uniform sampler2D tex;
+            layout (std140, binding = 20) uniform UniformData {
+                vec4 foreground;
+                vec2 screenSize;
+            } u;
             in vec2 g_texcoord;
             out vec4 color;
 
             void main(void) {
                 vec2 coord = g_texcoord / textureSize(tex, 0);
-                color = vec4(1, 1, 1, texture(tex, coord).r);
+                color = vec4(u.foreground.rgb, texture(tex, coord).r * u.foreground.a);
             }
         )"";
 
@@ -233,9 +238,14 @@ struct TextRenderer::impl {
         glSamplerParameteri(sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
 
-    void render(unsigned screenWidth, unsigned screenHeight) {
+    void render(unsigned screenWidth,
+                unsigned screenHeight,
+                glm::vec4 foreground,
+                glm::vec4 background)
+    {
         pipeline.bind();
         uniform->screenSize = { screenWidth, screenHeight };
+        uniform->foreground = foreground;
 
         int length = 0;
         for (auto& line : lines) {
@@ -328,11 +338,14 @@ void TextRenderer::line(unsigned x, unsigned y, std::string_view text) {
 
 void TextRenderer::line(std::string_view text) {
     p->lines.push_back({p->lineX, p->lineY, std::string(text)});
-    p->lineY += p->lineHeight;
+    p->lineY += 1.4f * p->lineHeight;
 }
 
-void TextRenderer::render(unsigned screenWidth, unsigned screenHeight) {
-    p->render(screenWidth, screenHeight);
+void TextRenderer::render(unsigned screenWidth,
+                          unsigned screenHeight,
+                          glm::vec4 foreground,
+                          glm::vec4 background) {
+    p->render(screenWidth, screenHeight, foreground, background);
 }
 
 void TextRenderer::clear() {

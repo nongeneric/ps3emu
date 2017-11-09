@@ -39,6 +39,8 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent, std::any)> e
         r = 0;
     for(auto& r : _V)
         r.set_xmm(_mm_setzero_si128());
+
+    _mm = g_state.mm;
 }
 
 void PPUThread::vmenter(uint32_t to) {

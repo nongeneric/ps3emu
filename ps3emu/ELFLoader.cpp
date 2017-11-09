@@ -190,7 +190,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                     auto va = (*segment.blocks)[i].va;
                     bbBytes[va] = g_state.mm->load32(va);
                     if (segment.spuEntryPoint) {
-                        g_state.mm->store32(va, instr);
+                        g_state.mm->store32(va, instr, g_state.granule);
                     } else {
                         g_state.bbcallMap->set(va, instr);
                     }
@@ -231,15 +231,15 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         auto base = pointsToSegment ? prxPh1Va : imageBase;
         auto val = rel->r_addend + base;
         if (type == R_PPC64_ADDR32) {
-            g_state.mm->store32(offset, val);
+            g_state.mm->store32(offset, val, g_state.granule);
         } else if (type == R_PPC64_ADDR16_LO) {
-            g_state.mm->store16(offset, lo(val));
+            g_state.mm->store16(offset, lo(val), g_state.granule);
         } else if (type == R_PPC64_ADDR16_HI) {
-            g_state.mm->store16(offset, hi(val));
+            g_state.mm->store16(offset, hi(val), g_state.granule);
         } else if (type == R_PPC64_ADDR16_HA) {
-            g_state.mm->store16(offset, ha(val));
+            g_state.mm->store16(offset, ha(val), g_state.granule);
         } else if (type == R_PPC64_ADDR16_LO_DS) {
-            g_state.mm->store16(offset, lo(val) >> 2);
+            g_state.mm->store16(offset, lo(val) >> 2, g_state.granule);
         } else {
             throw std::runtime_error("unimplemented reloc type");
         }
@@ -275,7 +275,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         auto it = bbBytes.find(codeVa);
         if (it != end(bbBytes)) {
             auto bytes = it->second;
-            g_state.mm->store32(codeVa, bytes);
+            g_state.mm->store32(codeVa, bytes, g_state.granule);
         }
         
         uint32_t index;
@@ -385,7 +385,7 @@ uint32_t findExportedEmuFunction(uint32_t id) {
     INFO(libs) << ssnprintf("    %s (ncall %x)", name, index);
     
     g_state.mm->setMemory(ncallDescrVa, 0, 8);
-    g_state.mm->store32(ncallDescrVa, ncallDescrVa + 4);
+    g_state.mm->store32(ncallDescrVa, ncallDescrVa + 4, g_state.granule);
     encodeNCall(g_state.mm, ncallDescrVa + 4, index);
     ncallDescrVa += 8;
     return ncallDescrVa - 8;
@@ -473,7 +473,7 @@ void ELFLoader::link(std::vector<std::shared_ptr<ELFLoader>> prxs) {
         for (auto j = 0; j < imports[i].variables; ++j) {
             auto descr = (vdescr*)g_state.mm->getMemoryPointer(vstubs[j], sizeof(vdescr));
             auto symbol = findExportedSymbol(prxs, vnids[j], library, prx_symbol_type_t::variable);
-            g_state.mm->store32(descr->toc, symbol);
+            g_state.mm->store32(descr->toc, symbol, g_state.granule);
         }
         auto fstubs = (big_uint32_t*)g_state.mm->getMemoryPointer(imports[i].fstubs, imports[i].functions);
         auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(imports[i].fnids, imports[i].functions);

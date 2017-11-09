@@ -182,6 +182,10 @@ public:
         EMU_ASSERT(_spu != -1u && _spu <= 255);
         return _spu;
     }
+
+    inline ReservationGranule* granule() {
+        return &_granule;
+    }
     
     void singleStepBreakpoint(bool value);
     void dbgPause(bool val);

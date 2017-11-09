@@ -76,7 +76,7 @@ namespace {
         pa_threaded_mainloop* pulseMainLoop = 0;
         pa_sample_spec pulseSpec;
         boost::thread playbackThread;
-        TimedCounter counter;
+        TimedCounter counter = TimedCounter(boost::chrono::seconds(1));
         boost::mutex streamStartedMutex;
         boost::condition_variable streamStartedCv;
         ThreadSafeIDMap<uint32_t, std::shared_ptr<PortInfo>> ports;

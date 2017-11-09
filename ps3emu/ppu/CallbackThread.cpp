@@ -39,7 +39,7 @@ CallbackThread::CallbackThread() : _queue(1) {
     findNCallEntry(calcFnid("callbackThreadQueueWait"), index);
     
     _initInfo = g_state.memalloc->internalAlloc<4, CallbackThreadInitInfo>(&_initInfoVa);
-    _initInfo->ncall = (1 << 26) | index;
+    _initInfo->ncall = (NCALL_OPCODE << 26) | index;
     
     IForm bl {0};
     bl.OPCD.set(18);

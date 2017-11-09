@@ -1228,7 +1228,7 @@ void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
         return;
     }
     auto bytes = g_state.mm->load32(va);
-    g_state.mm->store32(va, 0x7fe00088);
+    g_state.mm->store32(va, 0x7fe00088, g_state.granule);
     _softBreaks.push_back({va, bytes});
 }
 
@@ -1247,7 +1247,7 @@ void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {
             QString::fromStdString(ssnprintf("there is no breakpoint at %x", va)));
         return;
     }
-    g_state.mm->store32(va, it->bytes);
+    g_state.mm->store32(va, it->bytes, g_state.granule);
     _softBreaks.erase(it);
 }
 

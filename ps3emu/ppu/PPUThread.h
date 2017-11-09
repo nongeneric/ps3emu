@@ -132,6 +132,8 @@ struct ps3call_info_t {
     std::function<void()> then;
 };
 
+class MainMemory;
+
 class PPUThread {
     std::function<void(PPUThread*, PPUThreadEvent, std::any)> _eventHandler;
     boost::thread _thread;
@@ -172,6 +174,7 @@ class PPUThread {
     uint32_t _VRSAVE;
     
     std::stack<ps3call_info_t> _ps3calls;
+    MainMemory* _mm;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -357,6 +360,14 @@ public:
     
     inline uint32_t getNIP() {
         return _NIP;
+    }
+
+    inline ReservationGranule* granule() {
+        return &_granule;
+    }
+
+    inline MainMemory* mm() {
+        return _mm;
     }
     
     void setId(unsigned id, std::string name);

@@ -43,7 +43,11 @@ namespace br = boost::range;
 
 typedef std::array<float, 4> glvec4_t;
 
-Rsx::Rsx() : _isFlipInProgress(false), _lastFlipTime(0), _transformFeedbackQuery(0) {}
+Rsx::Rsx()
+    : _isFlipInProgress(false),
+      _lastFlipTime(0),
+      _transformFeedbackQuery(0),
+      _idleCounter(boost::chrono::seconds(1)) {}
 
 Rsx::~Rsx() {
     shutdown();
@@ -78,7 +82,7 @@ void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
     INFO(rsx) << ssnprintf("setting rsx label at offset %x (%08x)",
                            offset,
                            GcmLabelBaseOffset + offset);
-    g_state.mm->store32(GcmLabelBaseOffset + offset, value);
+    g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
 }
 
 void Rsx::ChannelSetContextDmaSemaphore(uint32_t handle) {
@@ -94,7 +98,10 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     INFO(rsx) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    while (g_state.mm->load32(GcmLabelBaseOffset + offset) != value) ;
+    RangeCloser r(&_semaphoreAcquireCounter);
+    while (g_state.mm->load32(GcmLabelBaseOffset + offset) != value) {
+        ums_sleep(1);
+    }
     INFO(rsx) << ssnprintf("acquired");
 }
 
@@ -103,7 +110,7 @@ void Rsx::SemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("releasing semaphore %x at offset %x with value %x",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
-    g_state.mm->store32(GcmLabelBaseOffset + offset, value);
+    g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
 }
 
 void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
@@ -113,7 +120,7 @@ void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("releasing texture semaphore at offset %x with value %x",
                            GcmLabelBaseOffset + offset,
                            value);
-    g_state.mm->store32(GcmLabelBaseOffset + offset, value);
+    g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
 }
 
 void Rsx::ClearRectHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -598,6 +605,7 @@ void Rsx::invokeHandler(uint32_t descrEa, uint32_t arg) {
     fdescr descr;
     g_state.mm->readMemory(descrEa, &descr, sizeof(descr));
     assert(_callbackThread);
+    RangeCloser r(&_callbackCounter);
     _callbackThread->schedule({arg}, descr.tocBase, descr.va);
 }
 
@@ -654,6 +662,9 @@ void Rsx::DriverFlip(uint32_t value) {
     _context->pipeline.bind();
     
     _window.swapBuffers();
+
+    _fpsCounter.openRange();
+    _fpsCounter.closeRange();
     
     _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
     _context->frame++;
@@ -700,45 +711,164 @@ void Rsx::DriverFlip(uint32_t value) {
 }
 
 void Rsx::drawStats() {
-    _context->fpsCounter.report();
-    if (_context->fpsCounter.hasWrapped()) {
-        _context->statText.clear();
-        _context->uTextureUpdateDuration = 0;
+    _context->statText.clear();
 
-        static std::vector<PerfMapEntry> vec;
-        vec.resize(0);
-        decltype(PerfMapEntry::time) total = {};
-        for (auto& [offset, entry] : _perfMap) {
-            entry.offset = offset;
-            vec.push_back(entry);
-            total += entry.time;
-            entry.time = {};
-            entry.count = 0;
-        }
+    auto count = std::get<1>(_fpsCounter.value());
+    auto line = ssnprintf("FPS: %d", count);
+    _context->statText.line(0, 0, line);
 
-        auto line = ssnprintf("FPS: %d, texture update time: %lld, total = %d us",
-                              _context->fpsCounter.elapsed(),
-                              _context->uTextureUpdateDuration / 1000,
-                              duration_cast<microseconds>(total).count());
-        _context->statText.line(0, 0, line);
+    auto [idleSum, idleCount] = _idleCounter.value();
+    boost::chrono::duration<float> loadDuration = boost::chrono::seconds(1) - idleSum;
 
-        std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
-            return a.time > b.time;
-        });
-        int i = 0;
-        for (auto& entry : vec) {
-            auto us = duration_cast<microseconds>(entry.time).count();
-            line = ssnprintf("%-8x %-4d %-8d %-1.4f",
-                             entry.offset,
-                             entry.count,
-                             us,
-                             (float)us / (float)duration_cast<microseconds>(total).count());
-            _context->statText.line(line);
-            if (i++ == 10)
-                break;
-        }
+    _context->statText.line(ssnprintf("RSX load: %1.2f, wait count: %d",
+                                      loadDuration.count(),
+                                      idleCount));
+
+    static std::vector<std::tuple<uint32_t, int, counter_duration_t>> vec;
+    vec.clear();
+    for (auto& [offset, counter] : _perfMap) {
+        auto [sum, count] = counter.value();
+        vec.push_back({offset, count, sum});
     }
-    _context->statText.render(_window.width(), _window.height());
+    std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
+        return std::get<2>(a) > std::get<2>(b);
+    });
+
+    int i = 0;
+    for (auto& [offset, count, sum] : vec) {
+        line = ssnprintf("%-8x %-8d %-1.4f",
+                         offset,
+                         count,
+                         boost::chrono::duration<float>(sum).count());
+        _context->statText.line(line);
+        if (i++ == 10)
+            break;
+    }
+
+    {
+        auto [sum, count] = _textureCounter.value();
+        _context->statText.line(
+            300,
+            0,
+            ssnprintf("texture:       %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _fragmentShaderCounter.value();
+        _context->statText.line(
+            ssnprintf("fragment sh:   %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _vertexShaderCounter.value();
+        _context->statText.line(
+            ssnprintf("vertex sh:     %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+
+    {
+        auto [sum, count] = _fragmentShaderRetrieveCounter.value();
+        _context->statText.line(
+            ssnprintf("fragment retr: %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _vertexShaderRetrieveCounter.value();
+        _context->statText.line(
+            ssnprintf("vertex retr:   %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _textureCacheCounter.value();
+        _context->statText.line(
+            ssnprintf("textureCache:  %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _shaderCacheCounter.value();
+        _context->statText.line(
+            ssnprintf("shaderCache:   %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _resetCacheCounter.value();
+        _context->statText.line(
+            ssnprintf("resetCache:    %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _linkShaderCounter.value();
+        _context->statText.line(
+            ssnprintf("linkShader:    %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _vdaCounter.value();
+        _context->statText.line(
+            ssnprintf("vda:           %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _waitingForIdleCounter.value();
+        _context->statText.line(
+            ssnprintf("waitForIdle:   %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _indexArrayProcessingCounter.value();
+        _context->statText.line(
+            ssnprintf("index copying: %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _loadTextureCounter.value();
+        _context->statText.line(
+            ssnprintf("load texture:  %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _callbackCounter.value();
+        _context->statText.line(
+            ssnprintf("callback:      %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    {
+        auto [sum, count] = _semaphoreAcquireCounter.value();
+        _context->statText.line(
+            ssnprintf("semaphore:     %-8d  %-1.4f",
+                      count,
+                      boost::chrono::duration<float>(sum).count()));
+    }
+
+    _context->statText.render(_window.width(), _window.height(), {0,1,0,1}, {});
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count) {
@@ -773,6 +903,8 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count
 }
 
 bool Rsx::linkShaderProgram() {
+    RangeCloser r(&_linkShaderCounter);
+
     if (!_context->fragmentShader || !_context->vertexShader)
         return false;
     
@@ -841,20 +973,24 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     auto sourceBuffer = getBuffer(_context->indexArray.location);
     auto byteSize = _context->indexArray.type == GcmDrawIndexArrayType::_16 ? 2 : 4;
     assert(count * byteSize <= destBuffer->size());
-    
-    auto source = ((uintptr_t)sourceBuffer->mapped() + _context->indexArray.offset);
-    auto dest = destBuffer->mapped();
-    
-    if (byteSize == 2) {
-        for (auto i = first; i < count; ++i) {
-            *((uint16_t*)dest + i) = *((big_uint16_t*)source + i);
-        }
-    } else {
-        for (auto i = first; i < count; ++i) {
-            *((uint32_t*)dest + i) = *((big_uint32_t*)source + i);
+
+    {
+        RangeCloser r(&_indexArrayProcessingCounter);
+
+        auto source = ((uintptr_t)sourceBuffer->mapped() + _context->indexArray.offset);
+        auto dest = destBuffer->mapped();
+
+        if (byteSize == 2) {
+            for (auto i = first; i < count; ++i) {
+                *((uint16_t*)dest + i) = *((big_uint16_t*)source + i);
+            }
+        } else {
+            for (auto i = first; i < count; ++i) {
+                *((uint32_t*)dest + i) = *((big_uint32_t*)source + i);
+            }
         }
     }
-    
+
     if (_mode != RsxOperationMode::Replay) {
         UpdateBufferCache(_context->indexArray.location,
                           _context->indexArray.offset + first * byteSize,
@@ -916,10 +1052,17 @@ void Rsx::updateShaders() {
     
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
-        
+
+         _fragmentShaderRetrieveCounter.openRange();
+
         FragmentShaderCacheKey key{_context->fragmentBytecode, isMrt(_context->surface)};
         auto shader = _context->fragmentShaderCache.retrieve(key);
+
+        _fragmentShaderRetrieveCounter.closeRange();
+
         if (!shader) {
+            RangeCloser r(&_fragmentShaderCounter);
+
             auto sizes = getFragmentSamplerSizes(_context.get());
             INFO(libs) << ssnprintf("Updated fragment shader:\n%s\n%s",
                             PrintFragmentBytecode(&_context->fragmentBytecode[0]),
@@ -943,6 +1086,9 @@ void Rsx::updateShaders() {
     
     if (_context->vertexShaderDirty) {
         _context->vertexShaderDirty = false;
+
+        _vertexShaderRetrieveCounter.openRange();
+
         std::array<int, 4> samplerSizes = { 
             _context->vertexTextureSamplers[0].texture.dimension,
             _context->vertexTextureSamplers[1].texture.dimension,
@@ -962,7 +1108,11 @@ void Rsx::updateShaders() {
                                  _context->vertexInstructions.data() + size),
             arraySizes};
         auto shader = _context->vertexShaderCache.retrieve(key);
+
+        _vertexShaderRetrieveCounter.closeRange();
+
         if (!shader) {
+            RangeCloser r(&_vertexShaderCounter);
             INFO(rsx) << "updating vertex shader";
             INFO(rsx) << ssnprintf("updated vertex shader:\n%s\n%s",
                      PrintVertexBytecode(&_context->vertexInstructions[0]),
@@ -1041,15 +1191,13 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     auto updater = new SimpleCacheItemUpdater<GLTexture> {
         va, size,
         [=](auto t) {
-            auto past = steady_clock::now();
+            RangeCloser r(&_loadTextureCounter);
 //             std::vector<uint8_t> buf(size);
 //             g_state.mm->readMemory(va, &buf[0], size);
 //             t->update(buf);
-            INFO(libs, cache) << ssnprintf("updating texture %x, %x", va, size);
+
             auto buffer = this->getBuffer(info.location);
             _textureReader->loadTexture(info, buffer->handle(), t->levelHandles());
-            this->_context->uTextureUpdateDuration +=
-                duration_cast<microseconds>(steady_clock::now() - past).count();
         }
     };
     auto texture = new GLTexture(info);
@@ -1121,6 +1269,7 @@ GLenum gcmFragmentTextureWrapToOpengl(unsigned wrap) {
 }
 
 void Rsx::updateTextures() {
+    RangeCloser r(&_textureCounter);
     int i = 0;
     auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
     for (auto& sampler : _context->vertexTextureSamplers) {
@@ -1620,6 +1769,7 @@ GLPersistentCpuBuffer* Rsx::getBuffer(MemoryLocation location) {
 }
 
 void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
+    RangeCloser r(&_vdaCounter);
     auto uniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer.mapped();
     for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
         auto& format = _context->vertexDataArrays[i];
@@ -1648,13 +1798,14 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
 
 void Rsx::waitForIdle() {
     TRACE(waitForIdle);
+    RangeCloser r(&_waitingForIdleCounter);
     glFinish();
 }
 
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
     waitForIdle();
-    g_state.mm->store32(_context->semaphoreOffset + GcmLabelBaseOffset, value);
+    g_state.mm->store32(_context->semaphoreOffset + GcmLabelBaseOffset, value, g_state.granule);
     __sync_synchronize();
 }
 
@@ -1681,12 +1832,14 @@ uint32_t Rsx::getPut() {
 }
 
 void Rsx::watchTextureCache() {
+    RangeCloser r(&_textureCacheCounter);
     _context->textureCache.watch([&](auto va, auto size) {
         return g_state.mm->modificationMap()->marked(va, size);
     });
 }
 
 void Rsx::watchShaderCache() {
+    RangeCloser r(&_shaderCacheCounter);
     _context->fragmentShaderCache.watch([&](auto va, auto size) {
         return g_state.mm->modificationMap()->marked(va, size);
     });
@@ -1694,6 +1847,7 @@ void Rsx::watchShaderCache() {
 }
 
 void Rsx::resetCacheWatch() {
+    RangeCloser r(&_resetCacheCounter);
     _context->textureCache.watch([&](auto va, auto size) {
         g_state.mm->modificationMap()->reset(va, size);
         //assert(!g_state.mm->modificationMap()->marked(va, size));
@@ -2250,8 +2404,8 @@ void Rsx::GetReport(uint8_t type, uint32_t offset) {
     
     // TODO: report zpass/zcull
     auto ea = getReportDataAddressLocation(offset / 16, _context->reportLocation);
-    g_state.mm->store64(ea, g_state.proc->getTimeBaseNanoseconds().count());
-    g_state.mm->store64(ea + 8 + 4, 0);
+    g_state.mm->store64(ea, g_state.proc->getTimeBaseNanoseconds().count(), g_state.granule);
+    g_state.mm->store64(ea + 8 + 4, 0, g_state.granule);
     __sync_synchronize();
 }
 
@@ -2424,4 +2578,4 @@ void Rsx::PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex) {
     _context->pointSpriteControl.tex = tex;
 }
 
-RsxContext::RsxContext() : statText(20) {}
+RsxContext::RsxContext() : statText(14) {}

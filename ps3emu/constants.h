@@ -4,8 +4,8 @@
 
 typedef uint32_t ps3_uintptr_t;
 typedef int emu_void_t;
-typedef unsigned __int128 uint128_t;
-typedef __int128 int128_t;
+typedef unsigned __int128 slow_uint128_t;
+typedef __int128 slow_int128_t;
 static constexpr emu_void_t emu_void = 0;
 
 static constexpr ps3_uintptr_t EmuInternalArea = 0x10000000;

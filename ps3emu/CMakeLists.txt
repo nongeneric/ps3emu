@@ -61,7 +61,6 @@ set(SRC
     rsx/GLShader.cpp
     rsx/TextRenderer.cpp
     gcmviz/GcmDatabase.cpp
-    TimedCounter.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp
     execmap/InstrDb.cpp

@@ -311,16 +311,16 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         ch == MFC_Size || ch == MFC_TagID || ch == MFC_WrTagMask ||
         ch == MFC_WrTagUpdate || ch == SPU_WrEventMask)
         return;
-    
-    std::string datastr;
-    if (ch == SPU_WrEventMask || ch == SPU_WrEventAck) {
-        datastr = to_string((MfcEvent)data);
-    } else if (ch == MFC_WrTagUpdate) {
-        datastr = to_string((MfcTag)data);
-    } else {
-        datastr = ssnprintf("%x", data);
-    }
-    INFO(spu) << ssnprintf("write %s to channel %d (%s)", datastr, ch, classIdToString(ch));
+
+    INFO(spu) << ssnprintf("write %s to channel %d (%s)",
+                           ch == SPU_WrEventMask || ch == SPU_WrEventAck
+                               ? to_string((MfcEvent)data)
+                               : ch == MFC_WrTagUpdate ? to_string((MfcTag)data)
+                                                       : ssnprintf("%x", data)
+
+                               ,
+                           ch,
+                           classIdToString(ch));
 }
 
 uint32_t SPUChannels::read(unsigned ch) {

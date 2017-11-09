@@ -129,7 +129,7 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
     auto thread = g_state.proc->getSpuThread(id);
     big_uint64_t v = 0;
     memcpy((char*)&v + 8 - type, thread->ptr(address), type);
-    g_state.mm->store64(value, v);
+    g_state.mm->store64(value, v, g_state.granule);
     return CELL_OK;
 }
 
@@ -500,7 +500,7 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
     assert(entry); (void)entry;
     auto info = g_state.proc->getStolenInfo(index);
     auto ncall = g_state.mm->load32(info.va);
-    g_state.mm->store32(info.va, info.bytes);
+    g_state.mm->store32(info.va, info.bytes, g_state.granule);
 
     auto modules = g_state.proc->loadedModules();
     auto initSpursStubVa =
@@ -518,7 +518,7 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
                                               prx_symbol_type_t::function);
 
     g_state.th->ps3call(g_state.mm->load32(initSpursStubVa), [=] {
-        g_state.mm->store32(info.va, ncall);
+        g_state.mm->store32(info.va, ncall, g_state.granule);
         if (!spursTrace.enabled)
             return g_state.th->getGPR(3);
         spursTrace.buffer = (char*)g_state.memalloc->allocInternalMemory(

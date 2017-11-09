@@ -56,7 +56,7 @@ class ReservationMap {
         if (line->granules.empty())
             return;
         auto e = end(line->granules);
-        auto it = std::find(begin(line->granules), e, exceptGranule);
+        auto contains = std::find(begin(line->granules), e, exceptGranule) != e;
         for (auto granule : line->granules) {
             if (granule == exceptGranule)
                 continue;
@@ -66,8 +66,9 @@ class ReservationMap {
             granule->line = nullptr;
         }
         line->granules.clear();
-        if (it != e)
-            line->granules.push_back(*it);
+        if (contains) {
+            line->granules.push_back(exceptGranule);
+        }
     }
     
 public:

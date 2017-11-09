@@ -75,7 +75,7 @@ class MainMemory {
     void writeSpuThreadVa(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readRawSpuVa(ps3_uintptr_t va);
     bool writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len);
-    bool readSpecialMemory(ps3_uintptr_t va, void* buf, uint len);
+    bool readSpecialMemory(ps3_uintptr_t va, void* buf);
     void dealloc();
 
 public:
@@ -93,52 +93,99 @@ public:
     void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
     uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
     
-    uint8_t load8(ps3_uintptr_t va, bool validate = true);
-    uint16_t load16(ps3_uintptr_t va, bool validate = true);
-    uint32_t load32(ps3_uintptr_t va, bool validate = true);
-    uint64_t load64(ps3_uintptr_t va, bool validate = true);
-    uint128_t load128(ps3_uintptr_t va, bool validate = true);
-    
-    void store8(ps3_uintptr_t va, uint8_t val);
-    void store16(ps3_uintptr_t va, uint16_t val);
-    void store32(ps3_uintptr_t va, uint32_t val);
-    void store64(ps3_uintptr_t va, uint64_t val);
-    void store128(ps3_uintptr_t va, uint128_t val);
-    
-    template <auto Len>
-    typename IntTraits<Len>::Type load(ps3_uintptr_t va) {
-        if constexpr(Len == 1)
-            return load8(va);
-        if constexpr(Len == 2)
-            return load16(va);
-        if constexpr(Len == 4)
-            return load32(va);
-        if constexpr(Len == 8)
-            return load64(va);
-        if constexpr(Len == 16)
-            return load128(va);
+    template<int Len>
+    typename IntTraits<Len>::Type load(ps3_uintptr_t va, bool validate) {
+        if constexpr(Len == 4) {
+            uint32_t special;
+            if (readSpecialMemory(va, &special))
+                return endian_reverse(special);
+        }
+        if (validate)
+            this->validate(va, Len, false);
+        VirtualAddress split { va };
+        auto& page = _pages[split.page.u()];
+        auto offset = split.offset.u();
+        auto ptr = page.ptr + offset;
+        if constexpr(Len == 16) {
+            auto val = _mm_lddqu_si128((__m128i*)ptr);
+            return _mm_shuffle_epi8(val, ENDIAN_SWAP_MASK128);
+        } else {
+            return *(typename IntTraits<Len>::BigType*)ptr;
+        }
+    }
+
+    inline uint8_t load8(ps3_uintptr_t va, bool validate = true) {
+        return load<1>(va, validate);
+    }
+
+    inline uint16_t load16(ps3_uintptr_t va, bool validate = true) {
+        return load<2>(va, validate);
+    }
+
+    inline uint32_t load32(ps3_uintptr_t va, bool validate = true) {
+        return load<4>(va, validate);
+    }
+
+    inline uint64_t load64(ps3_uintptr_t va, bool validate = true) {
+        return load<8>(va, validate);
+    }
+
+    inline uint128_t load128(ps3_uintptr_t va, bool validate = true) {
+        return load<16>(va, validate);
+    }
+
+    template<int Len>
+    void store(ps3_uintptr_t va, typename IntTraits<Len>::Type value, ReservationGranule* granule) {
+        if constexpr(Len == 4) {
+            auto reversed = endian_reverse(value);
+            if (writeSpecialMemory(va, &reversed, Len))
+                return;
+        }
+        validate(va, Len, false);
+        VirtualAddress split { va };
+        auto pageIndex = split.page.u();
+        auto& page = _pages[pageIndex];
+        auto offset = split.offset.u();
+        auto ptr = page.ptr.load();
+        ptr = ptr + offset;
+        auto line = _rmap.lock<Len>(va);
+        if constexpr(Len == 16) {
+            value = _mm_shuffle_epi8(value, ENDIAN_SWAP_MASK128);
+            _mm_store_si128((__m128i*)ptr, value);
+        } else {
+            *(typename IntTraits<Len>::BigType*)ptr = value;
+        }
+        _rmap.destroyExcept(line, granule);
+        _rmap.unlock(line);
+        _mmap.mark<Len>(va);
     }
     
-    template <auto Len>
-    void store(ps3_uintptr_t va, typename IntTraits<Len>::Type val) {
-        if constexpr(Len == 1)
-            store8(va, val);
-        if constexpr(Len == 2)
-            store16(va, val);
-        if constexpr(Len == 4)
-            store32(va, val);
-        if constexpr(Len == 8)
-            store64(va, val);
-        if constexpr(Len == 16)
-            store128(va, val);
+    void store8(ps3_uintptr_t va, uint8_t value, ReservationGranule* granule) {
+        store<1>(va, value, granule);
+    }
+
+    void store16(ps3_uintptr_t va, uint16_t value, ReservationGranule* granule) {
+        store<2>(va, value, granule);
+    }
+
+    void store32(ps3_uintptr_t va, uint32_t value, ReservationGranule* granule) {
+        store<4>(va, value, granule);
+    }
+
+    void store64(ps3_uintptr_t va, uint64_t value, ReservationGranule* granule) {
+        store<8>(va, value, granule);
+    }
+
+    void store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule) {
+        store<16>(va, value, granule);
     }
     
-    inline void storef(ps3_uintptr_t va, float value) {
-        store32(va, union_cast<float, uint32_t>(value));
+    inline void storef(ps3_uintptr_t va, float value, ReservationGranule* granule) {
+        store32(va, union_cast<float, uint32_t>(value), granule);
     }
     
-    inline void stored(ps3_uintptr_t va, double value) {
-        store64(va, union_cast<double, uint64_t>(value));
+    inline void stored(ps3_uintptr_t va, double value, ReservationGranule* granule) {
+        store64(va, union_cast<double, uint64_t>(value), granule);
     }
     
     inline float loadf(ps3_uintptr_t va) {

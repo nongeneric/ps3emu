@@ -8,6 +8,7 @@
 #include "ps3emu/BitField.h"
 #include "ps3emu/utils/SpinLock.h"
 #include "ps3emu/shaders/ShaderGenerator.h"
+#include "ps3emu/TimedCounter.h"
 #include "GLQuery.h"
 #include "GLFramebuffer.h"
 #include "RsxTextureReader.h"
@@ -209,12 +210,6 @@ struct GcmCommandReplayInfo {
     std::function<void()> action;
 };
 
-struct PerfMapEntry {
-    uint32_t offset = 0;;
-    uint32_t count = 0;
-    typename boost::chrono::high_resolution_clock::duration time = {};
-};
-
 struct RsxContext;
 class MainMemory;
 class Process;
@@ -228,16 +223,16 @@ class GLPersistentCpuBuffer;
 class CallbackThread;
 class Rsx {
     static RsxOperationMode _mode;
-    uint32_t _get = 0;
-    uint32_t _put = 0;
+    std::atomic<uint32_t> _get = 0;
+    std::atomic<uint32_t> _put = 0;
     uint32_t _ref = 0;
     uint32_t _ret = 0;
     std::atomic<bool> _isFlipInProgress;
     std::atomic<int64_t> _lastFlipTime;
     bool _shutdown = false;
     bool _initialized = false;
-    mutable SpinLock _mutex;
-    boost::condition_variable_any _cv;
+    mutable boost::mutex _mutex;
+    boost::condition_variable _cv;
     mutable boost::mutex _initMutex;
     boost::condition_variable _initCv;
     std::unique_ptr<boost::thread> _thread;
@@ -253,9 +248,26 @@ class Rsx {
     bool _frameCapturePending = false;
     bool _shortTrace = false;
     RsxTextureReader* _textureReader;
-    std::map<uint32_t, PerfMapEntry> _perfMap;
+    std::map<uint32_t, TimedCounter> _perfMap;
     std::unique_ptr<CallbackThread> _callbackThread;
     GLQuery _transformFeedbackQuery;
+    TimedCounter _fpsCounter;
+    TimedCounter _idleCounter;
+    TimedCounter _textureCounter;
+    TimedCounter _vertexShaderCounter;
+    TimedCounter _fragmentShaderCounter;
+    TimedCounter _vertexShaderRetrieveCounter;
+    TimedCounter _fragmentShaderRetrieveCounter;
+    TimedCounter _textureCacheCounter;
+    TimedCounter _shaderCacheCounter;
+    TimedCounter _resetCacheCounter;
+    TimedCounter _linkShaderCounter;
+    TimedCounter _vdaCounter;
+    TimedCounter _waitingForIdleCounter;
+    TimedCounter _indexArrayProcessingCounter;
+    TimedCounter _loadTextureCounter;
+    TimedCounter _callbackCounter;
+    TimedCounter _semaphoreAcquireCounter;
     
     void watchTextureCache();
     void watchShaderCache();

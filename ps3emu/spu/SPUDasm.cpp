@@ -1690,7 +1690,7 @@ PRINT(rotqbi) {
     auto& rt = th->r(_rt); \
     auto u128 = make128(ra.dw<0>(), ra.dw<1>()); \
     auto sh = (uint32_t)rb.w<0>() & 0b111; \
-    u128 = rol<uint128_t>(u128, sh); \
+    u128 = rol<slow_uint128_t>(u128, sh); \
     rt.set_dw(0,  u128 >> 64); \
     rt.set_dw(1,  u128); \
 }
@@ -1706,7 +1706,7 @@ PRINT(rotqbii) {
     auto& rt = th->r(_rt); \
     auto u128 = make128(ra.dw<0>(), ra.dw<1>()); \
     auto sh = _i7 & 0b111; \
-    u128 = rol<uint128_t>(u128, sh); \
+    u128 = rol<slow_uint128_t>(u128, sh); \
     rt.set_dw(0,  u128 >> 64); \
     rt.set_dw(1,  u128); \
 }
@@ -2751,7 +2751,7 @@ PRINT(cuflt) {
 #define _cuflt(_ra, _rt, _i8) { \
     auto ra = th->r(_ra); \
     auto& rt = th->r(_rt); \
-    uint128_t scale = 1; \
+    slow_uint128_t scale = 1; \
     scale <<= 155 - _i8; \
     for (int i = 0; i < 4; ++i) { \
         rt.set_fs(i, (float)(uint32_t)ra.w(i) / scale); \

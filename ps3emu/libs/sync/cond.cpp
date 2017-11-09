@@ -7,14 +7,15 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <set>
 
 namespace {
     struct cv_info_t {
         pthread_cond_t cv;
         PthreadMutexInfo* m;
         std::string name;
-        std::vector<sys_ppu_thread_t> waiters;
-        std::vector<sys_ppu_thread_t> next;
+        std::list<sys_ppu_thread_t> waiters;
+        std::list<sys_ppu_thread_t> next;
         boost::mutex waitersMutex;
     };
     

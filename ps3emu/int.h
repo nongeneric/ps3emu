@@ -1,18 +1,19 @@
 #pragma once
 
 #include <stdint.h>
+#include <x86intrin.h>
 #include <boost/endian/arithmetic.hpp>
 
-using uint128_t = __uint128_t;
-using int128_t = __int128_t;
+static const __m128i ENDIAN_SWAP_MASK128 =
+    _mm_set_epi8(
+        0, 1, 2, 3,
+        4, 5, 6, 7,
+        8, 9, 10, 11,
+        12, 13, 14, 15
+    );
 
-namespace boost { namespace endian {
-    typedef endian_arithmetic<order::big, __int128_t, 128> big_int128_t;
-    typedef endian_arithmetic<order::big, __uint128_t, 128> big_uint128_t;
-    inline uint128_t endian_reverse(uint128_t x) BOOST_NOEXCEPT {
-        return *(big_uint128_t*)&x;
-    }
-}}
+using uint128_t = __m128i;
+using int128_t = __m128i;
 
 using namespace boost::endian;
 
@@ -45,8 +46,8 @@ struct IntTraits<8> {
 
 template<>
 struct IntTraits<16> {
-    using BigType = big_uint128_t;
-    using Type = big_uint128_t;
+    using BigType = uint128_t;
+    using Type = uint128_t;
 };
 
 constexpr uint32_t constexpr_log2(uint32_t n, uint32_t p = 0) {

@@ -65,8 +65,14 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         assert(n != 0);\
         return read(get + 4 * n);\
     })(x)
+
+    auto offset = header.offset.u();
     
-    auto past = high_resolution_clock::now();
+    RangeCloser closer;
+    if (log_should(log_warning, log_rsx, log_perf)) {
+        closer = RangeCloser(&_perfMap[offset]);
+    }
+
     
     auto parseTextureAddress = [&](int argi, int index) {
         union {
@@ -152,7 +158,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
     
     if (header.val == 0) {
         assert(header.count.u() == 0);
-        INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, _put);
+        INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, _put.load());
         return 4;
     }
     if (header.prefix.u() == 1) {
@@ -177,7 +183,7 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         _ret = 0;
         return offset;
     }
-    auto offset = header.offset.u();
+
     auto len = 4;
     const char* name = nullptr;
     
@@ -1633,41 +1639,37 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
     len = (header.count.u() + 1) * 4;
     assert(len != 0);
     
-    if (log_should(log_warning, log_rsx, log_perf)) {
-        auto& entry = _perfMap[offset];
-        entry.count++;
-        entry.time += high_resolution_clock::now() - past;
-    }
-    
     return len;
 }
 
 void Rsx::setPut(uint32_t put) {
-    boost::unique_lock<SpinLock> lock(_mutex);
-    INFO(rsx) << ssnprintf("setting put = %x", put);
+    //auto lock = boost::unique_lock(_mutex);
+    //INFO(rsx) << ssnprintf("setting put = %x", put);
     _put = put;
-    _cv.notify_all();
+    //_cv.notify_all();
 }
 
 void Rsx::setGet(uint32_t get) {
-    boost::unique_lock<SpinLock> lock(_mutex);
+    //auto lock = boost::unique_lock(_mutex);
     _get = get;
-    _cv.notify_all();
+    //_cv.notify_all();
 }
 
 uint32_t Rsx::getRef() {
-    boost::unique_lock<SpinLock> lock(_mutex);
+    //auto lock = boost::unique_lock(_mutex);
     return _ref;
 }
 
 void Rsx::setRef(uint32_t ref) {
-    boost::unique_lock<SpinLock> lock(_mutex);
+    //auto lock = boost::unique_lock(_mutex);
     _ref = ref;
-    _cv.notify_all();
+    //_cv.notify_all();
 }
 
 void Rsx::loop() {
     initGcm();
+    _get = 0;
+    _put = 0;
     _ret = 0;
     _ref = 0xffffffff;
     _isFlipInProgress = false;
@@ -1682,25 +1684,27 @@ void Rsx::loop() {
 }
 
 void Rsx::runLoop() {
-    boost::unique_lock<SpinLock> lock(_mutex);
+    //auto lock = boost::unique_lock(_mutex);
     auto read = [&](uint32_t get) {
         return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get));
     };
     for (;;) {
         while (_get != _put || _ret) {
-            auto localGet = _get;
-            lock.unlock();
+            _idleCounter.closeRange();
+            auto localGet = _get.load();
+            //lock.unlock();
             auto len = interpret(localGet, read);
-            lock.lock();
+            //lock.lock();
             _get += len;
         }
         if (_shutdown && _get == _put) {
-            lock.unlock();
+            //lock.unlock();
             waitForIdle();
             return;
         }
-        _cv.wait(lock);
-        INFO(rsx) << "rsx loop update received";
+        _idleCounter.openRange();
+        //_cv.wait(lock);
+        //INFO(rsx) << "rsx loop update received";
     }
 }
 
@@ -1741,7 +1745,7 @@ void Rsx::shutdown() {
     if (!_shutdown) {
         INFO(rsx) << "waiting for shutdown";
         {
-            boost::unique_lock<SpinLock> lock(_mutex);
+            auto lock = boost::unique_lock(_mutex);
             _shutdown = true;
             _cv.notify_all();
         }
@@ -1755,7 +1759,7 @@ void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
     MethodHeader header { 0 };
     header.prefix.set(1);
     header.jumpoffset.set(destOffset);
-    g_state.mm->store32(va, header.val);
+    g_state.mm->store32(va, header.val, g_state.granule);
 }
 
 void Rsx::sendCommand(GcmCommandReplayInfo info) {

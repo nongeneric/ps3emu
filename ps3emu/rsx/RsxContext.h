@@ -219,8 +219,6 @@ struct RsxContext {
     uint32_t feedbackCount = 0;
     uint32_t feedbackMode;
     uint32_t frame = 0;
-    TimedCounter fpsCounter;
-    uint64_t uTextureUpdateDuration = 0;
     uint32_t commandNum = 0;
     SurfaceInfo surface;
     ViewPortInfo viewPort;

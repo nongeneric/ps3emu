@@ -6,6 +6,7 @@
 #include "ps3emu/state.h"
 #include "ps3emu/int.h"
 #include "ps3emu/ModificationMap.h"
+#include "ps3emu/TimedCounter.h"
 #include <vector>
 #include <atomic>
 #include <catch/catch.hpp>
@@ -104,23 +105,15 @@ TEST_CASE("read_write_memory") {
     mm.readMemory(0x400, &read, 4);
     REQUIRE(original == read);
     
-    mm.store32(0x400, (uint32_t)0x1122334455667788);
+    mm.store32(0x400, (uint32_t)0x1122334455667788, g_state.granule);
     REQUIRE(mm.load32(0x400) == 0x55667788);
-}
-
-TEST_CASE("read_memory_128") {
-    MainMemory mm;
-    mm.mark(0, 0x1000, false, "");
-    mm.setMemory(0x400, 0, 16);
-    uint128_t i128 = 0;
-    REQUIRE((mm.load128(0x400) == i128));
 }
 
 TEST_CASE("provide_memory") {
     MainMemory mm;
     mm.mark(0, DefaultMainMemoryPageSize * 10, false, "");
     mm.setMemory(DefaultMainMemoryPageSize * 5 + 0x300, 0, 1);
-    mm.store32(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344);
+    mm.store32(DefaultMainMemoryPageSize * 5 + 0x300, 0x11223344, g_state.granule);
     std::vector<uint8_t> vec(DefaultMainMemoryPageSize * 4);
     mm.provideMemory(DefaultMainMemoryPageSize * 2, DefaultMainMemoryPageSize * 4, vec.data());
     REQUIRE( mm.load32(DefaultMainMemoryPageSize * 5 + 0x300) == 0x11223344 );
@@ -253,9 +246,9 @@ TEST_CASE("fixed loads") {
         i++;
     };
     
-    mm.store64(32,       0x55ff44ff332211ff);
-    mm.store64(0x300000, 0xeeffddffccbbaaff);
-    mm.store64(0x300020, 0xaaffbbffccddeeff);
+    mm.store64(32,       0x55ff44ff332211ff, g_state.granule);
+    mm.store64(0x300000, 0xeeffddffccbbaaff, g_state.granule);
+    mm.store64(0x300020, 0xaaffbbffccddeeff, g_state.granule);
     
     next();
     REQUIRE( th.getGPR(3) == 0x0000000000000055 );
@@ -287,9 +280,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(8) == 0x000000000000eeff );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store64(32,       0xff11223344556677);
-    mm.store64(0x300000, 0xffaabbccddee9988);
-    mm.store64(0x300020, 0xff00aa11bb22cc33);
+    mm.store64(32,       0xff11223344556677, g_state.granule);
+    mm.store64(0x300000, 0xffaabbccddee9988, g_state.granule);
+    mm.store64(0x300020, 0xff00aa11bb22cc33, g_state.granule);
     
     next();
     REQUIRE( th.getGPR(3) == 0xffffffffffffff11 );
@@ -306,9 +299,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(8) == 0xffffffffffffffaa );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store64(32,       0x55ff44ff332211ff);
-    mm.store64(0x300000, 0xeeffddffccbbaaff);
-    mm.store64(0x300020, 0xaaffbbffccddeeff);
+    mm.store64(32,       0x55ff44ff332211ff, g_state.granule);
+    mm.store64(0x300000, 0xeeffddffccbbaaff, g_state.granule);
+    mm.store64(0x300020, 0xaaffbbffccddeeff, g_state.granule);
     
     next();
     REQUIRE( th.getGPR(3) == 0x0000000055ff44ff );
@@ -325,9 +318,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(8) == 0x00000000eeffddff );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store64(32,       0xff11223344556677);
-    mm.store64(0x300000, 0xffaabbccddee9988);
-    mm.store64(0x300020, 0xff00aa11bb22cc33);
+    mm.store64(32,       0xff11223344556677, g_state.granule);
+    mm.store64(0x300000, 0xffaabbccddee9988, g_state.granule);
+    mm.store64(0x300020, 0xff00aa11bb22cc33, g_state.granule);
     
     next();
     REQUIRE( th.getGPR(3) == 0xffffffffff112233 );
@@ -341,9 +334,9 @@ TEST_CASE("fixed loads") {
     REQUIRE( th.getGPR(7) == 0xffffffffffaabbcc );
     REQUIRE( th.getGPR(1) == 0x300000 );
     
-    mm.store64(32,       0x55ff44ff332211ff);
-    mm.store64(0x300000, 0xeeffddffccbbaaff);
-    mm.store64(0x300020, 0xaaffbbffccddeeff);
+    mm.store64(32,       0x55ff44ff332211ff, g_state.granule);
+    mm.store64(0x300000, 0xeeffddffccbbaaff, g_state.granule);
+    mm.store64(0x300020, 0xaaffbbffccddeeff, g_state.granule);
     
     next();
     REQUIRE( th.getGPR(3) == 0x55ff44ff332211ff );
@@ -520,8 +513,8 @@ TEST_CASE("fixed load store with reversal") {
     mm.setMemory(0x300010, 0, 100);
     th.setGPR(1, 0x300010);
     th.setGPR(2, 0x40);
-    mm.store64(0x300010, 0x1122334455667788);
-    mm.store64(0x300050, 0xaabbccddeeff0099);
+    mm.store64(0x300010, 0x1122334455667788, g_state.granule);
+    mm.store64(0x300050, 0xaabbccddeeff0099, g_state.granule);
     
     ppu_dasm<DasmMode::Emulate>(instr + 0*4, 0, &th);
     REQUIRE( th.getGPR(3) == 0x2211 );
@@ -1215,7 +1208,7 @@ TEST_CASE("lwz r27,112(r1)") {
     auto mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 8);
-    mm.store64(mem, 0x11223344aabbccdd);
+    mm.store64(mem, 0x11223344aabbccdd, g_state.granule);
     th.setGPR(1, mem - 112);
     uint8_t instr[] = { 0x83, 0x61, 0x00, 0x70 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
@@ -1261,8 +1254,8 @@ TEST_CASE("float loads") {
     auto mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 16);
-    mm.store64(mem,     0x3f92339c00000000); // float
-    mm.store64(mem + 8, 0x3ff2467381d7dbf5); // double
+    mm.store64(mem,     0x3f92339c00000000, g_state.granule); // float
+    mm.store64(mem + 8, 0x3ff2467381d7dbf5, g_state.granule); // double
     uint8_t instr[] = { 
         0xc0, 0x21, 0x00, 0x00, 0x7c, 0x41, 0x04, 0x2e, 0xc4, 0x61, 0x00,
         0x00, 0x7c, 0x81, 0x04, 0x6e, 0xc8, 0xa2, 0x00, 0x00, 0x7c, 0xc2,
@@ -1908,7 +1901,7 @@ TEST_CASE("ppu_failed_store_should_not_destroy_reservation") {
         mm.loadReserve<4>(0x10000, &buf);
         // same-thread store invalidates the reservation for a cond store of
         // any other thread, but doesn't destroy the reservation
-        mm.store32(0x10000, 0xddccbbaa);
+        mm.store32(0x10000, 0xddccbbaa, g_state.granule);
         
         step1 = true;
         while (!step2) ;
@@ -1981,4 +1974,18 @@ TEST_CASE("ppu_lwarx_should_not_destroy_reservations_of_other_threads") {
     
     th1.join();
     th2.join();
+}
+
+TEST_CASE("TimedCounter1") {
+    counter_point_t point;
+    TimedCounter tc;
+    tc.openRange(point);
+    tc.closeRange(point + boost::chrono::milliseconds(200));
+    tc.openRange(point + boost::chrono::milliseconds(800));
+    tc.closeRange(point + boost::chrono::milliseconds(1000));
+    {
+        auto [sum, count] = tc.value();
+        REQUIRE(count == 2);
+        REQUIRE((sum == boost::chrono::milliseconds(400)));
+    }
 }

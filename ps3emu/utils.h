@@ -75,14 +75,14 @@ private:
     D _d;
 };
 
-inline uint128_t make128(uint64_t low, uint64_t high) {
-    uint128_t i = low;
+inline slow_uint128_t make128(uint64_t low, uint64_t high) {
+    slow_uint128_t i = low;
     i <<= 64;
     return i | high;
 }
 
-inline uint128_t make128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
-    uint128_t i = w0;
+inline slow_uint128_t make128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
+    slow_uint128_t i = w0;
     i <<= 32;
     i |= w1;
     i <<= 32;
@@ -90,20 +90,6 @@ inline uint128_t make128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
     i <<= 32;
     i |= w3;
     return i;
-}
-
-inline void split128(uint128_t i, uint32_t* us) {
-    us[3] = i & 0xffffffff;
-    i >>= 32;
-    us[2] = i & 0xffffffff;
-    i >>= 32;
-    us[1] = i & 0xffffffff;
-    i >>= 32;
-    us[0] = i & 0xffffffff;
-}
-
-inline void split128(uint128_t i, float* fs) {
-    split128(i, (uint32_t*)fs);
 }
 
 void ums_sleep(uint64_t microseconds);

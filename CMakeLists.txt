@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 project(ps3emu-root)
-include_directories(${root_SOURCE_DIR})
+include_directories(${ps3emu-root_SOURCE_DIR})
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -44,7 +44,7 @@ set(EMU_CONFIGURATION_DEBUG   1)
 set(EMU_CONFIGURATION_TESTS   1)
 set(EMU_CONFIGURATION_PAUSE   1)
 set(EMU_CONFIGURATION_LOG     1)
-set(EMU_CONFIGURATION_EXECMAP 1)
+set(EMU_CONFIGURATION_EXECMAP 0)
 
 if(${EMU_CONFIGURATION_LOG})
     add_definitions(-DLOG_ENABLED)
