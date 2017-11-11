@@ -122,6 +122,16 @@ SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread, SPUThread* 
 #define LTS(x) ((x >> 32ul) & 0x7fffful)
 #define LEAL(x) (x & 0xfffffffful)
 
+void SPUChannels::handleGranuleNotification(ReservationGranule* granule) {
+    if (granule != g_state.granule) {
+        _event.set_or((unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
+    }
+}
+
+void handleGranuleNotificationWrapper(uintptr_t arg1, uintptr_t arg2) {
+    ((SPUChannels*)arg1)->handleGranuleNotification((ReservationGranule*)arg2);
+}
+
 void SPUChannels::command(uint32_t word) {
     auto disable = DisableSuspend(_sthread);
     union {
@@ -156,12 +166,11 @@ void SPUChannels::command(uint32_t word) {
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
             assert(size == 0x80);
-            auto granule = g_state.granule;
-            _mm->loadReserve<128>(eal, lsa, [=] {
-                if (granule != g_state.granule) {
-                    _event.set_or((unsigned)MfcEvent::MFC_LLR_LOST_EVENT);
-                }
-            });
+            _mm->loadReserve<128>(eal,
+                                  lsa,
+                                  handleGranuleNotificationWrapper,
+                                  (uintptr_t)this,
+                                  (uintptr_t)g_state.granule);
             // reservation always succeeds
             _channels[MFC_RdAtomicStat] |= 0b100; // G
             log();

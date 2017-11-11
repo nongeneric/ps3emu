@@ -109,8 +109,14 @@ public:
         if constexpr(Len == 16) {
             auto val = _mm_lddqu_si128((__m128i*)ptr);
             return _mm_shuffle_epi8(val, ENDIAN_SWAP_MASK128);
+        } else if constexpr(Len == 8) {
+            return __builtin_bswap64(*(uint64_t*)ptr);
+        } else if constexpr(Len == 4) {
+            return __builtin_bswap32(*(uint32_t*)ptr);
+        } else if constexpr(Len == 2) {
+            return __builtin_bswap16(*(uint16_t*)ptr);
         } else {
-            return *(typename IntTraits<Len>::BigType*)ptr;
+            return *(uint8_t*)ptr;
         }
     }
 
@@ -152,31 +158,37 @@ public:
         if constexpr(Len == 16) {
             value = _mm_shuffle_epi8(value, ENDIAN_SWAP_MASK128);
             _mm_store_si128((__m128i*)ptr, value);
+        } else if constexpr(Len == 8) {
+            *(uint64_t*)ptr = __builtin_bswap64(value);
+        } else if constexpr(Len == 4) {
+            *(uint32_t*)ptr = __builtin_bswap32(value);
+        } else if constexpr(Len == 2) {
+            *(uint16_t*)ptr = __builtin_bswap16(value);
         } else {
-            *(typename IntTraits<Len>::BigType*)ptr = value;
+            *(uint8_t*)ptr = value;
         }
         _rmap.destroyExcept(line, granule);
         _rmap.unlock(line);
         _mmap.mark<Len>(va);
     }
     
-    void store8(ps3_uintptr_t va, uint8_t value, ReservationGranule* granule) {
+    inline void store8(ps3_uintptr_t va, uint8_t value, ReservationGranule* granule) {
         store<1>(va, value, granule);
     }
 
-    void store16(ps3_uintptr_t va, uint16_t value, ReservationGranule* granule) {
+    inline void store16(ps3_uintptr_t va, uint16_t value, ReservationGranule* granule) {
         store<2>(va, value, granule);
     }
 
-    void store32(ps3_uintptr_t va, uint32_t value, ReservationGranule* granule) {
+    inline void store32(ps3_uintptr_t va, uint32_t value, ReservationGranule* granule) {
         store<4>(va, value, granule);
     }
 
-    void store64(ps3_uintptr_t va, uint64_t value, ReservationGranule* granule) {
+    inline void store64(ps3_uintptr_t va, uint64_t value, ReservationGranule* granule) {
         store<8>(va, value, granule);
     }
 
-    void store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule) {
+    inline void store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule) {
         store<16>(va, value, granule);
     }
     
@@ -205,7 +217,9 @@ public:
     template <auto Len>
     inline void loadReserve(ps3_uintptr_t va,
                             void* buf,
-                            lost_notify_t notify = {}) {
+                            lost_notify_t notify = 0,
+                            uintptr_t arg1 = 0,
+                            uintptr_t arg2 = 0) {
         static_assert(Len == 4 || Len == 8 || Len == 128);
         if constexpr(Len == 4)
             EMU_ASSERT((va & 0b11) == 0);
@@ -233,7 +247,9 @@ public:
         memcpy(buf, ptr, Len);
         granule->line = line.line;
         granule->notify = notify;
-        line.line->granules.push_back(granule);
+        granule->arg1 = arg1;
+        granule->arg2 = arg2;
+        line.line->granules.insert(granule);
         _rmap.unlock(line);
     }
 
@@ -244,9 +260,7 @@ public:
         assert(!line.nextLine && "only a single line can be reserved");
         if constexpr(!Unconditional)
             assert(g_state.granule);
-        if (Unconditional ||
-            std::find(begin(line.line->granules), end(line.line->granules), g_state.granule) !=
-                end(line.line->granules)) {
+        if (Unconditional || line.line->granules.exists(g_state.granule)) {
             auto ptr = getMemoryPointer(va, Len);
             memcpy(ptr, buf, Len);
             _rmap.destroySingleLine(line.line);

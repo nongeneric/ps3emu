@@ -202,6 +202,7 @@ public:
     void set(unsigned value);
 };
 
+struct ReservationGranule;
 class MainMemory;
 class SPUThread;
 class SPUChannels {
@@ -217,6 +218,8 @@ class SPUChannels {
     SpuEvent _event;
     SpuSignal _snr1, _snr2;
     void command(uint32_t word);
+    void handleGranuleNotification(ReservationGranule* granule);
+    friend void handleGranuleNotificationWrapper(uintptr_t arg1, uintptr_t arg2);
     
 public:
     SPUChannels(MainMemory* mm, ISPUChannelsThread* thread, SPUThread* sthread = nullptr);

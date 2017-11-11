@@ -12,25 +12,102 @@
 
 struct ReservationGranule;
 
-using lost_notify_t = std::function<void()>;
+using lost_notify_t = void(*)(uintptr_t arg1, uintptr_t arg2);
+
+template<typename ReservationGranule>
+class ReservationGranuleArray {
+    std::array<ReservationGranule*, 64> _arr;
+    size_t _size = 0;
+
+    void notify(ReservationGranule* granule) {
+        if (granule->notify) {
+            granule->notify(granule->arg1, granule->arg2);
+        }
+        granule->notify = 0;
+    }
+
+public:
+    inline ReservationGranuleArray() {
+        std::fill(begin(_arr), end(_arr), nullptr);
+    }
+
+    inline void insert(ReservationGranule* granule) {
+        for (auto i = 0u; i < _size; ++i) {
+            auto& g = _arr[i];
+            if (!g) {
+                g = granule;
+                return;
+            }
+        }
+        _size++;
+        _arr[_size - 1] = granule;
+    }
+
+    inline void clear() {
+        for (auto i = 0u; i < _size; ++i) {
+            auto granule = _arr[i];
+            if (granule) {
+                notify(granule);
+                granule->line = nullptr;
+            }
+        }
+        _size = 0;
+    }
+
+    inline void clearExcept(ReservationGranule* exceptGranule) {
+        auto newSize = 0u;
+        for (auto i = 0u; i < _size; ++i) {
+            auto& granule = _arr[i];
+            if (granule) {
+                if (granule == exceptGranule) {
+                    newSize = i + 1;
+                } else {
+                    notify(granule);
+                    granule->line = nullptr;
+                    granule = nullptr;
+                }
+            }
+        }
+        _size = newSize;
+    }
+
+    inline void clearOne(ReservationGranule* targetGranule) {
+        for (auto i = 0u; i < _size; ++i) {
+            auto& granule = _arr[i];
+            if (granule == targetGranule) {
+                notify(granule);
+                granule->line = nullptr;
+                granule = nullptr;
+            }
+        }
+    }
+
+    inline bool exists(ReservationGranule* granule) {
+        for (auto i = 0u; i < _size; ++i) {
+            if (_arr[i] == granule)
+                return true;
+        }
+        return false;
+    }
+};
 
 struct ReservationLine {
     SpinLock lock; 
-    std::vector<ReservationGranule*> granules;
+    ReservationGranuleArray<ReservationGranule> granules;
 };
 
 struct ReservationGranule {
     ReservationLine *line = nullptr;
-    lost_notify_t notify = {};
+    lost_notify_t notify = nullptr;
+    uintptr_t arg1 = 0;
+    uintptr_t arg2 = 0;
     std::string dbgName;
-    
+
     inline ~ReservationGranule() {
         auto local = line;
         if (local) {
             local->lock.lock();
-            auto it = std::find(begin(local->granules), end(local->granules), this);
-            if (it != end(local->granules))
-                local->granules.erase(it);
+            local->granules.clear();
             local->lock.unlock();
         }
     }
@@ -51,25 +128,6 @@ class ReservationMap {
     static constexpr unsigned _cacheLine = 128;
     static constexpr unsigned _slotNumber = 0xffffffff / _cacheLine;
     std::unique_ptr<ReservationLine[]> _lines;
-    
-    inline void destroySingleLineExcept(ReservationLine* line, ReservationGranule* exceptGranule) {
-        if (line->granules.empty())
-            return;
-        auto e = end(line->granules);
-        auto contains = std::find(begin(line->granules), e, exceptGranule) != e;
-        for (auto granule : line->granules) {
-            if (granule == exceptGranule)
-                continue;
-            if (granule->notify)
-                granule->notify();
-            granule->notify = {};
-            granule->line = nullptr;
-        }
-        line->granules.clear();
-        if (contains) {
-            line->granules.push_back(exceptGranule);
-        }
-    }
     
 public:
     inline ReservationMap() {
@@ -100,29 +158,17 @@ public:
     }
     
     inline void destroySingleReservation(ReservationGranule* granule) {
-        auto line = granule->line;
-        auto it = std::find(begin(line->granules), end(line->granules), granule);
-        assert(it != end(line->granules));
-        if (granule->notify)
-            granule->notify();
-        granule->notify = {};
-        granule->line = nullptr;
-        line->granules.erase(it);
+        granule->line->granules.clearOne(granule);
     }
     
     inline void destroySingleLine(ReservationLine* line) {
-        for (auto granule : line->granules) {
-            if (granule->notify)
-                granule->notify();
-            granule->notify = {};
-            granule->line = nullptr;
-        }
         line->granules.clear();
     }
     
     inline void destroyExcept(LockedLine lockedLine, ReservationGranule* granule) {
-        destroySingleLineExcept(lockedLine.line, granule);
-        if (lockedLine.nextLine)
-            destroySingleLineExcept(lockedLine.nextLine, granule);
+        lockedLine.line->granules.clearExcept(granule);
+        if (lockedLine.nextLine) {
+            lockedLine.nextLine->granules.clearExcept(granule);
+        }
     }
 };

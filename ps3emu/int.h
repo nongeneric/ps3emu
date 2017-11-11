@@ -23,25 +23,25 @@ struct IntTraits;
 template<>
 struct IntTraits<1> {
     using BigType = big_uint8_t;
-    using Type = big_uint8_t;
+    using Type = uint8_t;
 };
 
 template<>
 struct IntTraits<2> {
     using BigType = big_uint16_t;
-    using Type = big_uint16_t;
+    using Type = uint16_t;
 };
 
 template<>
 struct IntTraits<4> {
     using BigType = big_uint32_t;
-    using Type = big_uint32_t;
+    using Type = uint32_t;
 };
 
 template<>
 struct IntTraits<8> {
     using BigType = big_uint64_t;
-    using Type = big_uint64_t;
+    using Type = uint64_t;
 };
 
 template<>
