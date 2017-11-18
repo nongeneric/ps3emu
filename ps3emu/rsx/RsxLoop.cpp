@@ -1643,27 +1643,19 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
 }
 
 void Rsx::setPut(uint32_t put) {
-    //auto lock = boost::unique_lock(_mutex);
-    //INFO(rsx) << ssnprintf("setting put = %x", put);
     _put = put;
-    //_cv.notify_all();
 }
 
 void Rsx::setGet(uint32_t get) {
-    //auto lock = boost::unique_lock(_mutex);
     _get = get;
-    //_cv.notify_all();
 }
 
 uint32_t Rsx::getRef() {
-    //auto lock = boost::unique_lock(_mutex);
     return _ref;
 }
 
 void Rsx::setRef(uint32_t ref) {
-    //auto lock = boost::unique_lock(_mutex);
     _ref = ref;
-    //_cv.notify_all();
 }
 
 void Rsx::loop() {
@@ -1684,7 +1676,6 @@ void Rsx::loop() {
 }
 
 void Rsx::runLoop() {
-    //auto lock = boost::unique_lock(_mutex);
     auto read = [&](uint32_t get) {
         return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get));
     };
@@ -1692,19 +1683,14 @@ void Rsx::runLoop() {
         while (_get != _put || _ret) {
             _idleCounter.closeRange();
             auto localGet = _get.load();
-            //lock.unlock();
             auto len = interpret(localGet, read);
-            //lock.lock();
             _get += len;
         }
         if (_shutdown && _get == _put) {
-            //lock.unlock();
             waitForIdle();
             return;
         }
         _idleCounter.openRange();
-        //_cv.wait(lock);
-        //INFO(rsx) << "rsx loop update received";
     }
 }
 

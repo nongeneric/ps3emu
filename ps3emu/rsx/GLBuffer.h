@@ -33,7 +33,6 @@ class GLPersistentGpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
     uint32_t _size;
 public:
     GLPersistentGpuBuffer();
-    GLPersistentGpuBuffer& operator=(GLPersistentGpuBuffer&& other);
     GLPersistentGpuBuffer(uint32_t size);
     uint32_t size() const;
 };
@@ -43,7 +42,6 @@ class GLPersistentCpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
     void* _ptr;
 public:
     GLPersistentCpuBuffer();
-    GLPersistentCpuBuffer& operator=(GLPersistentCpuBuffer&& other);
     GLPersistentCpuBuffer(uint32_t size);
     uint8_t* mapped();
     uint32_t size();

@@ -42,7 +42,7 @@ void spliceFunction(uint32_t ea, std::function<void()> handler) {
     auto index = addNCallEntry({ssnprintf("spliced_%x", ea), 0, [=](auto th) {
         handler();
         if (bbcall) {
-            g_state.proc->bbcall(segment, label);
+            g_state.proc->bbcall(segment, label, th);
         } else {
             th->setNIP(ea + 4);
             ppu_dasm<DasmMode::Emulate>(&instr, ea, th);

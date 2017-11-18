@@ -29,7 +29,7 @@ void Tracer::pushBlob(const void* ptr, uint32_t size) {
 void Tracer::trace(uint32_t frame,
                    uint32_t num,
                    CommandId command,
-                   std::vector<GcmCommandArg> args) {
+                   std::vector<GcmCommandArg> const& args) {
     if (!_enabled)
         return;
     

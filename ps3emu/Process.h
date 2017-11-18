@@ -200,12 +200,12 @@ public:
                                      ps3_uintptr_t* fdescrva = nullptr);
     void dbgPause(bool pause);
     
-    inline void bbcall(unsigned index, unsigned label) {
-        _rewriterStore.invokePPU(index, label);
+    inline void bbcall(unsigned index, unsigned label, PPUThread* th) {
+        _rewriterStore.invokePPU(index, label, th);
     }
     
-    inline void bbcallSpu(unsigned index, unsigned label, uint32_t cia) {
-        _rewriterStore.invokeSPU(index, label, cia);
+    inline void bbcallSpu(unsigned index, unsigned label, uint32_t cia, SPUThread* sth) {
+        _rewriterStore.invokeSPU(index, label, cia, sth);
     }
 };
 

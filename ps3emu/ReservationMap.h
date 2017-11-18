@@ -16,8 +16,7 @@ using lost_notify_t = void(*)(uintptr_t arg1, uintptr_t arg2);
 
 template<typename ReservationGranule>
 class ReservationGranuleArray {
-    std::array<ReservationGranule*, 64> _arr;
-    size_t _size = 0;
+    std::vector<ReservationGranule*> _arr;
 
     void notify(ReservationGranule* granule) {
         if (granule->notify) {
@@ -27,36 +26,32 @@ class ReservationGranuleArray {
     }
 
 public:
-    inline ReservationGranuleArray() {
-        std::fill(begin(_arr), end(_arr), nullptr);
-    }
 
     inline void insert(ReservationGranule* granule) {
-        for (auto i = 0u; i < _size; ++i) {
+        for (auto i = 0u; i < _arr.size(); ++i) {
             auto& g = _arr[i];
             if (!g) {
                 g = granule;
                 return;
             }
         }
-        _size++;
-        _arr[_size - 1] = granule;
+        _arr.push_back(granule);
     }
 
     inline void clear() {
-        for (auto i = 0u; i < _size; ++i) {
+        for (auto i = 0u; i < _arr.size(); ++i) {
             auto granule = _arr[i];
             if (granule) {
                 notify(granule);
                 granule->line = nullptr;
             }
         }
-        _size = 0;
+        _arr.clear();
     }
 
     inline void clearExcept(ReservationGranule* exceptGranule) {
         auto newSize = 0u;
-        for (auto i = 0u; i < _size; ++i) {
+        for (auto i = 0u; i < _arr.size(); ++i) {
             auto& granule = _arr[i];
             if (granule) {
                 if (granule == exceptGranule) {
@@ -68,11 +63,11 @@ public:
                 }
             }
         }
-        _size = newSize;
+        _arr.resize(newSize);
     }
 
     inline void clearOne(ReservationGranule* targetGranule) {
-        for (auto i = 0u; i < _size; ++i) {
+        for (auto i = 0u; i < _arr.size(); ++i) {
             auto& granule = _arr[i];
             if (granule == targetGranule) {
                 notify(granule);
@@ -83,7 +78,7 @@ public:
     }
 
     inline bool exists(ReservationGranule* granule) {
-        for (auto i = 0u; i < _size; ++i) {
+        for (auto i = 0u; i < _arr.size(); ++i) {
             if (_arr[i] == granule)
                 return true;
         }

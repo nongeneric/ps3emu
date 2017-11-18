@@ -6,6 +6,10 @@
 #include "GLProgramPipeline.h"
 #include "GLTexture.h"
 #include "GLFramebuffer.h"
+#include "GLSync.h"
+#include "GLProxy.h"
+#include "GLVARs.h"
+#include "RingBuffer.h"
 #include "TextRenderer.h"
 #include "Cache.h"
 #include "Rsx.h"
@@ -230,18 +234,18 @@ struct RsxContext {
     GcmPrimitive vertexArrayMode;
     VertexShader* vertexShader = nullptr;
     FragmentShader* fragmentShader = nullptr;
-    GLPersistentCpuBuffer vertexConstBuffer;
-    GLPersistentCpuBuffer vertexSamplersBuffer;
-    GLPersistentCpuBuffer vertexViewportBuffer;
-    GLPersistentCpuBuffer fragmentSamplersBuffer;
-    GLPersistentCpuBuffer elementArrayIndexBuffer;
+    std::unique_ptr<RingBuffer> vertexConstBuffer;
+    std::unique_ptr<RingBuffer> vertexSamplersBuffer;
+    std::unique_ptr<RingBuffer> vertexViewportBuffer;
+    std::unique_ptr<RingBuffer> fragmentSamplersBuffer;
+    std::unique_ptr<RingBuffer> elementArrayIndexBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentBytecodeOffset = 0;
     uint32_t fragmentBytecodeLocation = 0;
     std::vector<uint8_t> fragmentBytecode;
     uint32_t fragmentConstCount = 0;
-    GLPersistentCpuBuffer fragmentConstBuffer;
+    std::unique_ptr<RingBuffer> fragmentConstBuffer;
     std::vector<uint8_t> lastFrame;
     std::array<VertexShaderInputFormat, 16> vertexInputs;
     std::array<uint8_t, 512 * 16> vertexInstructions;
@@ -275,6 +279,7 @@ struct RsxContext {
     PointSpriteControl pointSpriteControl;
     InputMask vertexAttribInputMask = {};
     uint32_t flipBuffer = 0;
+    GLVARs glVARs;
     
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;

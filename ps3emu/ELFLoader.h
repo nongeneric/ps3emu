@@ -189,12 +189,12 @@ public:
         return _spuModule - 1;
     }
     
-    inline void invokePPU(unsigned index, unsigned label) {
-        _ppuModules[index].ppuEntryPoint(g_state.th, label);
+    inline void invokePPU(unsigned index, unsigned label, PPUThread* th) {
+        _ppuModules[index].ppuEntryPoint(th, label);
     }
     
-    inline void invokeSPU(unsigned index, unsigned label, uint32_t cia) {
-        _spuModules[index].spuEntryPoint(g_state.sth, label, cia);
+    inline void invokeSPU(unsigned index, unsigned label, uint32_t cia, SPUThread* sth) {
+        _spuModules[index].spuEntryPoint(sth, label, cia);
     }
 };
 

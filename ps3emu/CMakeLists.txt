@@ -50,9 +50,11 @@ set(SRC
     shaders/DefaultVisitor.cpp
     rsx/Rsx.h
     rsx/Rsx.cpp
+    rsx/RsxContext.h
     rsx/RsxLoop.cpp
     rsx/GLTexture.cpp
     rsx/GLFramebuffer.cpp
+    rsx/GLBuffer.h
     rsx/GLBuffer.cpp
     rsx/Tracer.cpp
     rsx/TextureRenderer.cpp
@@ -60,6 +62,10 @@ set(SRC
     rsx/RsxTextureReader.cpp
     rsx/GLShader.cpp
     rsx/TextRenderer.cpp
+    rsx/RingBuffer.h
+    rsx/RingBuffer.cpp
+    rsx/GLProxy.h
+    rsx/GLVARs.h
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp

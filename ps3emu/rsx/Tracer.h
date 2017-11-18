@@ -153,7 +153,7 @@ public:
     void trace(uint32_t frame,
                uint32_t num,
                CommandId command,
-               std::vector<GcmCommandArg> args);
+               std::vector<GcmCommandArg> const& args);
 };
 
 template<typename T> struct GcmType { static constexpr uint32_t type = (uint32_t)GcmArgType::None; };
@@ -187,11 +187,13 @@ template <> struct ConvertType<float> {
                                #a, GcmType<decltype(a)>::type }
 #define TRACE_ARG(z, n, text) ARG(text) BOOST_PP_COMMA()
 #define TRACE(...) \
-    _context->trace(CommandId:: BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__), \
+    if (_context->tracer.isEnabled()) { \
+         _context->trace(CommandId:: BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__), \
             { BOOST_PP_LIST_FOR_EACH(TRACE_ARG, _, \
                   BOOST_PP_LIST_REST( \
                       BOOST_PP_VARIADIC_TO_LIST(__VA_ARGS__))) } \
-    )
+        ); \
+    }
 
 const char* printCommandId(CommandId id);
 std::string printArgHex(GcmCommandArg const& arg);

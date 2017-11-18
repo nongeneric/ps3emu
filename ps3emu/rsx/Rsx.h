@@ -524,6 +524,7 @@ class Rsx {
     
     void invokeHandler(uint32_t descrEa, uint32_t arg);
     void drawStats();
+    void advanceBuffers();
     
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);

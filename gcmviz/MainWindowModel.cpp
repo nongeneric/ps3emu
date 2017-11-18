@@ -533,7 +533,7 @@ public:
             case 8: return QString::fromStdString(to_string(vda.type));
             case 9: return op ? "MODULO" : "DIVIDE";
             case 10: {
-                auto uniform = (VertexShaderSamplerUniform*)_rsx->context()->vertexSamplersBuffer.mapped();
+                auto uniform = (VertexShaderSamplerUniform*)_rsx->context()->vertexSamplersBuffer->current()->mapped();
                 return QString::fromStdString(ssnprintf("%g,%g,%g,%g",
                                               uniform->disabledInputValues[index.row()][0],
                                               uniform->disabledInputValues[index.row()][1],
@@ -765,7 +765,7 @@ void MainWindowModel::update() {
         
         std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
         auto& buffer = _rsx->context()->vertexConstBuffer;
-        auto uints = (std::array<uint32_t, 4>*)buffer.mapped();
+        auto uints = (std::array<uint32_t, 4>*)buffer->current()->mapped();
         for (auto constIndex : usedConsts) {
             values.push_back(std::make_tuple(constIndex, uints[constIndex]));
         }
@@ -794,7 +794,7 @@ void MainWindowModel::update() {
             _window.teFragmentBytecode->setText(QString::fromStdString(bytecodeText));
             
             std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
-            auto ptr = (std::array<uint32_t, 4>*)context->fragmentConstBuffer.mapped();
+            auto ptr = (std::array<uint32_t, 4>*)context->fragmentConstBuffer->current()->mapped();
             for (auto i = 0u; i < context->fragmentConstCount; ++i) {
                 values.push_back(std::make_tuple(i, ptr[i]));
             }

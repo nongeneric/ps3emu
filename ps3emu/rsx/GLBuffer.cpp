@@ -57,13 +57,6 @@ uint32_t GLBuffer::size() {
 
 GLPersistentCpuBuffer::GLPersistentCpuBuffer() : HandleWrapper(0) { }
 
-GLPersistentCpuBuffer& GLPersistentCpuBuffer::operator=(GLPersistentCpuBuffer&& other) {
-    _ptr = other._ptr;
-    _size = other._size;
-    HandleWrapper::operator=(std::move(other));
-    return *this;
-}
-
 GLPersistentCpuBuffer::GLPersistentCpuBuffer(uint32_t size)
     : _size(size) {
     glCreateBuffers(1, &_handle);
@@ -83,12 +76,6 @@ uint32_t GLPersistentCpuBuffer::size() {
 }
 
 GLPersistentGpuBuffer::GLPersistentGpuBuffer() : HandleWrapper(0) { }
-
-GLPersistentGpuBuffer& GLPersistentGpuBuffer::operator=(GLPersistentGpuBuffer&& other) {
-    _size = other._size;
-    HandleWrapper::operator=(std::move(other));
-    return *this;
-}
 
 GLPersistentGpuBuffer::GLPersistentGpuBuffer(uint32_t size)
     : _size(size) {

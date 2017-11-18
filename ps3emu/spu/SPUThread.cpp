@@ -115,10 +115,10 @@ void SPUThread::loop(OneTimeEvent* event) {
 //                 fflush(tf);
 //             }
 
-            auto instr = *(big_uint32_t*)ptr(cia);
+            uint32_t instr = *(uint32_t*)ptr(cia);
             uint32_t segment, label;
-            if (dasm_bb_call(SPU_BB_CALL_OPCODE, instr, segment, label)) {
-                g_state.proc->bbcallSpu(segment, label, cia);
+            if (dasm_bb_call(SPU_BB_CALL_OPCODE, __builtin_bswap32(instr), segment, label)) {
+                g_state.proc->bbcallSpu(segment, label, cia, this);
             } else {  
                 setNip(cia + 4);
                 SPUDasm<DasmMode::Emulate>(&instr, cia, this);
@@ -179,7 +179,7 @@ void SPUThread::loop(OneTimeEvent* event) {
     }
     
     auto disable = DisableSuspend(this, true);
-    INFO(spu) << ssnprintf("spu thread loop finished, cause %s", to_string(_cause));
+    WARNING(spu) << ssnprintf("spu thread loop finished, cause %s", to_string(_cause));
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 
@@ -409,8 +409,8 @@ void SPUThread::enableSuspend() {
 void SPUThread::waitSuspended() {
     if (!_suspendEnabled)
         return;
-    while (_suspended) {
-        struct timespec t { 0, 200 };
+    for (int i = 0; _suspended; i++) {
+        struct timespec t { 0, i };
         nanosleep(&t, &t);
         //sched_yield();
     }
