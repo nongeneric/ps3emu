@@ -57,12 +57,18 @@ uint32_t GLBuffer::size() {
 
 GLPersistentCpuBuffer::GLPersistentCpuBuffer() : HandleWrapper(0) { }
 
-GLPersistentCpuBuffer::GLPersistentCpuBuffer(uint32_t size)
-    : _size(size) {
+GLPersistentCpuBuffer::GLPersistentCpuBuffer(uint32_t size, bool resident, bool client)
+    : _size(size), _gpuPtr(0) {
     glCreateBuffers(1, &_handle);
-    auto flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT |
-                 GL_CLIENT_STORAGE_BIT;
+    auto flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+    if (client) {
+        flags |= GL_CLIENT_STORAGE_BIT;
+    }
     glNamedBufferStorage(_handle, size, 0, flags);
+    if (resident) {
+        glMakeNamedBufferResidentNV(_handle, GL_READ_ONLY);
+        glGetNamedBufferParameterui64vNV(_handle, GL_BUFFER_GPU_ADDRESS_NV, &_gpuPtr);
+    }
     auto mapFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     _ptr = glMapNamedBufferRange(_handle, 0, size, mapFlags);
 }
@@ -75,12 +81,7 @@ uint32_t GLPersistentCpuBuffer::size() {
     return _size;
 }
 
-GLPersistentGpuBuffer::GLPersistentGpuBuffer() : HandleWrapper(0) { }
-
-GLPersistentGpuBuffer::GLPersistentGpuBuffer(uint32_t size)
-    : _size(size) {
-    glCreateBuffers(1, &_handle);
-    auto flags = 0;
-    glNamedBufferStorage(_handle, size, 0, flags);
+GLuint64 GLPersistentCpuBuffer::gpuPointer() {
+    assert(_gpuPtr);
+    return _gpuPtr;
 }
-

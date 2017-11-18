@@ -302,7 +302,7 @@ void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
     TRACE(ShaderProgram, offset, location);
 
     auto info = get_fragment_bytecode_info(ptr);
-    auto fconst = (std::array<float, 4>*)_context->fragmentConstBuffer->current()->mapped();
+    auto fconst = (std::array<float, 4>*)_context->drawRingBuffer->current(fragmentConstBuffer);
     _context->fragmentBytecode.resize(info.length * 16);
     _context->fragmentConstCount = 0;
     for (auto i = 0u; i < info.length; i += 16) {
@@ -522,11 +522,7 @@ void Rsx::endTransformFeedback() {
 }
 
 void Rsx::advanceBuffers() {
-    _context->vertexConstBuffer->advance(true);
-    _context->vertexViewportBuffer->advance();
-    _context->vertexSamplersBuffer->advance();
-    _context->fragmentSamplersBuffer->advance();
-    _context->fragmentConstBuffer->advance(true);
+    _context->drawRingBuffer->advance();
 }
 
 void Rsx::DrawArrays(unsigned first, unsigned count) {
@@ -903,7 +899,7 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count
             "vconst[%03d] = { %g, %g, %g, %g }", loadAt + i, u[0], u[1], u[2], u[3]);
     }
 
-    auto mapped = (uint8_t*)_context->vertexConstBuffer->current()->mapped() + loadAt * 16;
+    auto mapped = (uint8_t*)_context->drawRingBuffer->current(vertexConstBuffer) + loadAt * 16;
     memcpy(mapped, source.data(), size);
 }
 
@@ -919,18 +915,11 @@ bool Rsx::linkShaderProgram() {
     _context->pipeline.validate();
 #endif
     
-    glBindBufferBase(GL_UNIFORM_BUFFER,
-                     VertexShaderConstantBinding,
-                     _context->vertexConstBuffer->current()->handle());
-    glBindBufferBase(GL_UNIFORM_BUFFER,
-                     VertexShaderSamplesInfoBinding,
-                     _context->vertexSamplersBuffer->current()->handle());
-    glBindBufferBase(GL_UNIFORM_BUFFER,
-                     VertexShaderViewportMatrixBinding,
-                     _context->vertexViewportBuffer->current()->handle());
-    glBindBufferBase(GL_UNIFORM_BUFFER,
-                     FragmentShaderSamplesInfoBinding,
-                     _context->fragmentSamplersBuffer->current()->handle());
+    _context->drawRingBuffer->bindUniform(vertexConstBuffer, VertexShaderConstantBinding);
+    _context->drawRingBuffer->bindUniform(vertexSamplersBuffer, VertexShaderSamplesInfoBinding);
+    _context->drawRingBuffer->bindUniform(vertexViewportBuffer, VertexShaderViewportMatrixBinding);
+    _context->drawRingBuffer->bindUniform(fragmentSamplersBuffer, FragmentShaderSamplesInfoBinding);
+
     if (_mode == RsxOperationMode::Replay) {
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER,
                          TransformFeedbackBufferBinding,
@@ -976,7 +965,7 @@ void Rsx::IndexArrayAddress(uint8_t location, uint32_t offset, GcmDrawIndexArray
 void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     assert(first == 0);
     
-    auto destBuffer = _context->elementArrayIndexBuffer->current();
+    auto destBuffer = &_context->elementArrayIndexBuffer;
     auto sourceBuffer = getBuffer(_context->indexArray.location);
     auto byteSize = _context->indexArray.type == GcmDrawIndexArrayType::_16 ? 2 : 4;
     assert(count * byteSize <= destBuffer->size());
@@ -1012,7 +1001,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     linkShaderProgram();
     updateScissor();
     updateVertexDataArrays(first, count);
-    
+
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, destBuffer->handle());
     
     auto offset = (void*)(uintptr_t)(first * byteSize);
@@ -1022,7 +1011,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     
     // see DrawArrays for the rationale
     advanceBuffers();
-    _context->elementArrayIndexBuffer->advance();
+    waitForIdle(); // TODO: remove after handling GL_ELEMENT_ARRAY_BUFFER
     
     TRACE(DrawIndexArray, first, count);
 }
@@ -1044,7 +1033,7 @@ bool isMrt(SurfaceInfo const& surface) {
 
 void Rsx::updateShaders() {
     glEnableb(GL_PROGRAM_POINT_SIZE, _context->pointSizeVertexOutputEnabled);
-    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->fragmentSamplersBuffer->current()->mapped();
+    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->drawRingBuffer->current(fragmentSamplersBuffer);
     fragmentSamplerUniform->outputFromH = _context->fragmentShaderControl.outputFromH0;
     fragmentSamplerUniform->pointSpriteControl[0] = _context->pointSpriteControl.enabled;
     fragmentSamplerUniform->pointSpriteControl[1] = !!(_context->pointSpriteControl.tex & PointSpriteTex::Tex0);
@@ -1089,9 +1078,7 @@ void Rsx::updateShaders() {
         _context->fragmentShader = shader;
     }
 
-    glBindBufferBase(GL_UNIFORM_BUFFER,
-                     FragmentShaderConstantBinding,
-                     _context->fragmentConstBuffer->current()->handle());
+    _context->drawRingBuffer->bindUniform(fragmentConstBuffer, FragmentShaderConstantBinding);
 
     if (_context->vertexShaderDirty) {
         _context->vertexShaderDirty = false;
@@ -1280,7 +1267,7 @@ GLenum gcmFragmentTextureWrapToOpengl(unsigned wrap) {
 void Rsx::updateTextures() {
     RangeCloser r(&_textureCounter);
     int i = 0;
-    auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer->current()->mapped();
+    auto vertexSamplerUniform = (VertexShaderSamplerUniform*)_context->drawRingBuffer->current(vertexSamplersBuffer);
     for (auto& sampler : _context->vertexTextureSamplers) {
         if (sampler.enable) {
             auto textureUnit = i + VertexTextureUnit;
@@ -1307,7 +1294,7 @@ void Rsx::updateTextures() {
     }
 
     i = 0;
-    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->fragmentSamplersBuffer->current()->mapped();
+    auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->drawRingBuffer->current(fragmentSamplersBuffer);
     for (auto& sampler : _context->fragmentTextureSamplers) {
         if (sampler.enable && sampler.texture.width && sampler.texture.height) {
             auto textureUnit = i + FragmentTextureUnit;
@@ -1678,33 +1665,29 @@ void Rsx::initGcm() {
 
     const auto ringSize = 100;
     
-    size_t constBufferSize = VertexShaderConstantCount * sizeof(float) * 4;
-    _context->vertexConstBuffer = std::make_unique<RingBuffer>(ringSize, constBufferSize);
+    _context->drawRingBuffer.reset(new RingBuffer(ringSize, {
+        {VertexShaderConstantCount * sizeof(float) * 4, true},
+        {sizeof(VertexShaderSamplerUniform), false},
+        {sizeof(VertexShaderViewportUniform), false},
+        {sizeof(FragmentShaderSamplerUniform), false},
+        {FragmentProgramSize / 2, true}
+    }));
     
-    auto uniformSize = sizeof(VertexShaderSamplerUniform);
-    _context->vertexSamplersBuffer = std::make_unique<RingBuffer>(ringSize, uniformSize);
-    
-    uniformSize = sizeof(VertexShaderViewportUniform);
-    _context->vertexViewportBuffer = std::make_unique<RingBuffer>(ringSize, uniformSize);
-    
-    uniformSize = sizeof(FragmentShaderSamplerUniform);
-    _context->fragmentSamplersBuffer = std::make_unique<RingBuffer>(ringSize, uniformSize);
-    
-    _context->localMemoryBuffer = GLPersistentCpuBuffer(256u << 20);
-    _context->mainMemoryBuffer = GLPersistentCpuBuffer(256u << 20);
+    _context->localMemoryBuffer = GLPersistentCpuBuffer(256u << 20, true, false);
+    _context->mainMemoryBuffer = GLPersistentCpuBuffer(256u << 20, true);
     _context->feedbackBuffer = GLPersistentCpuBuffer(48u << 20);
-    _context->fragmentConstBuffer = std::make_unique<RingBuffer>(ringSize, FragmentProgramSize / 2);
     
     g_state.mm->provideMemory(RsxFbBaseAddr,
                               GcmLocalMemorySize,
                               _context->localMemoryBuffer.mapped());
     
-    _context->elementArrayIndexBuffer = std::make_unique<RingBuffer>(ringSize, (10 * (1u << 20)));
+    _context->elementArrayIndexBuffer = GLPersistentCpuBuffer(10 * (1u << 20));
         
     _context->framebuffer.reset(new GLFramebuffer());
     _context->textureRenderer.reset(new TextureRenderer());
     _textureReader = new RsxTextureReader();
     _textureReader->init();
+    //glEnableClientState(GL_ELEMENT_ARRAY_UNIFIED_NV);
     
     resetContext();
     
@@ -1763,7 +1746,7 @@ void Rsx::updateViewPort() {
                        _context->viewPort.offset[2],
                        1);
 
-    auto viewportUniform = (VertexShaderViewportUniform*)_context->vertexViewportBuffer->current()->mapped();
+    auto viewportUniform = (VertexShaderViewportUniform*)_context->drawRingBuffer->current(vertexViewportBuffer);
     viewportUniform->glInverseGcm = glm::inverse(gl) * gcm;
 }
 
@@ -1774,7 +1757,7 @@ GLPersistentCpuBuffer* Rsx::getBuffer(MemoryLocation location) {
 
 void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
     RangeCloser r(&_vdaCounter);
-    auto uniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer->current()->mapped();
+    auto uniform = (VertexShaderSamplerUniform*)_context->drawRingBuffer->current(vertexSamplersBuffer);
     for (auto i = 0u; i < _context->vertexDataArrays.size(); ++i) {
         auto& format = _context->vertexDataArrays[i];
         auto& input = _context->vertexInputs[i];
@@ -1785,15 +1768,14 @@ void Rsx::updateVertexDataArrays(unsigned first, unsigned count) {
             continue;
    
         auto bufferOffset = format.offset + first * format.stride;
-        auto handle = getBuffer(format.location)->handle();
+        auto buffer = getBuffer(format.location);
         
         uniform->inputBufferBases[i][0] = bufferOffset;
         uniform->inputBufferStrides[i][0] = format.stride;
         uniform->inputBufferOps[i][0] =
             _context->frequencyDividerOperation & (1u << i);
         uniform->inputBufferFrequencies[i][0] = format.frequency;
-        
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VertexInputsBinding + i, handle);
+        uniform->inputBuffers[i][0] = buffer->gpuPointer();
         if (_mode != RsxOperationMode::Replay) {
             UpdateBufferCache(format.location, bufferOffset, count * format.stride);
         }
@@ -2316,7 +2298,7 @@ void Rsx::ZStencilClearValue(uint32_t value) {
 
 void Rsx::VertexData4fM(unsigned index, float x, float y, float z, float w) {
     TRACE(VertexData4fM, index, x, y, z, w);
-    auto uniform = (VertexShaderSamplerUniform*)_context->vertexSamplersBuffer->current()->mapped();
+    auto uniform = (VertexShaderSamplerUniform*)_context->drawRingBuffer->current(vertexSamplersBuffer);
     uniform->disabledInputValues[index] = { x, y, z, w };
 }
 

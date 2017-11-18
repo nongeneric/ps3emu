@@ -183,6 +183,7 @@ struct __attribute__ ((__packed__)) VertexShaderSamplerUniform {
     std::array<uint32_t, 4> inputBufferStrides[16];
     std::array<uint32_t, 4> inputBufferOps[16];
     std::array<uint32_t, 4> inputBufferFrequencies[16];
+    std::array<uint64_t, 2> inputBuffers[16];
 };
 
 struct __attribute__ ((__packed__)) FragmentShaderSamplerUniform {

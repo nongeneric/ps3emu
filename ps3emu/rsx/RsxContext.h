@@ -216,6 +216,14 @@ struct PointSpriteControl {
     PointSpriteTex tex = PointSpriteTex();
 };
 
+enum BufferIndexes {
+    vertexConstBuffer,
+    vertexSamplersBuffer,
+    vertexViewportBuffer,
+    fragmentSamplersBuffer,
+    fragmentConstBuffer
+};
+
 class GLFramebuffer;
 class TextureRenderer;
 struct RsxContext {
@@ -234,18 +242,14 @@ struct RsxContext {
     GcmPrimitive vertexArrayMode;
     VertexShader* vertexShader = nullptr;
     FragmentShader* fragmentShader = nullptr;
-    std::unique_ptr<RingBuffer> vertexConstBuffer;
-    std::unique_ptr<RingBuffer> vertexSamplersBuffer;
-    std::unique_ptr<RingBuffer> vertexViewportBuffer;
-    std::unique_ptr<RingBuffer> fragmentSamplersBuffer;
-    std::unique_ptr<RingBuffer> elementArrayIndexBuffer;
+    std::unique_ptr<RingBuffer> drawRingBuffer;
+    GLPersistentCpuBuffer elementArrayIndexBuffer;
     bool vertexShaderDirty = false;
     bool fragmentShaderDirty = false;
     uint32_t fragmentBytecodeOffset = 0;
     uint32_t fragmentBytecodeLocation = 0;
     std::vector<uint8_t> fragmentBytecode;
     uint32_t fragmentConstCount = 0;
-    std::unique_ptr<RingBuffer> fragmentConstBuffer;
     std::vector<uint8_t> lastFrame;
     std::array<VertexShaderInputFormat, 16> vertexInputs;
     std::array<uint8_t, 512 * 16> vertexInstructions;

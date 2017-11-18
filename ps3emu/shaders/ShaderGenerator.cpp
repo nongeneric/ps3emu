@@ -164,10 +164,8 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     std::string res;
     auto line = [&](auto&& s) { res += s; res += "\n"; };
     line("#version 450 core");
-    line(ssnprintf(
-        "layout (std430, binding = %d) buffer Inputs {\n"
-        "    readonly uint us[];\n"
-        "} inputs[16];", VertexInputsBinding));
+    line("#extension GL_NV_shader_buffer_load : require");
+    line("#extension GL_ARB_gpu_shader_int64 : enable");
     line(ssnprintf("layout(std140, binding = %d) uniform VertexConstants {", 
                    VertexShaderConstantBinding));
     line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
@@ -182,20 +180,33 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    uint inputBufferStrides[16];");
     line("    uint inputBufferOps[16];");
     line("    uint inputBufferFrequencies[16];");
+    line("    intptr_t inputBuffers[16];");
     line("} samplersInfo;");
     // note the uint that is read is LE
+    line("uint reverse_uint(uint v) {");
+    line("    return ((v & 0xff) << 24)");
+    line("         | ((v & 0xff00) << 8)");
+    line("         | ((v & 0xff0000) >> 8)");
+    line("         | ((v & 0xff000000) >> 24);");
+    line("}");
+    line("float reverse(float f) {");
+    line("    uint bits = floatBitsToUint(f);");
+    line("    uint rev = ((bits & 0xff) << 24)");
+    line("             | ((bits & 0xff00) << 8)");
+    line("             | ((bits & 0xff0000) >> 8)");
+    line("             | ((bits & 0xff000000) >> 24);");
+    line("    return uintBitsToFloat(rev);");
+    line("}");
     line(
         "uint readbyte(uint input_idx, uint offset) {\n"
-        "    uint v = inputs[input_idx].us[offset / 4];\n"
+        "    uint v = *(uint*)(samplersInfo.inputBuffers[input_idx] + (int64_t)offset);\n"
         "    uint mod = offset % 4;\n"
         "    return (v >> (mod * 8)) & 0xff;\n"
         "}");
     line(
         "uint readuint(uint input_idx, uint offset) {\n"
-        "    return (readbyte(input_idx, offset) << 24)\n"
-        "         | (readbyte(input_idx, offset + 1) << 16)\n"
-        "         | (readbyte(input_idx, offset + 2) << 8)\n"
-        "         | readbyte(input_idx, offset + 3);\n"
+        "    uint le = *(uint*)(samplersInfo.inputBuffers[input_idx] + (int64_t)offset);\n"
+        "    return reverse_uint(le);\n"
         "}");
     line(
         "float readfloat(uint input_idx, uint offset) {\n"
@@ -212,17 +223,19 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "}");
     line(
         "vec4 read_f32vec(uint rank, uint input_idx, uint offset) {\n"
-        "    return vec4(readfloat(input_idx, offset),\n"
-        "                rank > 1 ? readfloat(input_idx, offset + 4) : 0,\n"
-        "                rank > 2 ? readfloat(input_idx, offset + 8) : 0,\n"
-        "                rank > 3 ? readfloat(input_idx, offset + 12) : 1);\n"
+        "    float* le = (float*)(samplersInfo.inputBuffers[input_idx] + (int64_t)offset);\n"
+        "    return vec4(reverse(le[0]),\n"
+        "                rank > 1 ? reverse(le[1]) : 0,\n"
+        "                rank > 2 ? reverse(le[2]) : 0,\n"
+        "                rank > 3 ? reverse(le[3]) : 1);\n"
         "}");
     line(
         "vec4 read_u8vec(uint rank, uint input_idx, uint offset) {\n"
-        "    return vec4(readbyte(input_idx, offset),\n"
-        "                rank > 1 ? readbyte(input_idx, offset + 1) : 0,\n"
-        "                rank > 2 ? readbyte(input_idx, offset + 2) : 0,\n"
-        "                rank > 3 ? readbyte(input_idx, offset + 3) : 255) / 255.0;\n"
+        "    uint ule = *(uint*)(samplersInfo.inputBuffers[input_idx] + (int64_t)offset);\n"
+        "    return vec4(float(ule & 0xff),\n"
+        "                rank > 1 ? float((ule >> 8) & 0xff) : 0,\n"
+        "                rank > 2 ? float((ule >> 16) & 0xff) : 0,\n"
+        "                rank > 3 ? float(ule >> 24) : 255) / 255.0;\n"
         "}");
      line(
         "vec4 read_s16vec(uint rank, uint input_idx, uint offset) {\n"
@@ -299,14 +312,6 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("out vec4 f_TEX9;");
     line("out vec4 f_SSA;");
     line("");
-    line("float reverse(float f) {");
-    line("    uint bits = floatBitsToUint(f);");
-    line("    uint rev = ((bits & 0xff) << 24)");
-    line("                     | ((bits & 0xff00) << 8)");
-    line("                     | ((bits & 0xff0000) >> 8)");
-    line("                     | ((bits & 0xff000000) >> 24);");
-    line("    return uintBitsToFloat(rev);");
-    line("}");
     line("vec4 reverse4f(vec4 v) {");
     line("    return vec4 ( reverse(v.x),");
     line("                  reverse(v.y),");

@@ -13,12 +13,21 @@ struct RingBufferEntry {
     RingBufferEntry(RingBufferEntry&&) = default;
 };
 
+struct RingBufferEntryInfo {
+    size_t size;
+    bool copyOnAdvance;
+};
+
 class RingBuffer {
     std::vector<RingBufferEntry> _entries;
+    std::vector<RingBufferEntryInfo> _infos;
+    std::vector<uint64_t> _offsets;
     size_t _currentIndex;
 
 public:
-    RingBuffer(size_t count, size_t bufferSize);
-    void advance(bool copy = false, bool flush = false);
-    GLPersistentCpuBuffer* current();
+    RingBuffer(size_t count, std::vector<RingBufferEntryInfo> infos);
+    void advance();
+    uint8_t* current(int buffer);
+    void bindUniform(int buffer, GLuint binding);
+    void bindElementArray(int buffer);
 };

@@ -29,20 +29,14 @@ public:
     void unmap(bool sync = true);
 };
 
-class GLPersistentGpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
-    uint32_t _size;
-public:
-    GLPersistentGpuBuffer();
-    GLPersistentGpuBuffer(uint32_t size);
-    uint32_t size() const;
-};
-
 class GLPersistentCpuBuffer : public HandleWrapper<GLuint, deleteBuffer> {
     uint32_t _size;
     void* _ptr;
+    GLuint64 _gpuPtr;
 public:
     GLPersistentCpuBuffer();
-    GLPersistentCpuBuffer(uint32_t size);
+    GLPersistentCpuBuffer(uint32_t size, bool resident = false, bool client = true);
     uint8_t* mapped();
     uint32_t size();
+    GLuint64 gpuPointer();
 };

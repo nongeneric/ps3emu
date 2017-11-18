@@ -66,6 +66,7 @@ set(SRC
     rsx/RingBuffer.cpp
     rsx/GLProxy.h
     rsx/GLVARs.h
+    rsx/GLSync.h
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp
