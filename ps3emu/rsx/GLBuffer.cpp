@@ -17,8 +17,8 @@ GLBuffer::GLBuffer(GLBufferType type, uint32_t size, const void* data)
     _mapFlags = type == GLBufferType::MapRead ? GL_MAP_READ_BIT
               : type == GLBufferType::MapWrite ? GL_MAP_WRITE_BIT
               : 0;
-    glcall(glCreateBuffers(1, &_handle));
-    glcall(glNamedBufferStorage(_handle, size, data, flags));
+    glCreateBuffers(1, &_handle);
+    glNamedBufferStorage(_handle, size, data, flags);
 }
 
 void* GLBuffer::map() {
@@ -32,14 +32,14 @@ void GLBuffer::unmap(bool sync) {
     if (!_mapFlags || !_mapped)
         throw std::runtime_error("buffer can't be unmapped");
     _mapped = false;
-    glcall(glUnmapNamedBuffer(handle()));
+    glUnmapNamedBuffer(handle());
     if (sync && _type == GLBufferType::MapWrite) {
-        //glcall(glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT));
+        //glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
     }
 }
 
 void deleteBuffer(GLuint handle) {
-    glcall(glDeleteBuffers(1, &handle));
+    glDeleteBuffers(1, &handle);
 }
 
 GLBuffer& GLBuffer::operator=(GLBuffer&& other) {

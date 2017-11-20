@@ -1,7 +1,6 @@
 #pragma once
 
 #include "HandleWrapper.h"
-#include "GLUtils.h"
 
 #include <glad/glad.h>
 #include <algorithm>

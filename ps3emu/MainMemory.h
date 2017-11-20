@@ -98,7 +98,7 @@ public:
         if constexpr(Len == 4) {
             uint32_t special;
             if (readSpecialMemory(va, &special))
-                return endian_reverse(special);
+                return fast_endian_reverse(special);
         }
         if (validate)
             this->validate(va, Len, false);
@@ -106,18 +106,8 @@ public:
         auto& page = _pages[split.page.u()];
         auto offset = split.offset.u();
         auto ptr = page.ptr + offset;
-        if constexpr(Len == 16) {
-            auto val = _mm_lddqu_si128((__m128i*)ptr);
-            return _mm_shuffle_epi8(val, ENDIAN_SWAP_MASK128);
-        } else if constexpr(Len == 8) {
-            return __builtin_bswap64(*(uint64_t*)ptr);
-        } else if constexpr(Len == 4) {
-            return __builtin_bswap32(*(uint32_t*)ptr);
-        } else if constexpr(Len == 2) {
-            return __builtin_bswap16(*(uint16_t*)ptr);
-        } else {
-            return *(uint8_t*)ptr;
-        }
+        auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
+        return fast_endian_reverse(*typedPtr);
     }
 
     inline uint8_t load8(ps3_uintptr_t va, bool validate = true) {
@@ -142,11 +132,9 @@ public:
 
     template<int Len>
     void store(ps3_uintptr_t va, typename IntTraits<Len>::Type value, ReservationGranule* granule) {
-        if constexpr(Len == 4) {
-            auto reversed = endian_reverse(value);
-            if (writeSpecialMemory(va, &reversed, Len))
-                return;
-        }
+        auto reversed = fast_endian_reverse(value);
+        if (writeSpecialMemory(va, &reversed, Len))
+            return;
         validate(va, Len, false);
         VirtualAddress split { va };
         auto pageIndex = split.page.u();
@@ -155,18 +143,8 @@ public:
         auto ptr = page.ptr.load();
         ptr = ptr + offset;
         auto line = _rmap.lock<Len>(va);
-        if constexpr(Len == 16) {
-            value = _mm_shuffle_epi8(value, ENDIAN_SWAP_MASK128);
-            _mm_store_si128((__m128i*)ptr, value);
-        } else if constexpr(Len == 8) {
-            *(uint64_t*)ptr = __builtin_bswap64(value);
-        } else if constexpr(Len == 4) {
-            *(uint32_t*)ptr = __builtin_bswap32(value);
-        } else if constexpr(Len == 2) {
-            *(uint16_t*)ptr = __builtin_bswap16(value);
-        } else {
-            *(uint8_t*)ptr = value;
-        }
+        auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
+        *typedPtr = fast_endian_reverse(value);
         _rmap.destroyExcept(line, granule);
         _rmap.unlock(line);
         _mmap.mark<Len>(va);

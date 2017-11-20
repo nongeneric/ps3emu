@@ -407,7 +407,6 @@ void GLTexture::update(std::vector<uint8_t>& blob) {
 }
 
 GLTexture::~GLTexture() {
-    //glcall(glDeleteTextures(1, &_handle));
     glDeleteTextures(1, &_handle);
 }
 
@@ -416,21 +415,7 @@ const RsxTextureInfo& GLTexture::info() const {
 }
 
 void GLTexture::bind(GLuint textureUnit) {
-    glcall(glBindTextureUnit(textureUnit, _handle));
-}
-
-void glcheck(int line, const char* call) {
-//     INFO(libs) << "glcall: " << call;
-//     auto err = glGetError();
-//     if (err) {
-//         auto msg = err == GL_INVALID_ENUM ? "GL_INVALID_ENUM"
-//                    : err == GL_INVALID_VALUE ? "GL_INVALID_VALUE"
-//                    : err == GL_INVALID_OPERATION ? "GL_INVALID_OPERATION"
-//                    : err == GL_INVALID_FRAMEBUFFER_OPERATION ? "GL_INVALID_FRAMEBUFFER_OPERATION"
-//                    : err == GL_OUT_OF_MEMORY ? "GL_OUT_OF_MEMORY"
-//                    : "unknown";
-//         throw std::runtime_error(ssnprintf("[%d] error: %x (%s)\n", line, err, msg));
-//     }
+    glBindTextureUnit(textureUnit, _handle);
 }
 
 TextureReader::TextureReader(GcmTextureFormat format, const RsxTextureInfo& info)
@@ -521,8 +506,8 @@ GLSimpleTexture::GLSimpleTexture(unsigned int width,
                                  GLuint format)
     : _width(width), _height(height), _format(format)
 {
-    glcall(glCreateTextures(GL_TEXTURE_2D, 1, &_handle));
-    glcall(glTextureStorage2D(_handle, 1, format, width, height));
+    glCreateTextures(GL_TEXTURE_2D, 1, &_handle);
+    glTextureStorage2D(_handle, 1, format, width, height);
 }
 
 GLSimpleTexture::~GLSimpleTexture() {

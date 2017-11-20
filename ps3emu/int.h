@@ -50,6 +50,26 @@ struct IntTraits<16> {
     using Type = uint128_t;
 };
 
+inline uint128_t fast_endian_reverse(uint128_t val) {
+    return _mm_shuffle_epi8(val, ENDIAN_SWAP_MASK128);
+}
+
+inline uint64_t fast_endian_reverse(uint64_t val) {
+    return __builtin_bswap64(val);
+}
+
+inline uint32_t fast_endian_reverse(uint32_t val) {
+    return __builtin_bswap32(val);
+}
+
+inline uint16_t fast_endian_reverse(uint16_t val) {
+    return __builtin_bswap16(val);
+}
+
+inline uint8_t fast_endian_reverse(uint8_t val) {
+    return val;
+}
+
 constexpr uint32_t constexpr_log2(uint32_t n, uint32_t p = 0) {
     return n <= 1 ? p : constexpr_log2(n / 2, p + 1);
 }

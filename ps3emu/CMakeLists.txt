@@ -67,6 +67,7 @@ set(SRC
     rsx/GLProxy.h
     rsx/GLVARs.h
     rsx/GLSync.h
+    rsx/GLSampler.h
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp

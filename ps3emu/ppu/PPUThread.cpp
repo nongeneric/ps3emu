@@ -148,7 +148,9 @@ void PPUThread::loop() {
     );
 }
 
-PPUThread::PPUThread() {}
+PPUThread::PPUThread() {
+    _mm = g_state.mm;
+}
 
 #ifdef DEBUGPAUSE
 void PPUThread::singleStepBreakpoint(bool value) {

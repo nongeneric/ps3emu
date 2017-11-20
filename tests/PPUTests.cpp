@@ -156,7 +156,7 @@ TEST_CASE("internal_alloc_unique_ptr") {
     REQUIRE( mm.load32(ea + sizeof(int)) == 0xbbbbbbbb );
 }
 
-TEST_CASE("fixed loads") {
+TEST_CASE("fixed_loads") {
 /*
 10474:       88 60 00 20     lbz     r3,32(0)
 10478:       88 81 ff e0     lbz     r4,-32(r1)              # ffffffe0
@@ -484,7 +484,7 @@ TEST_CASE("fixed_stores") {
     REQUIRE( th.getGPR(1) == 0x300050 );
 }
 
-TEST_CASE("fixed load store with reversal") {
+TEST_CASE("fixed_load_store_with_reversal") {
 /*
 10570:       7c 60 0e 2c     lhbrx   r3,0,r1
 10574:       7c 81 16 2c     lhbrx   r4,r1,r2
@@ -655,7 +655,7 @@ TEST_CASE("list2") {
     REQUIRE(th.getGPR(3) == (55 >> 2) + (29 << 5));
 }
 
-TEST_CASE("emu stw") {
+TEST_CASE("emu_stw") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
@@ -1237,7 +1237,7 @@ TEST_CASE("fcmpu cr7,f1,f30") {
     REQUIRE( th.getCRF(7) == 8 );
 }
 
-TEST_CASE("float loads") {
+TEST_CASE("float_loads") {
 /*
 1043c:       c0 21 00 00     lfs     f1,0(r1)
 10440:       7c 41 04 2e     lfsx    f2,r1,r0
@@ -1277,7 +1277,7 @@ TEST_CASE("float loads") {
     REQUIRE( th.getFPR(8) == 0x3ff2467381d7dbf5 );
 }
 
-TEST_CASE("float loads with update") {
+TEST_CASE("float_loads_with_update") {
 /*
    10654:       c4 61 00 70     lfsu    f3,112(r1)              # 70
    10658:       7c 81 04 6e     lfsux   f4,r1,r0
@@ -1313,7 +1313,7 @@ TEST_CASE("float loads with update") {
     REQUIRE( th.getGPR(2) == mem );
 }
 
-TEST_CASE("float stores") {
+TEST_CASE("float_stores") {
 /*
 10414:  d0 21 00 00     stfs    f1,0(r1)
 10418:  7c 22 05 2e     stfsx   f1,r2,r0

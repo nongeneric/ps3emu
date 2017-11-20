@@ -1,6 +1,5 @@
 #pragma once
 
-#include "GLUtils.h"
 #include "HandleWrapper.h"
 #include <glad/glad.h>
 
@@ -9,13 +8,13 @@ inline void deleteSampler(GLuint handle) {
 }
 
 class GLSampler : public HandleWrapper<GLuint, deleteSampler> {
-    float _minLOD = 0;
-    float _maxLOD = 0;
-    float _lodBias = 0;
-    GLenum _minFilter = 0;
-    GLenum _magFilter = 0;
-    GLenum _wrapS = 0;
-    GLenum _wrapT = 0;
+    float _minLOD = -1;
+    float _maxLOD = -1;
+    float _lodBias = -1;
+    GLenum _minFilter = -1;
+    GLenum _magFilter = -1;
+    GLenum _wrapS = -1;
+    GLenum _wrapT = -1;
 
 public:
     inline GLSampler(GLuint handle) : HandleWrapper(handle) { }

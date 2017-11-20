@@ -21,7 +21,7 @@ bool MainMemory::writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len)
         writeRawSpuVa(va, buf, len);
         return true;
     }
-    if (coversRsxRegsRange(va, len)) {
+    if (coversRsxRegsRange(va, len) && len == 4) {
         if (!g_state.rsx) {
             throw std::runtime_error("rsx not set");
         }

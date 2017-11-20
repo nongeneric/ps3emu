@@ -1,6 +1,5 @@
 #pragma once
 
-#include "GLUtils.h"
 #include "GLShader.h"
 #include "HandleWrapper.h"
 #include "ps3emu/log.h"
@@ -15,7 +14,7 @@ inline void deleteProgramPipeline(GLuint handle) {
 class GLProgramPipeline : public HandleWrapper<GLuint, deleteProgramPipeline> {
     static GLuint create() {
         GLuint handle = 0;
-        glcall(glGenProgramPipelines(1, &handle));
+        glGenProgramPipelines(1, &handle);
         return handle;
     }
 public:

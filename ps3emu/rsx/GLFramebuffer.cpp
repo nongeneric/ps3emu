@@ -27,7 +27,7 @@ GLSimpleTexture* GLFramebuffer::searchCache(GLuint format,
 }
 
 GLFramebuffer::GLFramebuffer() {
-    glcall(glCreateFramebuffers(1, &_id));
+    glCreateFramebuffers(1, &_id);
 }
 
 GLFramebuffer::~GLFramebuffer() {
@@ -35,7 +35,7 @@ GLFramebuffer::~GLFramebuffer() {
 }
 
 void GLFramebuffer::bindDefault() {
-    glcall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void GLFramebuffer::setSurface(const SurfaceInfo& info, unsigned width, unsigned height) {

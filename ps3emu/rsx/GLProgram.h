@@ -1,7 +1,6 @@
 #pragma once
 
 #include "HandleWrapper.h"
-#include "GLUtils.h"
 
 inline void deleteProgram(GLuint handle) {
     glDeleteProgram(handle);
