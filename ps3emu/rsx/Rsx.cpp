@@ -293,8 +293,8 @@ void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
         _context->fragmentBytecode = _currentReplayBlob;
     } else {
         auto ea = rsxOffsetToEa(gcmEnumToLocation(location), offset);
-        _context->fragmentBytecode.resize(FragmentProgramSize);
-        g_state.mm->readMemory(ea, &_context->fragmentBytecode[0], FragmentProgramSize);
+        auto ptr = g_state.mm->getMemoryPointer(ea, FragmentProgramSize);
+        memcpy(&_context->fragmentBytecode[0], ptr, FragmentProgramSize);
     }
 
     auto ptr = &_context->fragmentBytecode[0];
@@ -538,6 +538,8 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     beginTransformFeedback();
     glDrawArrays(_context->glVertexArrayMode, 0, count);
     endTransformFeedback();
+    // flush to make the buffers available faster
+    glFlush();
 
     // Right after a gcm draw command completes, the next command might immediately
     // update buffers or shader constants. OpenGL draw commands are asynchronous
@@ -909,8 +911,8 @@ bool Rsx::linkShaderProgram() {
     if (!_context->fragmentShader || !_context->vertexShader)
         return false;
 
-    _context->pipeline.useShader(*_context->vertexShader);
-    _context->pipeline.useShader(*_context->fragmentShader);
+    _context->pipeline.useShader(_context->vertexShader);
+    _context->pipeline.useShader(_context->fragmentShader);
 #if !NDEBUG
     _context->pipeline.validate();
 #endif
@@ -1008,6 +1010,7 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     beginTransformFeedback();
     glDrawElements(_context->glVertexArrayMode, count, _context->indexArray.glType, offset);
     endTransformFeedback();
+    glFlush();
 
     // see DrawArrays for the rationale
     advanceBuffers();
@@ -1092,18 +1095,15 @@ void Rsx::updateShaders() {
             _context->vertexTextureSamplers[3].texture.dimension
         };
 
-        auto size = CalcVertexBytecodeSize(_context->vertexInstructions.data());
-
         std::array<uint8_t, 16> arraySizes;
         assert(_context->vertexInputs.size() == arraySizes.size());
         for (auto i = 0u; i < arraySizes.size(); ++i) {
             arraySizes[i] = _context->vertexInputs[i].rank;
         }
-        VertexShaderCacheKey key{
-            std::vector<uint8_t>(_context->vertexInstructions.data(),
-                                 _context->vertexInstructions.data() + size),
-            arraySizes};
-        auto shader = _context->vertexShaderCache.retrieve(key);
+
+        auto shader = _context->vertexShaderCache.retrieve(&_context->vertexInstructions[0],
+                                                           _context->vertexLoadOffset,
+                                                           arraySizes);
 
         _vertexShaderRetrieveCounter.closeRange();
 
@@ -1121,10 +1121,10 @@ void Rsx::updateShaders() {
                                              _mode == RsxOperationMode::Replay);
             shader = new VertexShader(text.c_str());
             INFO(rsx) << ssnprintf("updated vertex shader (2):\n%s\n%s", text, shader->log());
-            auto updater = new SimpleCacheItemUpdater<VertexShader> {
-                uint32_t(), (uint32_t)key.bytecode.size(), [](auto){}
-            };
-            _context->vertexShaderCache.insert(key, shader, updater);
+            _context->vertexShaderCache.insert(&_context->vertexInstructions[0],
+                                               _context->vertexLoadOffset,
+                                               arraySizes,
+                                               shader);
         }
         _context->vertexShader = shader;
     }
@@ -2564,4 +2564,4 @@ void Rsx::PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex) {
     _context->pointSpriteControl.tex = tex;
 }
 
-RsxContext::RsxContext() : statText(14) {}
+RsxContext::RsxContext() : fragmentBytecode(FragmentProgramSize), statText(14) {}

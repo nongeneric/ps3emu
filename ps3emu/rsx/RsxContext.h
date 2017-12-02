@@ -14,6 +14,7 @@
 #include "Cache.h"
 #include "Rsx.h"
 #include "ps3emu/TimedCounter.h"
+#include "VertexShaderCache.h"
 #include "../shaders/ShaderGenerator.h"
 #include <boost/chrono.hpp>
 
@@ -109,17 +110,6 @@ struct InlineSettings {
     uint32_t srcSizeY = 0;
     uint32_t destSizeX = 0;
     uint32_t destSizeY = 0;
-};
-
-struct VertexShaderCacheKey {
-    std::vector<uint8_t> bytecode;
-    std::array<uint8_t, 16> arraySizes;
-    inline bool operator<(VertexShaderCacheKey const& other) const {
-        auto size = bytecode.size();
-        auto othersize = other.bytecode.size();
-        return std::tie(size, bytecode, arraySizes)
-             < std::tie(othersize, other.bytecode, other.arraySizes);
-    }
 };
 
 struct FragmentShaderCacheKey {
@@ -266,8 +256,8 @@ struct RsxContext {
     GLPersistentCpuBuffer localMemoryBuffer;
     GLPersistentCpuBuffer feedbackBuffer;
     Cache<TextureCacheKey, GLTexture, (256u << 20)> textureCache;
-    Cache<VertexShaderCacheKey, VertexShader, (20u << 20)> vertexShaderCache;
     Cache<FragmentShaderCacheKey, FragmentShader, (20u << 20)> fragmentShaderCache;
+    VertexShaderCache vertexShaderCache;
     uint32_t vBlankHandlerDescr = 0;
     uint32_t flipHandlerDescr = 0;
     MemoryLocation reportLocation;

@@ -23,6 +23,7 @@ void Window::shutdown() {
 
 void Window::swapBuffers() {
     glfwSwapBuffers(_window);
+    glfwPollEvents();
 }
 
 unsigned Window::width() {

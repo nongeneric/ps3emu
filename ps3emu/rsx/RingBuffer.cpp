@@ -23,7 +23,7 @@ void RingBuffer::advance() {
     auto prev = &_entries[_currentIndex];
     _currentIndex = (_currentIndex + 1) % _entries.size();
     auto current = &_entries[_currentIndex];
-    prev->sync = GLSync();
+    prev->sync.mark();
     current->sync.clientWait();
     for (auto i = 0u; i < _infos.size(); ++i) {
         if (_infos[i].copyOnAdvance) {

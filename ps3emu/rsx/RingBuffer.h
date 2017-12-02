@@ -8,7 +8,7 @@
 
 struct RingBufferEntry {
     GLPersistentCpuBuffer buffer;
-    GLSync sync;
+    GLQuerySync sync;
     RingBufferEntry(size_t bufferSize);
     RingBufferEntry(RingBufferEntry&&) = default;
 };

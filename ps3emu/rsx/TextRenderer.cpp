@@ -229,9 +229,9 @@ struct TextRenderer::impl {
         vertexShader = VertexShader(vertexCode);
         geometryShader = GeometryShader(geometryCode);
         fragmentShader = FragmentShader(fragmentCode);
-        pipeline.useShader(vertexShader);
-        pipeline.useShader(geometryShader);
-        pipeline.useShader(fragmentShader);
+        pipeline.useShader(&vertexShader);
+        pipeline.useShader(&geometryShader);
+        pipeline.useShader(&fragmentShader);
         pipeline.validate();
 
         glSamplerParameteri(sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);

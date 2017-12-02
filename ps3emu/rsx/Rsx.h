@@ -208,7 +208,7 @@ enum class RsxOperationMode {
 struct GcmCommandReplayInfo {
     GcmCommand command;
     bool notifyCompletion;
-    std::function<void()> action;
+    std::function<void(boost::chrono::nanoseconds)> action;
 };
 
 struct RsxContext;

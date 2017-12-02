@@ -121,8 +121,8 @@ void OpenGLPreviewWidget::initializeGL() {
     INFO(debugger) << _vs->log();
     INFO(debugger) << _fs->log();
     _pipeline.reset(new GLProgramPipeline());
-    _pipeline->useShader(*_vs);
-    _pipeline->useShader(*_fs);
+    _pipeline->useShader(_vs.get());
+    _pipeline->useShader(_fs.get());
     _pipeline->validate();
     _pipeline->bind();
     

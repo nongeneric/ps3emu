@@ -68,6 +68,8 @@ set(SRC
     rsx/GLVARs.h
     rsx/GLSync.h
     rsx/GLSampler.h
+    rsx/VertexShaderCache.h
+    rsx/VertexShaderCache.cpp
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp
@@ -105,6 +107,9 @@ set(SRC
     libs/perf.cpp
     libs/libnet.cpp
     libs/libnetctl.cpp
+
+    ../thirdparty/xxHash/xxhash.c
+    ../thirdparty/xxHash/xxhash.h
 )
 
 add_library(ps3emu SHARED ${SRC})

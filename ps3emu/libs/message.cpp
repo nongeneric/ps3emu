@@ -242,8 +242,8 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
     glVertexAttribBinding(0, 0);
     glBindVertexBuffer(0, context->buffer.handle(), 0, sizeof(glm::vec2));
     
-    context->pipeline.useShader(context->fragmentShader);
-    context->pipeline.useShader(context->vertexShader);
+    context->pipeline.useShader(&context->fragmentShader);
+    context->pipeline.useShader(&context->vertexShader);
     context->pipeline.bind();
 
     glEnable(GL_BLEND);
@@ -255,7 +255,7 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
     glDepthRange(0, 1);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
-    context->pipeline.useShader(context->textFragmentShader);
+    context->pipeline.useShader(&context->textFragmentShader);
     
     auto samplerIndex = 20;
     glBindTextureUnit(samplerIndex, context->texture->handle());

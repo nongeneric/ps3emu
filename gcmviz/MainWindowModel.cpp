@@ -33,12 +33,13 @@
 #include <gcm_tool.h>
 
 using namespace boost::endian;
+namespace chrono = boost::chrono;
 
 GcmCommandReplayInfo makeNopCommand() {
     return GcmCommandReplayInfo{GcmCommand{0, 0, (int)CommandId::waitForIdle}, true};
 }
 
-void execInRsxThread(Rsx* rsx, std::function<void()> action) {
+void execInRsxThread(Rsx* rsx, std::function<void(chrono::nanoseconds)> action) {
     auto command = makeNopCommand();
     command.action = action;
     rsx->sendCommand(command);
@@ -48,12 +49,32 @@ void execInRsxThread(Rsx* rsx, std::function<void()> action) {
 class CommandTableModel : public QAbstractItemModel {
     GcmDatabase* _db;
     int _frame;
+    std::map<int, chrono::nanoseconds> _durations;
     
 public:
-    CommandTableModel(GcmDatabase* db, int frame) : _db(db), _frame(frame) { }
-    
+    CommandTableModel(GcmDatabase* db, int frame) : _db(db), _frame(frame) {}
+
+    void setDuration(int row, chrono::nanoseconds duration) {
+        _durations[row] = duration;
+        auto index = createIndex(row, 1);
+        dataChanged(index, index);
+    }
+
+    QVariant headerData(int section,
+                        Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const override {
+        if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
+            return QVariant();
+        switch (section) {
+            case 0: return "#";
+            case 1: return "Name";
+            case 2: return "ns";
+        }
+        return QVariant();
+    }
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 1;
+        return 3;
     }
     
     QModelIndex index(int row,
@@ -82,6 +103,15 @@ public:
         }
         if (role != Qt::DisplayRole)
             return QVariant();
+        if (index.column() == 0) {
+            return QString::fromStdString(ssnprintf("%d", index.row()));
+        }
+        if (index.column() == 2) {
+            auto it = _durations.find(index.row());
+            if (it == end(_durations))
+                return "";
+            return QString::fromStdString(ssnprintf("%d", it->second.count()));
+        }
         auto display = printCommandId((CommandId)command.id);
         if (command.blob.empty())
             return display;
@@ -268,7 +298,7 @@ public:
             levels = 1;
         }
         
-        execInRsxThread(_rsx, [&] {
+        execInRsxThread(_rsx, [&](auto duration) {
             dumpOpenGLTextureAllImages(handle, false, levels, "/tmp", "last_texture");
         });
         
@@ -281,7 +311,7 @@ public:
         }
         
         QImage image(width, height, QImage::Format_RGBA8888);
-        execInRsxThread(_rsx, [&] {
+        execInRsxThread(_rsx, [&](auto duration) {
             assert(glIsTexture(handle));
             glGetTextureImage(handle, 
                               0,
@@ -885,14 +915,18 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         auto command = _db.getCommand(frame, i);
         commands.push_back(command);
     }
-    
+
+    int i = _currentCommand;
     for (auto& c : commands) {
         auto id = (CommandId)c.id;
         if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray) {
             // first + count (first is actually in bytes, not attributes, so it is an overfetch
             _lastDrawCount = c.args[0].value + c.args[1].value;
         }
-        _rsx->sendCommand({c, false});
+        _rsx->sendCommand({c, false, [&](auto duration) {
+            _commandModel->setDuration(i, duration);
+            i++;
+        }});
     }
     
     _rsx->sendCommand(makeNopCommand());
@@ -911,11 +945,11 @@ void MainWindowModel::changeFrame() {
     auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames());
     _window.labelFrame->setText(QString::fromStdString(text));
     
-    auto commandModel = new CommandTableModel(&_db, _currentFrame);
+    _commandModel = new CommandTableModel(&_db, _currentFrame);
     auto proxyModel = new QSortFilterProxyModel();
     proxyModel->setFilterKeyColumn(1);
     proxyModel->setFilterRegExp(QRegExp(_window.leSearchCommand->text(), Qt::CaseInsensitive, QRegExp::FixedString));
-    proxyModel->setSourceModel(commandModel);
+    proxyModel->setSourceModel(_commandModel);
     _window.commandTableView->setModel(proxyModel);
     _window.commandTableView->resizeColumnsToContents();
     auto selectionModel = _window.commandTableView->selectionModel();

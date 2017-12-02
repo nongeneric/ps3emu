@@ -30,3 +30,36 @@ public:
         }
     }
 };
+
+inline void deleteQuerySync(GLuint query) {
+    glDeleteQueries(1, &query);
+}
+
+class GLQuerySync : public HandleWrapper<GLuint, deleteQuerySync> {
+    bool _marked = false;
+
+public:
+    inline GLQuerySync(GLuint handle) : HandleWrapper(handle) { }
+    inline GLQuerySync() {
+        glGenQueries(1, &_handle);
+    }
+
+    inline void mark() {
+        glQueryCounter(_handle, GL_TIMESTAMP);
+        _marked = true;
+    }
+
+    inline void clientWait() {
+        if (!_marked)
+            return;
+        _marked = false;
+        GLint available = 0;
+        glGetQueryObjectiv(_handle, GL_QUERY_RESULT_AVAILABLE, &available);
+        if (available)
+            return;
+        glFlush();
+        while (!available) {
+            glGetQueryObjectiv(_handle, GL_QUERY_RESULT_AVAILABLE, &available);
+        }
+    }
+};

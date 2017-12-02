@@ -1707,6 +1707,9 @@ void Rsx::replayLoop() {
                        std::back_inserter(argValues),
                        [](auto& arg) { return arg.value; });
         _currentReplayBlob = command.blob;
+
+        auto past = boost::chrono::steady_clock::now();
+
         switch (id) {
 #define X(x) case CommandId::x: replay(&Rsx::x, this, argValues); break;
             CommandIdX
@@ -1715,7 +1718,7 @@ void Rsx::replayLoop() {
        }
        
        if (info.action) {
-           info.action();
+           info.action(boost::chrono::steady_clock::now() - past);
        }
        
        if (info.notifyCompletion) {

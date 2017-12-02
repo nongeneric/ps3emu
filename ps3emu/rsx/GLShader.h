@@ -20,6 +20,7 @@ public:
     }
     std::string log();
     std::string source();
+    // TODO: ~Shader()
 };
 
 class VertexShader : public Shader {

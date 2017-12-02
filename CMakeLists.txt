@@ -82,6 +82,7 @@ include_directories(SYSTEM $ENV{PS3_HOST_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_HOST_CG_INCLUDE})
 include_directories(SYSTEM $ENV{PS3_TARGET_COMMON_INCLUDE})
 include_directories(SYSTEM thirdparty/cereal/include)
+include_directories(SYSTEM thirdparty/xxHash)
 include_directories(SYSTEM ${FREETYPE2_INCLUDE_DIRS})
 
 add_subdirectory(ps3emu)

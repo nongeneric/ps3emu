@@ -10,6 +10,7 @@ class Process;
 class Rsx;
 class QDialog;
 class OpenGLPreview;
+class CommandTableModel;
 class MainWindowModel {
     Ui::MainWindow _window;
     QMainWindow _qwindow;
@@ -20,6 +21,7 @@ class MainWindowModel {
     std::unique_ptr<OpenGLPreview> _openglPreview;
     unsigned _currentCommand;
     unsigned _currentFrame;
+    CommandTableModel* _commandModel;
     void changeFrame();
     void updateContextTable();
     

@@ -26,8 +26,8 @@ TextureRenderer::TextureRenderer() {
 
     _fragmentShader = FragmentShader(fragmentCode);
     _vertexShader = VertexShader(vertexCode);
-    _pipeline.useShader(_fragmentShader);
-    _pipeline.useShader(_vertexShader);
+    _pipeline.useShader(&_fragmentShader);
+    _pipeline.useShader(&_vertexShader);
 
     glm::vec2 vertices[] {
         { -1.f, 1.f }, { -1.f, -1.f }, { 1.f, -1.f },

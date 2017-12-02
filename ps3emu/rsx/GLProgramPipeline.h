@@ -17,19 +17,33 @@ class GLProgramPipeline : public HandleWrapper<GLuint, deleteProgramPipeline> {
         glGenProgramPipelines(1, &handle);
         return handle;
     }
+
+    VertexShader* _vertex = nullptr;
+    FragmentShader* _fragment = nullptr;
+    GeometryShader* _geometry = nullptr;
+
 public:
     inline GLProgramPipeline() : HandleWrapper(create()) { }
     inline void bind() {
         glBindProgramPipeline(handle());
     }
-    inline void useShader(VertexShader& shader) {
-        glUseProgramStages(handle(), GL_VERTEX_SHADER_BIT, shader.handle());
+    inline void useShader(VertexShader* shader) {
+        if (shader == _vertex)
+            return;
+        _vertex = shader;
+        glUseProgramStages(handle(), GL_VERTEX_SHADER_BIT, shader->handle());
     }
-    inline void useShader(FragmentShader& shader) {
-        glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader.handle());
+    inline void useShader(FragmentShader* shader) {
+        if (shader == _fragment)
+            return;
+        _fragment = shader;
+        glUseProgramStages(handle(), GL_FRAGMENT_SHADER_BIT, shader->handle());
     }
-    inline void useShader(GeometryShader& shader) {
-        glUseProgramStages(handle(), GL_GEOMETRY_SHADER_BIT, shader.handle());
+    inline void useShader(GeometryShader* shader) {
+        if (shader == _geometry)
+            return;
+        _geometry = shader;
+        glUseProgramStages(handle(), GL_GEOMETRY_SHADER_BIT, shader->handle());
     }
     inline void validate() {
         glValidateProgramPipeline(handle());
@@ -52,8 +66,8 @@ public:
         )"";
         auto fs = FragmentShader(code);
         auto vs = VertexShader(code);
-        useShader(fs);
-        useShader(vs);
+        useShader(&fs);
+        useShader(&vs);
         validate();
     }
 };
