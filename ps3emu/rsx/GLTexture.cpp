@@ -2,7 +2,7 @@
 #include "DXT.h"
 #include "../MainMemory.h"
 #include "../log.h"
-#include <gcm_tool.h>
+#include "GcmConstants.h"
 
 using namespace glm;
 

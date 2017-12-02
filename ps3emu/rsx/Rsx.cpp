@@ -1,5 +1,6 @@
 #include "Rsx.h"
 
+#include "GcmConstants.h"
 #include "GLBuffer.h"
 #include "Cache.h"
 #include "GLFramebuffer.h"
@@ -1345,6 +1346,7 @@ void Rsx::init() {
     boost::unique_lock<boost::mutex> lock(_initMutex);
     _thread.reset(new boost::thread([=]{ loop(); }));
     assignAffinity(_thread->native_handle(), AffinityGroup::PPUHost);
+    initMethodMap();
     _initCv.wait(lock, [=] { return _initialized; });
 
     INFO(rsx) << "rsx loop completed initialization";

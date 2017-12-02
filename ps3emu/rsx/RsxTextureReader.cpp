@@ -1,3 +1,4 @@
+#include "GcmConstants.h"
 #include "RsxTextureReader.h"
 #include "ps3emu/BitField.h"
 #include "ps3emu/utils.h"

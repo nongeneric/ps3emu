@@ -7,19 +7,12 @@
 #include "Tracer.h"
 #include "../log.h"
 #include "ps3emu/state.h"
+#include "GcmConstants.h"
 #include <vector>
 #include <map>
 #include <assert.h>
 
 using namespace boost::chrono;
-
-bool isScale(uint32_t value, uint32_t base, uint32_t step, uint32_t maxIndex, uint32_t& index) {
-    if (value < base)
-        return false;
-    auto diff = value - base;
-    index = diff / step;
-    return diff % step == 0 && index < maxIndex;
-}
 
 uint32_t swap16(uint32_t v) {
     return (v >> 16) | (v << 16);
@@ -58,109 +51,24 @@ float fixedUint9ToFloat(uint32_t val) {
     return (float)val / 8.f;
 }
 
-int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
-    MethodHeader header { read(get) };
-    auto count = header.count.u();
-#define readarg(x) ([=](unsigned n) {\
-        assert(n != 0);\
-        return read(get + 4 * n);\
-    })(x)
-
+int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
+    MethodHeader header { fast_endian_reverse(read[0]) };
+    _currentCount = header.count.u();
+    _currentGet = read;
+    _currentGetValue = get;
     auto offset = header.offset.u();
     
     RangeCloser closer;
     if (log_should(log_warning, log_rsx, log_perf)) {
         closer = RangeCloser(&_perfMap[offset]);
     }
-
-    
-    auto parseTextureAddress = [&](int argi, int index) {
-        union {
-            uint32_t val;
-            BitField<0, 4> zfunc;
-            BitField<4, 8> signedRemap;
-            BitField<8, 12> gamma;
-            BitField<12, 16> wrapr;
-            BitField<16, 20> unsignedRemap;
-            BitField<20, 24> wrapt;
-            BitField<24, 28> anisoBias;
-            BitField<28, 32> wraps;
-        } arg = { readarg(argi) };
-        TextureAddress(
-            index,
-            arg.wraps.u(),
-            arg.wrapt.u(),
-            arg.wrapr.u(),
-            arg.unsignedRemap.u(),
-            arg.zfunc.u(),
-            arg.gamma.u(),
-            arg.anisoBias.u(),
-            arg.signedRemap.u()
-        );
-    };
-    
-    auto parseTextureControl0 = [&](int argi, int index) {
-        union {
-            uint32_t val;
-            BitField<0, 1> enable;
-            BitField<1, 5> minlod_i;
-            BitField<5, 13> minlod_d;
-            BitField<13, 17> maxlod_i;
-            BitField<17, 25> maxlod_d;
-            BitField<25, 28> maxaniso;
-            BitField<28, 30> alphakill;
-        } arg = { readarg(argi) };
-        TextureControl0(
-            index,
-            arg.alphakill.u(),
-            arg.maxaniso.u(),
-            arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f,
-            arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
-            arg.enable.u()
-        );
-    };
-    
-    auto parseTextureFilter = [&](int argi, int index) {
-        union {
-            uint32_t val;
-            BitField<0, 1> bs;
-            BitField<1, 2> gs;
-            BitField<2, 3> rs;
-            BitField<3, 4> as;
-            BitField<4, 8> mag;
-            BitField<8, 16> min;
-            BitField<16, 19> conv;
-            BitField<19, 24> biasInteger;
-            BitField<24, 32> biasDecimal;
-        } arg = { readarg(argi) };
-        TextureFilter(
-            index,
-            arg.biasInteger.s() + arg.biasDecimal.u() / 255.f,
-            arg.min.u(),
-            arg.mag.u(),
-            arg.conv.u(),
-            arg.as.u(),
-            arg.rs.u(),
-            arg.gs.u(),
-            arg.bs.u()
-        );
-    };
-    
-    auto parseTextureBorderColor = [&](int argi, int index) {
-        auto c = parseColor(readarg(argi));
-        TextureBorderColor(index, c[0], c[1], c[2], c[3]);
-    };
-    
-    auto parseTextureImageRect = [&](int argi, int index) {
-        auto arg = readarg(argi);
-        TextureImageRect(index, arg >> 16, arg & 0xffff);
-    };
     
     if (header.val == 0) {
         assert(header.count.u() == 0);
         INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, _put.load());
         return 4;
     }
+
     if (header.prefix.u() == 1) {
         auto offset = header.jumpoffset.u();
         if (offset != get) { // don't log on busy wait
@@ -168,12 +76,14 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         }
         return offset - get;
     }
+
     if (header.callsuffix.u() == 2) {
         auto offset = header.calloffset.u() << 2;
         _ret = get + 4;
         INFO(rsx) << ssnprintf("rsx call %x to %x", get, offset);
         return offset - get;
     }
+
     if (header.val == 0x20000) {
         INFO(rsx) << ssnprintf("rsx ret to %x", _ret);
         if (!get) {
@@ -184,1461 +94,11 @@ int64_t Rsx::interpret(uint32_t get, std::function<uint32_t(uint32_t)> read) {
         return offset;
     }
 
-    auto len = 4;
-    const char* name = nullptr;
-    
-    static bool drawActive = false;
-    static uint32_t drawArrayFirst = -1;
-    static uint32_t drawIndexFirst = -1;
-    static uint32_t drawCount = 0;
-    
-    switch (offset) {
-        case 0x00000050:
-            //name = "CELL_GCM_NV406E_SET_REFERENCE";
-            SetReference(readarg(1));
-            break;
-        case 0x00000060:
-            //name = "CELL_GCM_NV406E_SET_CONTEXT_DMA_SEMAPHORE";
-            ChannelSetContextDmaSemaphore(readarg(1));
-            break;
-        case 0x00000064:
-            //name = "CELL_GCM_NV406E_SEMAPHORE_OFFSET";
-            ChannelSemaphoreOffset(readarg(1));
-            break;
-        case 0x00000068:
-            //name = "CELL_GCM_NV406E_SEMAPHORE_ACQUIRE";
-            ChannelSemaphoreAcquire(readarg(1));
-            break;
-        case 0x0000006c:
-            //name = "CELL_GCM_NV406E_SEMAPHORE_RELEASE";
-            SemaphoreRelease(readarg(1));
-            break;
-        case 0x00000000:
-            name = "CELL_GCM_NV4097_SET_OBJECT";
-            break;
-        case 0x00000100:
-            name = "CELL_GCM_NV4097_NO_OPERATION";
-            break;
-        case 0x00000104:
-            name = "CELL_GCM_NV4097_NOTIFY";
-            break;
-        case 0x00000110:
-            name = "CELL_GCM_NV4097_WAIT_FOR_IDLE";
-            break;
-        case 0x00000140:
-            name = "CELL_GCM_NV4097_PM_TRIGGER";
-            break;
-        case 0x00000180:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_NOTIFIES";
-            break;
-        case 0x00000184:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_A";
-            break;
-        case 0x00000188:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_B";
-            break;
-        case 0x0000018c:
-            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_B";
-            ContextDmaColorB(readarg(1));
-            break;
-        case 0x00000190:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_STATE";
-            break;
-        case 0x00000194:
-            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_A";
-            ContextDmaColorA(readarg(1));
-            break;
-        case 0x00000198:
-            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_ZETA";
-            ContextDmaZeta(readarg(1));
-            break;
-        case 0x0000019c:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_A";
-            break;
-        case 0x000001a0:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_B";
-            break;
-        case 0x000001a4:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_SEMAPHORE";
-            break;
-        case 0x000001a8:
-            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_REPORT";
-            ContextDmaReport(readarg(1));
-            break;
-        case 0x000001ac:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_CLIP_ID";
-            break;
-        case 0x000001b0:
-            name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_CULL_DATA";
-            break;
-        case 0x000001b4:
-            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_C";
-            if (count == 1) {
-                ContextDmaColorC_1(readarg(1));
-            } else {
-                ContextDmaColorC_2(readarg(1), readarg(2));
-            }
-            break;
-        case 0x000001b8:
-            //name = "CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_D";
-            ContextDmaColorD(readarg(1));
-            break;
-        case 0x00000200: {
-            //name = "CELL_GCM_NV4097_SET_SURFACE_CLIP_HORIZONTAL";
-            auto arg1 = readarg(1);
-            auto arg2 = readarg(2);
-            SurfaceClipHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
-            break;
-        }
-        case 0x00000204:
-            name = "CELL_GCM_NV4097_SET_SURFACE_CLIP_VERTICAL";
-            break;
-        case 0x00000208: {
-            //name = "CELL_GCM_NV4097_SET_SURFACE_FORMAT";
-            union {
-                uint32_t val;
-                BitField<0, 8> height;
-                BitField<8, 16> width;
-                BitField<16, 20> antialias;
-                BitField<20, 24> type;
-                BitField<24, 27> depthFormat;
-                BitField<27, 32> colorFormat;
-            } arg = { readarg(1) };
-            SurfaceFormat(
-                enum_cast<GcmSurfaceColor>(arg.colorFormat.u()),
-                enum_cast<SurfaceDepthFormat>(arg.depthFormat.u()),
-                arg.antialias.u(),
-                arg.type.u(),
-                arg.width.u(),
-                arg.height.u(),
-                readarg(2),
-                readarg(3),
-                readarg(4),
-                readarg(5),
-                readarg(6)
-            );
-            break;
-        }
-        case 0x0000020c:
-            name = "CELL_GCM_NV4097_SET_SURFACE_PITCH_A";
-            break;
-        case 0x00000210:
-            name = "CELL_GCM_NV4097_SET_SURFACE_COLOR_AOFFSET";
-            break;
-        case 0x00000214:
-            name = "CELL_GCM_NV4097_SET_SURFACE_ZETA_OFFSET";
-            break;
-        case 0x00000218:
-            name = "CELL_GCM_NV4097_SET_SURFACE_COLOR_BOFFSET";
-            break;
-        case 0x0000021c:
-            name = "CELL_GCM_NV4097_SET_SURFACE_PITCH_B";
-            break;
-        case 0x00000220:
-            //name = "CELL_GCM_NV4097_SET_SURFACE_COLOR_TARGET";
-            SurfaceColorTarget(readarg(1));
-            break;
-        case 0x0000022c:
-            //name = "CELL_GCM_NV4097_SET_SURFACE_PITCH_Z";
-            SurfacePitchZ(readarg(1));
-            break;
-        case 0x00000234:
-            name = "CELL_GCM_NV4097_INVALIDATE_ZCULL";
-            break;
-        case 0x00000238:
-            name = "CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP";
-            break;
-        case 0x0000023c:
-            name = "CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP1";
-            break;
-        case 0x00000280:
-            //name = "CELL_GCM_NV4097_SET_SURFACE_PITCH_C";
-            SurfacePitchC(readarg(1), readarg(2), readarg(3), readarg(4));
-            break;
-        case 0x00000284:
-            name = "CELL_GCM_NV4097_SET_SURFACE_PITCH_D";
-            break;
-        case 0x00000288:
-            name = "CELL_GCM_NV4097_SET_SURFACE_COLOR_COFFSET";
-            break;
-        case 0x0000028c:
-            name = "CELL_GCM_NV4097_SET_SURFACE_COLOR_DOFFSET";
-            break;
-        case 0x000002b8: {
-            //name = "CELL_GCM_NV4097_SET_WINDOW_OFFSET";
-            auto arg1 = readarg(1);
-            WindowOffset(arg1 & 0xff, arg1 >> 16);
-            break;
-        }
-        case 0x000002bc:
-            name = "CELL_GCM_NV4097_SET_WINDOW_CLIP_TYPE";
-            break;
-        case 0x000002c0:
-            name = "CELL_GCM_NV4097_SET_WINDOW_CLIP_HORIZONTAL";
-            break;
-        case 0x000002c4:
-            name = "CELL_GCM_NV4097_SET_WINDOW_CLIP_VERTICAL";
-            break;
-        case 0x00000300:
-            name = "CELL_GCM_NV4097_SET_DITHER_ENABLE";
-            break;
-        case 0x00000304:
-            //name = "CELL_GCM_NV4097_SET_ALPHA_TEST_ENABLE";
-            AlphaTestEnable(readarg(1));
-            break;
-        case 0x00000308:
-            //name = "CELL_GCM_NV4097_SET_ALPHA_FUNC";
-            AlphaFunc(enum_cast<GcmOperator>(readarg(1)), readarg(2));
-            break;
-        case 0x0000030c:
-            name = "CELL_GCM_NV4097_SET_ALPHA_REF";
-            break;
-        case 0x00000310:
-            //name = "CELL_GCM_NV4097_SET_BLEND_ENABLE";
-            BlendEnable(readarg(1));
-            break;
-        case 0x00000314: {
-            //name = "CELL_GCM_NV4097_SET_BLEND_FUNC_SFACTOR";
-            auto arg1 = readarg(1);
-            auto arg2 = readarg(2);
-            BlendFuncSFactor(enum_cast<GcmBlendFunc>(arg1 & 0xffff),
-                             enum_cast<GcmBlendFunc>(arg1 >> 16),
-                             enum_cast<GcmBlendFunc>(arg2 & 0xffff),
-                             enum_cast<GcmBlendFunc>(arg2 >> 16));
-            break;
-        }
-        case 0x00000318:
-            name = "CELL_GCM_NV4097_SET_BLEND_FUNC_DFACTOR";
-            break;
-        case 0x0000031c:
-            name = "CELL_GCM_NV4097_SET_BLEND_COLOR";
-            break;
-        case 0x00000320: {
-            //name = "CELL_GCM_NV4097_SET_BLEND_EQUATION";
-            auto arg = readarg(1);
-            BlendEquation(enum_cast<GcmBlendEquation>(arg & 0xffff),
-                          enum_cast<GcmBlendEquation>(arg >> 16));
-            break;
-        }
-        case 0x00000324:
-            //name = "CELL_GCM_NV4097_SET_COLOR_MASK";
-            ColorMask(enum_cast<GcmColorMask>(readarg(1)));
-            break;
-        case 0x00000328:
-            //name = "CELL_GCM_NV4097_SET_STENCIL_TEST_ENABLE";
-            StencilTestEnable(readarg(1));
-            break;
-        case 0x0000032c:
-            //name = "CELL_GCM_NV4097_SET_STENCIL_MASK";
-            StencilMask(readarg(1));
-            break;
-        case 0x00000330:
-            //name = "CELL_GCM_NV4097_SET_STENCIL_FUNC";
-            StencilFunc(enum_cast<GcmOperator>(readarg(1)), readarg(2), readarg(3));
-            break;
-        case 0x00000334:
-            name = "CELL_GCM_NV4097_SET_STENCIL_FUNC_REF";
-            break;
-        case 0x00000338:
-            name = "CELL_GCM_NV4097_SET_STENCIL_FUNC_MASK";
-            break;
-        case 0x0000033c:
-            //name = "CELL_GCM_NV4097_SET_STENCIL_OP_FAIL";
-            StencilOpFail(readarg(1), readarg(2), readarg(3));
-            break;
-        case 0x00000340:
-            name = "CELL_GCM_NV4097_SET_STENCIL_OP_ZFAIL";
-            break;
-        case 0x00000344:
-            name = "CELL_GCM_NV4097_SET_STENCIL_OP_ZPASS";
-            break;
-        case 0x00000348:
-            name = "CELL_GCM_NV4097_SET_TWO_SIDED_STENCIL_TEST_ENABLE";
-            break;
-        case 0x0000034c:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_MASK";
-            break;
-        case 0x00000350:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC";
-            break;
-        case 0x00000354:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_REF";
-            break;
-        case 0x00000358:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_MASK";
-            break;
-        case 0x0000035c:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_OP_FAIL";
-            break;
-        case 0x00000360:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZFAIL";
-            break;
-        case 0x00000364:
-            name = "CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZPASS";
-            break;
-        case 0x00000368:
-            //name = "CELL_GCM_NV4097_SET_SHADE_MODE";
-            ShadeMode(readarg(1));
-            break;
-        case 0x0000036c:
-            name = "CELL_GCM_NV4097_SET_BLEND_ENABLE_MRT";
-            break;
-        case 0x00000370:
-            name = "CELL_GCM_NV4097_SET_COLOR_MASK_MRT";
-            break;
-        case 0x00000374:
-            //name = "CELL_GCM_NV4097_SET_LOGIC_OP_ENABLE";
-            LogicOpEnable(readarg(1));
-            break;
-        case 0x00000378: {
-            //name = "CELL_GCM_NV4097_SET_LOGIC_OP";
-            LogicOp(enum_cast<GcmLogicOp>(readarg(1)));
-            break;
-        }
-        case 0x0000037c:
-            name = "CELL_GCM_NV4097_SET_BLEND_COLOR2";
-            break;
-        case 0x00000380:
-            name = "CELL_GCM_NV4097_SET_DEPTH_BOUNDS_TEST_ENABLE";
-            break;
-        case 0x00000384:
-            name = "CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MIN";
-            break;
-        case 0x00000388:
-            name = "CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MAX";
-            break;
-        case 0x00000394:
-            //name = "CELL_GCM_NV4097_SET_CLIP_MIN";
-            ClipMin(
-                union_cast<uint32_t, float>(readarg(1)),
-                union_cast<uint32_t, float>(readarg(2))
-            );
-            break;
-        case 0x00000398:
-            name = "CELL_GCM_NV4097_SET_CLIP_MAX";
-            break;
-        case 0x000003b0:
-            //name = "CELL_GCM_NV4097_SET_CONTROL0";
-            Control0(readarg(1));
-            break;
-        case 0x000003b8: {
-            //name = "CELL_GCM_NV4097_SET_LINE_WIDTH";
-            LineWidth(fixedUint9ToFloat(readarg(1)));
-            break;
-        }
-        case 0x000003bc: {
-            //name = "CELL_GCM_NV4097_SET_LINE_SMOOTH_ENABLE";
-            LineSmoothEnable(readarg(1));
-            break;
-        }
-        case 0x000008c0: {
-            //name = "CELL_GCM_NV4097_SET_SCISSOR_HORIZONTAL";
-            auto arg1 = readarg(1);
-            auto arg2 = readarg(2);
-            ScissorHorizontal(arg1 & 0xffff, arg1 >> 16, arg2 & 0xffff, arg2 >> 16);
-            break;
-        }
-        case 0x000008c4:
-            name = "CELL_GCM_NV4097_SET_SCISSOR_VERTICAL";
-            break;
-        case 0x000008cc:
-            name = "CELL_GCM_NV4097_SET_FOG_MODE";
-            FogMode(readarg(1));
-            break;
-        case 0x000008d0:
-            name = "CELL_GCM_NV4097_SET_FOG_PARAMS";
-            break;
-        case 0x000008e4: {
-            //name = "CELL_GCM_NV4097_SET_SHADER_PROGRAM";
-            auto arg = readarg(1);
-            ShaderProgram(arg & ~0b11ul, (arg & 0b11) - 1);
-            break;
-        }
-        case 0x00000904:
-            name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FORMAT";
-            break;
-        case 0x00000a00: {
-            //name = "CELL_GCM_NV4097_SET_VIEWPORT_HORIZONTAL";
-            auto arg1 = readarg(1);
-            auto arg2 = readarg(2);
-            ViewportHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
-            break;
-        }
-        case 0x00000a04:
-            name = "CELL_GCM_NV4097_SET_VIEWPORT_VERTICAL";
-            break;
-        case 0x00000a0c:
-            name = "CELL_GCM_NV4097_SET_POINT_CENTER_MODE";
-            break;
-        case 0x00000a1c:
-            name = "CELL_GCM_NV4097_ZCULL_SYNC";
-            break;
-        case 0x00000a20: {
-            //name = "CELL_GCM_NV4097_SET_VIEWPORT_OFFSET";
-            ViewportOffset(
-                union_cast<uint32_t, float>(readarg(1)),
-                union_cast<uint32_t, float>(readarg(2)),
-                union_cast<uint32_t, float>(readarg(3)),
-                union_cast<uint32_t, float>(readarg(4)),
-                union_cast<uint32_t, float>(readarg(5)),
-                union_cast<uint32_t, float>(readarg(6)),
-                union_cast<uint32_t, float>(readarg(7)),
-                union_cast<uint32_t, float>(readarg(8))
-            );
-            break;
-        }
-        case 0x00000a30:
-            name = "CELL_GCM_NV4097_SET_VIEWPORT_SCALE";
-            break;
-        case 0x00000a60:
-            name = "CELL_GCM_NV4097_SET_POLY_OFFSET_POINT_ENABLE";
-            break;
-        case 0x00000a64:
-            //name = "CELL_GCM_NV4097_SET_POLY_OFFSET_LINE_ENABLE";
-            PolyOffsetLineEnable(readarg(1));
-            break;
-        case 0x00000a68:
-            //name = "CELL_GCM_NV4097_SET_POLY_OFFSET_FILL_ENABLE";
-            PolyOffsetFillEnable(readarg(1));
-            break;
-        case 0x00000a6c:
-            //name = "CELL_GCM_NV4097_SET_DEPTH_FUNC";
-            DepthFunc(enum_cast<GcmOperator>(readarg(1)));
-            break;
-        case 0x00000a70:
-            name = "CELL_GCM_NV4097_SET_DEPTH_MASK";
-            break;
-        case 0x00000a74:
-            //name = "CELL_GCM_NV4097_SET_DEPTH_TEST_ENABLE";
-            DepthTestEnable(readarg(1));
-            break;
-        case 0x00000a78:
-            name = "CELL_GCM_NV4097_SET_POLYGON_OFFSET_SCALE_FACTOR";
-            break;
-        case 0x00000a7c:
-            name = "CELL_GCM_NV4097_SET_POLYGON_OFFSET_BIAS";
-            break;
-        case 0x00000a80:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA_SCALED4S_M";
-            break;
-        case 0x00001428:
-            name = "CELL_GCM_NV4097_SET_SPECULAR_ENABLE";
-            break;
-        case 0x0000142c:
-            name = "CELL_GCM_NV4097_SET_TWO_SIDE_LIGHT_EN";
-            break;
-        case 0x00001438:
-            name = "CELL_GCM_NV4097_CLEAR_ZCULL_SURFACE";
-            break;
-        case 0x00001450:
-            name = "CELL_GCM_NV4097_SET_PERFORMANCE_PARAMS";
-            break;
-        case 0x00001454:
-            //name = "CELL_GCM_NV4097_SET_FLAT_SHADE_OP";
-            FlatShadeOp(readarg(1));
-            break;
-        case 0x0000145c:
-            name = "CELL_GCM_NV4097_SET_EDGE_FLAG";
-            break;
-        case 0x00001478:
-            name = "CELL_GCM_NV4097_SET_USER_CLIP_PLANE_CONTROL";
-            break;
-        case 0x0000147c:
-            name = "CELL_GCM_NV4097_SET_POLYGON_STIPPLE";
-            break;
-        case 0x00001480:
-            name = "CELL_GCM_NV4097_SET_POLYGON_STIPPLE_PATTERN";
-            break;
-        case 0x00001500:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA3F_M";
-            break;
-        case 0x00001710:
-            name = "CELL_GCM_NV4097_INVALIDATE_VERTEX_CACHE_FILE";
-            break;
-        case 0x00001714:
-            //name = "CELL_GCM_NV4097_INVALIDATE_VERTEX_FILE";
-            // no-op
-            break;
-        case 0x00001718:
-            name = "CELL_GCM_NV4097_PIPE_NOP";
-            break;
-        case 0x00001738:
-            //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_OFFSET";
-            VertexDataBaseOffset(readarg(1), readarg(2));
-            break;
-        case 0x0000173c:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_INDEX";
-            break;
-        case 0x000017c8:
-            name = "CELL_GCM_NV4097_CLEAR_REPORT_VALUE";
-            break;
-        case 0x000017cc:
-            name = "CELL_GCM_NV4097_SET_ZPASS_PIXEL_COUNT_ENABLE";
-            break;
-        case 0x00001800: {
-            //name = "CELL_GCM_NV4097_GET_REPORT";
-            auto arg = readarg(1);
-            GetReport(arg >> 24, arg & 0xffffff);
-            break;
-        }
-        case 0x00001804:
-            name = "CELL_GCM_NV4097_SET_ZCULL_STATS_ENABLE";
-            break;
-        case 0x00001808: {
-            //name = "CELL_GCM_NV4097_SET_BEGIN_END";
-            auto mode = enum_cast<GcmPrimitive>(readarg(1));
-            drawActive = (unsigned)mode;
-            if (!drawActive) {
-                if (drawArrayFirst != -1u) {
-                    DrawArrays(drawArrayFirst, drawCount);
-                } else if (drawIndexFirst != -1u) {
-                    DrawIndexArray(drawIndexFirst, drawCount);
-                }
-                drawArrayFirst = -1u;
-                drawIndexFirst = -1u;
-                drawCount = 0;
-            }
-            BeginEnd(mode);
-            break;
-        }
-        case 0x0000180c:
-            name = "CELL_GCM_NV4097_ARRAY_ELEMENT16";
-            break;
-        case 0x00001810:
-            name = "CELL_GCM_NV4097_ARRAY_ELEMENT32";
-            break;
-        case 0x00001814: {
-            //name = "CELL_GCM_NV4097_DRAW_ARRAYS";
-            auto arg = readarg(1);
-            if (drawArrayFirst == -1u) {
-                drawArrayFirst = arg & 0xffffff;
-            }
-            for (auto i = 1u; i <= count; ++i) {
-                arg = readarg(i);
-                drawCount += (arg >> 24) + 1;
-            }
-            break;
-        }
-        case 0x00001818:
-            //name = "CELL_GCM_NV4097_INLINE_ARRAY";
-            InlineArray(get + 4, count);
-            break;
-        case 0x0000181c: {
-            //name = "CELL_GCM_NV4097_SET_INDEX_ARRAY_ADDRESS";
-            if (count == 1) {
-                IndexArrayAddress1(readarg(1));
-            } else {
-                assert(count == 2);
-                auto arg2 = readarg(2);
-                IndexArrayAddress(arg2 & 0xf, readarg(1), enum_cast<GcmDrawIndexArrayType>(arg2 >> 4));
-            }
-            break;
-        }
-        case 0x00001820: {
-            //name = "CELL_GCM_NV4097_SET_INDEX_ARRAY_DMA";
-            auto arg = readarg(1);
-            IndexArrayDma(arg & 0xf, enum_cast<GcmDrawIndexArrayType>(arg >> 4));
-            assert(count == 1);
-            break;
-        }
-        case 0x00001824: {
-            //name = "CELL_GCM_NV4097_DRAW_INDEX_ARRAY";
-            auto arg = readarg(1);
-            if (drawIndexFirst == -1u) {
-                drawIndexFirst = arg & 0xffffff;
-            }
-            for (auto i = 1u; i <= count; ++i) {
-                arg = readarg(i);
-                drawCount += (arg >> 24) + 1;
-            }
-            break;
-        }
-        case 0x00001828:
-            //name = "CELL_GCM_NV4097_SET_FRONT_POLYGON_MODE";
-            FrontPolygonMode(readarg(1));
-            break;
-        case 0x0000182c:
-            //name = "CELL_GCM_NV4097_SET_BACK_POLYGON_MODE";
-            BackPolygonMode(readarg(1));
-            break;
-        case 0x00001830:
-            //name = "CELL_GCM_NV4097_SET_CULL_FACE";
-            CullFace(enum_cast<GcmCullFace>(readarg(1)));
-            break;
-        case 0x00001834:
-            name = "CELL_GCM_NV4097_SET_FRONT_FACE";
-            break;
-        case 0x00001838:
-            //name = "CELL_GCM_NV4097_SET_POLY_SMOOTH_ENABLE";
-            PolySmoothEnable(readarg(1));
-            break;
-        case 0x0000183c:
-            //name = "CELL_GCM_NV4097_SET_CULL_FACE_ENABLE";
-            CullFaceEnable(readarg(1));
-            break;
-        case 0x00001880:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA2F_M";
-            break;
-        case 0x00001900:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA2S_M";
-            break;
-        case 0x00001940:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA4UB_M";
-            break;
-        case 0x00001980:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA4S_M";
-            break;
-        case 0x00001a04:
-            name = "CELL_GCM_NV4097_SET_TEXTURE_FORMAT";
-            break;
-        case 0x00001d00:
-            name = "CELL_GCM_NV4097_SET_COLOR_KEY_COLOR";
-            break;
-        case 0x00001d60: {
-            //name = "CELL_GCM_NV4097_SET_SHADER_CONTROL";
-            auto arg = readarg(1);
-            ShaderControl(arg & 0xe, (arg & 0x40) == 0, arg & 0x80, arg >> 24);
-            break;
-        }
-        case 0x00001d64:
-            name = "CELL_GCM_NV4097_SET_INDEXED_CONSTANT_READ_LIMITS";
-            break;
-        case 0x00001d6c:
-            //name = "CELL_GCM_NV4097_SET_SEMAPHORE_OFFSET";
-            SemaphoreOffset(readarg(1));
-            break;
-        case 0x00001d70: {
-            //name = "CELL_GCM_NV4097_BACK_END_WRITE_SEMAPHORE_RELEASE";
-            auto value = swap02(readarg(1));
-            BackEndWriteSemaphoreRelease(value);
-            break;
-        }
-        case 0x00001d74:
-            //name = "CELL_GCM_NV4097_TEXTURE_READ_SEMAPHORE_RELEASE";
-            TextureReadSemaphoreRelease(readarg(1));
-            break;
-        case 0x00001d78:
-            name = "CELL_GCM_NV4097_SET_ZMIN_MAX_CONTROL";
-            break;
-        case 0x00001d7c:
-            name = "CELL_GCM_NV4097_SET_ANTI_ALIASING_CONTROL";
-            break;
-        case 0x00001d80:
-            name = "CELL_GCM_NV4097_SET_SURFACE_COMPRESSION";
-            SurfaceCompression(readarg(1));
-            break;
-        case 0x00001d84:
-            name = "CELL_GCM_NV4097_SET_ZCULL_EN";
-            break;
-        case 0x00001d88: {
-            //name = "CELL_GCM_NV4097_SET_SHADER_WINDOW";
-            auto arg = readarg(1);
-            ShaderWindow(arg & 0xfff, (arg >> 12) & 0xf, (arg >> 16) & 0xffff);
-            break;
-        }
-        case 0x00001d8c:
-            //name = "CELL_GCM_NV4097_SET_ZSTENCIL_CLEAR_VALUE";
-            ZStencilClearValue(readarg(1));
-            break;
-        case 0x00001d90:
-            //name = "CELL_GCM_NV4097_SET_COLOR_CLEAR_VALUE";
-            ColorClearValue(readarg(1));
-            break;
-        case 0x00001d94:
-            //name = "CELL_GCM_NV4097_CLEAR_SURFACE";
-            ClearSurface(enum_cast<GcmClearMask>(readarg(1)));
-            break;
-        case 0x00001d98: {
-            //name = "CELL_GCM_NV4097_SET_CLEAR_RECT_HORIZONTAL";
-            auto arg1 = readarg(1);
-            auto arg2 = readarg(2);
-            ClearRectHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
-            break;
-        }
-        case 0x00001d9c:
-            name = "CELL_GCM_NV4097_SET_CLEAR_RECT_VERTICAL";
-            break;
-        case 0x00001da4:
-            name = "CELL_GCM_NV4097_SET_CLIP_ID_TEST_ENABLE";
-            ClipIdTestEnable(readarg(1));
-            break;
-        case 0x00001dac:
-            //name = "CELL_GCM_NV4097_SET_RESTART_INDEX_ENABLE";
-            RestartIndexEnable(readarg(1));
-            break;
-        case 0x00001db0:
-            //name = "CELL_GCM_NV4097_SET_RESTART_INDEX";
-            RestartIndex(readarg(1));
-            break;
-        case 0x00001db4:
-            name = "CELL_GCM_NV4097_SET_LINE_STIPPLE";
-            break;
-        case 0x00001db8:
-            name = "CELL_GCM_NV4097_SET_LINE_STIPPLE_PATTERN";
-            break;
-        case 0x00001e40:
-            name = "CELL_GCM_NV4097_SET_VERTEX_DATA1F_M";
-            break;
-        case 0x00001e94:
-            name = "CELL_GCM_NV4097_SET_TRANSFORM_EXECUTION_MODE";
-            break;
-        case 0x00001e98:
-            name = "CELL_GCM_NV4097_SET_RENDER_ENABLE";
-            break;
-        case 0x00001e9c:
-            //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_LOAD";
-            if (count == 1) {
-                TransformProgramLoad(readarg(1), readarg(1));
-            } else {
-                assert(count == 2);
-                TransformProgramLoad(readarg(1), readarg(2));
-            }
-            break;
-        case 0x00001ea0: {
-            //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_START";
-            TransformProgramStart(readarg(1));
-            break;
-        }
-        case 0x00001ea4:
-            name = "CELL_GCM_NV4097_SET_ZCULL_CONTROL0";
-            break;
-        case 0x00001ea8:
-            name = "CELL_GCM_NV4097_SET_ZCULL_CONTROL1";
-            break;
-        case 0x00001eac:
-            name = "CELL_GCM_NV4097_SET_SCULL_CONTROL";
-            break;
-        case 0x00001ee0:
-            //name = "CELL_GCM_NV4097_SET_POINT_SIZE";
-            PointSize(union_cast<uint32_t, float>(readarg(1)));
-            break;
-        case 0x00001ee4:
-            //name = "CELL_GCM_NV4097_SET_POINT_PARAMS_ENABLE";
-            PointParamsEnable(readarg(1));
-            break;
-        case 0x00001ee8: {
-            //name = "CELL_GCM_NV4097_SET_POINT_SPRITE_CONTROL";
-            auto arg = readarg(1);
-            PointSpriteControl(arg & 1, (arg >> 1) & 3, enum_cast<PointSpriteTex>(arg & 0xffff00));
-            break;
-        }
-        case 0x00001ef8: {
-            //name = "CELL_GCM_NV4097_SET_TRANSFORM_TIMEOUT";
-            auto arg = readarg(1);
-            TransformTimeout(arg & 0xffff, arg >> 16);
-            break;
-        }
-        case 0x00001efc: {
-            //name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD";
-            TransformConstantLoad(readarg(1), 
-                                  get + 4 * 2, 
-                                  count - 1);
-            break;
-        }
-        case 0x00001f00:
-            name = "CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT";
-            break;
-        case 0x00001fc0:
-            //name = "CELL_GCM_NV4097_SET_FREQUENCY_DIVIDER_OPERATION";
-            FrequencyDividerOperation(readarg(1));
-            break;
-        case 0x00001fc4:
-            name = "CELL_GCM_NV4097_SET_ATTRIB_COLOR";
-            break;
-        case 0x00001fc8:
-            name = "CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD";
-            break;
-        case 0x00001fcc:
-            name = "CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD_EX";
-            break;
-        case 0x00001fd0:
-            name = "CELL_GCM_NV4097_SET_ATTRIB_UCLIP0";
-            break;
-        case 0x00001fd4:
-            name = "CELL_GCM_NV4097_SET_ATTRIB_UCLIP1";
-            break;
-        case 0x00001fd8:
-            name = "CELL_GCM_NV4097_INVALIDATE_L2";
-            break;
-        case 0x00001fe0:
-            //name = "CELL_GCM_NV4097_SET_REDUCE_DST_COLOR";
-            ReduceDstColor(readarg(1));
-            break;
-        case 0x00001fe8:
-            name = "CELL_GCM_NV4097_SET_NO_PARANOID_TEXTURE_FETCHES";
-            break;
-        case 0x00001fec:
-            name = "CELL_GCM_NV4097_SET_SHADER_PACKER";
-            break;
-        case 0x00001ff0:
-            //name = "CELL_GCM_NV4097_SET_VERTEX_ATTRIB_INPUT_MASK";
-            VertexAttribInputMask(enum_cast<InputMask>(readarg(1)));
-            break;
-        case 0x00001ff4:
-            //name = "CELL_GCM_NV4097_SET_VERTEX_ATTRIB_OUTPUT_MASK";
-            VertexAttribOutputMask(readarg(1));
-            break;
-        case 0x00001ff8:
-            name = "CELL_GCM_NV4097_SET_TRANSFORM_BRANCH_BITS";
-            break;
-        case 0x00002000:
-            name = "CELL_GCM_NV0039_SET_OBJECT";
-            break;
-        case 0x00002180:
-            name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_NOTIFIES";
-            break;
-        case 0x00002184:
-            //name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_IN";
-            DmaBufferIn(readarg(1), readarg(2));
-            break;
-        case 0x00002188:
-            name = "CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_OUT";
-            break;
-        case 0x0000230C:
-            //name = "CELL_GCM_NV0039_OFFSET_IN";
-            if (count == 1) {
-                OffsetIn_1(readarg(1));
-            } else {
-                assert(count == 8);
-                auto arg = readarg(7);
-                OffsetIn_9(readarg(1), 
-                           readarg(2), 
-                           readarg(3), 
-                           readarg(4), 
-                           readarg(5), 
-                           readarg(6), 
-                           arg & 0xff, 
-                           arg >> 8,
-                           readarg(8));
-            }
-            break;
-        case 0x00002310:
-            //name = "CELL_GCM_NV0039_OFFSET_OUT";
-            OffsetOut(readarg(1));
-            break;
-        case 0x00002314: {
-            //name = "CELL_GCM_NV0039_PITCH_IN";
-            auto arg = readarg(5);
-            PitchIn(readarg(1),
-                    readarg(2),
-                    readarg(3),
-                    readarg(4),
-                    arg & 0xff,
-                    arg >> 8);
-            break;
-        }
-        case 0x00002318:
-            name = "CELL_GCM_NV0039_PITCH_OUT";
-            break;
-        case 0x0000231C:
-            name = "CELL_GCM_NV0039_LINE_LENGTH_IN";
-            break;
-        case 0x00002320:
-            name = "CELL_GCM_NV0039_LINE_COUNT";
-            break;
-        case 0x00002324:
-            name = "CELL_GCM_NV0039_FORMAT";
-            break;
-        case 0x00002328:
-            //name = "CELL_GCM_NV0039_BUFFER_NOTIFY";
-            BufferNotify(readarg(1));
-            break;
-        case 0x00006000:
-            name = "CELL_GCM_NV3062_SET_OBJECT";
-            break;
-        case 0x00006180:
-            name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_NOTIFIES";
-            break;
-        case 0x00006184:
-            name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_SOURCE";
-            break;
-        case 0x00006188:
-            //name = "CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_DESTIN";
-            ContextDmaImageDestin(readarg(1));
-            break;
-        case 0x00006300: {
-            //name = "CELL_GCM_NV3062_SET_COLOR_FORMAT";
-            auto format = readarg(1);
-            auto arg2 = readarg(2);
-            auto srcPitch = arg2 & 0xffff; (void)srcPitch;
-            auto destPitch = arg2 >> 16;
-            if (count == 2) {
-                assert(srcPitch == destPitch);
-                ColorFormat_2(format, destPitch);
-            } else {
-                assert(count == 4);
-                if (readarg(3)) {
-                    assert(false);
-                }
-                ColorFormat_3(format, destPitch, readarg(4));
-            }
-            break;
-        }
-        case 0x00006304:
-            name = "CELL_GCM_NV3062_SET_PITCH";
-            break;
-        case 0x00006308:
-            name = "CELL_GCM_NV3062_SET_OFFSET_SOURCE";
-            break;
-        case 0x0000630C:
-            //name = "CELL_GCM_NV3062_SET_OFFSET_DESTIN";
-            OffsetDestin(readarg(1));
-            break;
-        case 0x00008000:
-            name = "CELL_GCM_NV309E_SET_OBJECT";
-            break;
-        case 0x00008180:
-            name = "CELL_GCM_NV309E_SET_CONTEXT_DMA_NOTIFIES";
-            break;
-        case 0x00008184:
-            //name = "CELL_GCM_NV309E_SET_CONTEXT_DMA_IMAGE";
-            ContextDmaImage(readarg(1));
-            break;
-        case 0x00008300: {
-            //name = "CELL_GCM_NV309E_SET_FORMAT";
-            auto arg = readarg(1);
-            Nv309eSetFormat(arg & 0xffff, 
-                            (arg >> 16) & 0xff, 
-                            (arg >> 24) & 0xff, 
-                            readarg(2));
-            break;
-        }
-        case 0x00008304:
-            name = "CELL_GCM_NV309E_SET_OFFSET";
-            break;
-        case 0x0000A000:
-            name = "CELL_GCM_NV308A_SET_OBJECT";
-            break;
-        case 0x0000A180:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_DMA_NOTIFIES";
-            break;
-        case 0x0000A184:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_COLOR_KEY";
-            break;
-        case 0x0000A188:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_CLIP_RECTANGLE";
-            break;
-        case 0x0000A18C:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_PATTERN";
-            break;
-        case 0x0000A190:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_ROP";
-            break;
-        case 0x0000A194:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_BETA1";
-            break;
-        case 0x0000A198:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_BETA4";
-            break;
-        case 0x0000A19C:
-            name = "CELL_GCM_NV308A_SET_CONTEXT_SURFACE";
-            break;
-        case 0x0000A2F8:
-            name = "CELL_GCM_NV308A_SET_COLOR_CONVERSION";
-            break;
-        case 0x0000A2FC:
-            name = "CELL_GCM_NV308A_SET_OPERATION";
-            break;
-        case 0x0000A300:
-            name = "CELL_GCM_NV308A_SET_COLOR_FORMAT";
-            break;
-        case 0x0000A304: {
-            //name = "CELL_GCM_NV308A_POINT";
-            auto arg1 = readarg(1);
-            auto arg2 = readarg(2);
-            auto arg3 = readarg(3);
-            Point(
-                arg1 & 0xffff, arg1 >> 16,
-                arg2 & 0xffff, arg2 >> 16,
-                arg3 & 0xffff, arg3 >> 16
-            );
-            break;
-        }
-        case 0x0000A308:
-            name = "CELL_GCM_NV308A_SIZE_OUT";
-            break;
-        case 0x0000A30C:
-            name = "CELL_GCM_NV308A_SIZE_IN";
-            break;
-        case 0x0000A400: {
-            //name = "CELL_GCM_NV308A_COLOR";
-            auto ptr = rsxOffsetToEa(MemoryLocation::Main, get + 4);
-            Color(ptr, count);
-            break;
-        }
-        case 0x0000C000:
-            name = "CELL_GCM_NV3089_SET_OBJECT";
-            break;
-        case 0x0000C180:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_DMA_NOTIFIES";
-            break;
-        case 0x0000C184:
-            //name = "CELL_GCM_NV3089_SET_CONTEXT_DMA_IMAGE";
-            Nv3089ContextDmaImage(readarg(1));
-            break;
-        case 0x0000C188:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_PATTERN";
-            break;
-        case 0x0000C18C:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_ROP";
-            break;
-        case 0x0000C190:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_BETA1";
-            break;
-        case 0x0000C194:
-            name = "CELL_GCM_NV3089_SET_CONTEXT_BETA4";
-            break;
-        case 0x0000C198:
-            //name = "CELL_GCM_NV3089_SET_CONTEXT_SURFACE";
-            Nv3089ContextSurface(readarg(1));
-            break;
-        case 0x0000C2FC: {
-            //name = "CELL_GCM_NV3089_SET_COLOR_CONVERSION";
-            auto xy = readarg(4);
-            auto hw = readarg(5);
-            auto outXy = readarg(6);
-            auto outHw = readarg(7);
-            Nv3089SetColorConversion(readarg(1),
-                                     readarg(2),
-                                     readarg(3),
-                                     xy & 0xffff,
-                                     xy >> 16,
-                                     hw & 0xffff,
-                                     hw >> 16,
-                                     outXy & 0xffff,
-                                     outXy >> 16,
-                                     outHw & 0xffff,
-                                     outHw >> 16,
-                                     fixedSint32ToFloat(readarg(8)),
-                                     fixedSint32ToFloat(readarg(9)));
-            break;
-        }
-        case 0x0000C300:
-            name = "CELL_GCM_NV3089_SET_COLOR_FORMAT";
-            break;
-        case 0x0000C304:
-            name = "CELL_GCM_NV3089_SET_OPERATION";
-            break;
-        case 0x0000C308:
-            name = "CELL_GCM_NV3089_CLIP_POINT";
-            break;
-        case 0x0000C30C:
-            name = "CELL_GCM_NV3089_CLIP_SIZE";
-            break;
-        case 0x0000C310:
-            name = "CELL_GCM_NV3089_IMAGE_OUT_POINT";
-            break;
-        case 0x0000C314:
-            name = "CELL_GCM_NV3089_IMAGE_OUT_SIZE";
-            break;
-        case 0x0000C318:
-            name = "CELL_GCM_NV3089_DS_DX";
-            break;
-        case 0x0000C31C:
-            name = "CELL_GCM_NV3089_DT_DY";
-            break;
-        case 0x0000C400: {
-            //name = "CELL_GCM_NV3089_IMAGE_IN_SIZE";
-            auto hw = readarg(1);
-            auto poi = readarg(2);
-            auto uv = readarg(4);
-            ImageInSize(hw & 0xffff,
-                        hw >> 16,
-                        poi & 0xffff,
-                        poi >> 16,
-                        poi >> 24,
-                        readarg(3),
-                        fixedUint16ToFloat(uv & 0xffff),
-                        fixedUint16ToFloat(uv >> 16));
-            break;
-        }
-        case 0x0000C404:
-            name = "CELL_GCM_NV3089_IMAGE_IN_FORMAT";
-            break;
-        case 0x0000C408:
-            name = "CELL_GCM_NV3089_IMAGE_IN_OFFSET";
-            break;
-        case 0x0000C40C:
-            name = "CELL_GCM_NV3089_IMAGE_IN";
-            break;
-        case 0x0000EB00:
-            //name = "CELL_GCM_DRIVER_INTERRUPT";
-            DriverInterrupt(readarg(1));
-            break;
-        case 0x0000E944:
-            //name = "CELL_GCM_DRIVER_QUEUE";
-            DriverQueue(readarg(1));
-            break;
-        case 0x0000E924:
-            //name = "CELL_GCM_DRIVER_FLIP";
-            DriverFlip(readarg(1));
-            break;
-        case 0x240:
-            name = "unknown_240";
-            break;
-        case 0xe000:
-            name = "unknown_e000";
-            break;
-        default: {
-            uint32_t index;
-            if (isScale(offset,
-                        0x00001a18,
-                        32,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT";
-                offset = 0x00001a18;
-                parseTextureImageRect(1, index);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001a1c,
-                        0x20,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR";
-                offset = 0x00001a1c;
-                parseTextureBorderColor(1, index);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001a0c,
-                        0x20,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL0";
-                offset = 0x00001a0c;
-                parseTextureControl0(1, index);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001a10,
-                        32,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL1";
-                offset = 0x00001a10;
-                TextureControl1(index, readarg(1));
-                break;
-            }
-            if (isScale(offset,
-                        0x00001a14,
-                        0x20,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_FILTER";
-                offset = 0x00001a14;
-                parseTextureFilter(1, index);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001a08,
-                        0x20,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_ADDRESS";
-                offset = 0x00001a08;
-                parseTextureAddress(1, index);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001680,
-                        4,
-                        16,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_OFFSET";
-                offset = 0x00001680;
-                for (auto i = 0u; i < count; ++i, ++index) {
-                    union {
-                        uint32_t val;
-                        BitField<0, 1> location;
-                        BitField<1, 32> offset;
-                    } arg = { readarg(1 + i) };
-                    VertexDataArrayOffset(
-                        index,
-                        arg.location.u(),
-                        arg.offset.u()
-                    );
-                }
-                break;
-            }
-            if (isScale(offset,
-                        0x00001740,
-                        4,
-                        16,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_FORMAT";
-                offset = 0x00001740;
-                for (auto i = 0u; i < count; ++i, ++index) {
-                    union {
-                        uint32_t val;
-                        BitField<0, 16> frequency;
-                        BitField<16, 24> stride;
-                        BitField<24, 28> size;
-                        BitField<28, 32> type;
-                    } arg = { readarg(1 + i) };
-                    VertexDataArrayFormat(
-                        index,
-                        arg.frequency.u(),
-                        arg.stride.u(),
-                        arg.size.u(),
-                        enum_cast<VertexInputType>(arg.type.u())
-                    );
-                }
-                break;
-            }
-            if (isScale(offset,
-                        0x00000908,
-                        32,
-                        4,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_ADDRESS";
-                offset = 0x00000908;
-                auto arg = readarg(1);
-                VertexTextureAddress(index, arg & 0xff, (arg >> 8) & 0xff);
-                break;
-            }
-            if (isScale(offset,
-                        0x0000091c,
-                        32,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_BORDER_COLOR";
-                offset = 0x0000091c;
-                auto c = parseColor(readarg(1));
-                VertexTextureBorderColor(index, c[0], c[1], c[2], c[3]);
-                break;
-            }
-            if (isScale(offset,
-                        0x0000090c,
-                        32,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL0";
-                offset = 0x0000090c;
-                union {
-                    uint32_t val;
-                    BitField<0, 1> enable;
-                    BitField<1, 5> minlod_i;
-                    BitField<5, 13> minlod_d;
-                    BitField<13, 17> maxlod_i;
-                    BitField<17, 25> maxlod_d;
-                } arg = { readarg(1) };
-                VertexTextureControl0(
-                    index, 
-                    arg.enable.u(), 
-                    arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
-                    arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f);
-                break;
-            }
-            if (isScale(offset,
-                        0x00000914,
-                        32,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FILTER";
-                offset = 0x00000914;
-                union {
-                    uint32_t val;
-                    BitField<19, 24> integer;
-                    BitField<24, 32> decimal;
-                } arg = { readarg(1) };
-                VertexTextureFilter(index, arg.integer.s() + (float)arg.decimal.u() / 256.f);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001a00,
-                        32,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_OFFSET";
-                offset = 0x00001a00;
-                assert(count == 2 || count == 8);
-                union {
-                    uint32_t val;
-                    BitField<8, 16> mipmap;
-                    BitField<16, 24> format;
-                    BitField<24, 28> dimension;
-                    BitField<28, 29> border;
-                    BitField<29, 30> cubemap;
-                    BitField<30, 32> location;
-                } f = { readarg(2) };
-                auto lnUnMask = (uint8_t)(GcmTextureLnUn::LN | GcmTextureLnUn::UN);
-                auto formatMask = ~lnUnMask;
-                auto format = enum_cast<GcmTextureFormat>(f.format.u() & formatMask);
-                auto lnUn = enum_cast<GcmTextureLnUn>(f.format.u() & lnUnMask);
-                TextureOffset(index,
-                              readarg(1),
-                              f.mipmap.u(),
-                              format,
-                              lnUn,
-                              f.dimension.u(),
-                              f.border.u(),
-                              f.cubemap.u(),
-                              f.location.u() - 1);
-                if (count == 8) {
-                    parseTextureAddress(3, index);
-                    parseTextureControl0(4, index);
-                    TextureControl1(index, readarg(5));
-                    parseTextureFilter(6, index);
-                    parseTextureImageRect(7, index);
-                    parseTextureBorderColor(8, index);
-                }
-                break;
-            }
-            if (isScale(offset,
-                        0x00001840,
-                        4,
-                        CELL_GCM_MAX_TEXIMAGE_COUNT,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL3";
-                offset = 0x00001840;
-                union {
-                    uint32_t val;
-                    BitField<0, 12> depth;
-                    BitField<12, 32> pitch;
-                } f = { readarg(1) };
-                TextureControl3(index, f.depth.u(), f.pitch.u());
-                break;
-            }
-            if (isScale(offset,
-                        0x00000900,
-                        32,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_OFFSET";
-                offset = 0x00000900;
-                union {
-                    uint32_t val;
-                    BitField<8, 16> mipmap;
-                    BitField<16, 24> format;
-                    BitField<24, 28> dimension;
-                    BitField<28, 32> location;
-                } f = { readarg(2) };
-                auto lnUnMask = (uint8_t)(GcmTextureLnUn::LN | GcmTextureLnUn::UN);
-                auto formatMask = ~lnUnMask;
-                auto format = enum_cast<GcmTextureFormat>(f.format.u() & formatMask);
-                auto lnUn = enum_cast<GcmTextureLnUn>(f.format.u() & lnUnMask);
-                VertexTextureOffset(index, 
-                                    readarg(1), 
-                                    f.mipmap.u(),
-                                    format,
-                                    lnUn,
-                                    f.dimension.u(),
-                                    f.location.u() - 1);
-                break;
-            }
-            if (isScale(offset,
-                        0x00000910,
-                        32,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL3";
-                offset = 0x00000910;
-                VertexTextureControl3(index, readarg(1));
-                break;
-            }
-            if (isScale(offset,
-                        0x00000918,
-                        32,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_TEXTURE_IMAGE_RECT";
-                offset = 0x00000918;
-                auto arg = readarg(1);
-                VertexTextureImageRect(index, arg >> 16, arg & 0xffff);
-                break;
-            }
-            if (isScale(offset,
-                        0x00000b40,
-                        4,
-                        16, // conf->texCoordsInputMask
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEX_COORD_CONTROL";
-                offset = 0x00000b40;
-                TexCoordControl(index, readarg(1));
-                break;
-            }
-            if (isScale(offset,
-                        0x00000b00,
-                        4,
-                        16,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TEXTURE_CONTROL2";
-                offset = 0x00000b00;
-                union {
-                    uint32_t val;
-                    BitField<24, 25> aniso;
-                    BitField<25, 26> iso;
-                    BitField<26, 32> slope;
-                } arg = { readarg(1) };
-                TextureControl2(index, arg.slope.u(), arg.iso.u(), arg.slope.u());
-                break;
-            }
-            if (isScale(offset,
-                        0x000003c0,
-                        4,
-                        CELL_GCM_MAX_VERTEX_TEXTURE,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_ANISO_SPREAD";
-                offset = 0x000003c0;
-                union {
-                    uint32_t val;
-                    BitField<11, 12> vReduceSamplesEnable;
-                    BitField<13, 16> vSpacingSelect;
-                    BitField<19, 20> hReduceSamplesEnable;
-                    BitField<21, 24> hSpacingSelect;
-                    BitField<27, 28> reduceSamplesEnable;
-                    BitField<29, 32> spacingSelect;
-                } arg = { readarg(1) };
-                AnisoSpread(
-                    index,
-                    arg.reduceSamplesEnable.u(),
-                    arg.hReduceSamplesEnable.u(),
-                    arg.vReduceSamplesEnable.u(),
-                    arg.spacingSelect.u(),
-                    arg.hSpacingSelect.u(),
-                    arg.vSpacingSelect.u()
-                );
-                break;
-            }
-            if (isScale(offset,
-                        0x00000b80,
-                        16,
-                        1, // ?
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM";
-                offset = 0x00000b80;
-                assert(count <= 32);
-                TransformProgram(get + 4, count);
-                break;
-            }
-            if (isScale(offset,
-                        0x00001c00,
-                        16,
-                        16,
-                        index)) {
-                //name = "CELL_GCM_NV4097_SET_VERTEX_DATA4F_M";
-                offset = 0x00001c00;
-                VertexData4fM(
-                    index,
-                    union_cast<uint32_t, float>(readarg(1)),
-                    union_cast<uint32_t, float>(readarg(2)),
-                    union_cast<uint32_t, float>(readarg(3)),
-                    union_cast<uint32_t, float>(readarg(4))
-                );
-                break;
-            }
-            ERROR(rsx) << ssnprintf("illegal method offset %x", offset);
-        }
-    }
-    if (name) {
-        WARNING(rsx) << ssnprintf("[0x%08x: %02d%s] %s",
-            get, header.count.u(), header.prefix.u() == 2 ? "(ni)" : "", name);
-    }
-    len = (header.count.u() + 1) * 4;
+    auto& entry = _methodMap[offset / 4];
+    (this->*(entry.handler))(entry.index);
+
+    auto len = (header.count.u() + 1) * 4;
     assert(len != 0);
-    
     return len;
 }
 
@@ -1676,14 +136,12 @@ void Rsx::loop() {
 }
 
 void Rsx::runLoop() {
-    auto read = [&](uint32_t get) {
-        return g_state.mm->load32(rsxOffsetToEa(MemoryLocation::Main, get));
-    };
     for (;;) {
         while (_get != _put || _ret) {
             _idleCounter.closeRange();
             auto localGet = _get.load();
-            auto len = interpret(localGet, read);
+            auto ptr = (uint32_t*)g_state.mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, localGet), 0);
+            auto len = interpret(localGet, ptr);
             _get += len;
         }
         if (_shutdown && _get == _put) {
@@ -1758,3 +216,1798 @@ void Rsx::sendCommand(GcmCommandReplayInfo info) {
 bool Rsx::receiveCommandCompletion() {
     return _completionQueue.receive(0);
 }
+
+void Rsx::unknown_impl(int index) {
+    throw std::runtime_error("unknown method offset");
+}
+
+uint32_t Rsx::readarg(int n) {
+    assert(n != 0);
+    return fast_endian_reverse(_currentGet[n]);
+}
+
+void Rsx::initMethodMap() {
+    _methodMap.resize(0x3ac1);
+    std::fill(begin(_methodMap), end(_methodMap), MethodMapEntry{&Rsx::unknown_impl, "unknown", 0});
+
+#define SINGLE(offset) \
+    _methodMap.at(offset / 4) = {&Rsx:: offset##_impl, #offset, 0};
+
+#define INDEXED(offset, step, count) \
+    assert(offset % 4 == 0); \
+    assert(step % 4 == 0); \
+    for (int i = offset; i < offset + step * count; i += step) \
+        _methodMap.at(i / 4) = {&Rsx:: offset##_impl, #offset, (i - offset) / step};
+
+    SINGLE(CELL_GCM_NV406E_SET_REFERENCE)
+    SINGLE(CELL_GCM_NV406E_SET_CONTEXT_DMA_SEMAPHORE)
+    SINGLE(CELL_GCM_NV406E_SEMAPHORE_OFFSET)
+    SINGLE(CELL_GCM_NV406E_SEMAPHORE_ACQUIRE)
+    SINGLE(CELL_GCM_NV406E_SEMAPHORE_RELEASE)
+    SINGLE(CELL_GCM_NV4097_SET_OBJECT)
+    SINGLE(CELL_GCM_NV4097_NO_OPERATION)
+    SINGLE(CELL_GCM_NV4097_NOTIFY)
+    SINGLE(CELL_GCM_NV4097_WAIT_FOR_IDLE)
+    SINGLE(CELL_GCM_NV4097_PM_TRIGGER)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_NOTIFIES)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_A)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_B)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_B)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_STATE)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_A)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_ZETA)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_A)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_B)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_SEMAPHORE)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_REPORT)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_CLIP_ID)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_CULL_DATA)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_C)
+    SINGLE(CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_D)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_CLIP_HORIZONTAL)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_CLIP_VERTICAL)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_FORMAT)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_PITCH_A)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_COLOR_AOFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_ZETA_OFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_COLOR_BOFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_PITCH_B)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_COLOR_TARGET)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_PITCH_Z)
+    SINGLE(CELL_GCM_NV4097_INVALIDATE_ZCULL)
+    SINGLE(CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP)
+    SINGLE(CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP1)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_PITCH_C)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_PITCH_D)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_COLOR_COFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_COLOR_DOFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_WINDOW_OFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_WINDOW_CLIP_TYPE)
+    SINGLE(CELL_GCM_NV4097_SET_WINDOW_CLIP_HORIZONTAL)
+    SINGLE(CELL_GCM_NV4097_SET_WINDOW_CLIP_VERTICAL)
+    SINGLE(CELL_GCM_NV4097_SET_DITHER_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_ALPHA_TEST_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_ALPHA_FUNC)
+    SINGLE(CELL_GCM_NV4097_SET_ALPHA_REF)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_FUNC_SFACTOR)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_FUNC_DFACTOR)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_COLOR)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_EQUATION)
+    SINGLE(CELL_GCM_NV4097_SET_COLOR_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_TEST_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_FUNC)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_FUNC_REF)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_FUNC_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_OP_FAIL)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_OP_ZFAIL)
+    SINGLE(CELL_GCM_NV4097_SET_STENCIL_OP_ZPASS)
+    SINGLE(CELL_GCM_NV4097_SET_TWO_SIDED_STENCIL_TEST_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_REF)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_OP_FAIL)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZFAIL)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZPASS)
+    SINGLE(CELL_GCM_NV4097_SET_SHADE_MODE)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_ENABLE_MRT)
+    SINGLE(CELL_GCM_NV4097_SET_COLOR_MASK_MRT)
+    SINGLE(CELL_GCM_NV4097_SET_LOGIC_OP_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_LOGIC_OP)
+    SINGLE(CELL_GCM_NV4097_SET_BLEND_COLOR2)
+    SINGLE(CELL_GCM_NV4097_SET_DEPTH_BOUNDS_TEST_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MIN)
+    SINGLE(CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MAX)
+    SINGLE(CELL_GCM_NV4097_SET_CLIP_MIN)
+    SINGLE(CELL_GCM_NV4097_SET_CLIP_MAX)
+    SINGLE(CELL_GCM_NV4097_SET_CONTROL0)
+    SINGLE(CELL_GCM_NV4097_SET_LINE_WIDTH)
+    SINGLE(CELL_GCM_NV4097_SET_LINE_SMOOTH_ENABLE)
+    INDEXED(CELL_GCM_NV4097_SET_ANISO_SPREAD, 4, CELL_GCM_MAX_VERTEX_TEXTURE)
+    SINGLE(CELL_GCM_NV4097_SET_SCISSOR_HORIZONTAL)
+    SINGLE(CELL_GCM_NV4097_SET_SCISSOR_VERTICAL)
+    SINGLE(CELL_GCM_NV4097_SET_FOG_MODE)
+    SINGLE(CELL_GCM_NV4097_SET_FOG_PARAMS)
+    SINGLE(CELL_GCM_NV4097_SET_SHADER_PROGRAM)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_OFFSET, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FORMAT)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_ADDRESS, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL0, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL3, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FILTER, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_IMAGE_RECT, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_TEXTURE_BORDER_COLOR, 32, CELL_GCM_MAX_VERTEX_TEXTURE)
+    SINGLE(CELL_GCM_NV4097_SET_VIEWPORT_HORIZONTAL)
+    SINGLE(CELL_GCM_NV4097_SET_VIEWPORT_VERTICAL)
+    SINGLE(CELL_GCM_NV4097_SET_POINT_CENTER_MODE)
+    SINGLE(CELL_GCM_NV4097_ZCULL_SYNC)
+    SINGLE(CELL_GCM_NV4097_SET_VIEWPORT_OFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_VIEWPORT_SCALE)
+    SINGLE(CELL_GCM_NV4097_SET_POLY_OFFSET_POINT_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_POLY_OFFSET_LINE_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_POLY_OFFSET_FILL_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_DEPTH_FUNC)
+    SINGLE(CELL_GCM_NV4097_SET_DEPTH_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_DEPTH_TEST_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_POLYGON_OFFSET_SCALE_FACTOR)
+    SINGLE(CELL_GCM_NV4097_SET_POLYGON_OFFSET_BIAS)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA_SCALED4S_M)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_CONTROL2, 4, 16)
+    INDEXED(CELL_GCM_NV4097_SET_TEX_COORD_CONTROL, 4, 16)
+    INDEXED(CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM, 16, 1)
+    SINGLE(CELL_GCM_NV4097_SET_SPECULAR_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_TWO_SIDE_LIGHT_EN)
+    SINGLE(CELL_GCM_NV4097_CLEAR_ZCULL_SURFACE)
+    SINGLE(CELL_GCM_NV4097_SET_PERFORMANCE_PARAMS)
+    SINGLE(CELL_GCM_NV4097_SET_FLAT_SHADE_OP)
+    SINGLE(CELL_GCM_NV4097_SET_EDGE_FLAG)
+    SINGLE(CELL_GCM_NV4097_SET_USER_CLIP_PLANE_CONTROL)
+    SINGLE(CELL_GCM_NV4097_SET_POLYGON_STIPPLE)
+    SINGLE(CELL_GCM_NV4097_SET_POLYGON_STIPPLE_PATTERN)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA3F_M)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_OFFSET, 4, 16)
+    SINGLE(CELL_GCM_NV4097_INVALIDATE_VERTEX_CACHE_FILE)
+    SINGLE(CELL_GCM_NV4097_INVALIDATE_VERTEX_FILE)
+    SINGLE(CELL_GCM_NV4097_PIPE_NOP)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_OFFSET)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_INDEX)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_FORMAT, 4, 16)
+    SINGLE(CELL_GCM_NV4097_CLEAR_REPORT_VALUE)
+    SINGLE(CELL_GCM_NV4097_SET_ZPASS_PIXEL_COUNT_ENABLE)
+    SINGLE(CELL_GCM_NV4097_GET_REPORT)
+    SINGLE(CELL_GCM_NV4097_SET_ZCULL_STATS_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_BEGIN_END)
+    SINGLE(CELL_GCM_NV4097_ARRAY_ELEMENT16)
+    SINGLE(CELL_GCM_NV4097_ARRAY_ELEMENT32)
+    SINGLE(CELL_GCM_NV4097_DRAW_ARRAYS)
+    SINGLE(CELL_GCM_NV4097_INLINE_ARRAY)
+    SINGLE(CELL_GCM_NV4097_SET_INDEX_ARRAY_ADDRESS)
+    SINGLE(CELL_GCM_NV4097_SET_INDEX_ARRAY_DMA)
+    SINGLE(CELL_GCM_NV4097_DRAW_INDEX_ARRAY)
+    SINGLE(CELL_GCM_NV4097_SET_FRONT_POLYGON_MODE)
+    SINGLE(CELL_GCM_NV4097_SET_BACK_POLYGON_MODE)
+    SINGLE(CELL_GCM_NV4097_SET_CULL_FACE)
+    SINGLE(CELL_GCM_NV4097_SET_FRONT_FACE)
+    SINGLE(CELL_GCM_NV4097_SET_POLY_SMOOTH_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_CULL_FACE_ENABLE)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_CONTROL3, 4, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA2F_M)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA2S_M)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA4UB_M)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA4S_M)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_OFFSET, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    SINGLE(CELL_GCM_NV4097_SET_TEXTURE_FORMAT)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_ADDRESS, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_CONTROL0, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_CONTROL1, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_FILTER, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    INDEXED(CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR, 32, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    INDEXED(CELL_GCM_NV4097_SET_VERTEX_DATA4F_M, 16, CELL_GCM_MAX_TEXIMAGE_COUNT)
+    SINGLE(CELL_GCM_NV4097_SET_COLOR_KEY_COLOR)
+    SINGLE(CELL_GCM_NV4097_SET_SHADER_CONTROL)
+    SINGLE(CELL_GCM_NV4097_SET_INDEXED_CONSTANT_READ_LIMITS)
+    SINGLE(CELL_GCM_NV4097_SET_SEMAPHORE_OFFSET)
+    SINGLE(CELL_GCM_NV4097_BACK_END_WRITE_SEMAPHORE_RELEASE)
+    SINGLE(CELL_GCM_NV4097_TEXTURE_READ_SEMAPHORE_RELEASE)
+    SINGLE(CELL_GCM_NV4097_SET_ZMIN_MAX_CONTROL)
+    SINGLE(CELL_GCM_NV4097_SET_ANTI_ALIASING_CONTROL)
+    SINGLE(CELL_GCM_NV4097_SET_SURFACE_COMPRESSION)
+    SINGLE(CELL_GCM_NV4097_SET_ZCULL_EN)
+    SINGLE(CELL_GCM_NV4097_SET_SHADER_WINDOW)
+    SINGLE(CELL_GCM_NV4097_SET_ZSTENCIL_CLEAR_VALUE)
+    SINGLE(CELL_GCM_NV4097_SET_COLOR_CLEAR_VALUE)
+    SINGLE(CELL_GCM_NV4097_CLEAR_SURFACE)
+    SINGLE(CELL_GCM_NV4097_SET_CLEAR_RECT_HORIZONTAL)
+    SINGLE(CELL_GCM_NV4097_SET_CLEAR_RECT_VERTICAL)
+    SINGLE(CELL_GCM_NV4097_SET_CLIP_ID_TEST_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_RESTART_INDEX_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_RESTART_INDEX)
+    SINGLE(CELL_GCM_NV4097_SET_LINE_STIPPLE)
+    SINGLE(CELL_GCM_NV4097_SET_LINE_STIPPLE_PATTERN)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_DATA1F_M)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_EXECUTION_MODE)
+    SINGLE(CELL_GCM_NV4097_SET_RENDER_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_LOAD)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_START)
+    SINGLE(CELL_GCM_NV4097_SET_ZCULL_CONTROL0)
+    SINGLE(CELL_GCM_NV4097_SET_ZCULL_CONTROL1)
+    SINGLE(CELL_GCM_NV4097_SET_SCULL_CONTROL)
+    SINGLE(CELL_GCM_NV4097_SET_POINT_SIZE)
+    SINGLE(CELL_GCM_NV4097_SET_POINT_PARAMS_ENABLE)
+    SINGLE(CELL_GCM_NV4097_SET_POINT_SPRITE_CONTROL)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_TIMEOUT)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT)
+    SINGLE(CELL_GCM_NV4097_SET_FREQUENCY_DIVIDER_OPERATION)
+    SINGLE(CELL_GCM_NV4097_SET_ATTRIB_COLOR)
+    SINGLE(CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD)
+    SINGLE(CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD_EX)
+    SINGLE(CELL_GCM_NV4097_SET_ATTRIB_UCLIP0)
+    SINGLE(CELL_GCM_NV4097_SET_ATTRIB_UCLIP1)
+    SINGLE(CELL_GCM_NV4097_INVALIDATE_L2)
+    SINGLE(CELL_GCM_NV4097_SET_REDUCE_DST_COLOR)
+    SINGLE(CELL_GCM_NV4097_SET_NO_PARANOID_TEXTURE_FETCHES)
+    SINGLE(CELL_GCM_NV4097_SET_SHADER_PACKER)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_ATTRIB_INPUT_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_VERTEX_ATTRIB_OUTPUT_MASK)
+    SINGLE(CELL_GCM_NV4097_SET_TRANSFORM_BRANCH_BITS)
+    SINGLE(CELL_GCM_NV0039_SET_OBJECT)
+    SINGLE(CELL_GCM_NV0039_SET_CONTEXT_DMA_NOTIFIES)
+    SINGLE(CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_IN)
+    SINGLE(CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_OUT)
+    SINGLE(CELL_GCM_NV0039_OFFSET_IN)
+    SINGLE(CELL_GCM_NV0039_OFFSET_OUT)
+    SINGLE(CELL_GCM_NV0039_PITCH_IN)
+    SINGLE(CELL_GCM_NV0039_PITCH_OUT)
+    SINGLE(CELL_GCM_NV0039_LINE_LENGTH_IN)
+    SINGLE(CELL_GCM_NV0039_LINE_COUNT)
+    SINGLE(CELL_GCM_NV0039_FORMAT)
+    SINGLE(CELL_GCM_NV0039_BUFFER_NOTIFY)
+    SINGLE(CELL_GCM_NV3062_SET_OBJECT)
+    SINGLE(CELL_GCM_NV3062_SET_CONTEXT_DMA_NOTIFIES)
+    SINGLE(CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_SOURCE)
+    SINGLE(CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_DESTIN)
+    SINGLE(CELL_GCM_NV3062_SET_COLOR_FORMAT)
+    SINGLE(CELL_GCM_NV3062_SET_PITCH)
+    SINGLE(CELL_GCM_NV3062_SET_OFFSET_SOURCE)
+    SINGLE(CELL_GCM_NV3062_SET_OFFSET_DESTIN)
+    SINGLE(CELL_GCM_NV309E_SET_OBJECT)
+    SINGLE(CELL_GCM_NV309E_SET_CONTEXT_DMA_NOTIFIES)
+    SINGLE(CELL_GCM_NV309E_SET_CONTEXT_DMA_IMAGE)
+    SINGLE(CELL_GCM_NV309E_SET_FORMAT)
+    SINGLE(CELL_GCM_NV309E_SET_OFFSET)
+    SINGLE(CELL_GCM_NV308A_SET_OBJECT)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_DMA_NOTIFIES)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_COLOR_KEY)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_CLIP_RECTANGLE)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_PATTERN)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_ROP)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_BETA1)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_BETA4)
+    SINGLE(CELL_GCM_NV308A_SET_CONTEXT_SURFACE)
+    SINGLE(CELL_GCM_NV308A_SET_COLOR_CONVERSION)
+    SINGLE(CELL_GCM_NV308A_SET_OPERATION)
+    SINGLE(CELL_GCM_NV308A_SET_COLOR_FORMAT)
+    SINGLE(CELL_GCM_NV308A_POINT)
+    SINGLE(CELL_GCM_NV308A_SIZE_OUT)
+    SINGLE(CELL_GCM_NV308A_SIZE_IN)
+    SINGLE(CELL_GCM_NV308A_COLOR)
+    SINGLE(CELL_GCM_NV3089_SET_OBJECT)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_DMA_NOTIFIES)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_DMA_IMAGE)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_PATTERN)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_ROP)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_BETA1)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_BETA4)
+    SINGLE(CELL_GCM_NV3089_SET_CONTEXT_SURFACE)
+    SINGLE(CELL_GCM_NV3089_SET_COLOR_CONVERSION)
+    SINGLE(CELL_GCM_NV3089_SET_COLOR_FORMAT)
+    SINGLE(CELL_GCM_NV3089_SET_OPERATION)
+    SINGLE(CELL_GCM_NV3089_CLIP_POINT)
+    SINGLE(CELL_GCM_NV3089_CLIP_SIZE)
+    SINGLE(CELL_GCM_NV3089_IMAGE_OUT_POINT)
+    SINGLE(CELL_GCM_NV3089_IMAGE_OUT_SIZE)
+    SINGLE(CELL_GCM_NV3089_DS_DX)
+    SINGLE(CELL_GCM_NV3089_DT_DY)
+    SINGLE(CELL_GCM_NV3089_IMAGE_IN_SIZE)
+    SINGLE(CELL_GCM_NV3089_IMAGE_IN_FORMAT)
+    SINGLE(CELL_GCM_NV3089_IMAGE_IN_OFFSET)
+    SINGLE(CELL_GCM_NV3089_IMAGE_IN)
+    SINGLE(CELL_GCM_DRIVER_INTERRUPT)
+    SINGLE(CELL_GCM_DRIVER_QUEUE)
+    SINGLE(CELL_GCM_DRIVER_FLIP)
+    SINGLE(CELL_GCM_unknown_240)
+    SINGLE(CELL_GCM_unknown_e000)
+
+#undef SINGLE
+#undef INDEXED
+}
+
+void Rsx::parseTextureAddress(int argi, int index) {
+    union {
+        uint32_t val;
+        BitField<0, 4> zfunc;
+        BitField<4, 8> signedRemap;
+        BitField<8, 12> gamma;
+        BitField<12, 16> wrapr;
+        BitField<16, 20> unsignedRemap;
+        BitField<20, 24> wrapt;
+        BitField<24, 28> anisoBias;
+        BitField<28, 32> wraps;
+    } arg = { readarg(argi) };
+    TextureAddress(
+        index,
+        arg.wraps.u(),
+        arg.wrapt.u(),
+        arg.wrapr.u(),
+        arg.unsignedRemap.u(),
+        arg.zfunc.u(),
+        arg.gamma.u(),
+        arg.anisoBias.u(),
+        arg.signedRemap.u()
+    );
+}
+
+void Rsx::parseTextureControl0(int argi, int index) {
+    union {
+        uint32_t val;
+        BitField<0, 1> enable;
+        BitField<1, 5> minlod_i;
+        BitField<5, 13> minlod_d;
+        BitField<13, 17> maxlod_i;
+        BitField<17, 25> maxlod_d;
+        BitField<25, 28> maxaniso;
+        BitField<28, 30> alphakill;
+    } arg = { readarg(argi) };
+    TextureControl0(
+        index,
+        arg.alphakill.u(),
+        arg.maxaniso.u(),
+        arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f,
+        arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
+        arg.enable.u()
+    );
+}
+
+void Rsx::parseTextureFilter(int argi, int index) {
+    union {
+        uint32_t val;
+        BitField<0, 1> bs;
+        BitField<1, 2> gs;
+        BitField<2, 3> rs;
+        BitField<3, 4> as;
+        BitField<4, 8> mag;
+        BitField<8, 16> min;
+        BitField<16, 19> conv;
+        BitField<19, 24> biasInteger;
+        BitField<24, 32> biasDecimal;
+    } arg = { readarg(argi) };
+    TextureFilter(
+        index,
+        arg.biasInteger.s() + arg.biasDecimal.u() / 255.f,
+        arg.min.u(),
+        arg.mag.u(),
+        arg.conv.u(),
+        arg.as.u(),
+        arg.rs.u(),
+        arg.gs.u(),
+        arg.bs.u()
+    );
+}
+
+void Rsx::parseTextureBorderColor(int argi, int index) {
+    auto c = parseColor(readarg(argi));
+    TextureBorderColor(index, c[0], c[1], c[2], c[3]);
+}
+
+void Rsx::parseTextureImageRect(int argi, int index) {
+    auto arg = readarg(argi);
+    TextureImageRect(index, arg >> 16, arg & 0xffff);
+}
+
+void Rsx::CELL_GCM_NV406E_SET_REFERENCE_impl(int index) {
+    SetReference(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV406E_SET_CONTEXT_DMA_SEMAPHORE_impl(int index) {
+    ChannelSetContextDmaSemaphore(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV406E_SEMAPHORE_OFFSET_impl(int index) {
+    ChannelSemaphoreOffset(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV406E_SEMAPHORE_ACQUIRE_impl(int index) {
+    ChannelSemaphoreAcquire(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV406E_SEMAPHORE_RELEASE_impl(int index) {
+    SemaphoreRelease(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_OBJECT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_OBJECT";
+}
+
+void Rsx::CELL_GCM_NV4097_NO_OPERATION_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_NO_OPERATION";
+}
+
+void Rsx::CELL_GCM_NV4097_NOTIFY_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_NOTIFY";
+}
+
+void Rsx::CELL_GCM_NV4097_WAIT_FOR_IDLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_WAIT_FOR_IDLE";
+}
+
+void Rsx::CELL_GCM_NV4097_PM_TRIGGER_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_PM_TRIGGER";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_NOTIFIES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_NOTIFIES";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_A_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_A";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_B_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_B";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_B_impl(int index) {
+    ContextDmaColorB(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_STATE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_STATE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_A_impl(int index) {
+    ContextDmaColorA(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_ZETA_impl(int index) {
+    ContextDmaZeta(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_A_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_A";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_B_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_VERTEX_B";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_SEMAPHORE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_SEMAPHORE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_REPORT_impl(int index) {
+    ContextDmaReport(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_CLIP_ID_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_CLIP_ID";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_CULL_DATA_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CONTEXT_DMA_CULL_DATA";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_C_impl(int index) {
+    if (_currentCount == 1) {
+        ContextDmaColorC_1(readarg(1));
+    } else {
+        ContextDmaColorC_2(readarg(1), readarg(2));
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTEXT_DMA_COLOR_D_impl(int index) {
+    ContextDmaColorD(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_CLIP_HORIZONTAL_impl(int index) {
+    auto arg1 = readarg(1);
+    auto arg2 = readarg(2);
+    SurfaceClipHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_CLIP_VERTICAL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_CLIP_VERTICAL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_FORMAT_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<0, 8> height;
+        BitField<8, 16> width;
+        BitField<16, 20> antialias;
+        BitField<20, 24> type;
+        BitField<24, 27> depthFormat;
+        BitField<27, 32> colorFormat;
+    } arg = {readarg(1)};
+
+    SurfaceFormat(enum_cast<GcmSurfaceColor>(arg.colorFormat.u()),
+                  enum_cast<SurfaceDepthFormat>(arg.depthFormat.u()),
+                  arg.antialias.u(),
+                  arg.type.u(),
+                  arg.width.u(),
+                  arg.height.u(),
+                  readarg(2),
+                  readarg(3),
+                  readarg(4),
+                  readarg(5),
+                  readarg(6));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_PITCH_A_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_PITCH_A";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_COLOR_AOFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_COLOR_AOFFSET";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_ZETA_OFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_ZETA_OFFSET";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_COLOR_BOFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_COLOR_BOFFSET";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_PITCH_B_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_PITCH_B";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_COLOR_TARGET_impl(int index) {
+    SurfaceColorTarget(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_PITCH_Z_impl(int index) {
+    SurfacePitchZ(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_INVALIDATE_ZCULL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_INVALIDATE_ZCULL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP1_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CYLINDRICAL_WRAP1";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_PITCH_C_impl(int index) {
+    SurfacePitchC(readarg(1), readarg(2), readarg(3), readarg(4));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_PITCH_D_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_PITCH_D";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_COLOR_COFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_COLOR_COFFSET";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_COLOR_DOFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SURFACE_COLOR_DOFFSET";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_WINDOW_OFFSET_impl(int index) {
+    auto arg1 = readarg(1);
+    WindowOffset(arg1 & 0xff, arg1 >> 16);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_WINDOW_CLIP_TYPE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_WINDOW_CLIP_TYPE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_WINDOW_CLIP_HORIZONTAL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_WINDOW_CLIP_HORIZONTAL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_WINDOW_CLIP_VERTICAL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_WINDOW_CLIP_VERTICAL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DITHER_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_DITHER_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ALPHA_TEST_ENABLE_impl(int index) {
+    AlphaTestEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ALPHA_FUNC_impl(int index) {
+    AlphaFunc(enum_cast<GcmOperator>(readarg(1)), readarg(2));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ALPHA_REF_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ALPHA_REF";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_ENABLE_impl(int index) {
+    BlendEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_FUNC_SFACTOR_impl(int index) {
+    auto arg1 = readarg(1);
+    auto arg2 = readarg(2);
+    BlendFuncSFactor(enum_cast<GcmBlendFunc>(arg1 & 0xffff),
+                     enum_cast<GcmBlendFunc>(arg1 >> 16),
+                     enum_cast<GcmBlendFunc>(arg2 & 0xffff),
+                     enum_cast<GcmBlendFunc>(arg2 >> 16));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_FUNC_DFACTOR_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BLEND_FUNC_DFACTOR";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_COLOR_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BLEND_COLOR";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_EQUATION_impl(int index) {
+    auto arg = readarg(1);
+    BlendEquation(enum_cast<GcmBlendEquation>(arg & 0xffff),
+                  enum_cast<GcmBlendEquation>(arg >> 16));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_COLOR_MASK_impl(int index) {
+    ColorMask(enum_cast<GcmColorMask>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_TEST_ENABLE_impl(int index) {
+    StencilTestEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_MASK_impl(int index) {
+    StencilMask(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_FUNC_impl(int index) {
+    StencilFunc(enum_cast<GcmOperator>(readarg(1)), readarg(2), readarg(3));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_FUNC_REF_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_STENCIL_FUNC_REF";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_FUNC_MASK_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_STENCIL_FUNC_MASK";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_OP_FAIL_impl(int index) {
+    StencilOpFail(readarg(1), readarg(2), readarg(3));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_OP_ZFAIL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_STENCIL_OP_ZFAIL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_STENCIL_OP_ZPASS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_STENCIL_OP_ZPASS";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TWO_SIDED_STENCIL_TEST_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_TWO_SIDED_STENCIL_TEST_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_MASK_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_MASK";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_REF_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_REF";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_MASK_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_FUNC_MASK";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_OP_FAIL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_OP_FAIL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZFAIL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZFAIL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZPASS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BACK_STENCIL_OP_ZPASS";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SHADE_MODE_impl(int index) {
+    ShadeMode(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_ENABLE_MRT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BLEND_ENABLE_MRT";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_COLOR_MASK_MRT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_COLOR_MASK_MRT";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_LOGIC_OP_ENABLE_impl(int index) {
+    LogicOpEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_LOGIC_OP_impl(int index) {
+    LogicOp(enum_cast<GcmLogicOp>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BLEND_COLOR2_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_BLEND_COLOR2";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DEPTH_BOUNDS_TEST_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_DEPTH_BOUNDS_TEST_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MIN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MIN";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MAX_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MAX";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CLIP_MIN_impl(int index) {
+    ClipMin(union_cast<uint32_t, float>(readarg(1)),
+            union_cast<uint32_t, float>(readarg(2)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CLIP_MAX_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CLIP_MAX";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CONTROL0_impl(int index) {
+    Control0(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_LINE_WIDTH_impl(int index) {
+    LineWidth(fixedUint9ToFloat(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_LINE_SMOOTH_ENABLE_impl(int index) {
+    LineSmoothEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ANISO_SPREAD_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<11, 12> vReduceSamplesEnable;
+        BitField<13, 16> vSpacingSelect;
+        BitField<19, 20> hReduceSamplesEnable;
+        BitField<21, 24> hSpacingSelect;
+        BitField<27, 28> reduceSamplesEnable;
+        BitField<29, 32> spacingSelect;
+    } arg = { readarg(1) };
+    AnisoSpread(
+        index,
+        arg.reduceSamplesEnable.u(),
+        arg.hReduceSamplesEnable.u(),
+        arg.vReduceSamplesEnable.u(),
+        arg.spacingSelect.u(),
+        arg.hSpacingSelect.u(),
+        arg.vSpacingSelect.u()
+    );
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SCISSOR_HORIZONTAL_impl(int index) {
+    auto arg1 = readarg(1);
+    auto arg2 = readarg(2);
+    ScissorHorizontal(arg1 & 0xffff, arg1 >> 16, arg2 & 0xffff, arg2 >> 16);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SCISSOR_VERTICAL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SCISSOR_VERTICAL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_FOG_MODE_impl(int index) {
+    FogMode(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_FOG_PARAMS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_FOG_PARAMS";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SHADER_PROGRAM_impl(int index) {
+    auto arg = readarg(1);
+    ShaderProgram(arg & ~0b11ul, (arg & 0b11) - 1);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_OFFSET_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<8, 16> mipmap;
+        BitField<16, 24> format;
+        BitField<24, 28> dimension;
+        BitField<28, 32> location;
+    } f = {readarg(2)};
+    auto lnUnMask = (uint8_t)(GcmTextureLnUn::LN | GcmTextureLnUn::UN);
+    auto formatMask = ~lnUnMask;
+    auto format = enum_cast<GcmTextureFormat>(f.format.u() & formatMask);
+    auto lnUn = enum_cast<GcmTextureLnUn>(f.format.u() & lnUnMask);
+    VertexTextureOffset(index,
+                        readarg(1),
+                        f.mipmap.u(),
+                        format,
+                        lnUn,
+                        f.dimension.u(),
+                        f.location.u() - 1);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FORMAT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FORMAT";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_ADDRESS_impl(int index) {
+    auto arg = readarg(1);
+    VertexTextureAddress(index, arg & 0xff, (arg >> 8) & 0xff);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL0_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<0, 1> enable;
+        BitField<1, 5> minlod_i;
+        BitField<5, 13> minlod_d;
+        BitField<13, 17> maxlod_i;
+        BitField<17, 25> maxlod_d;
+    } arg = {readarg(1)};
+    VertexTextureControl0(index,
+                          arg.enable.u(),
+                          arg.minlod_i.u() + (float)arg.minlod_d.u() / 255.f,
+                          arg.maxlod_i.u() + (float)arg.maxlod_d.u() / 255.f);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_CONTROL3_impl(int index) {
+    VertexTextureControl3(index, readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_FILTER_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<19, 24> integer;
+        BitField<24, 32> decimal;
+    } arg = {readarg(1)};
+    VertexTextureFilter(index, arg.integer.s() + (float)arg.decimal.u() / 256.f);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_IMAGE_RECT_impl(int index) {
+    auto arg = readarg(1);
+    VertexTextureImageRect(index, arg >> 16, arg & 0xffff);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_TEXTURE_BORDER_COLOR_impl(int index) {
+    auto c = parseColor(readarg(1));
+    VertexTextureBorderColor(index, c[0], c[1], c[2], c[3]);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VIEWPORT_HORIZONTAL_impl(int index) {
+    auto arg1 = readarg(1);
+    auto arg2 = readarg(2);
+    ViewportHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VIEWPORT_VERTICAL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VIEWPORT_VERTICAL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POINT_CENTER_MODE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_POINT_CENTER_MODE";
+}
+
+void Rsx::CELL_GCM_NV4097_ZCULL_SYNC_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_ZCULL_SYNC";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VIEWPORT_OFFSET_impl(int index) {
+    ViewportOffset(union_cast<uint32_t, float>(readarg(1)),
+                   union_cast<uint32_t, float>(readarg(2)),
+                   union_cast<uint32_t, float>(readarg(3)),
+                   union_cast<uint32_t, float>(readarg(4)),
+                   union_cast<uint32_t, float>(readarg(5)),
+                   union_cast<uint32_t, float>(readarg(6)),
+                   union_cast<uint32_t, float>(readarg(7)),
+                   union_cast<uint32_t, float>(readarg(8)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VIEWPORT_SCALE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VIEWPORT_SCALE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLY_OFFSET_POINT_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_POLY_OFFSET_POINT_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLY_OFFSET_LINE_ENABLE_impl(int index) {
+    PolyOffsetLineEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLY_OFFSET_FILL_ENABLE_impl(int index) {
+    PolyOffsetFillEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DEPTH_FUNC_impl(int index) {
+    DepthFunc(enum_cast<GcmOperator>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DEPTH_MASK_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_DEPTH_MASK";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_DEPTH_TEST_ENABLE_impl(int index) {
+    DepthTestEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLYGON_OFFSET_SCALE_FACTOR_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_POLYGON_OFFSET_SCALE_FACTOR";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLYGON_OFFSET_BIAS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_POLYGON_OFFSET_BIAS";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA_SCALED4S_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA_SCALED4S_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_CONTROL2_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<24, 25> aniso;
+        BitField<25, 26> iso;
+        BitField<26, 32> slope;
+    } arg = {readarg(1)};
+    TextureControl2(index, arg.slope.u(), arg.iso.u(), arg.slope.u());
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEX_COORD_CONTROL_impl(int index) {
+    TexCoordControl(index, readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_impl(int index) {
+    assert(_currentCount <= 32);
+    TransformProgram(_currentGetValue + 4, _currentCount);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SPECULAR_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SPECULAR_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TWO_SIDE_LIGHT_EN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_TWO_SIDE_LIGHT_EN";
+}
+
+void Rsx::CELL_GCM_NV4097_CLEAR_ZCULL_SURFACE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_CLEAR_ZCULL_SURFACE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_PERFORMANCE_PARAMS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_PERFORMANCE_PARAMS";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_FLAT_SHADE_OP_impl(int index) {
+    FlatShadeOp(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_EDGE_FLAG_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_EDGE_FLAG";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_USER_CLIP_PLANE_CONTROL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_USER_CLIP_PLANE_CONTROL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLYGON_STIPPLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_POLYGON_STIPPLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLYGON_STIPPLE_PATTERN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_POLYGON_STIPPLE_PATTERN";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA3F_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA3F_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_OFFSET_impl(int index) {
+    for (auto i = 0; i < _currentCount; ++i, ++index) {
+        union {
+            uint32_t val;
+            BitField<0, 1> location;
+            BitField<1, 32> offset;
+        } arg = {readarg(1 + i)};
+        VertexDataArrayOffset(index, arg.location.u(), arg.offset.u());
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_INVALIDATE_VERTEX_CACHE_FILE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_INVALIDATE_VERTEX_CACHE_FILE";
+}
+
+void Rsx::CELL_GCM_NV4097_INVALIDATE_VERTEX_FILE_impl(int index) {
+    // no-op
+}
+
+void Rsx::CELL_GCM_NV4097_PIPE_NOP_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_PIPE_NOP";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_OFFSET_impl(int index) {
+    VertexDataBaseOffset(readarg(1), readarg(2));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_INDEX_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA_BASE_INDEX";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA_ARRAY_FORMAT_impl(int index) {
+    for (auto i = 0; i < _currentCount; ++i, ++index) {
+        union {
+            uint32_t val;
+            BitField<0, 16> frequency;
+            BitField<16, 24> stride;
+            BitField<24, 28> size;
+            BitField<28, 32> type;
+        } arg = { readarg(1 + i) };
+        VertexDataArrayFormat(
+            index,
+            arg.frequency.u(),
+            arg.stride.u(),
+            arg.size.u(),
+            enum_cast<VertexInputType>(arg.type.u())
+        );
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_CLEAR_REPORT_VALUE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_CLEAR_REPORT_VALUE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZPASS_PIXEL_COUNT_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ZPASS_PIXEL_COUNT_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_GET_REPORT_impl(int index) {
+    auto arg = readarg(1);
+    GetReport(arg >> 24, arg & 0xffffff);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZCULL_STATS_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ZCULL_STATS_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BEGIN_END_impl(int index) {
+    auto mode = enum_cast<GcmPrimitive>(readarg(1));
+    _drawActive = (unsigned)mode;
+    if (!_drawActive) {
+        if (_drawArrayFirst != -1u) {
+            DrawArrays(_drawArrayFirst, _drawCount);
+        } else if (_drawIndexFirst != -1u) {
+            DrawIndexArray(_drawIndexFirst, _drawCount);
+        }
+        _drawArrayFirst = -1u;
+        _drawIndexFirst = -1u;
+        _drawCount = 0;
+    }
+    BeginEnd(mode);
+}
+
+void Rsx::CELL_GCM_NV4097_ARRAY_ELEMENT16_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_ARRAY_ELEMENT16";
+}
+
+void Rsx::CELL_GCM_NV4097_ARRAY_ELEMENT32_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_ARRAY_ELEMENT32";
+}
+
+void Rsx::CELL_GCM_NV4097_DRAW_ARRAYS_impl(int index) {
+    auto arg = readarg(1);
+    if (_drawArrayFirst == -1u) {
+        _drawArrayFirst = arg & 0xffffff;
+    }
+    for (auto i = 1; i <= _currentCount; ++i) {
+        arg = readarg(i);
+        _drawCount += (arg >> 24) + 1;
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_INLINE_ARRAY_impl(int index) {
+    InlineArray(_currentGetValue + 4, _currentCount);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_INDEX_ARRAY_ADDRESS_impl(int index) {
+    if (_currentCount == 1) {
+        IndexArrayAddress1(readarg(1));
+    } else {
+        assert(_currentCount == 2);
+        auto arg2 = readarg(2);
+        IndexArrayAddress(arg2 & 0xf, readarg(1), enum_cast<GcmDrawIndexArrayType>(arg2 >> 4));
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_SET_INDEX_ARRAY_DMA_impl(int index) {
+    auto arg = readarg(1);
+    IndexArrayDma(arg & 0xf, enum_cast<GcmDrawIndexArrayType>(arg >> 4));
+    assert(_currentCount == 1);
+}
+
+void Rsx::CELL_GCM_NV4097_DRAW_INDEX_ARRAY_impl(int index) {
+    auto arg = readarg(1);
+    if (_drawIndexFirst == -1u) {
+        _drawIndexFirst = arg & 0xffffff;
+    }
+    for (auto i = 1; i <= _currentCount; ++i) {
+        arg = readarg(i);
+        _drawCount += (arg >> 24) + 1;
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_SET_FRONT_POLYGON_MODE_impl(int index) {
+    FrontPolygonMode(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_BACK_POLYGON_MODE_impl(int index) {
+    BackPolygonMode(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CULL_FACE_impl(int index) {
+    CullFace(enum_cast<GcmCullFace>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_FRONT_FACE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_FRONT_FACE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POLY_SMOOTH_ENABLE_impl(int index) {
+    PolySmoothEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CULL_FACE_ENABLE_impl(int index) {
+    CullFaceEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_CONTROL3_impl(int index) {
+    union {
+        uint32_t val;
+        BitField<0, 12> depth;
+        BitField<12, 32> pitch;
+    } f = {readarg(1)};
+    TextureControl3(index, f.depth.u(), f.pitch.u());
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA2F_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA2F_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA2S_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA2S_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA4UB_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA4UB_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA4S_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA4S_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_OFFSET_impl(int index) {
+    assert(_currentCount == 2 || _currentCount == 8);
+    union {
+        uint32_t val;
+        BitField<8, 16> mipmap;
+        BitField<16, 24> format;
+        BitField<24, 28> dimension;
+        BitField<28, 29> border;
+        BitField<29, 30> cubemap;
+        BitField<30, 32> location;
+    } f = {readarg(2)};
+    auto lnUnMask = (uint8_t)(GcmTextureLnUn::LN | GcmTextureLnUn::UN);
+    auto formatMask = ~lnUnMask;
+    auto format = enum_cast<GcmTextureFormat>(f.format.u() & formatMask);
+    auto lnUn = enum_cast<GcmTextureLnUn>(f.format.u() & lnUnMask);
+    TextureOffset(index,
+                  readarg(1),
+                  f.mipmap.u(),
+                  format,
+                  lnUn,
+                  f.dimension.u(),
+                  f.border.u(),
+                  f.cubemap.u(),
+                  f.location.u() - 1);
+    if (_currentCount == 8) {
+        parseTextureAddress(3, index);
+        parseTextureControl0(4, index);
+        TextureControl1(index, readarg(5));
+        parseTextureFilter(6, index);
+        parseTextureImageRect(7, index);
+        parseTextureBorderColor(8, index);
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_FORMAT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_TEXTURE_FORMAT";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_ADDRESS_impl(int index) {
+    parseTextureAddress(1, index);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_CONTROL0_impl(int index) {
+    parseTextureControl0(1, index);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_CONTROL1_impl(int index) {
+    TextureControl1(index, readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_FILTER_impl(int index) {
+    parseTextureFilter(1, index);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_IMAGE_RECT_impl(int index) {
+    parseTextureImageRect(1, index);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR_impl(int index) {
+    parseTextureBorderColor(1, index);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA4F_M_impl(int index) {
+    VertexData4fM(
+        index,
+        union_cast<uint32_t, float>(readarg(1)),
+        union_cast<uint32_t, float>(readarg(2)),
+        union_cast<uint32_t, float>(readarg(3)),
+        union_cast<uint32_t, float>(readarg(4))
+    );
+}
+
+void Rsx::CELL_GCM_NV4097_SET_COLOR_KEY_COLOR_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_COLOR_KEY_COLOR";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SHADER_CONTROL_impl(int index) {
+    auto arg = readarg(1);
+    ShaderControl(arg & 0xe, (arg & 0x40) == 0, arg & 0x80, arg >> 24);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_INDEXED_CONSTANT_READ_LIMITS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_INDEXED_CONSTANT_READ_LIMITS";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SEMAPHORE_OFFSET_impl(int index) {
+    SemaphoreOffset(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_BACK_END_WRITE_SEMAPHORE_RELEASE_impl(int index) {
+    auto value = swap02(readarg(1));
+    BackEndWriteSemaphoreRelease(value);
+}
+
+void Rsx::CELL_GCM_NV4097_TEXTURE_READ_SEMAPHORE_RELEASE_impl(int index) {
+    TextureReadSemaphoreRelease(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZMIN_MAX_CONTROL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ZMIN_MAX_CONTROL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ANTI_ALIASING_CONTROL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ANTI_ALIASING_CONTROL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SURFACE_COMPRESSION_impl(int index) {
+    SurfaceCompression(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZCULL_EN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ZCULL_EN";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SHADER_WINDOW_impl(int index) {
+    auto arg = readarg(1);
+    ShaderWindow(arg & 0xfff, (arg >> 12) & 0xf, (arg >> 16) & 0xffff);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZSTENCIL_CLEAR_VALUE_impl(int index) {
+    ZStencilClearValue(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_COLOR_CLEAR_VALUE_impl(int index) {
+    ColorClearValue(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_CLEAR_SURFACE_impl(int index) {
+    ClearSurface(enum_cast<GcmClearMask>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CLEAR_RECT_HORIZONTAL_impl(int index) {
+    auto arg1 = readarg(1);
+    auto arg2 = readarg(2);
+    ClearRectHorizontal(arg1 & 0xff, arg1 >> 16, arg2 & 0xff, arg2 >> 16);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CLEAR_RECT_VERTICAL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_CLEAR_RECT_VERTICAL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_CLIP_ID_TEST_ENABLE_impl(int index) {
+    ClipIdTestEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_RESTART_INDEX_ENABLE_impl(int index) {
+    RestartIndexEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_RESTART_INDEX_impl(int index) {
+    RestartIndex(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_LINE_STIPPLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_LINE_STIPPLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_LINE_STIPPLE_PATTERN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_LINE_STIPPLE_PATTERN";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA1F_M_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_VERTEX_DATA1F_M";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_EXECUTION_MODE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_TRANSFORM_EXECUTION_MODE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_RENDER_ENABLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_RENDER_ENABLE";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_LOAD_impl(int index) {
+    if (_currentCount == 1) {
+        TransformProgramLoad(readarg(1), readarg(1));
+    } else {
+        assert(_currentCount == 2);
+        TransformProgramLoad(readarg(1), readarg(2));
+    }
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_PROGRAM_START_impl(int index) {
+    TransformProgramStart(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZCULL_CONTROL0_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ZCULL_CONTROL0";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ZCULL_CONTROL1_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ZCULL_CONTROL1";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SCULL_CONTROL_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SCULL_CONTROL";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POINT_SIZE_impl(int index) {
+    PointSize(union_cast<uint32_t, float>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POINT_PARAMS_ENABLE_impl(int index) {
+    PointParamsEnable(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_POINT_SPRITE_CONTROL_impl(int index) {
+    auto arg = readarg(1);
+    PointSpriteControl(arg & 1, (arg >> 1) & 3, enum_cast<PointSpriteTex>(arg & 0xffff00));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_TIMEOUT_impl(int index) {
+    auto arg = readarg(1);
+    TransformTimeout(arg & 0xffff, arg >> 16);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_LOAD_impl(int index) {
+    TransformConstantLoad(readarg(1), _currentGetValue + 4 * 2, _currentCount - 1);
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_TRANSFORM_CONSTANT";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_FREQUENCY_DIVIDER_OPERATION_impl(int index) {
+    FrequencyDividerOperation(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ATTRIB_COLOR_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ATTRIB_COLOR";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD_EX_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ATTRIB_TEX_COORD_EX";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ATTRIB_UCLIP0_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ATTRIB_UCLIP0";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_ATTRIB_UCLIP1_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_ATTRIB_UCLIP1";
+}
+
+void Rsx::CELL_GCM_NV4097_INVALIDATE_L2_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_INVALIDATE_L2";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_REDUCE_DST_COLOR_impl(int index) {
+    ReduceDstColor(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_NO_PARANOID_TEXTURE_FETCHES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_NO_PARANOID_TEXTURE_FETCHES";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_SHADER_PACKER_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_SHADER_PACKER";
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_ATTRIB_INPUT_MASK_impl(int index) {
+    VertexAttribInputMask(enum_cast<InputMask>(readarg(1)));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_VERTEX_ATTRIB_OUTPUT_MASK_impl(int index) {
+    VertexAttribOutputMask(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV4097_SET_TRANSFORM_BRANCH_BITS_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_TRANSFORM_BRANCH_BITS";
+}
+
+void Rsx::CELL_GCM_NV0039_SET_OBJECT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_SET_OBJECT";
+}
+
+void Rsx::CELL_GCM_NV0039_SET_CONTEXT_DMA_NOTIFIES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_SET_CONTEXT_DMA_NOTIFIES";
+}
+
+void Rsx::CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_IN_impl(int index) {
+    DmaBufferIn(readarg(1), readarg(2));
+}
+
+void Rsx::CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_OUT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_SET_CONTEXT_DMA_BUFFER_OUT";
+}
+
+void Rsx::CELL_GCM_NV0039_OFFSET_IN_impl(int index) {
+    if (_currentCount == 1) {
+        OffsetIn_1(readarg(1));
+    } else {
+        assert(_currentCount == 8);
+        auto arg = readarg(7);
+        OffsetIn_9(readarg(1),
+                   readarg(2),
+                   readarg(3),
+                   readarg(4),
+                   readarg(5),
+                   readarg(6),
+                   arg & 0xff,
+                   arg >> 8,
+                   readarg(8));
+    }
+}
+
+void Rsx::CELL_GCM_NV0039_OFFSET_OUT_impl(int index) {
+    OffsetOut(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV0039_PITCH_IN_impl(int index) {
+    auto arg = readarg(5);
+    PitchIn(readarg(1), readarg(2), readarg(3), readarg(4), arg & 0xff, arg >> 8);
+}
+
+void Rsx::CELL_GCM_NV0039_PITCH_OUT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_PITCH_OUT";
+}
+
+void Rsx::CELL_GCM_NV0039_LINE_LENGTH_IN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_LINE_LENGTH_IN";
+}
+
+void Rsx::CELL_GCM_NV0039_LINE_COUNT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_LINE_COUNT";
+}
+
+void Rsx::CELL_GCM_NV0039_FORMAT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV0039_FORMAT";
+}
+
+void Rsx::CELL_GCM_NV0039_BUFFER_NOTIFY_impl(int index) {
+    BufferNotify(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV3062_SET_OBJECT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3062_SET_OBJECT";
+}
+
+void Rsx::CELL_GCM_NV3062_SET_CONTEXT_DMA_NOTIFIES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3062_SET_CONTEXT_DMA_NOTIFIES";
+}
+
+void Rsx::CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_SOURCE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_SOURCE";
+}
+
+void Rsx::CELL_GCM_NV3062_SET_CONTEXT_DMA_IMAGE_DESTIN_impl(int index) {
+    ContextDmaImageDestin(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV3062_SET_COLOR_FORMAT_impl(int index) {
+    auto format = readarg(1);
+    auto arg2 = readarg(2);
+    auto srcPitch = arg2 & 0xffff; (void)srcPitch;
+    auto destPitch = arg2 >> 16;
+    if (_currentCount == 2) {
+        assert(srcPitch == destPitch);
+        ColorFormat_2(format, destPitch);
+    } else {
+        assert(_currentCount == 4);
+        if (readarg(3)) {
+            assert(false);
+        }
+        ColorFormat_3(format, destPitch, readarg(4));
+    }
+}
+
+void Rsx::CELL_GCM_NV3062_SET_PITCH_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3062_SET_PITCH";
+}
+
+void Rsx::CELL_GCM_NV3062_SET_OFFSET_SOURCE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3062_SET_OFFSET_SOURCE";
+}
+
+void Rsx::CELL_GCM_NV3062_SET_OFFSET_DESTIN_impl(int index) {
+    OffsetDestin(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV309E_SET_OBJECT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV309E_SET_OBJECT";
+}
+
+void Rsx::CELL_GCM_NV309E_SET_CONTEXT_DMA_NOTIFIES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV309E_SET_CONTEXT_DMA_NOTIFIES";
+}
+
+void Rsx::CELL_GCM_NV309E_SET_CONTEXT_DMA_IMAGE_impl(int index) {
+    ContextDmaImage(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV309E_SET_FORMAT_impl(int index) {
+    auto arg = readarg(1);
+    Nv309eSetFormat(arg & 0xffff, (arg >> 16) & 0xff, (arg >> 24) & 0xff, readarg(2));
+}
+
+void Rsx::CELL_GCM_NV309E_SET_OFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV309E_SET_OFFSET";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_OBJECT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_OBJECT";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_DMA_NOTIFIES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_DMA_NOTIFIES";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_COLOR_KEY_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_COLOR_KEY";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_CLIP_RECTANGLE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_CLIP_RECTANGLE";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_PATTERN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_PATTERN";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_ROP_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_ROP";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_BETA1_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_BETA1";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_BETA4_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_BETA4";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_CONTEXT_SURFACE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_CONTEXT_SURFACE";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_COLOR_CONVERSION_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_COLOR_CONVERSION";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_OPERATION_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_OPERATION";
+}
+
+void Rsx::CELL_GCM_NV308A_SET_COLOR_FORMAT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SET_COLOR_FORMAT";
+}
+
+void Rsx::CELL_GCM_NV308A_POINT_impl(int index) {
+    auto arg1 = readarg(1);
+    auto arg2 = readarg(2);
+    auto arg3 = readarg(3);
+    Point(
+        arg1 & 0xffff, arg1 >> 16,
+        arg2 & 0xffff, arg2 >> 16,
+        arg3 & 0xffff, arg3 >> 16
+    );
+}
+
+void Rsx::CELL_GCM_NV308A_SIZE_OUT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SIZE_OUT";
+}
+
+void Rsx::CELL_GCM_NV308A_SIZE_IN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV308A_SIZE_IN";
+}
+
+void Rsx::CELL_GCM_NV308A_COLOR_impl(int index) {
+    auto ptr = rsxOffsetToEa(MemoryLocation::Main, _currentGetValue + 4);
+    Color(ptr, _currentCount);
+}
+
+void Rsx::CELL_GCM_NV3089_SET_OBJECT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_OBJECT";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_DMA_NOTIFIES_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_CONTEXT_DMA_NOTIFIES";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_DMA_IMAGE_impl(int index) {
+    Nv3089ContextDmaImage(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_PATTERN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_CONTEXT_PATTERN";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_ROP_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_CONTEXT_ROP";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_BETA1_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_CONTEXT_BETA1";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_BETA4_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_CONTEXT_BETA4";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_CONTEXT_SURFACE_impl(int index) {
+    Nv3089ContextSurface(readarg(1));
+}
+
+void Rsx::CELL_GCM_NV3089_SET_COLOR_CONVERSION_impl(int index) {
+    auto xy = readarg(4);
+    auto hw = readarg(5);
+    auto outXy = readarg(6);
+    auto outHw = readarg(7);
+    Nv3089SetColorConversion(readarg(1),
+                             readarg(2),
+                             readarg(3),
+                             xy & 0xffff,
+                             xy >> 16,
+                             hw & 0xffff,
+                             hw >> 16,
+                             outXy & 0xffff,
+                             outXy >> 16,
+                             outHw & 0xffff,
+                             outHw >> 16,
+                             fixedSint32ToFloat(readarg(8)),
+                             fixedSint32ToFloat(readarg(9)));
+}
+
+void Rsx::CELL_GCM_NV3089_SET_COLOR_FORMAT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_COLOR_FORMAT";
+}
+
+void Rsx::CELL_GCM_NV3089_SET_OPERATION_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_SET_OPERATION";
+}
+
+void Rsx::CELL_GCM_NV3089_CLIP_POINT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_CLIP_POINT";
+}
+
+void Rsx::CELL_GCM_NV3089_CLIP_SIZE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_CLIP_SIZE";
+}
+
+void Rsx::CELL_GCM_NV3089_IMAGE_OUT_POINT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_IMAGE_OUT_POINT";
+}
+
+void Rsx::CELL_GCM_NV3089_IMAGE_OUT_SIZE_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_IMAGE_OUT_SIZE";
+}
+
+void Rsx::CELL_GCM_NV3089_DS_DX_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_DS_DX";
+}
+
+void Rsx::CELL_GCM_NV3089_DT_DY_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_DT_DY";
+}
+
+void Rsx::CELL_GCM_NV3089_IMAGE_IN_SIZE_impl(int index) {
+    auto hw = readarg(1);
+    auto poi = readarg(2);
+    auto uv = readarg(4);
+    ImageInSize(hw & 0xffff,
+                hw >> 16,
+                poi & 0xffff,
+                poi >> 16,
+                poi >> 24,
+                readarg(3),
+                fixedUint16ToFloat(uv & 0xffff),
+                fixedUint16ToFloat(uv >> 16));
+}
+
+void Rsx::CELL_GCM_NV3089_IMAGE_IN_FORMAT_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_IMAGE_IN_FORMAT";
+}
+
+void Rsx::CELL_GCM_NV3089_IMAGE_IN_OFFSET_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_IMAGE_IN_OFFSET";
+}
+
+void Rsx::CELL_GCM_NV3089_IMAGE_IN_impl(int index) {
+    WARNING(rsx) << "method not implemented: CELL_GCM_NV3089_IMAGE_IN";
+}
+
+void Rsx::CELL_GCM_DRIVER_INTERRUPT_impl(int index) {
+    DriverInterrupt(readarg(1));
+}
+
+void Rsx::CELL_GCM_DRIVER_QUEUE_impl(int index) {
+    DriverQueue(readarg(1));
+}
+
+void Rsx::CELL_GCM_DRIVER_FLIP_impl(int index) {
+    DriverFlip(readarg(1));
+}
+
+void Rsx::CELL_GCM_unknown_240_impl(int index) { }
+
+void Rsx::CELL_GCM_unknown_e000_impl(int index) { }

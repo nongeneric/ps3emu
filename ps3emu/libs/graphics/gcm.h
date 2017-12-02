@@ -4,10 +4,6 @@
 #include "../../constants.h"
 #include "sysutil_sysparam.h"
 #include <boost/endian/arithmetic.hpp>
-
-#define GCM_EMU
-#include <gcm_tool.h>
-
 #include <vector>
 #include "ps3emu/enum.h"
 
@@ -33,6 +29,15 @@ ENUM(MemoryLocation,
 
 namespace emu {
 namespace Gcm {
+
+struct CellGcmConfig {
+    boost::endian::big_uint32_t localAddress;
+    boost::endian::big_uint32_t ioAddress;
+    boost::endian::big_uint32_t localSize;
+    boost::endian::big_uint32_t ioSize;
+    boost::endian::big_uint32_t memoryFrequency;
+    boost::endian::big_uint32_t coreFrequency;
+};
     
 struct CellGcmOffsetTable {
     boost::endian::big_uint32_t ioAddress;

@@ -1,5 +1,6 @@
 #include "gcm.h"
 #include "graphics.h"
+#include "ps3emu/rsx/GcmConstants.h"
 #include "../sys.h"
 #include "ps3emu/constants.h"
 #include "ps3emu/Process.h"
@@ -11,6 +12,7 @@
 #include "ps3emu/state.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/fileutils.h"
+#include "ps3emu/utils/SpinLock.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <algorithm>
@@ -54,7 +56,7 @@ struct {
 } emuGcmState;
 
 struct OffsetTable {
-    boost::mutex _m;
+    SpinLock _m;
     
     OffsetTable() {
         for (auto& i : ioAddress) {
@@ -75,18 +77,18 @@ struct OffsetTable {
     std::array<uint16_t, 511> mapPageCount;
     
     uint32_t eaToOffset(uint32_t ea) {
-        boost::lock_guard<boost::mutex> lock(_m);
+        auto lock = boost::lock_guard(_m);
         return ((uint32_t)ioAddress[ea >> 20] << 20) | ((ea << 12) >> 12);
     }
     
     uint32_t offsetToEa(uint32_t offset) {
-        boost::lock_guard<boost::mutex> lock(_m);
+        auto lock = boost::lock_guard(_m);
         return ((uint32_t)eaAddress[offset >> 20] << 20) | ((offset << 12) >> 12);
     }
     
     void unmapEa(uint32_t ea) {
         INFO(rsx) << ssnprintf("unmapping ea %08x", ea);
-        boost::lock_guard<boost::mutex> lock(_m);
+        auto lock = boost::lock_guard(_m);
         ea >>= 20;
         auto io = ioAddress[ea];
         assert(io != 0xffff);
@@ -107,7 +109,7 @@ struct OffsetTable {
         INFO(rsx) << ssnprintf("mapping ea %08x to io %08x of size %08x", ea, io, size);
         assert((size & (DefaultMainMemoryPageSize - 1)) == 0);
         assert((ea & (DefaultMainMemoryPageSize - 1)) == 0);
-        boost::lock_guard<boost::mutex> lock(_m);
+        auto lock = boost::lock_guard(_m);
         auto pages = size / DefaultMainMemoryPageSize;
         auto ioIndex = io >> 20;
         auto eaIndex = ea >> 20;
@@ -249,6 +251,14 @@ emu_void_t cellGcmResetFlipStatus(Process* proc) {
     g_state.rsx->resetFlipStatus(); 
     return emu_void;
 }
+
+#define CELL_GCM_COUNT_SHIFT 18
+#define CELL_GCM_METHOD_FLAG_CALL 2
+#define CELL_GCM_METHOD(method, count) \
+    (((count) << CELL_GCM_COUNT_SHIFT) | (method))
+
+#define CELL_GCM_CALL(offset) \
+    ((offset) | CELL_GCM_METHOD_FLAG_CALL)
 
 void encodeFlipCommand(uint32_t contextEa,
                        uint32_t buffer,

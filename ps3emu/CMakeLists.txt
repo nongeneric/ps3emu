@@ -70,6 +70,7 @@ set(SRC
     rsx/GLSampler.h
     rsx/VertexShaderCache.h
     rsx/VertexShaderCache.cpp
+    rsx/GcmConstants.h
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp

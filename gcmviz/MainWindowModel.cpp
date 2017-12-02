@@ -25,12 +25,10 @@
 #include "ps3emu/libs/graphics/gcm.h"
 #include "ps3emu/ImageUtils.h"
 #include "ps3emu/fileutils.h"
+#include "ps3emu/rsx/GcmConstants.h"
 #include "OpenGLPreview.h"
 #include "OpenGLPreviewWidget.h"
 #include "emmintrin.h"
-
-#define GCM_EMU
-#include <gcm_tool.h>
 
 using namespace boost::endian;
 namespace chrono = boost::chrono;
@@ -901,12 +899,9 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         g_state.mm->mark(RsxFbBaseAddr, GcmLocalMemorySize, false, "gcmviz");
         g_state.mm->mark(HeapArea, 256u << 20, false, "gcmviz");
         uint32_t last = gcmInitCommandsSize - 4; // except the reset call
-        auto read = [&](uint32_t get) {
-            auto ptr = &gcmInitCommands[get];
-            return *(big_uint32_t*)ptr;
-        };
         for (auto get = 0u; get != last;) {
-            get += _rsx->interpret(get, read);
+            auto ptr = (uint32_t*)&gcmInitCommands[get];
+            get += _rsx->interpret(get, ptr);
         }
     }
     
