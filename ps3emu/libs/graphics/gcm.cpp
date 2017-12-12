@@ -53,6 +53,7 @@ struct {
     ps3_uintptr_t tileInfosOffset = 0;
     std::array<CellGcmZcullInfo, 8>* zcullInfos = nullptr;
     ps3_uintptr_t zcullInfosOffset = 0;
+    __itt_event defaultCallbackEvent;
 } emuGcmState;
 
 struct OffsetTable {
@@ -151,7 +152,9 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
                           ps3_uintptr_t ioAddress,
                           Process* proc) {
     INFO(rsx) << ssnprintf("_cellGcmInitBody(..., %x, %x, %x)", cmdSize, ioSize, ioAddress);
-    
+
+    emuGcmState.defaultCallbackEvent = __itt_event_create("callback", strlen("callback"));
+
     emuGcmState.offsetTable = g_state.memalloc->internalAlloc<128, OffsetTable>(&emuGcmState.offsetTableEmuEa);
     emuGcmState.ioSize = ioSize;
     
@@ -383,6 +386,8 @@ emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
 }
 
 uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) {
+    __itt_event_start(emuGcmState.defaultCallbackEvent);
+
     uint32_t kb8 = 8 * 1024;
     assert(count < kb8 - 4);
     auto ioBase = emuGcmState.offsetTable->offsetToEa(0);
@@ -396,8 +401,9 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     assert(nextBuffer != data->begin);
     
     g_state.rsx->setPut(data->current - ioBase);
-    while (data->current - ioBase != g_state.rsx->getGet()) {
-        sys_timer_usleep(20);
+    while (intersects(nextBuffer - ioBase, nextSize, g_state.rsx->getRet(), 4u) ||
+           intersects(nextBuffer - ioBase, nextSize, g_state.rsx->getGet(), 4u)) {
+        sys_timer_usleep(1);
     }
     
     g_state.rsx->encodeJump(data->current, nextBuffer - ioBase);
@@ -416,6 +422,9 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     data->current = nextBuffer;
     data->end = nextBuffer + nextSize - 4;
     assert(data->end - ioBase < emuGcmState.defaultCommandBufferSize);
+
+    __itt_event_end(emuGcmState.defaultCallbackEvent);
+
     return CELL_OK;
 }
 

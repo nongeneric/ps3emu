@@ -12,6 +12,12 @@ using counter_clock_t = boost::chrono::steady_clock;
 using counter_duration_t = counter_clock_t::duration;
 using counter_point_t = counter_clock_t::time_point;
 
+#ifdef LOG_ENABLED
+#define TIMED_COUNTER_NOW counter_clock_t::now()
+#else
+#define TIMED_COUNTER_NOW {}
+#endif
+
 class TimedCounter {
     counter_duration_t _window;
     counter_point_t _start;
@@ -31,21 +37,21 @@ public:
         counter_duration_t window = boost::chrono::seconds(1))
         : _window(window) {}
 
-    inline void openRange(counter_point_t now = counter_clock_t::now()) {
+    inline void openRange(counter_point_t now = TIMED_COUNTER_NOW) {
         if (_isOpened)
             return;
         _start = now;
         _isOpened = true;
     }
 
-    inline void closeRange(counter_point_t now = counter_clock_t::now()) {
+    inline void closeRange(counter_point_t now = TIMED_COUNTER_NOW) {
         if (!_isOpened)
             return;
         _acc(now - _start);
         _isOpened = false;
     }
 
-    inline std::tuple<counter_duration_t, int> value(counter_point_t now = counter_clock_t::now()) {
+    inline std::tuple<counter_duration_t, int> value(counter_point_t now = TIMED_COUNTER_NOW) {
         if (now - _lastSumQuery > _window) {
             _sum = boost::accumulators::sum(_acc);
             _count = boost::accumulators::count(_acc);

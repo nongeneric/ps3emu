@@ -9,6 +9,7 @@
 #include "ps3emu/utils/SpinLock.h"
 #include "ps3emu/shaders/ShaderGenerator.h"
 #include "ps3emu/TimedCounter.h"
+#include "ps3emu/profiler.h"
 #include "GLQuery.h"
 #include "GLFramebuffer.h"
 #include "RsxTextureReader.h"
@@ -216,6 +217,7 @@ struct MethodMapEntry {
     void (Rsx::*handler)(int index);
     const char* name;
     int index;
+    __itt_string_handle* task;
 };
 
 struct RsxContext;
@@ -234,7 +236,7 @@ class Rsx {
     std::atomic<uint32_t> _get = 0;
     std::atomic<uint32_t> _put = 0;
     uint32_t _ref = 0;
-    uint32_t _ret = 0;
+    std::atomic<uint32_t> _ret = 0;
     std::atomic<bool> _isFlipInProgress;
     std::atomic<int64_t> _lastFlipTime;
     bool _shutdown = false;
@@ -256,7 +258,7 @@ class Rsx {
     bool _frameCapturePending = false;
     bool _shortTrace = false;
     RsxTextureReader* _textureReader;
-    std::map<uint32_t, TimedCounter> _perfMap;
+    std::map<MethodMapEntry*, TimedCounter> _perfMap;
     std::unique_ptr<CallbackThread> _callbackThread;
     GLQuery _transformFeedbackQuery;
     TimedCounter _fpsCounter;
@@ -277,6 +279,8 @@ class Rsx {
     TimedCounter _callbackCounter;
     TimedCounter _semaphoreAcquireCounter;
     std::vector<MethodMapEntry> _methodMap;
+    __itt_string_handle* _loopProfilerTask;
+    __itt_domain* _profilerDomain;
 
     // loop
     const uint32_t* _currentGet = nullptr;
@@ -854,8 +858,8 @@ public:
     uint32_t getPut();
     uint32_t getGet();
     uint32_t getRef();
+    uint32_t getRet();
     void setRef(uint32_t ref);
-    bool isCallActive();
     void setLabel(int index, uint32_t value, bool waitForIdle = true);
     bool isFlipInProgress() const;
     void setFlipStatus();

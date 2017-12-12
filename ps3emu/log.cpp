@@ -7,6 +7,7 @@
 #include "ps3emu/ppu/PPUThread.h"
 #include "ps3emu/spu/SPUThread.h"
 #include "ps3emu/state.h"
+#include "ps3emu/profiler.h"
 #include <execinfo.h>
 
 namespace {
@@ -45,6 +46,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, int areas, log
 void log_set_thread_name(std::string name) {
     thread_name = "[" + name + "] ";
     prctl(PR_SET_NAME, (unsigned long)name.c_str(), 0, 0, 0);
+    __itt_thread_set_name(name.c_str());
 }
 
 void log_unconditional(log_severity_t severity, log_type_t type, log_area_t area, const char* message) {
@@ -75,7 +77,7 @@ void log_unconditional(log_severity_t severity, log_type_t type, log_area_t area
     logger->info(formatted);
 }
 
-#if LOG_ENABLED
+#ifdef LOG_ENABLED
 bool log_should(log_severity_t severity, log_type_t type, log_area_t area) {
     return severity == log_error || (severity >= active_severity &&
                                      (type & active_types) && (area & active_areas));

@@ -8,6 +8,7 @@
 #include "ps3emu/enum.h"
 #include "ps3emu/utils/debug.h"
 #include "ps3emu/OneTimeEvent.h"
+#include "ps3emu/profiler.h"
 #include "SPUChannels.h"
 #include "R128.h"
 #include <boost/thread.hpp>
@@ -131,6 +132,7 @@ class SPUThread : boost::noncopyable, public ISPUChannelsThread {
     pthread_t _pthread;
     ThreadGroup* _group;
     bool _suspendEnabled = true;
+    __itt_string_handle* _profilerSuspendedTask = nullptr;
     
     friend void suspend_handler(int);
 

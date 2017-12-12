@@ -430,6 +430,6 @@ uint8_t gcmInitCommands[] = {
     0x00, 0x00, 0x00, 0x02 // reset context
 };
 
-int gcmResetCommandsSize = sizeof(gcmResetCommands);
-int gcmInitCommandsSize = sizeof(gcmInitCommands);
+uint32_t gcmResetCommandsSize = sizeof(gcmResetCommands);
+uint32_t gcmInitCommandsSize = sizeof(gcmInitCommands);
 static_assert(sizeof(gcmResetCommands) == 0x1000, "");

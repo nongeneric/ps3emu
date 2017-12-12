@@ -277,6 +277,46 @@ void readString(MainMemory* mm, uint32_t va, std::string& str) {
     str = str.c_str();
 }
 
+void MainMemory::store8(ps3_uintptr_t va, uint8_t value, ReservationGranule* granule) {
+    store<1>(va, value, granule);
+}
+
+void MainMemory::store16(ps3_uintptr_t va, uint16_t value, ReservationGranule* granule) {
+    store<2>(va, value, granule);
+}
+
+void MainMemory::store32(ps3_uintptr_t va, uint32_t value, ReservationGranule* granule) {
+    store<4>(va, value, granule);
+}
+
+void MainMemory::store64(ps3_uintptr_t va, uint64_t value, ReservationGranule* granule) {
+    store<8>(va, value, granule);
+}
+
+void MainMemory::store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule) {
+    store<16>(va, value, granule);
+}
+
+uint8_t MainMemory::load8(ps3_uintptr_t va, bool validate) {
+    return load<1>(va, validate);
+}
+
+uint16_t MainMemory::load16(ps3_uintptr_t va, bool validate) {
+    return load<2>(va, validate);
+}
+
+uint32_t MainMemory::load32(ps3_uintptr_t va, bool validate) {
+    return load<4>(va, validate);
+}
+
+uint64_t MainMemory::load64(ps3_uintptr_t va, bool validate) {
+    return load<8>(va, validate);
+}
+
+uint128_t MainMemory::load128(ps3_uintptr_t va, bool validate) {
+    return load<16>(va, validate);
+}
+
 #ifdef MEMORY_PROTECTION
 
 auto pageSize = 1u << 10;

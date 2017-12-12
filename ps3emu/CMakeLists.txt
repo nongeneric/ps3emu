@@ -77,6 +77,8 @@ set(SRC
     execmap/InstrDb.cpp
     HeapMemoryAlloc.cpp
     AffinityManager.cpp
+    profiler.h
+    profiler.cpp
     
     libs/sys.cpp
     libs/fs.cpp
@@ -112,6 +114,13 @@ set(SRC
     ../thirdparty/xxHash/xxhash.c
     ../thirdparty/xxHash/xxhash.h
 )
+
+if(${EMU_CONFIGURATION_VTUNE})
+    set(SRC ${SRC}
+        /opt/intel/vtune_amplifier/sdk/src/ittnotify/ittnotify_static.c
+        /opt/intel/vtune_amplifier/sdk/src/ittnotify/jitprofiling.c
+    )
+endif()
 
 add_library(ps3emu SHARED ${SRC})
 target_link_libraries(ps3emu

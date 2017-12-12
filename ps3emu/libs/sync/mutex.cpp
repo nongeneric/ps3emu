@@ -3,6 +3,7 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/IDMap.h"
 #include "ps3emu/log.h"
+#include "ps3emu/profiler.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <memory>
@@ -46,6 +47,9 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     info->id = mutexes.create(info);
     *mutex_id = info->id;
     INFO(libs) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
+
+    __itt_sync_create(info.get(), "mutex", attr->name, 0);
+
     return CELL_OK;
 }
 
@@ -63,6 +67,7 @@ int sys_mutex_destroy(sys_mutex_t mutex_id) {
     ret = pthread_mutexattr_destroy(&(*info)->attr);
     assert(ret == 0);
     
+    __itt_sync_destroy(info->get());
     mutexes.destroy(mutex_id);
     
     return CELL_OK;
@@ -78,9 +83,12 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
         return CELL_ESRCH;
     
     auto mutex = &(*info)->mutex;
+
+    __itt_sync_prepare(info->get());
     
     if (timeout == 0) {
         auto ret = pthread_mutex_lock(mutex);
+        __itt_sync_acquired(info->get());
         assert(ret == EDEADLK || ret == 0);
         return ret == EDEADLK ? CELL_EDEADLK : CELL_OK;
     } else {
@@ -92,6 +100,11 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
         auto ret = pthread_mutex_timedlock(mutex, &abs_time);
         assert(ret != EINVAL);
         assert(ret == 0 || ret == ETIMEDOUT);
+        if (ret == ETIMEDOUT) {
+            __itt_sync_cancel(info->get());
+        } else {
+            __itt_sync_acquired(info->get());
+        }
         return ret == ETIMEDOUT ? CELL_ETIMEDOUT : CELL_OK;
     }
 }
@@ -104,16 +117,20 @@ int sys_mutex_trylock(sys_mutex_t mutex_id) {
     if (!info)
         return CELL_ESRCH;
 
+    __itt_sync_prepare(info->get());
+
     auto ret = pthread_mutex_trylock(&(*info)->mutex);
     assert(ret == EDEADLK || ret == EBUSY || ret == 0);
     if (ret == EDEADLK)
         return CELL_EDEADLK;
     if (ret == EBUSY) {
+        __itt_sync_cancel(info->get());
         if ((*info)->type() == PTHREAD_MUTEX_RECURSIVE) {
             return CELL_EBUSY;
         }
         return CELL_EDEADLK;
     }
+    __itt_sync_acquired(info->get());
     return CELL_OK;
 }
 
@@ -125,6 +142,7 @@ int sys_mutex_unlock(sys_mutex_t mutex_id) {
     if (!info)
         return CELL_ESRCH;
     
+    __itt_sync_releasing(info->get());
     auto ret = pthread_mutex_unlock(&(*info)->mutex);
     assert(ret == EPERM || ret == 0);
     if (ret == EPERM)

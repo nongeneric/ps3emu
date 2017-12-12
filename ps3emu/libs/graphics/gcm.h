@@ -10,8 +10,8 @@
 class Process;
 class MainMemory;
 
-extern int gcmResetCommandsSize;
-extern int gcmInitCommandsSize;
+extern uint32_t gcmResetCommandsSize;
+extern uint32_t gcmInitCommandsSize;
 extern uint8_t gcmResetCommands[];
 extern uint8_t gcmInitCommands[];
 

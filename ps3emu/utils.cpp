@@ -1,9 +1,9 @@
 #include "utils.h"
 
-#include <boost/thread.hpp>
+#include <unistd.h>
 
 void ums_sleep(uint64_t microseconds) {
-    boost::this_thread::sleep_for( boost::chrono::microseconds(microseconds) );
+    usleep(microseconds);
 }
 
 std::string print_hex(const void* buf, int len, bool cArray) {

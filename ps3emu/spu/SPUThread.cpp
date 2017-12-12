@@ -213,6 +213,7 @@ SPUThread::SPUThread(std::string name,
     }
     std::fill(std::begin(_ls), std::end(_ls), 0);
     _channels.interrupt() = INT_Mask_class2_B | INT_Mask_class2_T;
+    _profilerSuspendedTask = __itt_string_handle_create("suspended");
 }
 
 SPUThreadExitInfo SPUThread::tryJoin(unsigned ms) {
@@ -377,9 +378,9 @@ void SPUThread::suspend() {
     if (_suspended)
         return;
     _suspended = true;
-    sigval val;
-    val.sival_ptr = this;
-    pthread_sigqueue(_pthread, SIGUSR1, val);
+    //sigval val;
+    //val.sival_ptr = this;
+    //pthread_sigqueue(_pthread, SIGUSR1, val);
 }
 
 void SPUThread::resume() {
@@ -407,13 +408,15 @@ void SPUThread::enableSuspend() {
 }
 
 void SPUThread::waitSuspended() {
-    if (!_suspendEnabled)
+    if (!_suspendEnabled || !_suspended)
         return;
+    __itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerSuspendedTask);
     for (int i = 0; _suspended; i++) {
-        struct timespec t { 0, i };
+        struct timespec t { 0, i > 500 ? 500 : i };
         nanosleep(&t, &t);
         //sched_yield();
     }
+    __itt_task_end(g_profiler_process_domain);
 }
 
 DisableSuspend::DisableSuspend(SPUThread* sth, bool detach) : _detach(detach), _sth(sth) {

@@ -8,6 +8,7 @@
 #include "ps3emu/int.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/utils/debug.h"
+#include "ps3emu/profiler.h"
 #include <stdexcept>
 #include <algorithm>
 
@@ -116,6 +117,11 @@ SPUChannels::SPUChannels(MainMemory* mm, ISPUChannelsThread* thread, SPUThread* 
       _interrupt2(0) {
     std::fill(begin(_channels), end(_channels), 0);
     _channels[MFC_WrTagMask] = -1;
+    _profilerGETLLARTask = __itt_string_handle_create("getllar");
+    _profilerGETTask = __itt_string_handle_create("get");
+    _profilerGETLTask = __itt_string_handle_create("getl");
+    _profilerPUTLLCTask = __itt_string_handle_create("putllc");
+    _profilerPUTTask = __itt_string_handle_create("put");
 }
 
 #define STALL_AND_NOTIFY(x) (x >> 63ul)
@@ -165,6 +171,7 @@ void SPUChannels::command(uint32_t word) {
     }
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerGETLLARTask);
             assert(size == 0x80);
             _mm->loadReserve<128>(eal,
                                   lsa,
@@ -174,6 +181,7 @@ void SPUChannels::command(uint32_t word) {
             // reservation always succeeds
             _channels[MFC_RdAtomicStat] |= 0b100; // G
             log();
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         case MFC_GET_CMD:
@@ -182,24 +190,30 @@ void SPUChannels::command(uint32_t word) {
         case MFC_GETB_CMD:
         case MFC_GETFS_CMD:
         case MFC_GETBS_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerGETTask);
             // readMemory always synchronizes
             _mm->readMemory(eal, lsa, size);
             log();
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         case MFC_PUTLLC_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerPUTLLCTask);
             EMU_ASSERT(size == 0x80);
             auto stored = _mm->writeCond<128>(eal, lsa);
             _channels[MFC_RdAtomicStat] |= !stored; // S
             logAtomic(stored);
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         case MFC_PUTLLUC_CMD:
         case MFC_PUTQLLUC_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerPUTLLCTask);
             EMU_ASSERT(opcode != MFC_PUTQLLUC_CMD);
             _channels[MFC_RdAtomicStat] |= 0b010; // U
             _mm->writeCond<128, true>(eal, lsa);
             log();
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         case MFC_PUT_CMD:
@@ -211,14 +225,17 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTBS_CMD:
         case MFC_PUTRF_CMD:
         case MFC_PUTRB_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerPUTTask);
             // writeMemory always synchronizes
             _mm->writeMemory(eal, lsa, size);
             log();
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         case MFC_GETL_CMD:
         case MFC_GETLF_CMD:
         case MFC_GETLB_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerGETLTask);
             assert(size % sizeof(big_uint64_t) == 0);
             auto list = (const big_uint64_t*)_thread->ls(eal);
             for (auto i = 0u; i < size / sizeof(big_uint64_t); ++i) {
@@ -228,6 +245,7 @@ void SPUChannels::command(uint32_t word) {
                 lsa += cursize;
             }
             log();
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         case MFC_PUTL_CMD:
@@ -236,6 +254,7 @@ void SPUChannels::command(uint32_t word) {
         case MFC_PUTLB_CMD:
         case MFC_PUTRLF_CMD:
         case MFC_PUTRLB_CMD: {
+            //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerPUTTask);
             assert(size % sizeof(big_uint64_t) == 0);
             auto list = (const big_uint64_t*)_thread->ls(eal);
             for (auto i = 0u; i < size / sizeof(big_uint64_t); ++i) {
@@ -245,6 +264,7 @@ void SPUChannels::command(uint32_t word) {
                 lsa += cursize;
             }
             log();
+            //__itt_task_end(g_profiler_process_domain);
             break;
         }
         EMU_ASSERT(false);

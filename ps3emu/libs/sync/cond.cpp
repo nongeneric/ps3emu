@@ -4,6 +4,7 @@
 #include "ps3emu/IDMap.h"
 #include "ps3emu/log.h"
 #include "ps3emu/ppu/PPUThread.h"
+#include "ps3emu/profiler.h"
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
@@ -27,6 +28,7 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
                         const sys_cond_attribute_t* attr)
 {
     auto info = std::make_shared<cv_info_t>();
+    __itt_sync_create(info.get(), "cond", attr->name, 0);
     info->m = find_mutex(mutex).get();
     info->name = attr->name;
     // TODO: error handling
@@ -43,6 +45,7 @@ int32_t sys_cond_destroy(sys_cond_t cond) {
         return CELL_ESRCH;
     auto& info = *optinfo;
     pthread_cond_destroy(&info->cv);
+    __itt_sync_destroy(info.get());
     cvs.destroy(cond);
     return CELL_OK;
 }
@@ -68,6 +71,9 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
                             info->name,
                             info->m->id,
                             info->m->name);
+
+    __itt_sync_prepare(info.get());
+
     auto id = g_state.th->getId();
     {
         boost::lock_guard<boost::mutex> lock(info->waitersMutex);
@@ -97,11 +103,11 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
             auto res = pthread_cond_timedwait2(&info->cv, &info->m->mutex, 2);
             if (res == EPERM)
                 return CELL_EPERM;
-            if (res == ETIMEDOUT)
-                return CELL_OK;
             assert(res == 0 || res == ETIMEDOUT);
-            if (check())
+            if (check()) {
+                __itt_sync_acquired(info.get());
                 return CELL_OK;
+            }
         }
     } else {
         timespec abs_time;
@@ -111,13 +117,17 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
         abs_time.tv_nsec = ns % 1000000000;
         for (;;) {
             auto res = pthread_cond_timedwait(&info->cv, &info->m->mutex, &abs_time);
-            if (res == ETIMEDOUT)
+            if (res == ETIMEDOUT) {
+                __itt_sync_cancel(info.get());
                 return CELL_ETIMEDOUT;
+            }
             if (res == EPERM)
                 return CELL_EPERM;
             assert(res == 0);
-            if (check())
+            if (check()) {
+                __itt_sync_acquired(info.get());
                 return CELL_OK;
+            }
         }
     }
     return CELL_OK;
@@ -128,6 +138,7 @@ int32_t sys_cond_signal(sys_cond_t cond) {
     if (!optinfo)
         return CELL_ESRCH;
     auto& info = *optinfo;
+    __itt_sync_releasing(info.get());
     INFO(libs, sync) << ssnprintf("sys_cond_signal(%x) c:%s m:%x(%s)",
                             cond,
                             info->name,
@@ -146,6 +157,7 @@ int32_t sys_cond_signal_all(sys_cond_t cond) {
     if (!optinfo)
         return CELL_ESRCH;
     auto& info = *optinfo;
+    __itt_sync_releasing(info.get());
     INFO(libs, sync) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%x(%s)",
                             cond,
                             info->name,
@@ -163,6 +175,7 @@ int32_t sys_cond_signal_to(sys_cond_t cond, sys_ppu_thread_t ppu_thread_id) {
     if (!optinfo)
         return CELL_ESRCH;
     auto& info = *optinfo;
+    __itt_sync_releasing(info.get());
     INFO(libs, sync) << ssnprintf("sys_cond_signal_to(%x, %x) c:%s m:%x(%s)",
                             cond,
                             ppu_thread_id,

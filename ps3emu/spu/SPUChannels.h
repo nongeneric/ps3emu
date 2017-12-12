@@ -2,6 +2,7 @@
 
 #include "ps3emu/libs/ConcurrentBoundedQueue.h"
 #include "ps3emu/enum.h"
+#include "ps3emu/profiler.h"
 #include <stdexcept>
 #include <array>
 #include <atomic>
@@ -217,6 +218,11 @@ class SPUChannels {
     std::atomic<uint32_t> _interrupt2;
     SpuEvent _event;
     SpuSignal _snr1, _snr2;
+    __itt_string_handle* _profilerGETLLARTask;
+    __itt_string_handle* _profilerGETTask;
+    __itt_string_handle* _profilerGETLTask;
+    __itt_string_handle* _profilerPUTLLCTask;
+    __itt_string_handle* _profilerPUTTask;
     void command(uint32_t word);
     void handleGranuleNotification(ReservationGranule* granule);
     friend void handleGranuleNotificationWrapper(uintptr_t arg1, uintptr_t arg2);

@@ -660,15 +660,18 @@ void Rsx::DriverFlip(uint32_t value) {
     _context->framebuffer->bindDefault();
     if (tex) {
         _context->textureRenderer->render(tex);
-        emuMessageDraw(tex->width(), tex->height());
-        drawStats();
     }
+    emuMessageDraw(tex->width(), tex->height());
+    drawStats();
     _context->pipeline.bind();
 
     _window.swapBuffers();
 
-    _fpsCounter.openRange();
-    _fpsCounter.closeRange();
+    __itt_frame_end_v3(_profilerDomain, NULL);
+    __itt_frame_begin_v3(_profilerDomain, NULL);
+
+    _fpsCounter.openRange(counter_clock_t::now());
+    _fpsCounter.closeRange(counter_clock_t::now());
 
     _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
     _context->frame++;
@@ -687,7 +690,7 @@ void Rsx::DriverFlip(uint32_t value) {
     _isFlipInProgress = false;
 
     // RSX releases the semaphore here
-    this->setLabel(1, 0);
+    this->setLabel(1, 0, false);
 
     if (_context->vBlankHandlerDescr) {
         invokeHandler(_context->vBlankHandlerDescr, 1);
@@ -717,8 +720,8 @@ void Rsx::DriverFlip(uint32_t value) {
 void Rsx::drawStats() {
     _context->statText.clear();
 
-    auto count = std::get<1>(_fpsCounter.value());
-    auto line = ssnprintf("FPS: %d", count);
+    auto fpsCount = std::get<1>(_fpsCounter.value(counter_clock_t::now()));
+    auto line = ssnprintf("FPS: %d", fpsCount);
     _context->statText.line(0, 0, line);
 
     auto [idleSum, idleCount] = _idleCounter.value();
@@ -728,35 +731,39 @@ void Rsx::drawStats() {
                                       loadDuration.count(),
                                       idleCount));
 
-    static std::vector<std::tuple<uint32_t, int, counter_duration_t>> vec;
+    static std::vector<std::tuple<MethodMapEntry*, int, counter_duration_t>> vec;
     vec.clear();
-    for (auto& [offset, counter] : _perfMap) {
+    for (auto& [entry, counter] : _perfMap) {
         auto [sum, count] = counter.value();
-        vec.push_back({offset, count, sum});
+        vec.push_back({entry, count, sum});
     }
     std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
         return std::get<2>(a) > std::get<2>(b);
     });
 
     int i = 0;
-    for (auto& [offset, count, sum] : vec) {
-        line = ssnprintf("%-8x %-8d %-1.4f",
-                         offset,
+    for (auto& [entry, count, sum] : vec) {
+        line = ssnprintf("%-8d %-1.4f %-1.4f   %s",
                          count,
-                         boost::chrono::duration<float>(sum).count());
+                         boost::chrono::duration<float>(sum).count(),
+                         boost::chrono::duration<float>(sum).count() / fpsCount,
+                         entry->name + 9);
         _context->statText.line(line);
         if (i++ == 10)
             break;
     }
 
+    float total = 0;
+
     {
         auto [sum, count] = _textureCounter.value();
         _context->statText.line(
-            300,
+            500,
             0,
             ssnprintf("texture:       %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -765,6 +772,7 @@ void Rsx::drawStats() {
             ssnprintf("fragment sh:   %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -773,6 +781,7 @@ void Rsx::drawStats() {
             ssnprintf("vertex sh:     %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
 
@@ -782,6 +791,7 @@ void Rsx::drawStats() {
             ssnprintf("fragment retr: %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -790,6 +800,7 @@ void Rsx::drawStats() {
             ssnprintf("vertex retr:   %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -798,6 +809,7 @@ void Rsx::drawStats() {
             ssnprintf("textureCache:  %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -806,6 +818,7 @@ void Rsx::drawStats() {
             ssnprintf("shaderCache:   %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -814,6 +827,7 @@ void Rsx::drawStats() {
             ssnprintf("resetCache:    %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -822,6 +836,7 @@ void Rsx::drawStats() {
             ssnprintf("linkShader:    %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -830,6 +845,7 @@ void Rsx::drawStats() {
             ssnprintf("vda:           %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -838,6 +854,7 @@ void Rsx::drawStats() {
             ssnprintf("waitForIdle:   %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -846,6 +863,7 @@ void Rsx::drawStats() {
             ssnprintf("index copying: %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -854,6 +872,7 @@ void Rsx::drawStats() {
             ssnprintf("load texture:  %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -862,6 +881,7 @@ void Rsx::drawStats() {
             ssnprintf("callback:      %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
 
     {
@@ -870,7 +890,13 @@ void Rsx::drawStats() {
             ssnprintf("semaphore:     %-8d  %-1.4f",
                       count,
                       boost::chrono::duration<float>(sum).count()));
+        total += boost::chrono::duration<float>(sum).count();
     }
+
+    _context->statText.line(
+        ssnprintf("total time: %1.4f (real), %1.4f (frame adjusted)",
+                  total,
+                  total / fpsCount));
 
     _context->statText.render(_window.width(), _window.height(), {0,1,0,1}, {});
 }
@@ -1342,6 +1368,8 @@ void Rsx::updateTextures() {
 
 void Rsx::init() {
     INFO(rsx) << "waiting for rsx loop to initialize";
+    _profilerDomain = __itt_domain_create("rsx");
+    _loopProfilerTask = __itt_string_handle_create("loop");
 
     boost::unique_lock<boost::mutex> lock(_initMutex);
     _thread.reset(new boost::thread([=]{ loop(); }));
@@ -1654,8 +1682,10 @@ void Rsx::initGcm() {
 
     _window.init();
 
+#ifdef GL_DEBUG_ENABLED
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(&glDebugCallbackFunction, nullptr);
+#endif
 
     _context.reset(new RsxContext());
     _context->pipeline.bind();
@@ -1807,16 +1837,16 @@ void Rsx::invalidateCaches(uint32_t va, uint32_t size) {
     _context->fragmentShaderCache.invalidate(va, size);
 }
 
-bool Rsx::isCallActive() {
-    return _ret != 0;
-}
-
 uint32_t Rsx::getGet() {
     return _get;
 }
 
 uint32_t Rsx::getPut() {
     return _put;
+}
+
+uint32_t Rsx::getRet() {
+    return _ret;
 }
 
 void Rsx::watchTextureCache() {

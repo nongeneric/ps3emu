@@ -53,21 +53,17 @@ float fixedUint9ToFloat(uint32_t val) {
 
 int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     MethodHeader header { fast_endian_reverse(read[0]) };
-    _currentCount = header.count.u();
-    _currentGet = read;
-    _currentGetValue = get;
-    auto offset = header.offset.u();
-    
-    RangeCloser closer;
-    if (log_should(log_warning, log_rsx, log_perf)) {
-        closer = RangeCloser(&_perfMap[offset]);
-    }
     
     if (header.val == 0) {
         assert(header.count.u() == 0);
         INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, _put.load());
         return 4;
     }
+
+    _currentCount = header.count.u();
+    _currentGet = read;
+    _currentGetValue = get;
+    auto offset = header.offset.u();
 
     if (header.prefix.u() == 1) {
         auto offset = header.jumpoffset.u();
@@ -85,9 +81,9 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     }
 
     if (header.val == 0x20000) {
-        INFO(rsx) << ssnprintf("rsx ret to %x", _ret);
+        INFO(rsx) << ssnprintf("rsx ret to %x", _ret.load());
         if (!get) {
-            INFO(rsx) << "rsx ret to 0, command buffer corruption is likely";
+            ERROR(rsx) << "rsx ret to 0, command buffer corruption is likely";
         }
         auto offset = _ret - get;
         _ret = 0;
@@ -95,7 +91,15 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     }
 
     auto& entry = _methodMap[offset / 4];
+
+    RangeCloser closer;
+    if (log_should(log_warning, log_rsx, log_perf)) {
+        closer = RangeCloser(&_perfMap[&entry]);
+    }
+
+    __itt_task_begin(_profilerDomain, __itt_null, __itt_null, entry.task);
     (this->*(entry.handler))(entry.index);
+    __itt_task_end(_profilerDomain);
 
     auto len = (header.count.u() + 1) * 4;
     assert(len != 0);
@@ -138,7 +142,6 @@ void Rsx::loop() {
 void Rsx::runLoop() {
     for (;;) {
         while (_get != _put || _ret) {
-            _idleCounter.closeRange();
             auto localGet = _get.load();
             auto ptr = (uint32_t*)g_state.mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, localGet), 0);
             auto len = interpret(localGet, ptr);
@@ -148,7 +151,6 @@ void Rsx::runLoop() {
             waitForIdle();
             return;
         }
-        _idleCounter.openRange();
     }
 }
 
@@ -524,6 +526,10 @@ void Rsx::initMethodMap() {
 
 #undef SINGLE
 #undef INDEXED
+
+    for (auto& m : _methodMap) {
+        m.task = __itt_string_handle_create(m.name + 9);
+    }
 }
 
 void Rsx::parseTextureAddress(int argi, int index) {

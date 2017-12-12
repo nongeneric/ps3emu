@@ -9,6 +9,10 @@ public:
     inline void lock() {
         while (_flag.test_and_set(std::memory_order_acquire)) ;
     }
+
+    inline bool try_lock() {
+        return !_flag.test_and_set(std::memory_order_acquire);
+    }
     
     inline void unlock() {
         _flag.clear(std::memory_order_release);

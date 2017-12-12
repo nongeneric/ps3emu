@@ -78,21 +78,6 @@ class MainMemory {
     bool readSpecialMemory(ps3_uintptr_t va, void* buf);
     void dealloc();
 
-public:
-    MainMemory();
-    ~MainMemory();
-    void writeMemory(ps3_uintptr_t va, const void* buf, uint len);
-    void readMemory(ps3_uintptr_t va,
-                    void* buf,
-                    uint len,
-                    bool validate = true);
-    void setMemory(ps3_uintptr_t va, uint8_t value, uint len);
-    void reset();
-    int allocatedPages();
-    bool isAllocated(ps3_uintptr_t va);
-    void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
-    uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
-    
     template<int Len>
     typename IntTraits<Len>::Type load(ps3_uintptr_t va, bool validate) {
         if constexpr(Len == 4) {
@@ -108,26 +93,6 @@ public:
         auto ptr = page.ptr + offset;
         auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
         return fast_endian_reverse(*typedPtr);
-    }
-
-    inline uint8_t load8(ps3_uintptr_t va, bool validate = true) {
-        return load<1>(va, validate);
-    }
-
-    inline uint16_t load16(ps3_uintptr_t va, bool validate = true) {
-        return load<2>(va, validate);
-    }
-
-    inline uint32_t load32(ps3_uintptr_t va, bool validate = true) {
-        return load<4>(va, validate);
-    }
-
-    inline uint64_t load64(ps3_uintptr_t va, bool validate = true) {
-        return load<8>(va, validate);
-    }
-
-    inline uint128_t load128(ps3_uintptr_t va, bool validate = true) {
-        return load<16>(va, validate);
     }
 
     template<int Len>
@@ -149,26 +114,32 @@ public:
         _rmap.unlock(line);
         _mmap.mark<Len>(va);
     }
-    
-    inline void store8(ps3_uintptr_t va, uint8_t value, ReservationGranule* granule) {
-        store<1>(va, value, granule);
-    }
 
-    inline void store16(ps3_uintptr_t va, uint16_t value, ReservationGranule* granule) {
-        store<2>(va, value, granule);
-    }
+public:
+    MainMemory();
+    ~MainMemory();
+    void writeMemory(ps3_uintptr_t va, const void* buf, uint len);
+    void readMemory(ps3_uintptr_t va,
+                    void* buf,
+                    uint len,
+                    bool validate = true);
+    void setMemory(ps3_uintptr_t va, uint8_t value, uint len);
+    void reset();
+    int allocatedPages();
+    bool isAllocated(ps3_uintptr_t va);
+    void provideMemory(ps3_uintptr_t src, uint32_t size, void* memory);
+    uint8_t* getMemoryPointer(ps3_uintptr_t va, uint32_t len);
 
-    inline void store32(ps3_uintptr_t va, uint32_t value, ReservationGranule* granule) {
-        store<4>(va, value, granule);
-    }
-
-    inline void store64(ps3_uintptr_t va, uint64_t value, ReservationGranule* granule) {
-        store<8>(va, value, granule);
-    }
-
-    inline void store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule) {
-        store<16>(va, value, granule);
-    }
+    uint8_t load8(ps3_uintptr_t va, bool validate = true);
+    uint16_t load16(ps3_uintptr_t va, bool validate = true);
+    uint32_t load32(ps3_uintptr_t va, bool validate = true);
+    uint64_t load64(ps3_uintptr_t va, bool validate = true);
+    uint128_t load128(ps3_uintptr_t va, bool validate = true);
+    void store8(ps3_uintptr_t va, uint8_t value, ReservationGranule* granule);
+    void store16(ps3_uintptr_t va, uint16_t value, ReservationGranule* granule);
+    void store32(ps3_uintptr_t va, uint32_t value, ReservationGranule* granule);
+    void store64(ps3_uintptr_t va, uint64_t value, ReservationGranule* granule);
+    void store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule);
     
     inline void storef(ps3_uintptr_t va, float value, ReservationGranule* granule) {
         store32(va, union_cast<float, uint32_t>(value), granule);

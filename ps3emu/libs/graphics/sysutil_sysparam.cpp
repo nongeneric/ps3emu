@@ -23,10 +23,10 @@ int cellVideoOutGetResolution(uint32_t resolutionId, CellVideoOutResolution* res
     return CELL_OK;
 }
 
-int cellVideoOutConfigure(uint32_t videoOut, 
-                          CellVideoOutConfiguration* config, 
-                          CellVideoOutOption* option, 
-                          uint32_t waitForEvent) 
+int cellVideoOutConfigure(uint32_t videoOut,
+                          CellVideoOutConfiguration* config,
+                          CellVideoOutOption* option,
+                          uint32_t waitForEvent)
 {
     INFO(libs) << __FUNCTION__;
     assert(videoOut == CELL_VIDEO_OUT_PRIMARY);

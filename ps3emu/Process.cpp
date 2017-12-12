@@ -10,6 +10,7 @@
 #include "ps3emu/libs/sync/queue.h"
 #include "ps3emu/HeapMemoryAlloc.h"
 #include "ps3emu/utils/debug.h"
+#include "ps3emu/profiler.h"
 
 #include <SDL2/SDL.h>
 #include "ppu/InterruptPPUThread.h"
@@ -147,6 +148,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
         exit(1);
     }
     
+    g_profiler_process_domain = __itt_domain_create("proc");
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
                                                            EmuInternalAreaSize,
                                                            "internal alloc"));

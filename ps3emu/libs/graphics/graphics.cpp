@@ -6,6 +6,11 @@
 #include <stdexcept>
 
 void Window::init() {
+#ifdef GL_DEBUG_ENABLED
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+#else
+    glfwWindowHint(GLFW_CONTEXT_NO_ERROR, GL_TRUE);
+#endif
     _window = glfwCreateWindow(width(), height(), "ps3emu", NULL, NULL);
     if (!_window) {
         throw std::runtime_error("window creation failed");
