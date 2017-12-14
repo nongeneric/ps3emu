@@ -37,6 +37,7 @@ struct RewriteCommand {
     std::string cpp;
     uint32_t imageBase;
     bool isSpu = false;
+    bool noFexcept = false;
 };
 
 struct PrxStoreCommand {

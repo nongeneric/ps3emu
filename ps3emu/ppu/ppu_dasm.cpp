@@ -51,6 +51,12 @@ using namespace boost::endian;
     #define BRANCH_TO_LR(lr) TH->setNIP(lr & ~3ul)
 #endif
 
+#ifdef EMU_REWRITER_NOFEXCEPT
+#define FECLEAR_EXCEPT
+#else
+#define FECLEAR_EXCEPT std::feclearexcept(FE_ALL_EXCEPT)
+#endif
+
 #define SET_NIP SET_NIP_INITIAL
 
 #define MM thread->mm()
@@ -2646,6 +2652,7 @@ inline uint32_t getFPRF(double r) {
 template <typename A, typename B>
 void completeFPInstr(
     A a, B b, unsigned c, unsigned r, unsigned rc, PPUThread* thread) {
+#ifndef EMU_REWRITER_NOFEXCEPT
     // TODO: set FI
     // TODO: set FR
     auto fpscr = TH->getFPSCR();
@@ -2673,6 +2680,7 @@ void completeFPInstr(
     TH->setFPSCR(fpscr.v);
     if (rc)
         update_CRFSign<1>(r, TH);
+#endif
 }
 
 PRINT(FADD, AForm_2) {
@@ -2682,7 +2690,7 @@ PRINT(FADD, AForm_2) {
 #define _FADD(_fra, _frb, _frt, _rc) { \
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frb); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a + b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0, r, _rc, TH); \
@@ -2697,7 +2705,7 @@ PRINT(FSUB, AForm_2) {
 #define _FSUB(_fra, _frb, _frt, _rc) { \
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frb); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a - b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0, r, _rc, TH); \
@@ -2712,7 +2720,7 @@ PRINT(FSUBS, AForm_2) {
 #define _FSUBS(_fra, _frb, _frt, _rc) { \
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frb); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a - b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0, r, _rc, TH); \
@@ -2727,7 +2735,7 @@ PRINT(FADDS, AForm_2) {
 #define _FADDS(_fra, _frb, _frt, _rc) { \
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frb); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a + b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0f, r, _rc, TH); \
@@ -2742,7 +2750,7 @@ PRINT(FMUL, AForm_3) {
 #define _FMUL(_fra, _frc, _frt, _rc) { \
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a * b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0, r, _rc, TH); \
@@ -2757,7 +2765,7 @@ PRINT(FMULS, AForm_3) {
 #define _FMULS(_fra, _frc, _frt, _rc) { \
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a * b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0f, r, _rc, TH); \
@@ -2772,7 +2780,7 @@ PRINT(FDIV, AForm_2) {
 #define _FDIV(_fra, _frb, _frt, _rc) { \
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frb); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a / b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0, r, _rc, TH); \
@@ -2787,7 +2795,7 @@ PRINT(FDIVS, AForm_2) {
 #define _FDIVS(_fra, _frb, _frt, _rc) { \
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frb); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a / b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, .0f, r, _rc, TH); \
@@ -2803,7 +2811,7 @@ PRINT(FMADD, AForm_1) {
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frb); \
     auto c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a * c + b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2819,7 +2827,7 @@ PRINT(FMADDS, AForm_1) {
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frb); \
     float c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a * c + b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2835,7 +2843,7 @@ PRINT(FMSUB, AForm_1) {
     double a = TH->getFPRd(_fra); \
     double b = TH->getFPRd(_frb); \
     double c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a * c - b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2852,7 +2860,7 @@ PRINT(FMSUBS, AForm_1) {
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frb); \
     float c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = a * c - b; \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2868,7 +2876,7 @@ PRINT(FNMADD, AForm_1) {
     auto a = TH->getFPRd(_fra); \
     auto b = TH->getFPRd(_frb); \
     auto c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = -(a * c + b); \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2884,7 +2892,7 @@ PRINT(FNMADDS, AForm_1) {
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frb); \
     float c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = -(a * c + b); \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2900,7 +2908,7 @@ PRINT(FNMSUB, AForm_1) {
     double a = TH->getFPRd(_fra); \
     double b = TH->getFPRd(_frb); \
     double c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = -(a * c - b); \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \
@@ -2917,7 +2925,7 @@ PRINT(FNMSUBS, AForm_1) {
     float a = TH->getFPRd(_fra); \
     float b = TH->getFPRd(_frb); \
     float c = TH->getFPRd(_frc); \
-    std::feclearexcept(FE_ALL_EXCEPT); \
+    FECLEAR_EXCEPT; \
     auto r = -(a * c - b); \
     TH->setFPRd(_frt, r); \
     completeFPInstr(a, b, c, r, _rc, TH); \

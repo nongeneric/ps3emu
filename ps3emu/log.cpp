@@ -32,7 +32,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, int areas, log
     }
     if (sink_flags & log_file) {
         sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            "/tmp/ps3", "log", (1ull << 30) * 128, 1, true));
+            "/tmp/ps3", (1ull << 30u) * 128, 1));
     }
     logger = std::make_shared<spdlog::logger>("name", begin(sinks), end(sinks));
     spdlog::register_logger(logger);

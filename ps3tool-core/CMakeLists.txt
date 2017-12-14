@@ -4,6 +4,9 @@ set(SRC
     Rewriter.cpp
     GraphTools.cpp
     NinjaScript.cpp
+    Rewriter.h
+    GraphTools.h
+    NinjaScript.h
 )
 
 add_library(ps3tool-core SHARED ${SRC})

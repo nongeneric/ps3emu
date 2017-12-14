@@ -75,9 +75,9 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
     _mmap.mark(va, len);
     while (va != last) {
         auto next = std::min(last, (va + 128) & 0xffffff80);
-        auto line = _rmap.lock<128>(va & 0xffffff80);
         auto size = next - va;
         auto dest = getMemoryPointer(va, size);
+        auto line = _rmap.lock<128>(va & 0xffffff80);
         memcpy(dest, src, size);
         _rmap.destroyExcept(line, g_state.granule);
         _rmap.unlock(line);

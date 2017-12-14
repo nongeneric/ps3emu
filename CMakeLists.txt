@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
+cmake_policy(VERSION 3.10)
 
 project(ps3emu-root)
 include_directories(${ps3emu-root_SOURCE_DIR})
@@ -40,7 +41,7 @@ set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native -msse2avx -rdynamic ${CMAKE_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 
-set(EMU_CONFIGURATION_DEBUG   1)
+set(EMU_CONFIGURATION_DEBUG   0)
 set(EMU_CONFIGURATION_TESTS   1)
 set(EMU_CONFIGURATION_PAUSE   1)
 set(EMU_CONFIGURATION_LOG     1)

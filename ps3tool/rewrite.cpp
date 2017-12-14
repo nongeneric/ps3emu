@@ -2,6 +2,7 @@
 #include "ps3emu/ELFLoader.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/ppu/ppu_dasm_forms.h"
 #include "ps3emu/spu/SPUDasm.h"
 #include "ps3emu/utils.h"
 #include "ps3tool-core/Rewriter.h"
@@ -17,6 +18,7 @@
 #include <boost/endian/arithmetic.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/variant.hpp>
 #include <iostream>
 #include <stack>
 #include <set>
@@ -197,6 +199,176 @@ std::set<uint32_t> collectInitialPPULeads(uint32_t vaBase, ELFLoader& elf, uint3
     return leads;
 }
 
+struct SimpleInstruction {
+    uint32_t cia;
+    uint32_t bytes;
+};
+
+struct LoadStoreStatementSource {
+    uint32_t reg;
+    uint32_t size;
+};
+
+struct LoadStoreStatement {
+    SimpleInstruction simple;
+    std::vector<LoadStoreStatementSource> src;
+    uint32_t destReg;
+    int disp;
+    bool load;
+
+    int size() const {
+        int res = 0;
+        for (auto& s : src) {
+            res += s.size;
+        }
+        return res;
+    }
+};
+
+typedef boost::variant<
+    SimpleInstruction,
+    LoadStoreStatement
+> BasicBlockStatement;
+
+struct ConcreteBasicBlock {
+    std::vector<BasicBlockStatement> statements;
+};
+
+class StatementPrinter : public boost::static_visitor<> {
+public:
+    mutable std::vector<std::string> result;
+
+    void operator()(SimpleInstruction& simple) const {
+        std::string rewritten, printed;
+        big_uint32_t instr = g_state.mm->load32(simple.cia);
+        ppu_dasm<DasmMode::Rewrite>(&instr, simple.cia, &rewritten);
+        ppu_dasm<DasmMode::Print>(&instr, simple.cia, &printed);
+        result = {ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;",
+                            simple.cia,
+                            printed,
+                            simple.cia,
+                            rewritten)};
+    }
+
+    void operator()(LoadStoreStatement& store) const {
+        if (store.src.size() == 1) {
+            (*this)(store.simple);
+            return;
+        }
+        result.clear();
+        result.push_back(ssnprintf("{ // %s %d (%d bytes)",
+                                   store.load ? "LOAD" : "STORE",
+                                   store.src.size(),
+                                   store.size()));
+        result.push_back("    struct __attribute__((packed)) {");
+        int i = 0;
+        for (auto& s : store.src) {
+            result.push_back(ssnprintf("        uint%d_t r%d;", s.size * 8, i));
+            i++;
+        }
+        result.push_back("    } t;");
+        auto dest = store.destReg == 0 ? "0" : ssnprintf("TH->getGPR(%d)", store.destReg);
+        if (store.load) {
+            result.push_back(ssnprintf("    MM->readMemory(%s + (%d), &t, %d);", dest, store.disp, store.size()));
+            i = 0;
+            for (auto& s : store.src) {
+                result.push_back(ssnprintf(
+                    "    TH->setGPR(%d, fast_endian_reverse(t.r%d));", s.reg, i));
+                i++;
+            }
+        } else {
+            i = 0;
+            for (auto& s : store.src) {
+                result.push_back(ssnprintf(
+                    "    t.r%d = fast_endian_reverse((uint%d_t)TH->getGPR(%d));",
+                    i,
+                    s.size * 8,
+                    s.reg));
+                i++;
+            }
+            result.push_back(ssnprintf("    MM->writeMemory(%s + (%d), &t, %d);", dest, store.disp, store.size()));
+        }
+        result.push_back("}");
+    }
+};
+
+ConcreteBasicBlock transformBasicBlock(BasicBlock const& block) {
+    ConcreteBasicBlock res;
+    for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
+        big_uint32_t instr = g_state.mm->load32(cia);
+        std::string name;
+        ppu_dasm<DasmMode::Name>(&instr, cia, &name);
+        SimpleInstruction simple{cia, instr};
+        auto size = (name == "STB" || name == "LBZ") ? 1u
+                  : (name == "STH" || name == "LHZ") ? 2u
+                  : (name == "STW" || name == "LWZ") ? 4u
+                  : (name == "STD" || name == "LDZ") ? 8u
+                  : 0u;
+        if (size) {
+            DForm_3 i = union_cast<uint32_t, DForm_3>(instr);
+            auto ra = i.RA.u();
+            auto rs = i.RS.u();
+            auto d = i.D.s();
+            auto isLoad = name[0] == 'L';
+            LoadStoreStatement st{simple, {{rs, size}}, ra, d, isLoad};
+            res.statements.push_back(st);
+        } else {
+            res.statements.push_back(simple);
+        }
+    }
+    return res;
+}
+
+void optimizeAdjacentLoadStores(ConcreteBasicBlock& block, bool load) {
+    std::vector<std::tuple<int, int>> seqs;
+    auto len = 0, start = 0, cur = 0;
+    for (auto& st : block.statements) {
+        auto loadStore = boost::get<LoadStoreStatement>(&st);
+        if (loadStore && loadStore->load == load) {
+            if (start == -1) {
+                start = cur;
+            }
+            len++;
+        } else {
+            if (len > 1) {
+                seqs.push_back({start, len});
+            }
+            len = 0;
+            start = -1;
+        }
+        cur++;
+    }
+    for (auto seq = (int)seqs.size() - 1; seq >= 0; --seq) {
+        auto [start, len] = seqs[seq];
+        std::vector<LoadStoreStatement> sts;
+        for (auto i = start; i < start + len; ++i) {
+            sts.push_back(boost::get<LoadStoreStatement>(block.statements[i]));
+        }
+        std::sort(begin(sts), end(sts), [](auto& a, auto& b) {
+            return a.disp < b.disp;
+        });
+        auto sameDest = std::all_of(begin(sts), end(sts), [&](auto& st) {
+            return st.destReg == sts[0].destReg;
+        });
+        bool overlap = false;
+        for (auto i = 1u; i < sts.size(); ++i) {
+            overlap |= sts[i - 1].disp + sts[i - 1].size() != sts[i].disp;
+        }
+        if (!sameDest || overlap)
+            continue;
+        while (sts.size() != 1) {
+            auto& a = sts[0];
+            auto& b = sts[1];
+            for (auto& s : b.src)
+                a.src.push_back(s);
+            sts.erase(begin(sts) + 1);
+        }
+        block.statements.erase(begin(block.statements) + start,
+                               begin(block.statements) + start + len);
+        block.statements.insert(begin(block.statements) + start, sts[0]);
+    }
+}
+
 std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream& log) {
     ELFLoader elf;
     RewriterStore rewriterStore;
@@ -222,7 +394,7 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
             return false;
         }
     };
-    
+
     auto blocks = discoverBasicBlocks(
         vaBase, segmentSize, leads, log, analyzeFunc, validate, [&](uint32_t cia) {
             auto instr = endian_reverse(g_state.mm->load32(cia));
@@ -231,15 +403,17 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
             return "ppu_" + name;
         }, {});
     auto parts = partitionBasicBlocks(blocks, analyzeFunc);
-    
+
+    StatementPrinter printer;
     for (auto& part : parts) {
         for (auto& block : part) {
-            for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
-                std::string rewritten, printed;
-                big_uint32_t instr = g_state.mm->load32(cia);
-                ppu_dasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
-                ppu_dasm<DasmMode::Print>(&instr, cia, &printed);
-                block.body.push_back(ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;", cia, printed, cia, rewritten));
+            auto processed = transformBasicBlock(block);
+            optimizeAdjacentLoadStores(processed, true);
+            optimizeAdjacentLoadStores(processed, false);
+            for (auto& st : processed.statements) {
+                boost::apply_visitor(printer, st);
+                for (auto& line : printer.result)
+                    block.body.push_back(line);
             }
             auto [target, fallthrough] = outOfPartTargets(block, part, analyzeFunc);
             if (target) {
@@ -492,10 +666,13 @@ std::string entrySignature(auto& segment) {
                      segment.isSpu ? ", uint32_t bb_va" : "");
 }
 
-void printHeader(std::string name, std::vector<SegmentInfo> const& segments) {
+void printHeader(std::string name, std::vector<SegmentInfo> const& segments, bool noFexcept) {
     std::ofstream f(name);
     assert(f.is_open());
-    
+
+    if (noFexcept) {
+        f << "#define EMU_REWRITER_NOFEXCEPT\n";
+    }
     f << header;
     
     for (auto& segment : segments) {
@@ -624,7 +801,7 @@ void HandleRewrite(RewriteCommand const& command) {
     auto ninjaName = command.cpp + ".ninja";
     auto mainName = command.cpp + ".cpp";
     
-    printHeader(headerName, segmentInfos);
+    printHeader(headerName, segmentInfos, command.noFexcept);
     printMain(mainName, segmentInfos);
     printNinja(ninjaName, segmentInfos);
     for (auto i = 0u; i < segmentInfos.size(); ++i) {

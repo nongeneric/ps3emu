@@ -139,12 +139,14 @@ struct RewriteParser : CommandParser<RewriteCommand> {
             ("cpp", value<std::string>(&command.cpp)->required(), "output cpp file")
             ("image-base", value<std::string>(&imageBaseStr)->default_value("0"), "image base")
             ("spu", bool_switch()->default_value(false), "spu")
+            ("no-fexcept", bool_switch()->default_value(false), "disable fp exceptions")
             ;
     }
     
     void parse(variables_map& vm) override {
         command.imageBase = std::stoi(imageBaseStr, 0, 16);
         command.isSpu = vm["spu"].as<bool>();
+        command.noFexcept = vm["no-fexcept"].as<bool>();
     }
 };
 
