@@ -74,6 +74,11 @@ struct DasmCommand {
     std::string elf;
 };
 
+struct UnpackTrpCommand {
+    std::string trp;
+    std::string output;
+};
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
@@ -87,3 +92,4 @@ void HandleDumpInstrDb(DumpInstrDbCommand const& command);
 void HandlePrintGcmVizTrace(PrintGcmVizTraceCommand const& command);
 void HandleTraceViz(TraceVizCommand const& command);
 void HandleDasm(DasmCommand const& command);
+void HandleUnpackTrp(UnpackTrpCommand const& command);

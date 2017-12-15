@@ -1379,7 +1379,7 @@ void Rsx::CELL_GCM_NV4097_SET_CULL_FACE_impl(int index) {
 }
 
 void Rsx::CELL_GCM_NV4097_SET_FRONT_FACE_impl(int index) {
-    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_FRONT_FACE";
+    FrontFace(enum_cast<GcmFrontFace>(readarg(1)));
 }
 
 void Rsx::CELL_GCM_NV4097_SET_POLY_SMOOTH_ENABLE_impl(int index) {

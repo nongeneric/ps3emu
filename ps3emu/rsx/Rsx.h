@@ -103,6 +103,11 @@ ENUM(GcmCullFace,
     (FRONT_AND_BACK, 0x0408)
 )
 
+ENUM(GcmFrontFace,
+    (CW, 0x0900),
+    (CCW, 0x0901)
+)
+
 ENUM(GcmOperator,
     (NEVER, 0x0200),
     (LESS, 0x0201),
@@ -381,6 +386,7 @@ class Rsx {
     void ColorMask(GcmColorMask mask);
     void DepthFunc(GcmOperator zf);
     void CullFaceEnable(bool enable);
+    void FrontFace(GcmFrontFace dir);
     void DepthTestEnable(bool enable);
     void ShadeMode(uint32_t sm);
     void ColorClearValue(uint32_t color);

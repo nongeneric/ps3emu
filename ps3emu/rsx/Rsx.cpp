@@ -391,6 +391,12 @@ void Rsx::CullFaceEnable(bool enable) {
     glEnableb(GL_CULL_FACE, enable);
 }
 
+void Rsx::FrontFace(GcmFrontFace dir) {
+    TRACE(FrontFace, dir);
+    _context->cullFaceDirection = dir;
+    glFrontFace(dir == GcmFrontFace::CW ? GL_CW : GL_CCW);
+}
+
 void Rsx::ShadeMode(uint32_t sm) {
     TRACE(ShadeMode, sm);
     _context->isFlatShadeMode = sm == CELL_GCM_FLAT;

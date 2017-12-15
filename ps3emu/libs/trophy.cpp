@@ -95,8 +95,8 @@ std::optional<path> emuDir() {
             for (auto& nested : directory_iterator(dir)) {
                 if (!is_directory(nested))
                         continue;
-                if (nested.path().filename() != "TROPHY.EMU" || !is_directory(nested)) {
-                    ERROR(libs) << "no TROPHY.EMU dir found";
+                if (nested.path().filename() != "TROPHY.TRPEMU" || !is_directory(nested)) {
+                    ERROR(libs) << "TROPHY.TRPEMU dir not found";
                     return {};
                 }
                 return nested.path();
@@ -158,42 +158,38 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
     if (!emuPath)
         return CELL_OK;
     
-    auto configPath = *emuPath / "index.trx";
-    xml_document doc;
-    doc.load_file(configPath.string().c_str());
-    auto root = doc.child("trophytrp");
-    for (auto file = root.child("file"); file; file = file.next_sibling("file")) {
-        auto name = file.attribute("name").as_string();
-        if (name == "TROPCONF.SFM"s) {
-            auto trophyconf = file.child("trophyconf");
-            for (auto t = trophyconf.child("trophy"); t; t = t.next_sibling("trophy")) {
-                Trophy trophy;
-                trophy.id = t.attribute("id").as_int();
-                trophy.hidden = t.attribute("hidden").as_string() == "yes"s;
-                trophy.grade = parseGrade(t.attribute("ttype").as_string()[0]);
-                trophy.unlocked = 0;
-                trophy.imagePath = *emuPath / ssnprintf("TROP%03d.PNG", trophy.id);
-                context.trophies.push_back(trophy);
-            }
-        }
-        if (name == "TROP.SFM"s) {
-            auto trophyconf = file.child("trophyconf");
-            strncpy(context.gameDetails.title,
-                    trophyconf.child("title-name").text().get(),
-                    SCE_NP_TROPHY_NAME_MAX_SIZE);
-            strncpy(context.gameDetails.description,
-                    trophyconf.child("title-detail").text().get(),
-                    SCE_NP_TROPHY_DESCR_MAX_SIZE);
-            for (auto t = trophyconf.child("trophy"); t; t = t.next_sibling("trophy")) {
-                auto id = t.attribute("id").as_int();
-                auto& trophy = context.trophies.at(id);
-                assert(trophy.id == id);
-                trophy.name = t.child("name").text().get();
-                trophy.detail = t.child("detail").text().get();
-            }
-        }
+    auto configPath = *emuPath / "TROPCONF.SFM";
+    auto tropPath = *emuPath / "TROP.SFM";
+
+    xml_document config;
+    config.load_file(configPath.string().c_str());
+    for (auto t = config.child("trophyconf").child("trophy"); t; t = t.next_sibling("trophy")) {
+        Trophy trophy;
+        trophy.id = t.attribute("id").as_int();
+        trophy.hidden = t.attribute("hidden").as_string() == "yes"s;
+        trophy.grade = parseGrade(t.attribute("ttype").as_string()[0]);
+        trophy.unlocked = 0;
+        trophy.imagePath = *emuPath / ssnprintf("TROP%03d.PNG", trophy.id);
+        context.trophies.push_back(trophy);
     }
-    
+
+    xml_document trop;
+    trop.load_file(tropPath.string().c_str());
+    auto trophyconf = trop.child("trophyconf");
+    strncpy(context.gameDetails.title,
+            trophyconf.child("title-name").text().get(),
+            SCE_NP_TROPHY_NAME_MAX_SIZE);
+    strncpy(context.gameDetails.description,
+            trophyconf.child("title-detail").text().get(),
+            SCE_NP_TROPHY_DESCR_MAX_SIZE);
+    for (auto t = trophyconf.child("trophy"); t; t = t.next_sibling("trophy")) {
+        auto id = t.attribute("id").as_int();
+        auto& trophy = context.trophies.at(id);
+        assert(trophy.id == id);
+        trophy.name = t.child("name").text().get();
+        trophy.detail = t.child("detail").text().get();
+    }
+
     context.gameImagePath = *emuPath / "ICON0.PNG";
     context.gameDetails.numTrophies = context.trophies.size();
     context.gameDetails.numPlatinum = 0;

@@ -50,6 +50,7 @@
     X(ColorMask) \
     X(DepthFunc) \
     X(CullFaceEnable) \
+    X(FrontFace) \
     X(DepthTestEnable) \
     X(ShadeMode) \
     X(ColorClearValue) \

@@ -226,6 +226,7 @@ struct RsxContext {
     ViewPortInfo viewPort;
     GcmColorMask colorMask;
     bool isCullFaceEnabled;
+    GcmFrontFace cullFaceDirection;
     bool isFlatShadeMode;
     std::array<VertexDataArrayFormatInfo, 16> vertexDataArrays;
     GLuint glVertexArrayMode;

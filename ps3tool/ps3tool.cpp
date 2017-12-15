@@ -27,6 +27,7 @@ typedef boost::variant<NoneCommand,
                        DumpInstrDbCommand,
                        TraceVizCommand,
                        DasmCommand,
+                       UnpackTrpCommand,
                        PrintGcmVizTraceCommand>
     Command;
 
@@ -236,8 +237,6 @@ struct TraceVizParser : CommandParser<TraceVizCommand> {
 struct DasmParser : CommandParser<DasmCommand> {
     DasmParser() : CommandParser<DasmCommand>("dasm") {}
     
-    std::string _offsetStr;
-    
     void init() override {
         desc.add_options()
             ("elf", value<std::string>(&command.elf)->required(), "elf path")
@@ -246,7 +245,20 @@ struct DasmParser : CommandParser<DasmCommand> {
     
     void parse(variables_map& vm) override { }
 };
-    
+
+struct UnpackTrpParser : CommandParser<UnpackTrpCommand> {
+    UnpackTrpParser() : CommandParser<UnpackTrpCommand>("unpack-trp") {}
+
+    void init() override {
+        desc.add_options()
+            ("trp", value<std::string>(&command.trp)->required(), "trp path")
+            ("output", value<std::string>(&command.output), "output dir path")
+            ;
+    }
+
+    void parse(variables_map& vm) override { }
+};
+
 Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
     std::string commandName;
@@ -282,7 +294,8 @@ Command ParseOptions(int argc, const char *argv[]) {
         DumpInstrDbParser(),
         PrintGcmVizTraceParser(),
         TraceVizParser(),
-        DasmParser()
+        DasmParser(),
+        UnpackTrpParser()
     );
     
     if (commandName == "") {
@@ -365,6 +378,10 @@ public:
     
     void operator()(DasmCommand& command) const {
         HandleDasm(command);
+    }
+
+    void operator()(UnpackTrpCommand& command) const {
+        HandleUnpackTrp(command);
     }
 };
 
