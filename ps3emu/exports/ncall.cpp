@@ -26,10 +26,10 @@
 #include "ps3emu/libs/libnetctl.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
+#include <tbb/concurrent_vector.h>
 #include <openssl/sha.h>
 #include <memory>
 #include <algorithm>
-#include <vector>
 
 using namespace emu::Gcm;
 
@@ -113,7 +113,7 @@ int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t 
 
 #define ENTRY(name) { #name, calcFnid(#name), [](PPUThread* th) { wrap(name, th); } }
 
-std::vector<NCallEntry> ncallTable {
+tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(EmuInitLoadedPrxModules),
     ENTRY(defaultContextCallback),
     ENTRY(_sys_process_atexitspawn),
@@ -315,17 +315,17 @@ void PPUThread::ncall(uint32_t index) {
 }
 
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound) {
-    auto it = std::find_if(begin(ncallTable), end(ncallTable), [=](auto& entry) {
+    auto it = std::find_if(ncallTable.begin(), ncallTable.end(), [=](auto& entry) {
         return entry.fnid == fnid;
     });
-    if (it == end(ncallTable))
+    if (it == ncallTable.end())
         return nullptr;
-    index = std::distance(begin(ncallTable), it);
-    auto next = std::find_if(it + 1, end(ncallTable), [=](auto& entry) {
+    index = std::distance(ncallTable.begin(), it);
+    auto next = std::find_if(it + 1, ncallTable.end(), [=](auto& entry) {
         return entry.fnid == fnid;
     });
     (void)next;
-    assert(next == end(ncallTable));
+    assert(next == ncallTable.end());
     return &(*it);
 }
 

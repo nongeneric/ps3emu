@@ -3,6 +3,7 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/spu/SPUGroupManager.h"
 #include "../sys_defs.h"
+#include <boost/context/all.hpp>
 
 using sys_spu_thread_t = big_uint32_t;
 using sys_spu_thread_group_t = big_uint32_t;
@@ -141,8 +142,8 @@ class InternalMemoryManager;
 
 void spuImageMap(MainMemory* mm, sys_spu_image_t* image, void* ls);
 
-int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va);
-int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va, uint32_t attr_va);
+int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va, boost::context::continuation* sink);
+int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va, uint32_t attr_va, boost::context::continuation* sink);
 int32_t cellSpursFinalize(uint32_t spurs_va);
 void dumpSpursTrace(std::function<void(std::string)> log,
                     char* buffer = nullptr,

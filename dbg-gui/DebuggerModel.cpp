@@ -409,7 +409,7 @@ public:
                 auto isSpuElf = isSpuElfAddress(row);
                 if (ppu && !isSpuElf) {
                     ppu_dasm<DasmMode::Print>(&instr, row, &str);
-                    auto bbcall = g_state.bbcallMap->get(row);
+                    auto bbcall = g_state.bbcallMap->safeGet(row);
                     str = ssnprintf("%s%s", bbcall ? "." : " ", str);
                 } else {
                     SPUDasm<DasmMode::Print>(&instr, row, &str);

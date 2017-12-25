@@ -3,6 +3,7 @@
 #include "sys.h"
 #include <optional>
 #include <array>
+#include <boost/context/all.hpp>
 
 typedef big_int32_t SceNpTrophyId;
 typedef big_uint32_t SceNpTrophyContext;
@@ -79,7 +80,9 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext context,
                                    SceNpTrophyHandle handle,
                                    uint32_t callback,
                                    uint32_t arg,
-                                   uint64_t options);
+                                   uint64_t options,
+                                   PPUThread* th,
+                                   boost::context::continuation* sink);
 
 int32_t sceNpTrophyUnlockTrophy(SceNpTrophyContext context,
                                 SceNpTrophyHandle handle,

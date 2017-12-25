@@ -666,8 +666,8 @@ void Rsx::DriverFlip(uint32_t value) {
     _context->framebuffer->bindDefault();
     if (tex) {
         _context->textureRenderer->render(tex);
+        emuMessageDraw(tex->width(), tex->height());
     }
-    emuMessageDraw(tex->width(), tex->height());
     drawStats();
     _context->pipeline.bind();
 

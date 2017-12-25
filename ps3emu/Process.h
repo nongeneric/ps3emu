@@ -7,6 +7,7 @@
 #include "libs/ConcurrentBoundedQueue.h"
 #include "OneTimeEvent.h"
 
+#include <boost/context/all.hpp>
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -214,6 +215,7 @@ int32_t executeExportedFunction(uint32_t imageBase,
                                 ps3_uintptr_t argp,
                                 ps3_uintptr_t modres, // big_int32_t*
                                 PPUThread* thread,
-                                const char* name);
-int32_t EmuInitLoadedPrxModules(PPUThread* thread);
+                                const char* name,
+                                boost::context::continuation* sink);
+int32_t EmuInitLoadedPrxModules(PPUThread* thread, boost::context::continuation* sink);
 uint32_t findExportedModuleFunction(uint32_t imageBase, const char* name);

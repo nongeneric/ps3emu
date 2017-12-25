@@ -4,6 +4,7 @@
 #include "../../constants.h"
 #include "sysutil_sysparam.h"
 #include <boost/endian/arithmetic.hpp>
+#include <boost/context/all.hpp>
 #include <vector>
 #include "ps3emu/enum.h"
 
@@ -43,8 +44,13 @@ struct CellGcmOffsetTable {
     boost::endian::big_uint32_t ioAddress;
     boost::endian::big_uint32_t eaAddress;
 };
-    
-uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa, uint32_t cmdSize, uint32_t ioSize, ps3_uintptr_t ioAddress, Process* proc);
+
+uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
+                          uint32_t cmdSize,
+                          uint32_t ioSize,
+                          ps3_uintptr_t ioAddress,
+                          Process* proc,
+                          boost::context::continuation* sink);
 uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count);
 
 emu_void_t cellGcmSetFlipMode(uint32_t mode);

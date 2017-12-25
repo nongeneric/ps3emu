@@ -83,7 +83,8 @@ int32_t executeExportedFunction(uint32_t imageBase,
                                 ps3_uintptr_t argp,
                                 ps3_uintptr_t modres, // big_int32_t*
                                 PPUThread* thread,
-                                const char* name) {
+                                const char* name,
+                                boost::context::continuation* sink) {
     auto& segments = g_state.proc->getSegments();
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
     assert(segment != end(segments));
@@ -100,12 +101,9 @@ int32_t executeExportedFunction(uint32_t imageBase,
         return CELL_OK;
     }
     INFO(libs) << ssnprintf("calling %s for module %s", name, elfName);
-    thread->setGPR(2, func->tocBase);
     //thread->setGPR(3, args);
     //thread->setGPR(4, argp);
-    thread->ps3call(func->va,
-                    [=] { /*g_state.mm->store32(modres, thread->getGPR(3));*/ });
-    return thread->getGPR(3);
+    return thread->ps3call(*func, nullptr, 0, sink);
 }
 
 void Process::insertSegment(ModuleSegment segment) {
@@ -121,7 +119,7 @@ void Process::loadPrxStore() {
     loadPrx((storePath / "sys" / "external" / "liblv2.sprx.elf").string());
 }
 
-int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
+int32_t EmuInitLoadedPrxModules(PPUThread* thread, boost::context::continuation* sink) {
     uint32_t modresVa;
     g_state.memalloc->internalAlloc<4, uint32_t>(&modresVa);
     auto& segments = g_state.proc->getSegments();
@@ -133,7 +131,7 @@ int32_t EmuInitLoadedPrxModules(PPUThread* thread) {
         if (s.index != 0)
             continue;
         thread->setGPR(11, g_state.elf->entryPoint()); // module_start of lv2 branches to this fdescr
-        executeExportedFunction(s.va, 0, 0, modresVa, thread, "module_start");
+        executeExportedFunction(s.va, 0, 0, modresVa, thread, "module_start", sink);
     }
     return thread->getGPR(3);
 }

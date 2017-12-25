@@ -87,7 +87,7 @@ public:
 };
 
 struct ReservationLine {
-    SpinLock lock; 
+    SpinLock lock;
     ReservationGranuleArray<ReservationGranule> granules;
 };
 

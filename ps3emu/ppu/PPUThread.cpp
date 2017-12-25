@@ -68,6 +68,11 @@ void PPUThread::innerLoop() {
     assert(getNIP());
 
     auto bbcalls = g_state.bbcallMap->base();
+
+#ifdef DEBUG
+    uint64_t dbgCounter = 0;
+    std::array<uint32_t, 1000> dbgTrace = {0};
+#endif
     
     for (;;) {
 #ifdef DEBUGPAUSE
@@ -79,10 +84,14 @@ void PPUThread::innerLoop() {
             ums_sleep(100);
         }
 #endif
-        
+
         uint32_t cia;
         try {
             cia = getNIP();
+#ifdef DEBUG
+            dbgTrace[dbgCounter % dbgTrace.size()] = cia;
+            dbgCounter++;
+#endif
             auto bbcall = bbcalls[cia / 4];
             if (bbcall) {
                 uint32_t segment, label;
@@ -101,6 +110,7 @@ void PPUThread::innerLoop() {
             _eventHandler(this, PPUThreadEvent::Breakpoint, {});
         } catch (IllegalInstructionException& e) {
             setNIP(cia);
+            ERROR(libs) << "illegal instruction";
             _eventHandler(this, PPUThreadEvent::InvalidInstruction, {});
             break;
         } catch (MemoryAccessException& e) {
@@ -225,17 +235,34 @@ struct CallStub {
     uint32_t ncall;
 };
 
-void PPUThread::ps3call(uint32_t va, std::function<void()> then) {
+uint64_t PPUThread::ps3call(fdescr const& descriptor,
+                            const uint64_t* firstArg,
+                            unsigned argCount,
+                            boost::context::continuation* sink) {
+    for (auto i = 0u; i < argCount; ++i) {
+        setGPR(i + 3, firstArg[i]);
+    }
+    setGPR(2, descriptor.tocBase);
+    if (g_state.rewriter_ncall) {
+        setNIP(descriptor.va);
+        vmenter(getLR());
+    } else {
+        ps3call_impl(descriptor.va);
+        *sink = sink->resume();
+    }
+    return getGPR(3);
+}
+
+uint64_t PPUThread::ps3call(fdescr const& descriptor,
+                            std::initializer_list<uint64_t> args,
+                            boost::context::continuation* sink) {
+    return ps3call(descriptor, &*begin(args), args.size(), sink);
+}
+
+void PPUThread::ps3call_impl(uint32_t va) {
     INFO(libs) << ssnprintf("ps3call: %x", va);
     
-    if (g_state.rewriter_ncall) {
-        setNIP(va);
-        vmenter(getLR());
-        then();
-        return;
-    }
-    
-    _ps3calls.push({getNIP(), getLR(), then});
+    _ps3calls.push({getNIP(), getLR()});
     
     uint32_t stubVa;
     g_state.memalloc->internalAlloc<4, CallStub>(&stubVa);
@@ -253,7 +280,7 @@ uint64_t ps3call_then(PPUThread* thread) {
     thread->_ps3calls.pop();
     thread->setLR(top.lr);
     thread->setNIP(top.ret);
-    top.then();
+    thread->_pscallContinuation = thread->_pscallContinuation.resume();
     // TODO: delete stub
     return thread->getGPR(3);
 }

@@ -1605,7 +1605,7 @@ TEST_CASE("rlwinm r0,r9,0,17,27") {
     REQUIRE( th.getGPR(0) == 0x7ff0 );
 }
 
-TEST_CASE("fixed divs") {
+TEST_CASE("fixed_divs") {
 /*
    10624:       7c 82 1b d2     divd    r4,r2,r3
    10628:       7c a2 1b d6     divw    r5,r2,r3
@@ -1621,8 +1621,8 @@ TEST_CASE("fixed divs") {
         , 0x7c, 0xc2, 0x1b, 0x92
         , 0x7c, 0xe2, 0x1b, 0x96
     };
-    th.setGPR(2, 0xf1f23456abcdef09);
-    th.setGPR(3, 0x1234567887654321);
+    th.setGPR(2, 0xf1f23456abcdef09ll);
+    th.setGPR(3, 0x1234567887654321ll);
     
     for (auto i = 0u; i < sizeof(instr); i += 4) {
         ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
@@ -1639,9 +1639,9 @@ TEST_CASE("fixed divs") {
         ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( th.getGPR(4) == -506344709675354235 );
-    REQUIRE( (th.getGPR(5) & 0xffffffff) == -706283643 );
-    REQUIRE( th.getGPR(6) == 8717027327179421572 );
+    REQUIRE( th.getGPR(4) == -506344709675354235ll );
+    REQUIRE( (th.getGPR(5) & 0xffffffff) == 0xd5e6f785 );
+    REQUIRE( th.getGPR(6) == 8717027327179421572ll );
     REQUIRE( (th.getGPR(7) & 0xffffffff) == 0x55e6f784 );
 }
 

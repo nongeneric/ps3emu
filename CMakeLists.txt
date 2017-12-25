@@ -12,7 +12,7 @@ set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
 find_package(Boost COMPONENTS 
     filesystem regex thread system
-    chrono program_options REQUIRED)
+    chrono program_options context REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
@@ -25,23 +25,26 @@ pkg_search_module(ZLIB REQUIRED zlib)
 pkg_search_module(FREETYPE2 REQUIRED freetype2)
 pkg_search_module(PULSEAUDIO REQUIRED libpulse)
 pkg_search_module(ICUUC REQUIRED icu-uc)
+pkg_search_module(TBB REQUIRED tbb)
+pkg_search_module(SDL2 REQUIRED sdl2)
 
 set(CMAKE_AR gcc-ar)
 set(CMAKE_RANLIB gcc-ranlib)
 
 include_directories(SYSTEM ps3emu/libs/graphics/GL/include)
-#-fsanitize=undefined
-#-fsanitize=thread
 
 set(CMAKE_CXX_FLAGS "-Wno-unknown-pragmas ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-format-security ${CMAKE_CXX_FLAGS}")
-#set(CMAKE_CXX_FLAGS "-Wno-unused-const-variable ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-missing-braces ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wno-comment ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native -msse2avx -rdynamic ${CMAKE_CXX_FLAGS}")
+
+#set(CMAKE_CXX_FLAGS "-fsanitize=thread ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-Wno-unused-const-variable ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-fsanitize=undefined ${CMAKE_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 
-set(EMU_CONFIGURATION_DEBUG   0)
+set(EMU_CONFIGURATION_DEBUG   1)
 set(EMU_CONFIGURATION_TESTS   1)
 set(EMU_CONFIGURATION_PAUSE   1)
 set(EMU_CONFIGURATION_LOG     1)
@@ -77,7 +80,7 @@ if(${EMU_CONFIGURATION_DEBUG})
     add_definitions(-DDEBUG)
 
     # detect accesses to unallocated memory (massive performance hit)
-    add_definitions(-DMEMORY_PROTECTION)
+    #add_definitions(-DMEMORY_PROTECTION)
     
     set(CMAKE_CXX_FLAGS "-ggdb3 -O0 ${CMAKE_CXX_FLAGS}")
 else()

@@ -150,10 +150,12 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
                                    SceNpTrophyHandle,
                                    uint32_t callback,
                                    uint32_t arg,
-                                   uint64_t options) {
+                                   uint64_t options,
+                                   PPUThread* th,
+                                   boost::context::continuation* sink) {
     context.callback = callback;
     context.arg = arg;
-    
+
     auto emuPath = emuDir();
     if (!emuPath)
         return CELL_OK;
@@ -196,7 +198,7 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
     context.gameDetails.numGold = 0;
     context.gameDetails.numSilver = 0;
     context.gameDetails.numBronze = 0;
-    
+
     for (auto& t : context.trophies) {
         switch (t.grade) {
             case SCE_NP_TROPHY_GRADE_PLATINUM: context.gameDetails.numPlatinum++; break;
@@ -205,29 +207,34 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
             case SCE_NP_TROPHY_GRADE_BRONZE: context.gameDetails.numBronze++; break;
         }
     }
-    
-    int64_t res = emuCallback(
-        context.callback, {1, SCE_NP_TROPHY_STATUS_INSTALLED, 0, 0, context.arg}, true);
+
+    // even though the docs specify that a call to cellSysutilCheckCallback is required to fire the events
+    // this function calls the callback directly
+
+    fdescr cbdescr;
+    g_state.mm->readMemory(context.callback, &cbdescr, sizeof(cbdescr));
+    int64_t res = th->ps3call(
+        cbdescr, {1, SCE_NP_TROPHY_STATUS_INSTALLED, 0, 0, context.arg}, sink);
     (void)res;
     assert(res >= 0);
-    
-    emuCallback(context.callback,
+
+    th->ps3call(cbdescr,
                 {1, SCE_NP_TROPHY_STATUS_PROCESSING_SETUP, 0, 0, context.arg},
-                true);
-    emuCallback(context.callback,
+                sink);
+    th->ps3call(cbdescr,
                 {1,
                  SCE_NP_TROPHY_STATUS_PROCESSING_PROGRESS,
                  (uint32_t)context.trophies.size(),
                  (uint32_t)context.trophies.size(),
                  context.arg},
-                true);
-    emuCallback(context.callback,
+                sink);
+    th->ps3call(cbdescr,
                 {1, SCE_NP_TROPHY_STATUS_PROCESSING_FINALIZE, 0, 0, context.arg},
-                true);
-    emuCallback(context.callback,
+                sink);
+    th->ps3call(cbdescr,
                 {1, SCE_NP_TROPHY_STATUS_PROCESSING_COMPLETE, 0, 0, context.arg},
-                true);
-            
+                sink);
+
     return CELL_OK;
 }
 

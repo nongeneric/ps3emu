@@ -133,6 +133,8 @@ target_link_libraries(ps3emu
     ${FREETYPE2_LIBRARIES}
     ${PULSEAUDIO_LIBRARIES}
     ${ICUUC_LIBRARIES}
+    ${TBB_LIBRARIES}
+    ${SDL2_LIBRARIES}
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvimage/libnvimage.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc7/libbc7.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc6h/libbc6h.a
@@ -141,5 +143,4 @@ target_link_libraries(ps3emu
     pthread
     dl
     pugixml
-    SDL2
 )

@@ -494,7 +494,10 @@ int32_t sys_spu_thread_group_disconnect_event_all_threads(sys_spu_thread_group_t
 #define CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP 0x2
 #define CELL_SPURS_TRACE_MODE_FLAG_MASK 0x3
 
-int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va, uint32_t fnid) {
+int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va,
+                                             uint32_t attr_va,
+                                             uint32_t fnid,
+                                             boost::context::continuation* sink) {
     uint32_t index;
     auto entry = findNCallEntry(fnid, index);
     assert(entry); (void)entry;
@@ -517,29 +520,29 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va, uint32_t attr_va
                                               "cellSpurs",
                                               prx_symbol_type_t::function);
 
-    g_state.th->ps3call(g_state.mm->load32(initSpursStubVa), [=] {
-        g_state.mm->store32(info.va, ncall, g_state.granule);
-        if (!spursTrace.enabled)
-            return g_state.th->getGPR(3);
-        spursTrace.buffer = (char*)g_state.memalloc->allocInternalMemory(
-            &spursTrace.bufferVa, spursTraceBufferSize, 128);
-        g_state.th->setGPR(3, spurs_va);
-        g_state.th->setGPR(4, spursTrace.bufferVa);
-        g_state.th->setGPR(5, spursTraceBufferSize);
-        g_state.th->setGPR(6, CELL_SPURS_TRACE_MODE_FLAG_WRAP_BUFFER |
-                              CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP);
-        g_state.th->ps3call(g_state.mm->load32(initTraceStubVa), [&] {
-            assert(g_state.th->getGPR(3) == 0);
-            g_state.th->setGPR(3, spurs_va);
-            g_state.th->ps3call(g_state.mm->load32(startTraceStubVa), [&] {
-                assert(g_state.th->getGPR(3) == 0);
-                return g_state.th->getGPR(3);
-            });
-            return g_state.th->getGPR(3);
-        });
+    fdescr initSpursDescr, initTraceDescr, startTraceDescr;
+    g_state.mm->readMemory(initSpursStubVa, &initSpursDescr, sizeof(fdescr));
+    g_state.mm->readMemory(initTraceStubVa, &initTraceDescr, sizeof(fdescr));
+    g_state.mm->readMemory(startTraceStubVa, &startTraceDescr, sizeof(fdescr));
+
+    g_state.th->ps3call(initSpursDescr, {}, sink);
+    g_state.mm->store32(info.va, ncall, g_state.granule);
+    if (!spursTrace.enabled)
         return g_state.th->getGPR(3);
-    });
-    return g_state.th->getGPR(3);
+    spursTrace.buffer = (char*)g_state.memalloc->allocInternalMemory(
+        &spursTrace.bufferVa, spursTraceBufferSize, 128);
+
+    std::initializer_list<uint64_t> args {
+        spurs_va,
+        spursTrace.bufferVa,
+        spursTraceBufferSize,
+        CELL_SPURS_TRACE_MODE_FLAG_WRAP_BUFFER |
+        CELL_SPURS_TRACE_MODE_FLAG_SYNCHRONOUS_START_STOP
+    };
+
+    auto res = g_state.th->ps3call(initTraceDescr, args, sink);
+    assert(res == 0);
+    return g_state.th->ps3call(startTraceDescr, {spurs_va}, sink);
 }
 
 std::vector<std::shared_ptr<ThreadGroup>> getThreadGroups() {
@@ -550,14 +553,18 @@ std::vector<std::shared_ptr<ThreadGroup>> getThreadGroups() {
     return res;
 }
 
-int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va, uint32_t attr_va) {
+int32_t cellSpursInitializeWithAttribute(uint32_t spurs_va,
+                                         uint32_t attr_va,
+                                         boost::context::continuation* sink) {
     return cellSpursInitializeWithAttribute1or2(
-        spurs_va, attr_va, calcFnid("cellSpursInitializeWithAttribute"));
+        spurs_va, attr_va, calcFnid("cellSpursInitializeWithAttribute"), sink);
 }
 
-int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va, uint32_t attr_va) {
+int32_t cellSpursInitializeWithAttribute2(uint32_t spurs_va,
+                                          uint32_t attr_va,
+                                          boost::context::continuation* sink) {
     return cellSpursInitializeWithAttribute1or2(
-        spurs_va, attr_va, calcFnid("cellSpursInitializeWithAttribute2"));
+        spurs_va, attr_va, calcFnid("cellSpursInitializeWithAttribute2"), sink);
 }
 
 int32_t cellSpursFinalize(uint32_t spurs_va) {

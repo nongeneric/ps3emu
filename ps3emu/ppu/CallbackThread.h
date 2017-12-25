@@ -4,6 +4,7 @@
 #include "../libs/ConcurrentBoundedQueue.h"
 #include "ps3emu/ELFLoader.h"
 #include "ps3emu/int.h"
+#include <boost/context/all.hpp>
 #include <future>
 #include <vector>
 #include <memory>
@@ -35,7 +36,7 @@ public:
     std::future<void> schedule(std::vector<uint64_t> args, uint32_t toc, uint32_t ea);
     void terminate();
     uint64_t id();
-    void ps3callInit(std::string_view name);
+    void ps3callInit(std::string_view name, boost::context::continuation* sink);
 };
 
 uint64_t callbackThreadQueueWait(PPUThread* ppuThread);

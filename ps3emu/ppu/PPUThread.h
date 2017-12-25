@@ -6,9 +6,11 @@
 #include "ps3emu/spu/R128.h"
 #include "ps3emu/ReservationMap.h"
 #include "ps3emu/ppu/ppu_dasm.h"
+#include "ps3emu/ELFLoader.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread.hpp>
+#include <boost/context/all.hpp>
 #include <stdint.h>
 #include <functional>
 #include <atomic>
@@ -129,7 +131,6 @@ static_assert(sizeof(XER_t) == sizeof(uint64_t), "");
 struct ps3call_info_t {
     uint64_t ret;
     uint64_t lr;
-    std::function<void()> then;
 };
 
 class MainMemory;
@@ -175,6 +176,7 @@ class PPUThread {
     
     std::stack<ps3call_info_t> _ps3calls;
     MainMemory* _mm;
+    boost::context::continuation _pscallContinuation;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -188,6 +190,12 @@ class PPUThread {
         auto f = value << (32 - fpos - 4);
         return (r & fmask) | f;
     }
+
+    void ps3call_impl(uint32_t va);
+
+    friend uint64_t ps3call_then(PPUThread* thread);
+    template <typename F>
+    friend auto wrap(F f, PPUThread* th);
     
     void loop();
 protected:
@@ -369,17 +377,22 @@ public:
     inline MainMemory* mm() {
         return _mm;
     }
-    
+
     void setId(unsigned id, std::string name);
     unsigned getId();
     std::string getName();
     void ncall(uint32_t index);
     void scall();
     void yield();
-    void ps3call(uint32_t va, std::function<void()> then);
+    uint64_t ps3call(fdescr const& descriptor,
+                     const uint64_t* firstArg,
+                     unsigned argCount,
+                     boost::context::continuation* sink);
+    uint64_t ps3call(fdescr const& descriptor,
+                     std::initializer_list<uint64_t> args,
+                     boost::context::continuation* sink);
     virtual void setArg(uint64_t arg);
     ~PPUThread() = default;
-    friend uint64_t ps3call_then(PPUThread* thread);
     void raiseModuleLoaded(uint32_t imageBase);
     unsigned getTid();
 };

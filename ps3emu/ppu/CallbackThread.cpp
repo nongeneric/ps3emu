@@ -92,22 +92,21 @@ uint64_t CallbackThread::id() {
     return _initInfo->threadId;
 }
 
-void CallbackThread::ps3callInit(std::string_view name) {
+void CallbackThread::ps3callInit(std::string_view name, boost::context::continuation* sink) {
     strncpy(_initInfo->name, begin(name), sizeof(CallbackThreadInitInfo::name) - 1);
     auto& segments = g_state.proc->getSegments();
     assert(segments.size() > 2);
     auto& lv2segment = segments[2];
     auto func = g_state.proc->findExport(lv2segment.elf.get(), calcFnid("sys_ppu_thread_create"));
     assert(!!func);
-    g_state.th->setGPR(2, func->tocBase);
-    g_state.th->setGPR(3, _initInfoVa + offsetof(CallbackThreadInitInfo, threadId));
-    g_state.th->setGPR(4, _initInfoVa + offsetof(CallbackThreadInitInfo, descr));
-    g_state.th->setGPR(5, 0); // arg
-    g_state.th->setGPR(6, 1000); // priority
-    g_state.th->setGPR(7, 0x1000); // stack size
-    g_state.th->setGPR(8, 0); // flags
-    g_state.th->setGPR(9, _initInfoVa + offsetof(CallbackThreadInitInfo, name));
-    g_state.th->ps3call(func->va, [=]{
-        g_state.th->setGPR(3, CELL_OK);
-    });
+    std::initializer_list<uint64_t> args = {
+        _initInfoVa + offsetof(CallbackThreadInitInfo, threadId),
+        _initInfoVa + offsetof(CallbackThreadInitInfo, descr),
+        0, // arg
+        1000, // priority
+        0x1000, // stack size
+        0, // flags
+        _initInfoVa + offsetof(CallbackThreadInitInfo, name)
+    };
+    g_state.th->ps3call(*func, args, sink);
 }

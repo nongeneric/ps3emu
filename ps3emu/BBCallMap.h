@@ -16,6 +16,10 @@ public:
     inline uint32_t get(uint32_t va) {
         return _map[va / 4];
     }
+
+    inline uint32_t safeGet(uint32_t va) {
+        return va > 0x20000000 ? 0 : get(va);
+    }
     
     inline uint32_t* base() {
         return &_map[0];

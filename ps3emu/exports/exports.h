@@ -6,6 +6,7 @@
 #include "ps3emu/libs/sys_defs.h"
 
 #include <boost/hana.hpp>
+#include <boost/context/all.hpp>
 
 namespace hana = boost::hana;
 using namespace hana::literals;
@@ -30,6 +31,14 @@ template <int ArgN>
 struct get_arg<ArgN, Process*> {
     inline Process* value(PPUThread*) {
         return g_state.proc;
+    }
+    inline void destroy() {}
+};
+
+template <int ArgN>
+struct get_arg<ArgN, boost::context::continuation*> {
+    inline boost::context::continuation* value(PPUThread*) {
+        return nullptr;
     }
     inline void destroy() {}
 };
@@ -86,10 +95,21 @@ constexpr auto make_type_tuple(R (*)(Args...)) {
     return hana::make_tuple(hana::type_c<Args>...);
 }
 
+constexpr bool containsContinuationArgument(auto types) {
+    auto argCount = hana::int_c<hana::length(types)>;
+    if constexpr(argCount.value > 0) {
+        if constexpr(types[argCount - 1_c] == hana::type_c<boost::context::continuation*>) {
+            return true;
+        }
+    }
+    return false;
+}
+
 template <typename F>
 auto wrap(F f, PPUThread* th) {
     auto types = make_type_tuple(f);
-    auto ns = make_n_tuple(hana::make_tuple(), hana::int_c<hana::length(types)>);
+    auto argCount = hana::int_c<hana::length(types)>;
+    auto ns = make_n_tuple(hana::make_tuple(), argCount);
     auto pairs = hana::zip(ns, types);
     auto holders = hana::transform(pairs, [&](auto t) {
         return get_arg<t[0_c].value, typename decltype(+t[1_c])::type>();
@@ -97,8 +117,22 @@ auto wrap(F f, PPUThread* th) {
     auto values = hana::transform(holders, [&](auto& h) {
         return h.value(th);
     });
-    th->setGPR(3, hana::unpack(values, f));
-    hana::for_each(holders, [&](auto& h) {
-        h.destroy();
-    });
+
+    if constexpr(containsContinuationArgument(types)) {
+        boost::context::continuation source =
+            boost::context::callcc([&](boost::context::continuation&& sink) {
+                auto updatedValues = hana::append(hana::drop_back(values), &sink);
+                th->setGPR(3, hana::unpack(updatedValues, f));
+                hana::for_each(holders, [&](auto& h) {
+                    h.destroy();
+                });
+                return std::move(sink);
+            });
+        th->_pscallContinuation = std::move(source);
+    } else {
+        th->setGPR(3, hana::unpack(values, f));
+        hana::for_each(holders, [&](auto& h) {
+            h.destroy();
+        });
+    }
 }

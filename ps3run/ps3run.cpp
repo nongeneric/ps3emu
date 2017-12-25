@@ -17,7 +17,7 @@ void emulate(std::string path, std::vector<std::string> args) {
     for (;;) {
         auto untyped = proc.run();
         if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
-            INFO(libs) << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
+            ERROR(libs) << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
             return;
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             return;

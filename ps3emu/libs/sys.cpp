@@ -285,7 +285,7 @@ int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUTh
 }
 
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
-    INFO(libs) << __FUNCTION__;
+    INFO(libs) << ssnprintf("cellSysmoduleLoadModule(0x%x)", id);
     return CELL_OK;
 }
 

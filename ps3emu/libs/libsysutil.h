@@ -3,12 +3,13 @@
 #include "sys_defs.h"
 #include "../Process.h"
 #include "../ELFLoader.h"
+#include <boost/context/all.hpp>
 
 class MainMemory;
 
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata);
 int32_t cellSysutilUnregisterCallback(int32_t slot);
-int64_t cellSysutilCheckCallback();
+int64_t cellSysutilCheckCallback(boost::context::continuation* sink);
 emu_void_t cellGcmSetDebugOutputLevel(int32_t level);
 int32_t cellVideoOutGetResolutionAvailability(uint32_t videoOut,
                                               uint32_t resolutionId,

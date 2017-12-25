@@ -150,7 +150,8 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
                           uint32_t cmdSize,
                           uint32_t ioSize,
                           ps3_uintptr_t ioAddress,
-                          Process* proc) {
+                          Process* proc,
+                          boost::context::continuation* sink) {
     INFO(rsx) << ssnprintf("_cellGcmInitBody(..., %x, %x, %x)", cmdSize, ioSize, ioAddress);
 
     emuGcmState.defaultCallbackEvent = __itt_event_create("callback", strlen("callback"));
@@ -210,7 +211,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     
     auto callbackThread = new CallbackThread();
     g_state.rsx->setCallbackThread(callbackThread);
-    callbackThread->ps3callInit("gcm_intr");
+    callbackThread->ps3callInit("gcm_intr", sink);
     
     return g_state.th->getGPR(3);  
 }

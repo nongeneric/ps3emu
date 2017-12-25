@@ -4,7 +4,7 @@
 #include "ps3emu/ContentManager.h"
 #include "ps3emu/libs/message.h"
 #include "ps3emu/libs/trophy.h"
-#include "ConcurrentQueue.h"
+#include <tbb/concurrent_queue.h>
 #include <future>
 #include "assert.h"
 #include <memory>
@@ -38,7 +38,7 @@ namespace {
         std::promise<uint64_t> promise;
     };
     
-    ConcurrentFifoQueue<std::shared_ptr<CallbackInfo>> callbackQueue(12);
+    tbb::concurrent_queue<std::shared_ptr<CallbackInfo>> callbackQueue;
 }
 
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata) {
@@ -47,22 +47,15 @@ int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_ui
     return CELL_OK;
 }
 
-int64_t cellSysutilCheckCallback() {
+int64_t cellSysutilCheckCallback(boost::context::continuation* sink) {
     std::shared_ptr<CallbackInfo> info;
-    size_t count;
-    callbackQueue.tryReceive(&info, 1, &count);
-    if (!count) {
-        return CELL_OK;
+    while (callbackQueue.try_pop(info)) {
+        fdescr descr;
+        g_state.mm->readMemory(info->va, &descr, sizeof(descr));
+        auto res = g_state.th->ps3call(descr, &info->args[0], info->args.size(), sink);
+        info->promise.set_value(res);
     }
-    g_state.th->setGPR(2, g_state.mm->load32(info->va + 4));
-    for (auto i = 1u; i < info->args.size(); ++i) {
-        g_state.th->setGPR(3 + i, info->args.at(i));
-    }
-    g_state.th->ps3call(g_state.mm->load32(info->va), [=] {
-        info->promise.set_value(g_state.th->getGPR(3));
-        cellSysutilCheckCallback();
-    });
-    return info->args.at(0);
+    return CELL_OK;
 }
 
 uint64_t emuCallback(uint32_t va, std::vector<uint64_t> const& args, bool wait) {
@@ -70,7 +63,7 @@ uint64_t emuCallback(uint32_t va, std::vector<uint64_t> const& args, bool wait) 
     info->va = va;
     info->args = args;
     auto future = info->promise.get_future();
-    callbackQueue.send(info);
+    callbackQueue.push(info);
     if (wait)
         return future.get();
     return 0;
@@ -178,4 +171,3 @@ int32_t cellVideoOutGetResolutionAvailability(uint32_t videoOut,
 int32_t cellSysutilUnregisterCallback(int32_t slot) {
     return CELL_OK;
 }
-

@@ -23,8 +23,9 @@ void log_init(int sink_flags, log_severity_t severity, int types, int areas, log
     active_types = types;
     active_areas = areas;
 
-    if (boost::filesystem::exists("/tmp/ps3.log"))
-        boost::filesystem::remove("/tmp/ps3.log");
+    auto fileName = "/tmp/ps3.log";
+    if (boost::filesystem::exists(fileName))
+        boost::filesystem::remove(fileName);
 
     std::vector<spdlog::sink_ptr> sinks;
     if (sink_flags & log_console) {
@@ -32,7 +33,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, int areas, log
     }
     if (sink_flags & log_file) {
         sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            "/tmp/ps3", (1ull << 30u) * 128, 1));
+            fileName, (1ull << 30u) * 128, 1));
     }
     logger = std::make_shared<spdlog::logger>("name", begin(sinks), end(sinks));
     spdlog::register_logger(logger);
