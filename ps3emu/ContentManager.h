@@ -45,11 +45,13 @@ struct SFOEntry {
 
 class ContentManager {
     std::string _elfPath;
+    std::vector<SFOEntry> _sfo;
+
 public:
     void setElfPath(std::string_view path);
     std::string usrDir();
     std::string contentDir();
     std::string toHost(std::string_view path);
     std::string cacheDir();
-    std::vector<SFOEntry> sfo();
+    const std::vector<SFOEntry>& sfo();
 };

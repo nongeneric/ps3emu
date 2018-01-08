@@ -243,5 +243,7 @@ struct sys_prx_get_module_list_t {
 static_assert(sizeof(sys_prx_get_module_list_t) == 0x20, "");
 
 int32_t sys_prx_get_module_list(uint32_t flags, sys_prx_get_module_list_t* info);
+emu_void_t _sys_memcpy(uint64_t dest, uint64_t src, uint64_t size, MainMemory* mm);
+emu_void_t _sys_memset(uint64_t dest, uint64_t value, uint64_t size, MainMemory* mm);
 
 uint32_t emuEmptyModuleStart();

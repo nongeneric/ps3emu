@@ -617,3 +617,14 @@ int sys_memory_get_page_attribute(uint32_t addr, sys_page_attr_t* attr) {
     attr->access_right = SYS_MEMORY_ACCESS_RIGHT_ANY;
     return CELL_OK;
 }
+
+emu_void_t _sys_memcpy(uint64_t dest, uint64_t src, uint64_t size, MainMemory* mm) {
+    auto srcptr = mm->getMemoryPointer(src, size);
+    mm->writeMemory(dest, srcptr, size);
+    return emu_void;
+}
+
+emu_void_t _sys_memset(uint64_t dest, uint64_t value, uint64_t size, MainMemory* mm) {
+    mm->setMemory(dest, value, size);
+    return emu_void;
+}

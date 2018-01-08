@@ -191,7 +191,8 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
                                  uint32_t funcFile,
                                  uint32_t container,
                                  uint32_t userdata,
-                                 bool isLoad) {
+                                 bool isLoad,
+                                 boost::context::continuation* sink) {
     INFO(libs) << ssnprintf(
         "cellSaveDataAutoSaveLoad(%s) buf: dirmax %d filemax %d size %x",
         dirName.str,
@@ -294,7 +295,11 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
         get->sizeKB /= 1024;
     }
     
-    emuCallback(funcStat, {resultVa, getVa, setVa}, true);
+    fdescr funcStatDescr, funcFileDescr;
+    g_state.mm->readMemory(funcStat, &funcStatDescr, sizeof(fdescr));
+    g_state.mm->readMemory(funcFile, &funcFileDescr, sizeof(fdescr));
+
+    g_state.th->ps3call(funcStatDescr, {resultVa, getVa, setVa}, sink);
     if (result->result == CELL_SAVEDATA_CBRESULT_ERR_NODATA ||
         result->result == CELL_SAVEDATA_CBRESULT_ERR_INVALID) {
         return CELL_SAVEDATA_ERROR_CBRESULT;
@@ -313,7 +318,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
     assert(result->result == CELL_SAVEDATA_CBRESULT_OK_NEXT);
     
     for (;;) {
-        emuCallback(funcFile, {resultVa, fileGetVa, fileSetVa}, true);
+        g_state.th->ps3call(funcFileDescr, {resultVa, fileGetVa, fileSetVa}, sink);
         if (result->result != CELL_SAVEDATA_CBRESULT_OK_NEXT)
             break;
         
@@ -363,7 +368,8 @@ int32_t cellSaveDataAutoSave2(uint32_t version,
                               uint32_t funcStat,
                               uint32_t funcFile,
                               uint32_t container,
-                              uint32_t userdata) {
+                              uint32_t userdata,
+                              boost::context::continuation* sink) {
     return cellSaveDataAutoSaveLoad(version,
                                     dirName,
                                     errDialog,
@@ -372,7 +378,8 @@ int32_t cellSaveDataAutoSave2(uint32_t version,
                                     funcFile,
                                     container,
                                     userdata,
-                                    false);
+                                    false,
+                                    sink);
 }
 
 int32_t cellSaveDataAutoLoad2(uint32_t version,
@@ -382,7 +389,8 @@ int32_t cellSaveDataAutoLoad2(uint32_t version,
                               uint32_t funcStat,
                               uint32_t funcFile,
                               uint32_t container,
-                              uint32_t userdata) {
+                              uint32_t userdata,
+                              boost::context::continuation* sink) {
     return cellSaveDataAutoSaveLoad(version,
                                     dirName,
                                     errDialog,
@@ -391,7 +399,8 @@ int32_t cellSaveDataAutoLoad2(uint32_t version,
                                     funcFile,
                                     container,
                                     userdata,
-                                    true);
+                                    true,
+                                    sink);
 }
 
 emu_void_t cellSaveDataEnableOverlay(int32_t enable) {

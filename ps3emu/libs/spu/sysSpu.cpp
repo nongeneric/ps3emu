@@ -541,7 +541,7 @@ int32_t cellSpursInitializeWithAttribute1or2(uint32_t spurs_va,
     };
 
     auto res = g_state.th->ps3call(initTraceDescr, args, sink);
-    assert(res == 0);
+    assert(res == 0); (void)res;
     return g_state.th->ps3call(startTraceDescr, {spurs_va}, sink);
 }
 

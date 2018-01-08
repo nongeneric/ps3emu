@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ps3emu/libs/sys.h"
+#include <boost/context/all.hpp>
 
 struct CellSaveDataSetBuf {
     big_uint32_t dirListMax;
@@ -24,7 +25,8 @@ int32_t cellSaveDataAutoSave2(uint32_t version,
                               uint32_t funcStat,
                               uint32_t funcFile,
                               uint32_t container,
-                              uint32_t userdata);
+                              uint32_t userdata,
+                              boost::context::continuation* sink);
 
 int32_t cellSaveDataAutoLoad2(uint32_t version,
                               cstring_ptr_t dirName,
@@ -33,7 +35,9 @@ int32_t cellSaveDataAutoLoad2(uint32_t version,
                               uint32_t funcStat,
                               uint32_t funcFile,
                               uint32_t container,
-                              uint32_t userdata);
+                              uint32_t userdata,
+                              boost::context::continuation* sink);
+
 emu_void_t cellSaveDataEnableOverlay(int32_t enable);
 int32_t cellSaveDataListLoad2(uint32_t version,
                               CellSaveDataSetList* setList,

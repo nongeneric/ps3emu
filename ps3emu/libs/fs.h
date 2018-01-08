@@ -76,7 +76,19 @@ CellFsErrno cellFsSdataOpen(cstring_ptr_t path,
 CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t *pos);
 CellFsErrno cellFsClose(int32_t fd);
 CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nread, MainMemory* mm);
+CellFsErrno cellFsReadWithOffset(int32_t fd,
+                                 uint64_t offset,
+                                 ps3_uintptr_t buf,
+                                 uint64_t nbytes,
+                                 big_uint64_t* nread,
+                                 MainMemory* mm);
 CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nwrite, MainMemory* mm);
+CellFsErrno cellFsWriteWithOffset(int32_t fd,
+                                  uint64_t offset,
+                                  ps3_uintptr_t buf,
+                                  uint64_t nbytes,
+                                  big_uint64_t* nwrite,
+                                  MainMemory* mm);
 CellFsErrno cellFsMkdir(const char* path, uint32_t mode, Process* proc);
 CellFsErrno cellFsGetFreeSize(const char* directory_path,
                               big_uint32_t* block_size,

@@ -38,12 +38,12 @@ void MainWindow::setupDocks() {
     gprDock->setWidget(gprGrid);
     gprDock->setTitleBarWidget(new QWidget(this));
     addDockWidget(Qt::RightDockWidgetArea, gprDock);
-    
-    auto bottomLogDock = new QDockWidget("Debug", this);
+
+    _bottomLogDock = new QDockWidget("Debug", this);
     _log = new QTextEdit();
     _log->setReadOnly(true);
     _log->setFont(QFont("monospace", 10));
-    bottomLogDock->setWidget(_log);
+    _bottomLogDock->setWidget(_log);
     
     auto bottomOutputDock = new QDockWidget("Output", this);
     auto output = new QTextEdit();
@@ -56,8 +56,8 @@ void MainWindow::setupDocks() {
         output->moveCursor(QTextCursor::End);
     });
     
-    addDockWidget(Qt::BottomDockWidgetArea, bottomLogDock);
-    tabifyDockWidget(bottomLogDock, bottomOutputDock);
+    addDockWidget(Qt::BottomDockWidgetArea, _bottomLogDock);
+    tabifyDockWidget(_bottomLogDock, bottomOutputDock);
     
     auto memoryGrid = new MonospaceGrid();
     memoryGrid->setModel(_model.getMemoryDumpModel());
@@ -271,6 +271,7 @@ void MainWindow::setupStatusBar() {
         auto line = _command->text();
         _command->clear();
        _log->append(QString("executing \"%1\"").arg(line));
+       _bottomLogDock->raise();
        _model.exec(line);
     });
     

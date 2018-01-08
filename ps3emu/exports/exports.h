@@ -111,7 +111,7 @@ auto wrap(F f, PPUThread* th) {
     auto argCount = hana::int_c<hana::length(types)>;
     auto ns = make_n_tuple(hana::make_tuple(), argCount);
     auto pairs = hana::zip(ns, types);
-    auto holders = hana::transform(pairs, [&](auto t) {
+    auto holders = hana::transform(pairs, [](auto t) {
         return get_arg<t[0_c].value, typename decltype(+t[1_c])::type>();
     });
     auto values = hana::transform(holders, [&](auto& h) {
@@ -120,10 +120,10 @@ auto wrap(F f, PPUThread* th) {
 
     if constexpr(containsContinuationArgument(types)) {
         boost::context::continuation source =
-            boost::context::callcc([&](boost::context::continuation&& sink) {
+            boost::context::callcc([holders, &values, &f, th](boost::context::continuation&& sink) mutable {
                 auto updatedValues = hana::append(hana::drop_back(values), &sink);
                 th->setGPR(3, hana::unpack(updatedValues, f));
-                hana::for_each(holders, [&](auto& h) {
+                hana::for_each(holders, [](auto& h) {
                     h.destroy();
                 });
                 return std::move(sink);

@@ -31,7 +31,10 @@ uint32_t findExportedSymbol(std::vector<ELFLoader*> const& prxs,
 void ELFLoader::load(std::string filePath) {
     _elfName = filePath;
     FILE* f = fopen(filePath.c_str(), "rb");
-    assert(f);
+    if (!f) {
+        ERROR(libs) << ssnprintf("can't open file %s: %s", filePath, strerror(errno));
+        exit(1);
+    }
     fseek(f, 0, SEEK_END);
     auto fileSize = static_cast<unsigned>(ftell(f));
     if (fileSize < sizeof(Elf64_Ehdr))
@@ -262,6 +265,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         { "sysPrxForUser", "sys_lwcond_wait" },
         { "sysPrxForUser", "sys_lwcond_signal_all" },
         { "sysPrxForUser", "sys_lwcond_signal" },
+        { "sysPrxForUser", "_sys_memcpy" },
+        { "sysPrxForUser", "_sys_memset" },
     };
     
     std::vector<StolenFuncInfo> stolenInfos;
@@ -305,7 +310,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
                               name == "cellSyncMutexTryLock";
                 spliceFunction(codeVa, [=] {
-                    auto message = ssnprintf("proxy %s.%s", libname, name);
+                    auto message = ssnprintf("proxy [%08x] %s.%s", codeVa, libname, name);
                     if (isSync) {
                         INFO(libs, sync) << message;
                     } else {
@@ -344,23 +349,17 @@ std::tuple<prx_export_t*, int> ELFLoader::exports() {
 
 bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     auto name = prx->shortName();
-    if (name == "liblv2.prx") {
-        return true;
-    }
-    if (name == "libsre.prx") {
-        return true;
-    }
-    if (name == "libsync2.prx") {
-        return true;
-    }
-    if (name == "libfiber.prx") {
+    if (name == "liblv2.prx" || name == "libsre.prx" || name == "libsync2.prx" ||
+        name == "libfiber.prx") {
         return true;
     }
     if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libio.sprx.elf" ||
         name == "libaudio.sprx.elf" || name == "libfs.sprx.elf" ||
-        name == "libsysutil_np_trophy.sprx.elf" || name == "libsysutil_np.sprx.elf" ||
-        name == "libnetctl.sprx.elf" || name == "libnet.sprx.elf") {
+        name == "libsysutil_np_trophy.sprx.elf" ||
+        name == "libsysutil_np.sprx.elf" || name == "libnetctl.sprx.elf" ||
+        name == "libnet.sprx.elf" || name == "libgem.sprx.elf" ||
+        name == "libcamera.sprx.elf") {
         return false;
     }
     return true;

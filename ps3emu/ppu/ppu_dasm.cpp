@@ -3570,6 +3570,17 @@ PRINT(VADDUWM, SIMDForm) {
 }
 EMU_REWRITE(VADDUWM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
+PRINT(VSUBUHM, SIMDForm) {
+    *result = format_nn("vsubuhm", i->vD, i->vB);
+}
+
+#define _VSUBUHM(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_sub_epi16(a, b); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VSUBUHM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 PRINT(VSUBUWM, SIMDForm) {
     *result = format_nnn("vsubuwm", i->vD, i->vA, i->vB);
@@ -3619,6 +3630,21 @@ PRINT(VCMPGTFP, SIMDForm) {
 }
 EMU_REWRITE(VCMPGTFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
+PRINT(VCMPGTUH, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpgtuh." : "vcmpgtuh", i->vD, i->vA, i->vB);
+}
+
+#define _VCMPGTUH(_va, _vb, _vd, _rc) { \
+    auto val = _mm_set1_epi16(0x8000); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_sub_epi16(a, val); \
+    b = _mm_sub_epi16(b, val); \
+    auto d = _mm_cmpgt_epi16(a, b); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
+}
+EMU_REWRITE(VCMPGTUH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
 PRINT(VCMPGTUW, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpgtuw." : "vcmpgtuw", i->vD, i->vA, i->vB);
@@ -4076,7 +4102,6 @@ PRINT(VUPKLSB, SIMDForm) {
 }
 EMU_REWRITE(VUPKLSB, SIMDForm, i->vB.u(), i->vD.u())
 
-
 PRINT(DCBZ, XForm_1) {
     *result = format_nn("dcbz", i->RA, i->RB);
 }
@@ -4126,6 +4151,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                     switch (simd->VXR_XO.u()) {
                         case 198: invoke(VCMPEQFP);
                         case 646: invoke(VCMPGTUW);
+                        case 582: invoke(VCMPGTUH);
                         case 710: invoke(VCMPGTFP);
                         case 902: invoke(VCMPGTSW);
                         default:
@@ -4151,6 +4177,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 1156: invoke(VOR);
                                 case 128: invoke(VADDUWM);
                                 case 1152: invoke(VSUBUWM);
+                                case 1088: invoke(VSUBUHM);
                                 case 134: invoke(VCMPEQUW);
                                 case 388: invoke(VSLW);
                                 case 644: invoke(VSRW);

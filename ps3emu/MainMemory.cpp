@@ -32,10 +32,12 @@ bool MainMemory::writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len)
             } else if (va == GcmControlRegisters + 4) {
                 g_state.rsx->setGet(val);
             } else {
-                throw std::runtime_error("only put and get rsx registers are supported");
+                ERROR(rsx) << "only put and get rsx registers are supported";
+                exit(1);
             }
         } else {
-            throw std::runtime_error("only one rsx register can be set at a time");
+            ERROR(rsx) << "only one rsx register can be set at a time";
+            exit(1);
         }
         return true;
     }

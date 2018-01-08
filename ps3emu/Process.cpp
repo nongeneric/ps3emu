@@ -66,6 +66,8 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* fname) {
                       "libsysutil_np.sprx.elf",
                       "libnetctl.sprx.elf",
                       "libnet.sprx.elf",
+                      "libgem.sprx.elf",
+                      "libcamera.sprx.elf",
                       "libresc.sprx.elf"}) {
         if (name == elfName) {
             INFO(libs) << ssnprintf("ignoring function %s for module %s", fname, elfName);

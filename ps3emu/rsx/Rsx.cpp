@@ -2430,7 +2430,6 @@ void Rsx::GetReport(uint8_t type, uint32_t offset) {
     auto ea = getReportDataAddressLocation(offset / 16, _context->reportLocation);
     g_state.mm->store64(ea, g_state.proc->getTimeBaseNanoseconds().count(), g_state.granule);
     g_state.mm->store64(ea + 8 + 4, 0, g_state.granule);
-    __sync_synchronize();
 }
 
 void Rsx::updateScissor() {

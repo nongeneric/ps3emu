@@ -127,18 +127,19 @@ CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc) {
 
 FILE* openFile(const char* path, int flags) {
     assert((flags & CELL_FS_O_MSELF) == 0);
-    FILE* f = nullptr;
     bool e = exists(path);
     bool c = flags & CELL_FS_O_CREAT;
     bool t = flags & CELL_FS_O_TRUNC;
+    bool rw = flags & CELL_FS_O_RDWR;
     if (!e && !c)
         return nullptr;
     if (e && (flags & CELL_FS_O_EXCL))
         return nullptr;
-    if (t || !e) {
-        f = fopen(path, "w+");
-    } else {
-        f = fopen(path, "r+");
+    auto mode = t || !e ? (rw ? "w+" : "w") : (rw ? "r+" : "r");
+    auto f = fopen(path, mode);
+    if (!f) {
+        ERROR(libs) << ssnprintf("openFile failed: %s", strerror(errno));
+        exit(1);
     }
     if (flags & CELL_FS_O_APPEND) {
         fseek(f, 0, SEEK_END);
@@ -210,6 +211,26 @@ CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint6
     return CELL_FS_SUCCEEDED;
 }
 
+CellFsErrno cellFsReadWithOffset(int32_t fd,
+                                 uint64_t offset,
+                                 ps3_uintptr_t buf,
+                                 uint64_t nbytes,
+                                 big_uint64_t* nread,
+                                 MainMemory* mm) {
+    std::vector<char> localBuf(nbytes);
+    auto file = fileMap.get(fd);
+    auto pos = ftell(file);
+    fseek(file, offset, SEEK_SET);
+    auto bytesRead = fread(&localBuf[0], 1, nbytes, file);
+    if (nread) {
+         *nread = bytesRead;
+    }
+    fseek(file, pos, SEEK_SET);
+    mm->writeMemory(buf, &localBuf[0], bytesRead);
+    INFO(libs) << ssnprintf("cellFsReadWithOffset(%x, %x, %x, %d) : %d", fd, offset, buf, nbytes, bytesRead);
+    return CELL_FS_SUCCEEDED;
+}
+
 CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t* nwrite, MainMemory* mm) {
     auto file = fileMap.get(fd);
     std::vector<char> localBuf(nbytes);
@@ -218,6 +239,25 @@ CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint
     if (nwrite) {
         *nwrite = bytesWritten;
     }
+    return CELL_FS_SUCCEEDED;
+}
+
+CellFsErrno cellFsWriteWithOffset(int32_t fd,
+                                  uint64_t offset,
+                                  ps3_uintptr_t buf,
+                                  uint64_t nbytes,
+                                  big_uint64_t* nwrite,
+                                  MainMemory* mm) {
+    auto file = fileMap.get(fd);
+    auto pos = ftell(file);
+    fseek(file, offset, SEEK_SET);
+    std::vector<char> localBuf(nbytes);
+    mm->readMemory(buf, &localBuf[0], nbytes);
+    auto bytesWritten = fwrite(&localBuf[0], 1, nbytes, file);
+    if (nwrite) {
+        *nwrite = bytesWritten;
+    }
+    fseek(file, pos, SEEK_SET);
     return CELL_FS_SUCCEEDED;
 }
 

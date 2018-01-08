@@ -2,6 +2,7 @@
 
 #include "ps3emu/Config.h"
 #include "ps3emu/state.h"
+#include "ps3emu/utils.h"
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <assert.h>
@@ -46,18 +47,25 @@ void ContentManager::setElfPath(std::string_view path) {
 }
 
 std::string ContentManager::usrDir() {
-    return "/dev_hdd0/USRDIR";
+    return contentDir() + "/USRDIR";
 }
 
 std::string ContentManager::contentDir() {
-    return "/dev_hdd0";
+    std::string id = "unknown";
+    for (auto& entry : sfo()) {
+        if (entry.id == CELL_GAME_PARAMID_TITLE_ID) {
+            id = boost::get<std::string>(entry.data);
+        }
+    }
+    auto path = ssnprintf("/dev_hdd0/%s", id);
+    create_directories(toHost(path));
+    return path;
 }
 
 std::string ContentManager::cacheDir() {
-    auto dir = "/dev_hdd1";
-    assert(!_elfPath.empty());
-    create_directories(toHost(dir) / dir);
-    return dir;
+    auto path = "/dev_hdd1";
+    create_directories(toHost(path));
+    return path;
 }
 
 std::string ContentManager::toHost(std::string_view path) {
@@ -74,7 +82,7 @@ std::string ContentManager::toHost(std::string_view path) {
         case MountPoint::HostHome: return absolute(elfdir / "app_home" / relative).string();
         case MountPoint::HostAbsolute: return absolute(elfdir / "host_root" / relative).string();
         case MountPoint::Bluray: return absolute(approot / ".." / relative).string();
-        case MountPoint::GameData: return absolute(approot / relative).string();
+        case MountPoint::GameData: return absolute(approot / "dev_hdd0" / relative).string();
         case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
         case MountPoint::DevFlash: return absolute(g_state.config->prxStorePath / relative).string();
         default: throw std::runtime_error("unknown mount point");
@@ -105,11 +113,14 @@ struct sfo_index_table_entry {
 };
 static_assert(sizeof(sfo_index_table_entry) == 16, "");
 
-std::vector<SFOEntry> ContentManager::sfo() {
-    auto sfoPath = path(toHost(contentDir().c_str())) / "PARAM.SFO";
+const std::vector<SFOEntry>& ContentManager::sfo() {
+    if (!_sfo.empty())
+        return _sfo;
+
+    path sfoPath = toHost("/dev_bdvd/PS3_GAME/PARAM.SFO");
     std::ifstream f(sfoPath.string());
     if (!f.is_open())
-        return { };
+        return _sfo;
     std::vector<char> vec(file_size(sfoPath));
     f.read(&vec[0], vec.size());
     auto header = (sfo_header*)&vec[0];
@@ -147,11 +158,11 @@ std::vector<SFOEntry> ContentManager::sfo() {
         { "APP_VER", CELL_GAME_PARAMID_APP_VER }
     };
     
-    std::vector<SFOEntry> entries(header->table_entries);
+    _sfo.resize(header->table_entries);
     auto keys = &vec[header->key_table_start];
     auto data = &vec[header->data_table_start];
     auto fileEntry = (sfo_index_table_entry*)&vec[sizeof(sfo_header)];
-    for (auto& entry : entries) {
+    for (auto& entry : _sfo) {
         entry.key = std::string(&keys[fileEntry->key_offset]);
         auto knownId = knownIds.find(entry.key);
         entry.id = knownId != end(knownIds) ? knownId->second : -1;
@@ -165,5 +176,5 @@ std::vector<SFOEntry> ContentManager::sfo() {
         }
         fileEntry++;
     }
-    return entries;
+    return _sfo;
 }

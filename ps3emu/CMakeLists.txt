@@ -110,6 +110,10 @@ set(SRC
     libs/perf.cpp
     libs/libnet.cpp
     libs/libnetctl.cpp
+    libs/libcamera.h
+    libs/libcamera.cpp
+    libs/libgem.h
+    libs/libgem.cpp
 
     ../thirdparty/xxHash/xxhash.c
     ../thirdparty/xxHash/xxhash.h

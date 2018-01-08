@@ -24,6 +24,8 @@
 #include "ps3emu/libs/savedata/savedata.h"
 #include "ps3emu/libs/libnet.h"
 #include "ps3emu/libs/libnetctl.h"
+#include "ps3emu/libs/libcamera.h"
+#include "ps3emu/libs/libgem.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <tbb/concurrent_vector.h>
@@ -299,6 +301,13 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(cellGcmGetDefaultCommandWordSize),
     ENTRY(cellGcmGetDefaultSegmentWordSize),
     ENTRY(cellKbSetReadMode),
+    ENTRY(_sys_memcpy),
+    ENTRY(_sys_memset),
+    ENTRY(cellFsReadWithOffset),
+    ENTRY(cellFsWriteWithOffset),
+    ENTRY(cellCameraInit),
+    ENTRY(cellGemGetMemorySize),
+    ENTRY(cellGemInit),
 };
 
 void PPUThread::ncall(uint32_t index) {
