@@ -8,64 +8,43 @@
 #include "utils.h"
 #include <stdlib.h>
 
-inline bool coversRsxRegsRange(ps3_uintptr_t va, uint len) {
-    return !(va + len <= GcmControlRegisters || va >= GcmControlRegisters + 12);
+template<int Len>
+inline typename IntTraits<Len>::Type MainMemory::load(ps3_uintptr_t va, bool validate) {
+    if constexpr(Len == 4) {
+        uint32_t special;
+        if (readSpecialMemory(va, &special))
+            return fast_endian_reverse(special);
+    }
+    if (validate)
+        this->validate(va, Len, false);
+    VirtualAddress split { va };
+    auto& page = _pages[split.page.u()];
+    auto offset = split.offset.u();
+    auto ptr = page.ptr + offset;
+    auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
+    return fast_endian_reverse(*typedPtr);
 }
 
-bool MainMemory::writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len) {
-    if ((va & SpuThreadBaseAddr) == SpuThreadBaseAddr) {
-        writeSpuThreadVa(va, buf, len);
-        return true;
-    }
-    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        writeRawSpuVa(va, buf, len);
-        return true;
-    }
-    if (coversRsxRegsRange(va, len) && len == 4) {
-        if (!g_state.rsx) {
-            throw std::runtime_error("rsx not set");
-        }
-        if (len == 4) {
-            uint32_t val = *(boost::endian::big_uint32_t*)buf;
-            if (va == GcmControlRegisters) {
-                g_state.rsx->setPut(val);
-            } else if (va == GcmControlRegisters + 4) {
-                g_state.rsx->setGet(val);
-            } else {
-                ERROR(rsx) << "only put and get rsx registers are supported";
-                exit(1);
-            }
-        } else {
-            ERROR(rsx) << "only one rsx register can be set at a time";
-            exit(1);
-        }
-        return true;
-    }
-    return false;
-}
-
-bool MainMemory::readSpecialMemory(ps3_uintptr_t va, void* buf) {
-    if ((va & RawSpuBaseAddr) == RawSpuBaseAddr) {
-        *(big_uint32_t*)buf = readRawSpuVa(va);
-        return true;
-    }
-    
-    auto GcmControlRegistersSegment = 0x40000000u;
-    
-    if ((va & GcmControlRegistersSegment) && coversRsxRegsRange(va, 4)) {
-        if (va == GcmControlRegisters) {
-            *(big_uint32_t*)buf = g_state.rsx->getPut();
-            return true;
-        } else if (va == GcmControlRegisters + 4) {
-            *(big_uint32_t*)buf = g_state.rsx->getGet();
-            return true;
-        } else if (va == GcmControlRegisters + 8) {
-            *(big_uint32_t*)buf = g_state.rsx->getRef();
-            return true;
-        }
-        throw std::runtime_error("unknown rsx register");
-    }
-    return false;
+template<int Len>
+inline void MainMemory::store(ps3_uintptr_t va, typename IntTraits<Len>::Type value, ReservationGranule* granule) {
+    auto reversed = fast_endian_reverse(value);
+    if (unlikely(writeSpecialMemory(va, &reversed, Len)))
+        return;
+    validate(va, Len, false);
+    VirtualAddress split { va };
+    auto pageIndex = split.page.u();
+    auto& page = _pages[pageIndex];
+    auto offset = split.offset.u();
+    auto ptr = page.ptr.load();
+    ptr = ptr + offset;
+    ReservationLine *line, *nextLine;
+    _rmap.lock<Len>(va, &line, &nextLine);
+    auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
+    auto reversedValue = fast_endian_reverse(value);
+    *typedPtr = reversedValue;
+    _rmap.destroyExcept(line, nextLine, granule);
+    _rmap.unlock(line, nextLine);
+    _mmap.mark<Len>(va);
 }
 
 void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
@@ -79,10 +58,11 @@ void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
         auto next = std::min(last, (va + 128) & 0xffffff80);
         auto size = next - va;
         auto dest = getMemoryPointer(va, size);
-        auto line = _rmap.lock<128>(va & 0xffffff80);
+        ReservationLine *line, *nextLine;
+        _rmap.lock<128>(va & 0xffffff80, &line, &nextLine);
         memcpy(dest, src, size);
-        _rmap.destroyExcept(line, g_state.granule);
-        _rmap.unlock(line);
+        _rmap.destroyExcept(line, nextLine, g_state.granule);
+        _rmap.unlock(line, nextLine);
         src += size;
         va = next;
     }
@@ -182,8 +162,7 @@ void MemoryPage::dealloc() {
 uint8_t* MainMemory::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
     VirtualAddress split { va };
     auto& page = _pages[split.page.u()];
-    if (!page.ptr)
-        throw std::runtime_error("getting memory pointer for not allocated memory");
+    assert(page.ptr);
     auto offset = split.offset.u();
     // TODO: check that the range is continuous
     return (uint8_t*)page.ptr.load() + offset;
@@ -191,16 +170,19 @@ uint8_t* MainMemory::getMemoryPointer(ps3_uintptr_t va, uint32_t len) {
 
 void MainMemory::provideMemory(ps3_uintptr_t src, uint32_t size, void* memory) {
     VirtualAddress split { src };
-    if (split.offset.u() != 0 || size % DefaultMainMemoryPageSize != 0)
-        throw std::runtime_error("expecting multiple of page size");
+    if (split.offset.u() != 0 || size % DefaultMainMemoryPageSize != 0) {
+        ERROR(libs) << "expecting multiple of page size";
+        exit(1);
+    }
     auto pageCount = size / DefaultMainMemoryPageSize;
     auto firstPage = split.page.u();
     assert(firstPage < DefaultMainMemoryPageCount);
     for (auto i = 0u; i < pageCount; ++i) {
         auto& page = _pages[firstPage + i];
         auto memoryPtr = (uint8_t*)memory + i * DefaultMainMemoryPageSize;
-        if (page.ptr) {
-            memcpy(memoryPtr, (void*)page.ptr.load(), DefaultMainMemoryPageSize);
+        auto ptr = page.ptr.load();
+        if (ptr) {
+            memcpy(memoryPtr, (void*)ptr, DefaultMainMemoryPageSize);
         }
         page.ptr = (uintptr_t)memoryPtr;
         _providedMemoryPages.set(firstPage + i);

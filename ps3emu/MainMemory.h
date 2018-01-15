@@ -74,45 +74,31 @@ class MainMemory {
     void writeRawSpuVa(ps3_uintptr_t va, const void* val, uint32_t len);
     void writeSpuThreadVa(ps3_uintptr_t va, const void* val, uint32_t len);
     uint32_t readRawSpuVa(ps3_uintptr_t va);
-    bool writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len);
-    bool readSpecialMemory(ps3_uintptr_t va, void* buf);
     void dealloc();
 
     template<int Len>
-    typename IntTraits<Len>::Type load(ps3_uintptr_t va, bool validate) {
-        if constexpr(Len == 4) {
-            uint32_t special;
-            if (readSpecialMemory(va, &special))
-                return fast_endian_reverse(special);
+    inline typename IntTraits<Len>::Type load(ps3_uintptr_t va, bool validate);
+    template<int Len>
+    inline void store(ps3_uintptr_t va, typename IntTraits<Len>::Type value, ReservationGranule* granule);
+
+    inline bool writeSpecialMemory(ps3_uintptr_t va, const void* buf, uint len) {
+        if (unlikely((va & SpuThreadBaseAddr) == SpuThreadBaseAddr)) {
+            writeSpuThreadVa(va, buf, len);
+            return true;
         }
-        if (validate)
-            this->validate(va, Len, false);
-        VirtualAddress split { va };
-        auto& page = _pages[split.page.u()];
-        auto offset = split.offset.u();
-        auto ptr = page.ptr + offset;
-        auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
-        return fast_endian_reverse(*typedPtr);
+        if (unlikely((va & RawSpuBaseAddr) == RawSpuBaseAddr)) {
+            writeRawSpuVa(va, buf, len);
+            return true;
+        }
+        return false;
     }
 
-    template<int Len>
-    void store(ps3_uintptr_t va, typename IntTraits<Len>::Type value, ReservationGranule* granule) {
-        auto reversed = fast_endian_reverse(value);
-        if (writeSpecialMemory(va, &reversed, Len))
-            return;
-        validate(va, Len, false);
-        VirtualAddress split { va };
-        auto pageIndex = split.page.u();
-        auto& page = _pages[pageIndex];
-        auto offset = split.offset.u();
-        auto ptr = page.ptr.load();
-        ptr = ptr + offset;
-        auto line = _rmap.lock<Len>(va);
-        auto typedPtr = (typename IntTraits<Len>::Type*)ptr;
-        *typedPtr = fast_endian_reverse(value);
-        _rmap.destroyExcept(line, granule);
-        _rmap.unlock(line);
-        _mmap.mark<Len>(va);
+    inline bool readSpecialMemory(ps3_uintptr_t va, void* buf) {
+        if (unlikely((va & RawSpuBaseAddr) == RawSpuBaseAddr)) {
+            *(big_uint32_t*)buf = readRawSpuVa(va);
+            return true;
+        }
+        return false;
     }
 
 public:
@@ -189,35 +175,37 @@ public:
             granuleLine->lock.unlock();
         }
         
-        auto line = _rmap.lock<Len>(va);
-        assert(!line.nextLine && "only a single line can be reserved");
+        ReservationLine *line, *nextLine;
+        _rmap.lock<Len>(va, &line, &nextLine);
+        assert(!nextLine && "only a single line can be reserved");
         assert(((va & 0x7f) + Len) <= 128);
         auto ptr = getMemoryPointer(va, Len);
         memcpy(buf, ptr, Len);
-        granule->line = line.line;
+        granule->line = line;
         granule->notify = notify;
         granule->arg1 = arg1;
         granule->arg2 = arg2;
-        line.line->granules.insert(granule);
-        _rmap.unlock(line);
+        line->granules.insert(granule);
+        _rmap.unlock(line, nextLine);
     }
 
     template <auto Len, bool Unconditional = false>
     bool writeCond(ps3_uintptr_t va, void* buf) {
         static_assert(Len == 4 || Len == 8 || Len == 128);
-        auto line = _rmap.lock<Len>(va);
-        assert(!line.nextLine && "only a single line can be reserved");
+        ReservationLine *line, *nextLine;
+        _rmap.lock<Len>(va, &line, &nextLine);
+        assert(!nextLine && "only a single line can be reserved");
         if constexpr(!Unconditional)
             assert(g_state.granule);
-        if (Unconditional || line.line->granules.exists(g_state.granule)) {
+        if (Unconditional || line->granules.exists(g_state.granule)) {
             auto ptr = getMemoryPointer(va, Len);
             memcpy(ptr, buf, Len);
-            _rmap.destroySingleLine(line.line);
-            _rmap.unlock(line);
+            _rmap.destroySingleLine(line);
+            _rmap.unlock(line, nextLine);
             _mmap.mark<Len>(va);
             return true;
         }
-        _rmap.unlock(line);
+        _rmap.unlock(line, nextLine);
         return false;
     }
     

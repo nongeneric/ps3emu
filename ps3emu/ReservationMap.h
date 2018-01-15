@@ -46,7 +46,7 @@ public:
                 granule->line = nullptr;
             }
         }
-        _arr.clear();
+        _arr.resize(0);
     }
 
     inline void clearExcept(ReservationGranule* exceptGranule) {
@@ -108,11 +108,6 @@ struct ReservationGranule {
     }
 };
 
-struct LockedLine {
-    ReservationLine* line;
-    ReservationLine* nextLine;
-};
-
 // Assume all reservations are naturally aligned. That is, data of length 4 must be aligned to 4,
 // data of length 8 must be aligned to 8, and so on.
 // In other words, no reservation might cross a cache line.
@@ -130,26 +125,29 @@ public:
     }
     
     template <auto Len>
-    LockedLine lock(uint32_t va) {
+    void lock(uint32_t va, ReservationLine** first, ReservationLine** second) {
         static_assert(Len == 1 || Len == 2 || Len == 4 || Len == 8 || Len == 16 ||
                       Len == 128);
         auto index = va >> 7;
         auto line = &_lines[index];
         line->lock.lock();
-        if ((va & 0x7f) + Len > 128) {
+        if (unlikely((va & 0x7f) + Len > 128)) {
             //INFO(spu) << ssnprintf("locking second line %x", va);
-            auto next = &_lines[index + 1];
+            auto next = line + 1;
             next->lock.lock();
-            return {line, next};
+            *first = line;
+            *second = next;
+            return;
         }
-        return {line, nullptr};
+        *first = line;
+        *second = nullptr;
     }
     
-    inline void unlock(LockedLine lockedLine) {
-        if (lockedLine.nextLine) {
-            lockedLine.nextLine->lock.unlock();
+    inline void unlock(ReservationLine* line, ReservationLine* nextLine) {
+        if (unlikely(nextLine != nullptr)) {
+            nextLine->lock.unlock();
         }
-        lockedLine.line->lock.unlock();
+        line->lock.unlock();
     }
     
     inline void destroySingleReservation(ReservationGranule* granule) {
@@ -160,10 +158,10 @@ public:
         line->granules.clear();
     }
     
-    inline void destroyExcept(LockedLine lockedLine, ReservationGranule* granule) {
-        lockedLine.line->granules.clearExcept(granule);
-        if (lockedLine.nextLine) {
-            lockedLine.nextLine->granules.clearExcept(granule);
+    inline void destroyExcept(ReservationLine* line, ReservationLine* nextLine, ReservationGranule* granule) {
+        line->granules.clearExcept(granule);
+        if (unlikely(nextLine != nullptr)) {
+            nextLine->granules.clearExcept(granule);
         }
     }
 };

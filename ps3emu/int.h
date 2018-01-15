@@ -73,3 +73,6 @@ inline uint8_t fast_endian_reverse(uint8_t val) {
 constexpr uint32_t constexpr_log2(uint32_t n, uint32_t p = 0) {
     return n <= 1 ? p : constexpr_log2(n / 2, p + 1);
 }
+
+#define likely(x) __builtin_expect ((x), 1)
+#define unlikely(x) __builtin_expect ((x), 0)

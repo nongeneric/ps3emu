@@ -56,7 +56,7 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     
     if (header.val == 0) {
         assert(header.count.u() == 0);
-        INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, _put.load());
+        INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, getPut());
         return 4;
     }
 
@@ -107,27 +107,27 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
 }
 
 void Rsx::setPut(uint32_t put) {
-    _put = put;
+    *_put = fast_endian_reverse(put);
 }
 
 void Rsx::setGet(uint32_t get) {
-    _get = get;
+    *_get = fast_endian_reverse(get);
 }
 
 uint32_t Rsx::getRef() {
-    return _ref;
+    return fast_endian_reverse(*_ref);
 }
 
 void Rsx::setRef(uint32_t ref) {
-    _ref = ref;
+    *_ref = fast_endian_reverse(ref);
 }
 
 void Rsx::loop() {
     initGcm();
-    _get = 0;
-    _put = 0;
+    setGet(0);
+    setPut(0);
+    setRef(0xffffffff);
     _ret = 0;
-    _ref = 0xffffffff;
     _isFlipInProgress = false;
     log_set_thread_name("rsx_loop");
     INFO(rsx) << "rsx loop started, waiting for updates";
@@ -141,13 +141,13 @@ void Rsx::loop() {
 
 void Rsx::runLoop() {
     for (;;) {
-        while (_get != _put || _ret) {
-            auto localGet = _get.load();
+        while (getGet() != getPut() || _ret) {
+            auto localGet = getGet();
             auto ptr = (uint32_t*)g_state.mm->getMemoryPointer(rsxOffsetToEa(MemoryLocation::Main, localGet), 0);
             auto len = interpret(localGet, ptr);
-            _get += len;
+            setGet(localGet + len);
         }
-        if (_shutdown && _get == _put) {
+        if (_shutdown && getGet() == getPut()) {
             waitForIdle();
             return;
         }

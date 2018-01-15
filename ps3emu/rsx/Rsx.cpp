@@ -14,6 +14,7 @@
 #include "../utils.h"
 #include "ps3emu/ImageUtils.h"
 #include "ps3emu/state.h"
+#include "ps3emu/int.h"
 #include <atomic>
 #include <vector>
 #include <fstream>
@@ -48,7 +49,12 @@ Rsx::Rsx()
     : _isFlipInProgress(false),
       _lastFlipTime(0),
       _transformFeedbackQuery(0),
-      _idleCounter(boost::chrono::seconds(1)) {}
+      _idleCounter(boost::chrono::seconds(1)) {
+    auto regs = (uint32_t*)g_state.mm->getMemoryPointer(GcmControlRegisters, 12);
+    _put = regs;
+    _get = regs + 1;
+    _ref = regs + 2;
+}
 
 Rsx::~Rsx() {
     shutdown();
@@ -1508,7 +1514,7 @@ void Rsx::TextureControl0(unsigned index,
 
 void Rsx::SetReference(uint32_t ref) {
     waitForIdle();
-    _ref = ref;
+    *_ref = fast_endian_reverse(ref);
 }
 
 // Surface
@@ -1844,11 +1850,11 @@ void Rsx::invalidateCaches(uint32_t va, uint32_t size) {
 }
 
 uint32_t Rsx::getGet() {
-    return _get;
+    return fast_endian_reverse(*_get);
 }
 
 uint32_t Rsx::getPut() {
-    return _put;
+    return fast_endian_reverse(*_put);
 }
 
 uint32_t Rsx::getRet() {

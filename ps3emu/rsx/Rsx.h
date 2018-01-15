@@ -238,9 +238,9 @@ class GLPersistentCpuBuffer;
 class CallbackThread;
 class Rsx {
     static RsxOperationMode _mode;
-    std::atomic<uint32_t> _get = 0;
-    std::atomic<uint32_t> _put = 0;
-    uint32_t _ref = 0;
+    uint32_t* _get = nullptr;
+    uint32_t* _put = nullptr;
+    uint32_t* _ref = nullptr;
     std::atomic<uint32_t> _ret = 0;
     std::atomic<bool> _isFlipInProgress;
     std::atomic<int64_t> _lastFlipTime;
