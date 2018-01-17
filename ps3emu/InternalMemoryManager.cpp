@@ -23,6 +23,7 @@ namespace {
 void* InternalMemoryManager::allocInternalMemory(uint32_t* ea,
                                                  uint32_t size,
                                                  uint32_t alignment) {
+    auto lock = boost::lock_guard(_mutex);
     assert(alignment <= g_maxalignment);
     auto fitp = fit(_base);
     assert(fitp->check_sanity());
@@ -49,5 +50,6 @@ void InternalMemoryManager::free(uint32_t ea) {
 }
 
 void InternalMemoryManager::free(void* ptr) {
+    auto lock = boost::lock_guard(_mutex);
     fit(_base)->deallocate(ptr);
 }

@@ -29,7 +29,7 @@ struct ScalarString {
 
 }}
 
-void spliceFunction(uint32_t ea, std::function<void()> handler) {
+void spliceFunction(uint32_t ea, std::function<void()> before, std::function<void()> after) {
     uint32_t instr;
     g_state.mm->readMemory(ea, &instr, 4);
     auto opcode = endian_reverse(instr) >> 26;
@@ -39,14 +39,18 @@ void spliceFunction(uint32_t ea, std::function<void()> handler) {
     uint32_t segment, label;
     bbcallmap_dasm(bbcall, segment, label);
     g_state.bbcallMap->set(ea, 0);
-    auto index = addNCallEntry({ssnprintf("spliced_%x", ea), 0, [=](auto th) {
-        handler();
-        if (bbcall) {
-            g_state.proc->bbcall(segment, label, th);
-        } else {
-            th->setNIP(ea + 4);
-            ppu_dasm<DasmMode::Emulate>(&instr, ea, th);
-        }
+    auto index = addNCallEntry({ssnprintf("spliced_%x", ea), 0, [=](PPUThread* th) {
+        wrap(std::function([=](Process* proc, PPUThread* th, MainMemory* mm, boost::context::continuation* sink) {
+            before();
+            if (bbcall) {
+                g_state.proc->bbcall(segment, label, th);
+            } else {
+                ppu_dasm<DasmMode::Emulate>(&instr, ea, th);
+                th->ps3call({ea + 4, th->getGPR(2)}, nullptr, 0, sink);
+            }
+            after();
+            return th->getGPR(3);
+        }), th);
     }});
     encodeNCall(g_state.mm, ea, index);
 }

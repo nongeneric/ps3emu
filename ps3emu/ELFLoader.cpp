@@ -309,13 +309,17 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 auto codeVa = g_state.mm->load32(stubs[j]);
                 auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
                               name == "cellSyncMutexTryLock";
-                spliceFunction(codeVa, [=] {
-                    auto message = ssnprintf("proxy [%08x] %s.%s", codeVa, libname, name);
+                auto log = [=](auto message) {
                     if (isSync) {
                         INFO(libs, sync) << message;
                     } else {
                         INFO(libs) << message;
                     }
+                };
+                spliceFunction(codeVa, [=] {
+                    log(ssnprintf("proxy [%08x] %s.%s", codeVa, libname, name));
+                }, [=] {
+                    log(ssnprintf("proxy [%08x] %s.%s -> %llx", codeVa, libname, name, g_state.th->getGPR(3)));
                 });
             }
         }

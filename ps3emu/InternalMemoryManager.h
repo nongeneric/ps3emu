@@ -4,10 +4,12 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include <boost/thread/mutex.hpp>
 
 class InternalMemoryManager {
     uint32_t _base;
     std::string _name;
+    boost::mutex _mutex;
     
 public:
     InternalMemoryManager(uint32_t base, uint32_t size, std::string name);

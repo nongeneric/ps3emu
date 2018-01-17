@@ -4,5 +4,5 @@
 #include <functional>
 #include <optional>
 
-void spliceFunction(uint32_t ea, std::function<void()> handler);
+void spliceFunction(uint32_t ea, std::function<void()> handler, std::function<void()> after = []{});
 std::optional<std::string> fnidToName(uint32_t fnid);

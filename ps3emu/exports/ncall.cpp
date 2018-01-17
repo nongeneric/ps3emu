@@ -308,6 +308,7 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(cellCameraInit),
     ENTRY(cellGemGetMemorySize),
     ENTRY(cellGemInit),
+    ENTRY(ps3call_tests),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -345,6 +346,6 @@ const NCallEntry* findNCallEntryByIndex(uint32_t index) {
 }
 
 uint32_t addNCallEntry(NCallEntry entry) {
-    ncallTable.push_back(entry);
-    return ncallTable.size() - 1;
+    auto it = ncallTable.push_back(entry);
+    return std::distance(ncallTable.begin(), it);
 }

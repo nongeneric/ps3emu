@@ -9,6 +9,7 @@
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/BBCallMap.h"
 #include "ps3emu/AffinityManager.h"
+#include "ps3emu/exports/exports.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -261,7 +262,7 @@ uint64_t PPUThread::ps3call(fdescr const& descriptor,
 
 void PPUThread::ps3call_impl(uint32_t va) {
     INFO(libs) << ssnprintf("ps3call: %x", va);
-    
+
     _ps3calls.push({getNIP(), getLR()});
     
     uint32_t stubVa;
@@ -280,8 +281,12 @@ uint64_t ps3call_then(PPUThread* thread) {
     thread->_ps3calls.pop();
     thread->setLR(top.lr);
     thread->setNIP(top.ret);
-    thread->_pscallContinuation = thread->_pscallContinuation.resume();
-    // TODO: delete stub
+    auto& cont = thread->_pscallContinuation.top();
+    cont = cont.resume();
+    if (!cont) { // current coroutine has exited
+        thread->_pscallContinuation.pop();
+    }
+    //g_state.memalloc->free(thread->getNIP());
     return thread->getGPR(3);
 }
 
@@ -299,4 +304,52 @@ void PPUThread::raiseModuleLoaded(uint32_t imageBase) {
 
 unsigned PPUThread::getTid() {
     return _tid;
+}
+
+emu_void_t ps3call_tests(fdescr* simpleDescr,
+                         fdescr* recursiveDescr,
+                         fdescr* recursiveChildDescr,
+                         PPUThread* thread,
+                         boost::context::continuation* sink) {
+    // allow the child patch
+    g_state.bbcallMap->set(recursiveChildDescr->va, 0);
+
+    // otherwise the patched child will never be called
+    // the rewriter will just "goto" to an already rewritten child
+    g_state.bbcallMap->set(recursiveDescr->va, 0);
+
+    auto write = [](std::string msg) {
+        printf("%s\n", msg.c_str());
+    };
+
+    write(ssnprintf("stolen ps3call_tests(%x, %x, %x)",
+                    simpleDescr->va,
+                    recursiveDescr->va,
+                    recursiveChildDescr->va));
+
+    write("calling simple(5,7)");
+    auto res = thread->ps3call(*simpleDescr, {5ull, 7ull}, sink);
+    write(ssnprintf("returned %d", res));
+
+    write(ssnprintf("[after a ps3call] stolen ps3call_tests(%x, %x, %x)",
+                    simpleDescr->va,
+                    recursiveDescr->va,
+                    recursiveChildDescr->va));
+
+    auto index = addNCallEntry({"stolen_recursive_child_cb", 0, [=](PPUThread* th) {
+        wrap(std::function([=](uint32_t a, boost::context::continuation* sink) {
+            write("calling (from recursive child) simple(10,20)");
+            auto res = thread->ps3call(*simpleDescr, {10ull, 20ull}, sink);
+            write(ssnprintf("simple returned %d", res));
+            return a + 17ul;
+        }), th);
+    }});
+
+    encodeNCall(g_state.mm, recursiveChildDescr->va, index);
+
+    write("calling recursive(11)");
+    res = thread->ps3call(*recursiveDescr, {11ull}, sink);
+    write(ssnprintf("recursive returned %d", res));
+
+    return emu_void;
 }

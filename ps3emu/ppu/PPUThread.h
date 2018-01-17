@@ -176,7 +176,7 @@ class PPUThread {
     
     std::stack<ps3call_info_t> _ps3calls;
     MainMemory* _mm;
-    boost::context::continuation _pscallContinuation;
+    std::stack<boost::context::continuation> _pscallContinuation;
     
     inline uint8_t get4bitField(uint32_t r, uint8_t n) {
         auto fpos = 4 * n;
@@ -398,3 +398,8 @@ public:
 };
 
 uint64_t ps3call_then(PPUThread* thread);
+emu_void_t ps3call_tests(fdescr* simpleDescr,
+                         fdescr* recursiveDescr,
+                         fdescr* recursiveChildDescr,
+                         PPUThread* thread,
+                         boost::context::continuation* sink);

@@ -2980,3 +2980,21 @@ TEST_CASE("spu_thread_group_2") {
         "Exiting.\n"
     );
 }
+
+TEST_CASE("ps3call_tests") {
+    test_interpreter_and_rewriter({"./binaries/ps3call_tests/a.elf"},
+        "main\n"
+        "stolen ps3call_tests(107c4, 10744, 106f4)\n"
+        "calling simple(5,7)\n"
+        "simple_cb(5, 7)\n"
+        "returned 12\n"
+        "[after a ps3call] stolen ps3call_tests(107c4, 10744, 106f4)\n"
+        "calling recursive(11)\n"
+        "calling (from recursive child) simple(10,20)\n"
+        "simple_cb(10, 20)\n"
+        "simple returned 30\n"
+        "recursive child returned 13\n"
+        "recursive returned 35\n"
+        "done\n"
+    );
+}

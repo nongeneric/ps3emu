@@ -91,6 +91,11 @@ constexpr auto make_n_tuple(T t, N n) {
 }
 
 template <typename R, typename... Args>
+constexpr auto make_type_tuple(std::function<R(Args...)> f) {
+    return hana::make_tuple(hana::type_c<Args>...);
+}
+
+template <typename R, typename... Args>
 constexpr auto make_type_tuple(R (*)(Args...)) {
     return hana::make_tuple(hana::type_c<Args>...);
 }
@@ -114,13 +119,13 @@ auto wrap(F f, PPUThread* th) {
     auto holders = hana::transform(pairs, [](auto t) {
         return get_arg<t[0_c].value, typename decltype(+t[1_c])::type>();
     });
-    auto values = hana::transform(holders, [&](auto& h) {
-        return h.value(th);
-    });
 
     if constexpr(containsContinuationArgument(types)) {
         boost::context::continuation source =
-            boost::context::callcc([holders, &values, &f, th](boost::context::continuation&& sink) mutable {
+            boost::context::callcc([holders, &f, th](boost::context::continuation&& sink) mutable {
+                auto values = hana::transform(holders, [&](auto& h) {
+                    return h.value(th);
+                });
                 auto updatedValues = hana::append(hana::drop_back(values), &sink);
                 th->setGPR(3, hana::unpack(updatedValues, f));
                 hana::for_each(holders, [](auto& h) {
@@ -128,8 +133,14 @@ auto wrap(F f, PPUThread* th) {
                 });
                 return std::move(sink);
             });
-        th->_pscallContinuation = std::move(source);
+        if (source) { // ps3call has been called by the coroutine
+            assert(!th->_ps3calls.empty());
+            th->_pscallContinuation.push(std::move(source));
+        }
     } else {
+        auto values = hana::transform(holders, [&](auto& h) {
+            return h.value(th);
+        });
         th->setGPR(3, hana::unpack(values, f));
         hana::for_each(holders, [&](auto& h) {
             h.destroy();
