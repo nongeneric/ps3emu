@@ -122,7 +122,7 @@ auto wrap(F f, PPUThread* th) {
 
     if constexpr(containsContinuationArgument(types)) {
         boost::context::continuation source =
-            boost::context::callcc([holders, &f, th](boost::context::continuation&& sink) mutable {
+            boost::context::callcc([holders, f, th](boost::context::continuation&& sink) mutable {
                 auto values = hana::transform(holders, [&](auto& h) {
                     return h.value(th);
                 });

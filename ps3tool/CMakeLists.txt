@@ -23,6 +23,7 @@ set(SRC
     trace_viz.cpp
     dasm.cpp
     unpack_trp.cpp
+    split_log.cpp
 )
 add_executable(ps3tool ${SRC})
 target_link_libraries(ps3tool ps3emu ps3tool-core ${Boost_LIBRARIES} z Qt5::Core Qt5::Widgets)

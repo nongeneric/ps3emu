@@ -79,6 +79,11 @@ struct UnpackTrpCommand {
     std::string output;
 };
 
+struct SplitLogCommand {
+    std::string log;
+    std::string output;
+};
+
 void HandleUnsce(UnsceCommand const& command);
 void HandleShaderDasm(ShaderDasmCommand const& command);
 void HandleRestoreElf(RestoreElfCommand const& command);
@@ -93,3 +98,4 @@ void HandlePrintGcmVizTrace(PrintGcmVizTraceCommand const& command);
 void HandleTraceViz(TraceVizCommand const& command);
 void HandleDasm(DasmCommand const& command);
 void HandleUnpackTrp(UnpackTrpCommand const& command);
+void HandleSplitLog(SplitLogCommand const& command);

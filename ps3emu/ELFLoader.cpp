@@ -317,7 +317,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                     }
                 };
                 spliceFunction(codeVa, [=] {
-                    log(ssnprintf("proxy [%08x] %s.%s", codeVa, libname, name));
+                    log(ssnprintf("proxy [%08x] %s.%s(%llx)", codeVa, libname, name, g_state.th->getGPR(3)));
                 }, [=] {
                     log(ssnprintf("proxy [%08x] %s.%s -> %llx", codeVa, libname, name, g_state.th->getGPR(3)));
                 });

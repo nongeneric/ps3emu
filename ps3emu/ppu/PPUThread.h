@@ -403,3 +403,7 @@ emu_void_t ps3call_tests(fdescr* simpleDescr,
                          fdescr* recursiveChildDescr,
                          PPUThread* thread,
                          boost::context::continuation* sink);
+emu_void_t slicing_tests(fdescr* singleDescr,
+                         fdescr* multipleDescr,
+                         fdescr* multipleRecursiveDescr,
+                         PPUThread* thread);

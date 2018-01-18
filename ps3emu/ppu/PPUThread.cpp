@@ -10,6 +10,7 @@
 #include "ps3emu/BBCallMap.h"
 #include "ps3emu/AffinityManager.h"
 #include "ps3emu/exports/exports.h"
+#include "ps3emu/exports/splicer.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -318,7 +319,7 @@ emu_void_t ps3call_tests(fdescr* simpleDescr,
     // the rewriter will just "goto" to an already rewritten child
     g_state.bbcallMap->set(recursiveDescr->va, 0);
 
-    auto write = [](std::string msg) {
+    auto write = [=](std::string msg) {
         printf("%s\n", msg.c_str());
     };
 
@@ -350,6 +351,36 @@ emu_void_t ps3call_tests(fdescr* simpleDescr,
     write("calling recursive(11)");
     res = thread->ps3call(*recursiveDescr, {11ull}, sink);
     write(ssnprintf("recursive returned %d", res));
+
+    return emu_void;
+}
+
+emu_void_t slicing_tests(fdescr* singleDescr,
+                         fdescr* multipleDescr,
+                         fdescr* multipleRecursiveDescr,
+                         PPUThread* thread) {
+
+    auto write = [=](std::string msg) {
+        printf("%s\n", msg.c_str());
+    };
+
+    spliceFunction(singleDescr->va, [=] {
+        write(ssnprintf("proxy single(%d, %d)", g_state.th->getGPR(3), g_state.th->getGPR(4)));
+    }, [=] {
+        write(ssnprintf("proxy single = %d", g_state.th->getGPR(3)));
+    });
+
+    spliceFunction(multipleDescr->va, [=] {
+        write(ssnprintf("proxy multiple(%d, %d)", g_state.th->getGPR(3), g_state.th->getGPR(4)));
+    }, [=] {
+        write(ssnprintf("proxy multiple = %d", g_state.th->getGPR(3)));
+    });
+
+    spliceFunction(multipleRecursiveDescr->va, [=] {
+        write(ssnprintf("proxy multipleRecursive(%d, %d)", g_state.th->getGPR(3), g_state.th->getGPR(4)));
+    }, [=] {
+        write(ssnprintf("proxy multipleRecursive = %d", g_state.th->getGPR(3)));
+    });
 
     return emu_void;
 }

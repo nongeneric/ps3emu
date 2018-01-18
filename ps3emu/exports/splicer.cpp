@@ -35,19 +35,13 @@ void spliceFunction(uint32_t ea, std::function<void()> before, std::function<voi
     auto opcode = endian_reverse(instr) >> 26;
     if (opcode == NCALL_OPCODE)
         return;
-    auto bbcall = g_state.bbcallMap->get(ea);
-    uint32_t segment, label;
-    bbcallmap_dasm(bbcall, segment, label);
     g_state.bbcallMap->set(ea, 0);
+    g_state.bbcallMap->set(ea + 4, 0);
     auto index = addNCallEntry({ssnprintf("spliced_%x", ea), 0, [=](PPUThread* th) {
         wrap(std::function([=](Process* proc, PPUThread* th, MainMemory* mm, boost::context::continuation* sink) {
             before();
-            if (bbcall) {
-                g_state.proc->bbcall(segment, label, th);
-            } else {
-                ppu_dasm<DasmMode::Emulate>(&instr, ea, th);
-                th->ps3call({ea + 4, th->getGPR(2)}, nullptr, 0, sink);
-            }
+            ppu_dasm<DasmMode::Emulate>(&instr, ea, th);
+            th->ps3call({ea + 4, th->getGPR(2)}, nullptr, 0, sink);
             after();
             return th->getGPR(3);
         }), th);

@@ -28,6 +28,7 @@ typedef boost::variant<NoneCommand,
                        TraceVizCommand,
                        DasmCommand,
                        UnpackTrpCommand,
+                       SplitLogCommand,
                        PrintGcmVizTraceCommand>
     Command;
 
@@ -259,6 +260,19 @@ struct UnpackTrpParser : CommandParser<UnpackTrpCommand> {
     void parse(variables_map& vm) override { }
 };
 
+struct SplitLogParser : CommandParser<SplitLogCommand> {
+    SplitLogParser() : CommandParser<SplitLogCommand>("split-log") {}
+
+    void init() override {
+        desc.add_options()
+            ("log", value<std::string>(&command.log)->required(), "log path")
+            ("output", value<std::string>(&command.output), "output dir path")
+            ;
+    }
+
+    void parse(variables_map& vm) override { }
+};
+
 Command ParseOptions(int argc, const char *argv[]) {
     options_description global("Global options");
     std::string commandName;
@@ -295,6 +309,7 @@ Command ParseOptions(int argc, const char *argv[]) {
         PrintGcmVizTraceParser(),
         TraceVizParser(),
         DasmParser(),
+        SplitLogParser(),
         UnpackTrpParser()
     );
     
@@ -382,6 +397,10 @@ public:
 
     void operator()(UnpackTrpCommand& command) const {
         HandleUnpackTrp(command);
+    }
+
+    void operator()(SplitLogCommand& command) const {
+        HandleSplitLog(command);
     }
 };
 

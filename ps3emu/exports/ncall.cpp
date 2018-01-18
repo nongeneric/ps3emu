@@ -309,6 +309,7 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(cellGemGetMemorySize),
     ENTRY(cellGemInit),
     ENTRY(ps3call_tests),
+    ENTRY(slicing_tests),
 };
 
 void PPUThread::ncall(uint32_t index) {

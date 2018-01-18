@@ -2998,3 +2998,29 @@ TEST_CASE("ps3call_tests") {
         "done\n"
     );
 }
+
+TEST_CASE("function_splicing") {
+    auto output = startWaitGetOutput({"./binaries/function_splicing/a.elf"});
+    REQUIRE( output ==
+        "main\n"
+        "---------\n"
+        "proxy single(1, 2)\n"
+        "proxy single = 3\n"
+        "---------\n"
+        "proxy multiple(5, 6)\n"
+        "multiple_bb(5, 6) first\n"
+        "multiple_bb(5, 6) second\n"
+        "proxy multiple = 11\n"
+        "---------\n"
+        "proxy multipleRecursive(7, 9)\n"
+        "proxy single(9, 7)\n"
+        "proxy single = 16\n"
+        "proxy multiple(14, 27)\n"
+        "multiple_bb(14, 27) first\n"
+        "multiple_bb(14, 27) second\n"
+        "proxy multiple = 41\n"
+        "proxy multipleRecursive = 41\n"
+        "---------\n"
+        "done\n"
+    );
+}
