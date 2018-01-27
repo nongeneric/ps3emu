@@ -12,3 +12,4 @@ typedef struct sys_net_initialize_parameter {
 } sys_net_initialize_parameter_t;
 
 int32_t sys_net_initialize_network_ex(const sys_net_initialize_parameter_t* param);
+int32_t sys_net_free_thread_context(uint32_t tid, int flags);

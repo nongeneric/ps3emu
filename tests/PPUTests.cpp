@@ -1989,3 +1989,30 @@ TEST_CASE("TimedCounter1") {
         REQUIRE((sum == boost::chrono::milliseconds(400)));
     }
 }
+
+TEST_CASE("vrlw v0,v0,v12") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    PPUThread th;
+    th.r(0).set_xmm(_mm_set_epi32(0x11223344, 0xaabbccdd, 0x22334455, 0x55667788));
+    th.r(12).set_xmm(_mm_set_epi32(0, 32, 5, 0b111101111));
+    uint8_t instr[] = { 0x10, 0x00, 0x60, 0x84 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.r(0).w(0) == 0x11223344 );
+    REQUIRE( th.r(0).w(1) == 0xaabbccdd );
+    REQUIRE( th.r(0).w(2) == 0x46688aa4 );
+    REQUIRE( th.r(0).w(3) == 0x3bc42ab3 );
+}
+
+TEST_CASE("vrfin v0,v0") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    PPUThread th;
+    th.r(0).set_xmm_f(_mm_set_ps(-25.1f, -24.7f, 100.555f, 100.49f));
+    uint8_t instr[] = { 0x10, 0x00, 0x02, 0x0a };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.r(0).fs(0) == -25.f );
+    REQUIRE( th.r(0).fs(1) == -25.f );
+    REQUIRE( th.r(0).fs(2) == 101.f );
+    REQUIRE( th.r(0).fs(3) == 100.f );
+}

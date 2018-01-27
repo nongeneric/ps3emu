@@ -4,6 +4,7 @@
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
 #include "ps3emu/Config.h"
+#include "ps3emu/EmuCallbacks.h"
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 #include "stdio.h"
@@ -11,7 +12,28 @@
 
 using namespace boost::program_options;
 
+class RuntimeEmuCallbacks : public IEmuCallbacks {
+public:
+    virtual void stdout(const char* str, int len) override {
+        fwrite(str, 1, len, ::stdout);
+        fflush(::stdout);
+    }
+
+    virtual void stderr(const char* str, int len) override {
+        fwrite(str, 1, len, ::stderr);
+        fflush(::stderr);
+    }
+
+    virtual void spustdout(const char* str, int len) override {
+        stdout(str, len);
+    }
+};
+
+
 void emulate(std::string path, std::vector<std::string> args) {
+    RuntimeEmuCallbacks callbacks;
+    g_state.callbacks = &callbacks;
+
     Process proc;
     proc.init(path, args);
     for (;;) {

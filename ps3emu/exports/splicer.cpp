@@ -32,8 +32,8 @@ struct ScalarString {
 void spliceFunction(uint32_t ea, std::function<void()> before, std::function<void()> after) {
     uint32_t instr;
     g_state.mm->readMemory(ea, &instr, 4);
-    auto opcode = endian_reverse(instr) >> 26;
-    if (opcode == NCALL_OPCODE)
+    auto info = analyze(endian_reverse(instr), ea);
+    if (info.ncall || info.flow)
         return;
     g_state.bbcallMap->set(ea, 0);
     g_state.bbcallMap->set(ea + 4, 0);

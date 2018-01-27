@@ -158,7 +158,6 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         
         assert(ph->p_memsz >= ph->p_filesz);
         g_state.mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz);
-        g_state.mm->setMemory(va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
         
         if (ph->p_type != PT_TLS) {
             makeSegment(va, ph->p_memsz, index);
@@ -306,6 +305,8 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 });
                 if (replacement != end(replacements))
                     continue;
+                if (name == "sys_ppu_thread_get_id")
+                    continue;
                 auto codeVa = g_state.mm->load32(stubs[j]);
                 auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
                               name == "cellSyncMutexTryLock";
@@ -359,11 +360,12 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     }
     if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libio.sprx.elf" ||
-        name == "libaudio.sprx.elf" || name == "libfs.sprx.elf" ||
+        name == "libaudio.sprx.elf" ||
         name == "libsysutil_np_trophy.sprx.elf" ||
-        name == "libsysutil_np.sprx.elf" || name == "libnetctl.sprx.elf" ||
-        name == "libnet.sprx.elf" || name == "libgem.sprx.elf" ||
-        name == "libcamera.sprx.elf") {
+        name == "libsysutil_np.sprx.elf" || name == "libsysutil_np2.sprx.elf" ||
+        name == "libnetctl.sprx.elf" || name == "libnet.sprx.elf" ||
+        name == "libgem.sprx.elf" || name == "libcamera.sprx.elf" ||
+        name == "libsysutil_userinfo.sprx.elf") {
         return false;
     }
     return true;

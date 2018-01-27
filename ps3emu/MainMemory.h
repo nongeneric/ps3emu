@@ -104,7 +104,9 @@ class MainMemory {
 public:
     MainMemory();
     ~MainMemory();
-    void writeMemory(ps3_uintptr_t va, const void* buf, uint len);
+    void writeMemory(ps3_uintptr_t va,
+                     const void* buf,
+                     uint len);
     void readMemory(ps3_uintptr_t va,
                     void* buf,
                     uint len,

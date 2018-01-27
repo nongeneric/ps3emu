@@ -26,6 +26,7 @@
 #include "ps3emu/libs/libnetctl.h"
 #include "ps3emu/libs/libcamera.h"
 #include "ps3emu/libs/libgem.h"
+#include "ps3emu/libs/userinfo.h"
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 #include <tbb/concurrent_vector.h>
@@ -60,45 +61,6 @@ uint32_t calcFnid(const char* name) {
         0x56, 0x64, 0x27, 0x49, 0x94, 0x89, 0x74, 0x1A
     };
     return calcSHA1id(name, (const uint8_t*)suffix, sizeof(suffix));
-}
-
-CellFsErrno cellFsStat_proxy(ps3_uintptr_t path, CellFsStat* sb, Process* proc) {
-    std::string pathStr;
-    readString(g_state.mm, path, pathStr);
-    return cellFsStat(pathStr.c_str(), sb, proc);
-}
-
-CellFsErrno cellFsMkdir_proxy(ps3_uintptr_t path,
-                              uint32_t mode,
-                              Process* proc)
-{
-    std::string pathStr;
-    readString(g_state.mm, path, pathStr);
-    return cellFsMkdir(pathStr.c_str(), mode, proc);
-}
-
-CellFsErrno cellFsUnlink_proxy(ps3_uintptr_t path,
-                               Process* proc)
-{
-    std::string pathStr;
-    readString(g_state.mm, path, pathStr);
-    return cellFsUnlink(pathStr.c_str(), proc);
-}
-
-CellFsErrno cellFsGetFreeSize_proxy(ps3_uintptr_t directory_path,
-                              big_uint32_t* block_size,
-                              big_uint64_t* free_block_count,
-                              Process* proc)
-{
-    std::string pathStr;
-    readString(g_state.mm, directory_path, pathStr);
-    return cellFsGetFreeSize(pathStr.c_str(), block_size, free_block_count, proc);
-}
-
-CellFsErrno cellFsOpendir_proxy(ps3_uintptr_t path, big_int32_t *fd, Process* proc) {
-    std::string pathStr;
-    readString(g_state.mm, path, pathStr);
-    return cellFsOpendir(pathStr.c_str(), fd, proc);
 }
 
 int32_t sceNpDrmIsAvailable_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t path, MainMemory* mm) {
@@ -164,18 +126,18 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(cellSysmoduleUnloadModule),
     ENTRY(cellSysmoduleIsLoaded),
     ENTRY(cellSysmoduleInitialize),
-    { "cellFsStat", calcFnid("cellFsStat"), [](PPUThread* th) { wrap(cellFsStat_proxy, th); } },
-    { "cellFsMkdir", calcFnid("cellFsMkdir"), [](PPUThread* th) { wrap(cellFsMkdir_proxy, th); } },
-    { "cellFsGetFreeSize", calcFnid("cellFsGetFreeSize"), [](PPUThread* th) { wrap(cellFsGetFreeSize_proxy, th); } },
-    { "cellFsUnlink", calcFnid("cellFsUnlink"), [](PPUThread* th) { wrap(cellFsUnlink_proxy, th); } },
-    { "cellFsOpendir", calcFnid("cellFsOpendir"), [](PPUThread* th) { wrap(cellFsOpendir_proxy, th); } },
-    ENTRY(cellFsOpen),
-    ENTRY(cellFsSdataOpen),
-    ENTRY(cellFsLseek),
-    ENTRY(cellFsClose),
-    ENTRY(cellFsFstat),
-    ENTRY(cellFsRead),
-    ENTRY(cellFsWrite),
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "nonexbn", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
     ENTRY(sys_ppu_thread_join),
     ENTRY(sys_ppu_thread_exit),
     ENTRY(cellGameBootCheck),
@@ -198,10 +160,10 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(sceNpManagerGetNpId),
     ENTRY(cellSysCacheMount),
     ENTRY(cellSysCacheClear),
-    ENTRY(cellFsFsync),
-    ENTRY(cellFsReaddir),
-    ENTRY(cellFsClosedir),
-    ENTRY(cellFsGetDirectoryEntries),
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
     ENTRY(sys_ppu_thread_once),
     ENTRY(_sys_spu_printf_initialize),
     ENTRY(_sys_spu_printf_finalize),
@@ -303,13 +265,24 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(cellKbSetReadMode),
     ENTRY(_sys_memcpy),
     ENTRY(_sys_memset),
-    ENTRY(cellFsReadWithOffset),
-    ENTRY(cellFsWriteWithOffset),
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
+    { "none", calcFnid("none"), [](PPUThread* th) { } },
     ENTRY(cellCameraInit),
     ENTRY(cellGemGetMemorySize),
     ENTRY(cellGemInit),
-    ENTRY(ps3call_tests),
-    ENTRY(slicing_tests),
+    ENTRY(ps3call_tests), // don't move
+    ENTRY(slicing_tests), // don't move
+    ENTRY(cellUserInfoGetList),
+    ENTRY(cellUserInfoGetStat),
+    ENTRY(sceNpMatching2Init),
+    ENTRY(cellNetCtlAddHandler),
+    ENTRY(cellNetCtlGetState),
+    ENTRY(sceNpBasicGetMatchingInvitationEntryCount),
+    ENTRY(sceNpScoreInit),
+    ENTRY(sceNpManagerGetOnlineName),
+    ENTRY(sceNpManagerGetAvatarUrl),
+    ENTRY(cellGameDataCheckCreate2),
+    ENTRY(sys_net_free_thread_context),
 };
 
 void PPUThread::ncall(uint32_t index) {
@@ -326,17 +299,19 @@ void PPUThread::ncall(uint32_t index) {
 }
 
 const NCallEntry* findNCallEntry(uint32_t fnid, uint32_t& index, bool assertFound) {
-    auto it = std::find_if(ncallTable.begin(), ncallTable.end(), [=](auto& entry) {
+    auto end = ncallTable.end();
+    auto it = std::find_if(ncallTable.begin(), end, [=](auto& entry) {
         return entry.fnid == fnid;
     });
-    if (it == ncallTable.end())
+    if (it == end)
         return nullptr;
     index = std::distance(ncallTable.begin(), it);
-    auto next = std::find_if(it + 1, ncallTable.end(), [=](auto& entry) {
+#if DEBUG
+    auto next = std::find_if(it + 1, end, [=](auto& entry) {
         return entry.fnid == fnid;
     });
-    (void)next;
-    assert(next == ncallTable.end());
+    assert(next == end);
+#endif
     return &(*it);
 }
 

@@ -164,8 +164,8 @@ struct InstructionInfo {
 union BBCallForm {
     uint32_t val;
     BitField<0, 6> OPCD;
-    BitField<6, 16> Segment;
-    BitField<16, 32> Label;
+    BitField<6, 17> Segment;
+    BitField<17, 32> Label;
 };
 
 inline uint32_t asm_bb_call(unsigned opcode, uint32_t segment, uint32_t label) {

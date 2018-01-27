@@ -288,7 +288,6 @@ void encodeFlipCommand(uint32_t contextEa,
     buf[i++] = 0x30;
     // here gcm acquires the semaphore that is released by RSX
     // as there is no one to release the semaphore, just release it the second time
-    // the end result 
     buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_RELEASE, 1);
     buf[i++] = 1;
     buf[i++] = CELL_GCM_CALL(0);
@@ -574,11 +573,11 @@ emu_void_t cellGcmSetSecondVFrequency(uint32_t freq) {
 }
 
 uint32_t cellGcmGetDefaultCommandWordSize() {
-    return 4;
+    return 0x4000;
 }
 
 uint32_t cellGcmGetDefaultSegmentWordSize() {
-    return 8 * 1024 / 4;
+    return 0x2000;
 }
 
 }}

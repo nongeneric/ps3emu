@@ -64,9 +64,11 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* fname) {
                       "libsysutil_np_trophy.sprx.elf",
                       "libsysutil_game.sprx.elf",
                       "libsysutil_np.sprx.elf",
+                      "libsysutil_np2.sprx.elf",
                       "libnetctl.sprx.elf",
                       "libnet.sprx.elf",
                       "libgem.sprx.elf",
+                      "libsysutil_userinfo.sprx.elf",
                       "libcamera.sprx.elf",
                       "libresc.sprx.elf"}) {
         if (name == elfName) {

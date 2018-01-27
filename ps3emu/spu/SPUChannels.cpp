@@ -172,12 +172,14 @@ void SPUChannels::command(uint32_t word) {
     switch (opcode) {
         case MFC_GETLLAR_CMD: {
             //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerGETLLARTask);
-            assert(size == 0x80);
+            assert(size <= 0x80);
+            uint8_t buf[0x80];
             _mm->loadReserve<128>(eal,
-                                  lsa,
+                                  buf,
                                   handleGranuleNotificationWrapper,
                                   (uintptr_t)this,
                                   (uintptr_t)g_state.granule);
+            memcpy(lsa, buf, size);
             // reservation always succeeds
             _channels[MFC_RdAtomicStat] |= 0b100; // G
             log();
@@ -199,7 +201,7 @@ void SPUChannels::command(uint32_t word) {
         }
         case MFC_PUTLLC_CMD: {
             //__itt_task_begin(g_profiler_process_domain, __itt_null, __itt_null, _profilerPUTLLCTask);
-            EMU_ASSERT(size == 0x80);
+            EMU_ASSERT(size <= 0x80);
             auto stored = _mm->writeCond<128>(eal, lsa);
             _channels[MFC_RdAtomicStat] |= !stored; // S
             logAtomic(stored);

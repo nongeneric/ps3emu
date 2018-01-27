@@ -2,6 +2,7 @@
 
 #include "ps3emu/Process.h"
 #include "ps3emu/libs/ConcurrentBoundedQueue.h"
+#include "ps3emu/EmuCallbacks.h"
 #include "MonospaceGrid.h"
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
@@ -44,7 +45,7 @@ class GPRModel;
 class DasmModel;
 class MemoryDumpModel;
 class Rsx;
-class DebuggerModel : public QWidget {
+class DebuggerModel : public QWidget, public IEmuCallbacks {
     Q_OBJECT
 
     PPUThread* _activeThread = nullptr;
@@ -99,6 +100,11 @@ class DebuggerModel : public QWidget {
     boost::condition_variable _runCv;
     std::ofstream _dbgOutput;
     
+    void debugStdout(const char* str, int len);
+    virtual void stdout(const char* str, int len) override;
+    virtual void stderr(const char* str, int len) override;
+    virtual void spustdout(const char* str, int len) override;
+
     template<typename... Ts>
     void messagef(const char* format, Ts... args) {
         emit message(QString::fromStdString(ssnprintf(format, args...)));

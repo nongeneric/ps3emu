@@ -7,7 +7,6 @@
 #include "ps3emu/spu/SPUDasm.h"
 #include "ps3emu/state.h"
 #include "ps3emu/libs/spu/sysSpu.h"
-#include "ps3emu/EmuCallbacks.h"
 #include "ps3emu/log.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwmutex.h"
@@ -26,6 +25,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/filesystem.hpp>
 #include <set>
+
 
 class GridModelChangeTracker {
     MonospaceGridModel* _model;
@@ -508,6 +508,26 @@ void DebuggerModel::dbgLoop() {
     }
 }
 
+void DebuggerModel::debugStdout(const char* str, int len) {
+    _dbgOutput << std::string(str, len);
+    _dbgOutput.flush();
+    emit this->output(QString::fromLatin1(str, len));
+    fwrite(str, 1, len, ::stdout);
+    fflush(::stdout);
+}
+
+void DebuggerModel::stdout(const char* str, int len) {
+    debugStdout(str, len);
+}
+
+void DebuggerModel::stderr(const char* str, int len) {
+    debugStdout(str, len);
+}
+
+void DebuggerModel::spustdout(const char* str, int len) {
+    debugStdout(str, len);
+}
+
 DebuggerModel::DebuggerModel()
     : _debugThreadQueue(1), _dbgOutput("/tmp/ps3_dbg_output.log")
 {
@@ -516,14 +536,7 @@ DebuggerModel::DebuggerModel()
         Rsx::setOperationMode(RsxOperationMode::RunCapture);
     }
 
-    auto callback = [&](auto str, auto len) {
-        _dbgOutput << std::string(str, len);
-        _dbgOutput.flush();
-        emit this->output(QString::fromLatin1(str, len));
-    };
-    g_state.callbacks->stdout = callback;
-    g_state.callbacks->stderr = callback;
-    g_state.callbacks->spustdout = callback;
+    g_state.callbacks = this;
     _gprModel.reset(new GPRModel());
     _dasmModel.reset(new DasmModel());
     _memoryDumpModel.reset(new MemoryDumpModel());

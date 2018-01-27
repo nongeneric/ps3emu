@@ -11,6 +11,7 @@
 #include "ps3emu/AffinityManager.h"
 #include "ps3emu/exports/exports.h"
 #include "ps3emu/exports/splicer.h"
+#include "ps3emu/EmuCallbacks.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 
@@ -262,8 +263,6 @@ uint64_t PPUThread::ps3call(fdescr const& descriptor,
 }
 
 void PPUThread::ps3call_impl(uint32_t va) {
-    INFO(libs) << ssnprintf("ps3call: %x", va);
-
     _ps3calls.push({getNIP(), getLR()});
     
     uint32_t stubVa;
@@ -278,6 +277,7 @@ void PPUThread::ps3call_impl(uint32_t va) {
 }
 
 uint64_t ps3call_then(PPUThread* thread) {
+    auto stubVa = thread->getNIP();
     auto top = thread->_ps3calls.top();
     thread->_ps3calls.pop();
     thread->setLR(top.lr);
@@ -287,7 +287,7 @@ uint64_t ps3call_then(PPUThread* thread) {
     if (!cont) { // current coroutine has exited
         thread->_pscallContinuation.pop();
     }
-    //g_state.memalloc->free(thread->getNIP());
+    g_state.memalloc->free(stubVa);
     return thread->getGPR(3);
 }
 
@@ -361,7 +361,8 @@ emu_void_t slicing_tests(fdescr* singleDescr,
                          PPUThread* thread) {
 
     auto write = [=](std::string msg) {
-        printf("%s\n", msg.c_str());
+        msg = ssnprintf("%s\n", msg);
+        g_state.callbacks->stdout(msg.c_str(), msg.size());
     };
 
     spliceFunction(singleDescr->va, [=] {

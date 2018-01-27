@@ -2,9 +2,10 @@
 
 #include <functional>
 
-class EmuCallbacks {
+class IEmuCallbacks {
 public:
-    std::function<void(const char*, unsigned)> stdout = nullptr;
-    std::function<void(const char*, unsigned)> stderr = nullptr;
-    std::function<void(const char*, unsigned)> spustdout = nullptr;
+    virtual ~IEmuCallbacks() = default;
+    virtual void stdout(const char* str, int len) = 0;
+    virtual void stderr(const char* str, int len) = 0;
+    virtual void spustdout(const char* str, int len) = 0;
 };

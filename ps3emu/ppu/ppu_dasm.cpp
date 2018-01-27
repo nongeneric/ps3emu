@@ -3516,6 +3516,35 @@ PRINT(VSUBFP, SIMDForm) {
 EMU_REWRITE(VSUBFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 
+PRINT(VRLW, SIMDForm) {
+    *result = format_nnn("vrlw", i->vD, i->vA, i->vB);
+}
+
+#define _VRLW(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    b = _mm_and_si128(b, _mm_set1_epi32(0b11111)); \
+    auto left = _mm_sllv_epi32(a, b); \
+    b = _mm_sub_epi32(_mm_set1_epi32(32), b); \
+    auto right = _mm_srlv_epi32(a, b); \
+    auto d = _mm_or_si128(left, right); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VRLW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+
+PRINT(VRFIN, SIMDForm) {
+    *result = format_nn("vrfin", i->vD, i->vB);
+}
+
+#define _VRFIN(_vd, _vb) { \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto d = _mm_round_ps(b, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)); \
+    TH->r(_vd).set_xmm_f(d); \
+}
+EMU_REWRITE(VRFIN, SIMDForm, i->vD.u(), i->vB.u())
+
+
 PRINT(VRSQRTEFP, SIMDForm) {
     *result = format_nn("vrsqrtefp", i->vD, i->vB);
 }
@@ -4197,6 +4226,8 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 332: invoke(VMRGLH);
                                 case 76: invoke(VMRGHH);
                                 case 328: invoke(VMULOSH);
+                                case 132: invoke(VRLW);
+                                case 522: invoke(VRFIN);
                                 default: throw IllegalInstructionException();
                             }
                     }

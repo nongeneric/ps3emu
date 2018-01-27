@@ -2,6 +2,7 @@
 
 #include "../ContentManager.h"
 #include "../MainMemory.h"
+#include "ps3emu/InternalMemoryManager.h"
 #include <boost/filesystem.hpp>
 #include "../log.h"
 #include "ps3emu/state.h"
@@ -61,10 +62,10 @@ int32_t cellGameBootCheck(big_uint32_t* type,
     init(size, proc);
     *type = CELL_GAME_GAMETYPE_DISC;
     *attributes = 0;
-//    auto str = "EMUGAME";
-//    if (dirName) {
-//        memcpy(dirName, str, strlen(str) + 1);
-//    }
+    auto str = "EMUGAME";
+    if (dirName) {
+        memcpy(dirName, str, strlen(str) + 1);
+    }
     return CELL_OK;
 }
 
@@ -75,5 +76,20 @@ int32_t cellGameDataCheck(uint32_t type,
 {
     INFO(libs) << ssnprintf("cellGameDataCheck(%d, %s, ...)", type, dirName);
     init(size, proc);
+    return CELL_OK;
+}
+
+int32_t cellGameDataCheckCreate2(uint32_t type,
+                                 const cell_game_dirname_t *dirName,
+                                 uint32_t arg,
+                                 const fdescr* cb,
+                                 uint32_t memContainer,
+                                 PPUThread* th,
+                                 boost::context::continuation* sink)
+{
+    uint32_t va;
+    auto size = g_state.memalloc->internalAllocU<4, CellGameContentSize>(&va);
+    cellGameDataCheck(type, dirName, size.get(), g_state.proc);
+    th->ps3call(*cb, {(uint64_t)arg, (uint64_t)va}, sink);
     return CELL_OK;
 }

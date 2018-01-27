@@ -25,8 +25,11 @@ inline typename IntTraits<Len>::Type MainMemory::load(ps3_uintptr_t va, bool val
     return fast_endian_reverse(*typedPtr);
 }
 
-template<int Len>
-inline void MainMemory::store(ps3_uintptr_t va, typename IntTraits<Len>::Type value, ReservationGranule* granule) {
+template <int Len>
+inline void MainMemory::store(ps3_uintptr_t va,
+                              typename IntTraits<Len>::Type value,
+                              ReservationGranule* granule)
+{
     auto reversed = fast_endian_reverse(value);
     if (unlikely(writeSpecialMemory(va, &reversed, Len)))
         return;
@@ -47,7 +50,10 @@ inline void MainMemory::store(ps3_uintptr_t va, typename IntTraits<Len>::Type va
     _mmap.mark<Len>(va);
 }
 
-void MainMemory::writeMemory(ps3_uintptr_t va, const void* buf, uint len) {
+void MainMemory::writeMemory(ps3_uintptr_t va,
+                             const void* buf,
+                             uint len)
+{
     if (writeSpecialMemory(va, buf, len))
         return;
     validate(va, len, true);

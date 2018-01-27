@@ -44,11 +44,11 @@ struct CellFsDirectoryEntry {
     CellFsDirent entry_name;
 };
 
-CellFsErrno sys_fs_open(const char *path,
+CellFsErrno sys_fs_open(cstring_ptr_t path,
                         uint32_t flags,
                         big_int32_t *fd,
                         uint64_t mode,
-                        const void *arg,
+                        uint32_t arg,
                         uint64_t size);
 CellFsErrno sys_fs_lseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t *pos);
 CellFsErrno sys_fs_read(int32_t fd,
@@ -59,48 +59,34 @@ CellFsErrno sys_fs_write(int32_t fd,
                         ps3_uintptr_t buf,
                         uint64_t nbytes,
                         big_uint64_t* nwrite);
-CellFsErrno sys_fs_fstat(int32_t fd, CellFsStat* sb, Process* proc);
+CellFsErrno sys_fs_fstat(int32_t fd, CellFsStat* sb);
 CellFsErrno sys_fs_close(int32_t fd);
-CellFsErrno cellFsStat(const char* path, CellFsStat* sb, Process* proc);
-CellFsErrno cellFsFstat(int32_t fd, CellFsStat* sb, Process* proc);
-CellFsErrno cellFsOpen(cstring_ptr_t path,
-                       int32_t flags,
-                       big_int32_t *fd,
-                       uint64_t arg,
-                       uint64_t size);
-CellFsErrno cellFsSdataOpen(cstring_ptr_t path,
-                       int32_t flags,
-                       big_int32_t *fd,
-                       uint64_t arg,
-                       uint64_t size);
-CellFsErrno cellFsLseek(int32_t fd, int64_t offset, int32_t whence, big_uint64_t *pos);
-CellFsErrno cellFsClose(int32_t fd);
-CellFsErrno cellFsRead(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nread, MainMemory* mm);
-CellFsErrno cellFsReadWithOffset(int32_t fd,
-                                 uint64_t offset,
-                                 ps3_uintptr_t buf,
-                                 uint64_t nbytes,
-                                 big_uint64_t* nread,
-                                 MainMemory* mm);
-CellFsErrno cellFsWrite(int32_t fd, ps3_uintptr_t buf, uint64_t nbytes, big_uint64_t *nwrite, MainMemory* mm);
-CellFsErrno cellFsWriteWithOffset(int32_t fd,
-                                  uint64_t offset,
-                                  ps3_uintptr_t buf,
-                                  uint64_t nbytes,
-                                  big_uint64_t* nwrite,
-                                  MainMemory* mm);
-CellFsErrno cellFsMkdir(const char* path, uint32_t mode, Process* proc);
-CellFsErrno cellFsGetFreeSize(const char* directory_path,
-                              big_uint32_t* block_size,
-                              big_uint64_t* free_block_count,
-                              Process* proc);
-CellFsErrno cellFsFsync(int32_t fd);
-CellFsErrno cellFsUnlink(const char* path, Process* proc);
-CellFsErrno cellFsOpendir(const char *path, big_int32_t *fd, Process* proc);
-CellFsErrno cellFsReaddir(int32_t fd, CellFsDirent *dir, big_uint64_t *nread);
-CellFsErrno cellFsClosedir(int32_t fd);
-CellFsErrno cellFsGetDirectoryEntries(int32_t fd,
-                                      CellFsDirectoryEntry *entries,
-                                      uint32_t entries_size,
-                                      uint32_t *data_count);
+CellFsErrno sys_fs_fcntl(int32_t fd, uint32_t cmd, uint32_t data, uint32_t size);
+CellFsErrno sys_fs_truncate(cstring_ptr_t path, uint64_t size);
+CellFsErrno sys_fs_ftruncate(int32_t fd, uint64_t size);
+CellFsErrno sys_fs_rename(cstring_ptr_t src, cstring_ptr_t dest);
+CellFsErrno sys_fs_stat(cstring_ptr_t path, CellFsStat *sb);
+CellFsErrno sys_fs_mkdir(cstring_ptr_t path, CellFsMode mode);
+CellFsErrno sys_fs_opendir(cstring_ptr_t path, big_int32_t *fd);
+CellFsErrno sys_fs_readdir(int32_t fd, CellFsDirent *dirent, big_uint64_t *nread);
+CellFsErrno sys_fs_closedir(int32_t fd);
+CellFsErrno sys_fs_unlink(cstring_ptr_t path);
+CellFsErrno sys_fs_rmdir(cstring_ptr_t path);
+CellFsErrno sys_fs_fget_block_size(int32_t fd,
+                                   big_uint64_t* sector_size,
+                                   big_uint64_t* block_size,
+                                   big_uint64_t* unk1,
+                                   big_uint32_t* unk2);
+CellFsErrno sys_fs_get_block_size(cstring_ptr_t path,
+                                  big_uint64_t* sector_size,
+                                  big_uint64_t* block_size,
+                                  big_uint64_t* unk1);
+CellFsErrno sys_fs_lsn_lock(int32_t fd);
+CellFsErrno sys_fs_lsn_unlock(int32_t fd);
+CellFsErrno sys_fs_lsn_get_cda_size(int32_t fd, big_uint64_t* unk);
+CellFsErrno sys_fs_fsync(int32_t fd);
+CellFsErrno sys_fs_disk_free(cstring_ptr_t directory_path,
+                             big_uint64_t* capacity,
+                             big_uint64_t* free);
+
 FILE* searchFileMap(int32_t fd);

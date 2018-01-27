@@ -231,7 +231,8 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     assert(audioParam->nChannel == CELL_AUDIO_PORT_2CH ||
            audioParam->nChannel == CELL_AUDIO_PORT_8CH);
     assert(audioParam->nBlock == CELL_AUDIO_BLOCK_8 ||
-           audioParam->nBlock == CELL_AUDIO_BLOCK_16);
+           audioParam->nBlock == CELL_AUDIO_BLOCK_16 ||
+           audioParam->nBlock == CELL_AUDIO_BLOCK_32);
     
     INFO(libs) << "cellAudioPortOpen";
     
@@ -256,7 +257,7 @@ int32_t cellAudioPortOpen(const CellAudioPortParam* audioParam,
     info->readIndexAddr = (big_uint64_t*)(ptr + offset);
     info->eaReadIndexAddr = va + offset;
     
-    context.pulseSpec = { PA_SAMPLE_FLOAT32BE, 48000, 2 };    
+    context.pulseSpec = { PA_SAMPLE_FLOAT32BE, 48000, 2 };
     pa_channel_map channels;
     pa_channel_map_init_stereo(&channels);
     info->pulseStream = pa_stream_new(context.pulseContext, "emu", &context.pulseSpec, &channels);
@@ -367,7 +368,7 @@ int32_t cellAudioGetPortTimestamp(uint32_t portNum, uint64_t frameTag, big_uint6
 
 int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float volume) {
     volume = g_state.th->getFPRd(0); // TODO: handle in exports.h
-    WARNING(libs) << "not impl";
+    WARNING(libs) << "cellAudioAddData not impl";
     // TODO: make thread safe (readIndexAddr should be atomic)
 //     assert(portNum == 1);
 //     auto blockSize = calcBlockSize();
@@ -381,18 +382,18 @@ int32_t cellAudioAddData(uint32_t portNum, uint32_t src, uint32_t samples, float
 }
 
 int32_t cellAudioSetPortLevel(uint32_t portNum, float level) {
-    WARNING(libs) << "not impl";
+    WARNING(libs) << "cellAudioSetPortLevel not impl";
     return CELL_OK;
 }
 
 int32_t cellAudioAdd2chData(uint32_t portNum, uint32_t src, uint32_t samples, float volume) {
     volume = g_state.th->getFPRd(0); // TODO: handle in exports.h
-    WARNING(libs) << "not impl";
+    WARNING(libs) << "cellAudioAdd2chData not impl";
     return CELL_OK;
 }
 
 int32_t cellAudioAdd6chData(uint32_t portNum, uint32_t src, float volume) {
     volume = g_state.th->getFPRd(0); // TODO: handle in exports.h
-    WARNING(libs) << "not impl";
+    WARNING(libs) << "cellAudioAdd6chData not impl";
     return CELL_OK;
 }

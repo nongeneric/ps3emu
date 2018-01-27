@@ -1470,7 +1470,7 @@ void Rsx::TextureOffset(unsigned index,
     t.mipmap = mipmap;
     t.format = format;
     t.lnUn = lnUn;
-    t.dimension = dimension;
+    t.dimension = dimension == 1 ? 2 : dimension;
     t.fragmentBorder = border;
     t.fragmentCubemap = cubemap;
     t.location = gcmEnumToLocation(location);

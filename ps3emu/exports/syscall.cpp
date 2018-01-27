@@ -13,25 +13,6 @@
 #include "ps3emu/ppu/CallbackThread.h"
 #include "ps3emu/log.h"
 
-uint32_t sys_fs_open_proxy(uint32_t path,
-                           uint32_t flags,
-                           big_int32_t *fd,
-                           uint64_t mode,
-                           uint32_t arg,
-                           uint64_t size,
-                           PPUThread* thread)
-{
-    std::string pathStr;
-    readString(g_state.mm, path, pathStr);
-    std::vector<uint8_t> argVec(size + 1);
-    if (arg) {
-        g_state.mm->readMemory(arg, &argVec[0], size);
-    } else {
-        argVec[0] = 0;
-    }
-    return sys_fs_open(pathStr.c_str(), flags, fd, mode, &argVec[0], size);
-}
-
 void PPUThread::scall() {
     auto index = getGPR(11);
     //INFO(libs) << ssnprintf("  -- scall %d at %08x", index, getNIP());
@@ -43,7 +24,7 @@ void PPUThread::scall() {
         case 349: wrap(sys_memory_free, this); break;
         case 141: wrap(sys_timer_usleep, this); break;
         case 142: wrap(sys_timer_sleep, this); break;
-        case 801: wrap(sys_fs_open_proxy, this); break;
+        case 801: wrap(sys_fs_open, this); break;
         case 128: wrap(sys_event_queue_create, this); break;
         case 129: wrap(sys_event_queue_destroy, this); break;
         case 130: wrap(sys_event_queue_receive, this); break;
@@ -66,6 +47,7 @@ void PPUThread::scall() {
         case 92: wrap(sys_semaphore_wait, this); break;
         case 93: wrap(sys_semaphore_trywait, this); break;
         case 94: wrap(sys_semaphore_post, this); break;
+        case 114: wrap(sys_semaphore_get_value, this); break;
         case 41: wrap(sys_ppu_thread_exit, this); break;
         case 44: wrap(sys_ppu_thread_join, this); break;
         case 47: wrap(sys_ppu_thread_set_priority, this); break;
@@ -92,6 +74,7 @@ void PPUThread::scall() {
         case 172: wrap(sys_spu_thread_initialize, this); break;
         case 173: wrap(sys_spu_thread_group_start, this); break;
         case 178: wrap(sys_spu_thread_group_join, this); break;
+        case 45: wrap(sys_ppu_thread_detach, this); break;
         case 165: wrap(sys_spu_thread_get_exit_status, this); break;
         case 160: wrap(sys_raw_spu_create, this); break;
         case 156: wrap(sys_spu_image_open, this); break;
@@ -157,11 +140,30 @@ void PPUThread::scall() {
         case 351: wrap(sys_memory_get_page_attribute, this); break;
         case 140: wrap(sys_event_port_connect_ipc, this); break;
         case 324: wrap(sys_memory_container_create, this); break;
+        case 325: wrap(sys_memory_container_destroy, this); break;
         case 343: wrap(sys_memory_container_get_size, this); break;
         case 497: wrap(sys_prx_load_module_on_memcontainer, this); break;
         case 962: wrap(sys_perf_insert_cbe_bookmark, this); break;
         case 174: wrap(sys_spu_thread_group_suspend, this); break;
         case 175: wrap(sys_spu_thread_group_resume, this); break;
+        case 817: wrap(sys_fs_fcntl, this); break;
+        case 831: wrap(sys_fs_truncate, this); break;
+        case 812: wrap(sys_fs_rename, this); break;
+        case 808: wrap(sys_fs_stat, this); break;
+        case 811: wrap(sys_fs_mkdir, this); break;
+        case 832: wrap(sys_fs_ftruncate, this); break;
+        case 805: wrap(sys_fs_opendir, this); break;
+        case 806: wrap(sys_fs_readdir, this); break;
+        case 807: wrap(sys_fs_closedir, this); break;
+        case 814: wrap(sys_fs_unlink, this); break;
+        case 813: wrap(sys_fs_rmdir, this); break;
+        case 821: wrap(sys_fs_fget_block_size, this); break;
+        case 827: wrap(sys_fs_lsn_lock, this); break;
+        case 828: wrap(sys_fs_lsn_unlock, this); break;
+        case 825: wrap(sys_fs_lsn_get_cda_size, this); break;
+        case 820: wrap(sys_fs_fsync, this); break;
+        case 840: wrap(sys_fs_disk_free, this); break;
+        case 822: wrap(sys_fs_fget_block_size, this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

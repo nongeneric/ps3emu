@@ -9,3 +9,7 @@ int32_t sys_net_initialize_network_ex(const sys_net_initialize_parameter_t* para
         return init ? SYS_NET_ERROR_EBUSY : CELL_OK;
     return CELL_OK;
 }
+
+int32_t sys_net_free_thread_context(uint32_t tid, int flags) {
+    return CELL_OK;
+}

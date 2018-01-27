@@ -2,6 +2,7 @@
 
 #include "sys_defs.h"
 #include "../Process.h"
+#include <boost/context/all.hpp>
 #include <array>
 
 struct CellGameContentSize {
@@ -54,3 +55,10 @@ int32_t cellGameDataCheck(uint32_t type,
 int32_t cellGamePatchCheck(CellGameContentSize *size, uint64_t reserved);
 int32_t cellGameContentPermit(cell_game_path_t *contentInfoPath, cell_game_path_t *usrdirPath, Process* proc);
 int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize, Process* proc);
+int32_t cellGameDataCheckCreate2(uint32_t type,
+                                 const cell_game_dirname_t* dirName,
+                                 uint32_t arg,
+                                 const fdescr* cb,
+                                 uint32_t memContainer,
+                                 PPUThread* th,
+                                 boost::context::continuation* sink);

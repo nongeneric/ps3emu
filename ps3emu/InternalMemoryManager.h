@@ -31,4 +31,5 @@ public:
     
     void free(uint32_t ea);
     void free(void* ptr);
+    unsigned available() const;
 };

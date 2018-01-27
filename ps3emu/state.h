@@ -8,7 +8,7 @@ class Rsx;
 class ELFLoader;
 class PPUThread;
 class SPUThread;
-class EmuCallbacks;
+class IEmuCallbacks;
 class Config;
 struct ReservationGranule;
 struct ExecutionMapCollection;
@@ -27,7 +27,7 @@ struct g_state_t {
     ContentManager* content;
     Rsx* rsx;
     ELFLoader* elf;
-    EmuCallbacks* callbacks;
+    IEmuCallbacks* callbacks;
     Config* config;
     ExecutionMapCollection* executionMaps;
     BBCallMap* bbcallMap;

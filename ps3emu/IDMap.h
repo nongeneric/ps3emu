@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <assert.h>
 #include <memory>
 #include <boost/thread/lock_guard.hpp>
@@ -11,17 +12,27 @@ template <typename ID, typename T, int InitialID = 1>
 class IDMap {
     ID _maxId = InitialID;
     std::map<ID, T> _map;
+    std::set<ID> _free;
+
 public:
     ID create(T&& t) {
-        assert(_maxId <= 2000 + InitialID); // TODO: implement id reuse
-        _map.insert(std::make_pair(_maxId, std::move(t)));
-        return _maxId++;
+        ID id;
+        if (!_free.empty()) {
+            auto it = begin(_free);
+            id = *it;
+            _free.erase(it);
+        } else {
+            id = _maxId++;
+        }
+        _map.insert(std::make_pair(id, std::move(t)));
+        return id;
     }
     
     void destroy(ID id) {
         auto it = _map.find(id);
         assert(it != end(_map));
         _map.erase(it);
+        _free.insert(id);
     }
     
     T& get(ID id) {

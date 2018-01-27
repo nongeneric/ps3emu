@@ -79,6 +79,8 @@ set(SRC
     AffinityManager.cpp
     profiler.h
     profiler.cpp
+    EmuCallbacks.h
+    EmuCallbacks.cpp
     
     libs/sys.cpp
     libs/fs.cpp
@@ -114,6 +116,8 @@ set(SRC
     libs/libcamera.cpp
     libs/libgem.h
     libs/libgem.cpp
+    libs/userinfo.h
+    libs/userinfo.cpp
 
     ../thirdparty/xxHash/xxhash.c
     ../thirdparty/xxHash/xxhash.h

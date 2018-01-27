@@ -1,6 +1,5 @@
 #include "state.h"
 
-#include "ps3emu/EmuCallbacks.h"
 #include "ps3emu/Config.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/BBCallMap.h"
@@ -14,7 +13,6 @@ g_state_t::g_state_t()
       content(nullptr),
       rsx(nullptr),
       elf(nullptr),
-      callbacks(new EmuCallbacks()),
       config(new Config()),
       executionMaps(new ExecutionMapCollection()),
       bbcallMap(new BBCallMap()),

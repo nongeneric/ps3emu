@@ -18,7 +18,8 @@ enum class MountPoint {
     Bluray,
     HostHome,
     HostAbsolute,
-    DevFlash
+    DevFlash,
+    Relative
 };
 
 MountPoint splitPathImpl(const char* path, const char** point, const char** relative) {
@@ -38,8 +39,9 @@ MountPoint splitPathImpl(const char* path, const char** point, const char** rela
     check("/app_home", MountPoint::HostHome);
     check("/host_root", MountPoint::HostAbsolute);
     check("/dev_flash", MountPoint::DevFlash);
+    check("", MountPoint::Relative);
 #undef check
-    throw std::runtime_error("illegal mount point");
+    throw std::runtime_error(ssnprintf("illegal mount point %s", path));
 }
 
 void ContentManager::setElfPath(std::string_view path) {
@@ -51,15 +53,7 @@ std::string ContentManager::usrDir() {
 }
 
 std::string ContentManager::contentDir() {
-    std::string id = "unknown";
-    for (auto& entry : sfo()) {
-        if (entry.id == CELL_GAME_PARAMID_TITLE_ID) {
-            id = boost::get<std::string>(entry.data);
-        }
-    }
-    auto path = ssnprintf("/dev_hdd0/%s", id);
-    create_directories(toHost(path));
-    return path;
+    return "/dev_hdd0";
 }
 
 std::string ContentManager::cacheDir() {
@@ -79,10 +73,11 @@ std::string ContentManager::toHost(std::string_view path) {
     auto elfdir = exe.parent_path();
     auto approot = elfdir.parent_path();
     switch (type) {
+        case MountPoint::Relative:
         case MountPoint::HostHome: return absolute(elfdir / "app_home" / relative).string();
         case MountPoint::HostAbsolute: return absolute(elfdir / "host_root" / relative).string();
         case MountPoint::Bluray: return absolute(approot / ".." / relative).string();
-        case MountPoint::GameData: return absolute(approot / "dev_hdd0" / relative).string();
+        case MountPoint::GameData: return absolute(approot / relative).string();
         case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
         case MountPoint::DevFlash: return absolute(g_state.config->prxStorePath / relative).string();
         default: throw std::runtime_error("unknown mount point");
@@ -117,7 +112,7 @@ const std::vector<SFOEntry>& ContentManager::sfo() {
     if (!_sfo.empty())
         return _sfo;
 
-    path sfoPath = toHost("/dev_bdvd/PS3_GAME/PARAM.SFO");
+    auto sfoPath = path(toHost(contentDir())) / "PARAM.SFO";
     std::ifstream f(sfoPath.string());
     if (!f.is_open())
         return _sfo;

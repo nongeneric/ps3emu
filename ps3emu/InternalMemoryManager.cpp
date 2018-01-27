@@ -34,7 +34,6 @@ void* InternalMemoryManager::allocInternalMemory(uint32_t* ea,
     *ea = (uintptr_t)ptr - (uintptr_t)fitp + _base;
     g_state.mm->mark(*ea, size, false, _name);
     assert((*ea & (alignment - 1)) == 0);
-    INFO(libs) << ssnprintf("allocating %08x, size %x, alignment %x", *ea, size, alignment);
     return ptr;
 }
 
@@ -52,4 +51,8 @@ void InternalMemoryManager::free(uint32_t ea) {
 void InternalMemoryManager::free(void* ptr) {
     auto lock = boost::lock_guard(_mutex);
     fit(_base)->deallocate(ptr);
+}
+
+unsigned InternalMemoryManager::available() const {
+    return fit(_base)->get_free_memory();
 }

@@ -158,6 +158,7 @@ int32_t sys_semaphore_destroy(sys_semaphore_t sem);
 int32_t sys_semaphore_wait(sys_semaphore_t sem, usecond_t timeout);
 int32_t sys_semaphore_trywait(sys_semaphore_t sem);
 int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val);
+int32_t sys_semaphore_get_value(sys_semaphore_t sem, sys_semaphore_value_t* val);
 
 // ppu thread
 
@@ -178,6 +179,7 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
                               cstring_ptr_t threadname);
 int32_t sys_ppu_thread_start(sys_ppu_thread_t id);
 int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc);
+int32_t sys_ppu_thread_detach(sys_ppu_thread_t thread_id);
 int32_t sys_ppu_thread_exit(uint64_t code, PPUThread* thread);
 int32_t sys_ppu_thread_set_priority(sys_ppu_thread_t thread_id, int32_t prio, Process* proc);
 emu_void_t sys_ppu_thread_yield(PPUThread* thread);

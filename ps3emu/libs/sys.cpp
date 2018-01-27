@@ -26,9 +26,11 @@ void init_sys_lib() {
 }
 
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
-    INFO(libs) << __FUNCTION__;
-    mem_info->total_user_memory = 221249536;
-    mem_info->available_user_memory = 0.9 * mem_info->total_user_memory; // TODO: handle alloc/dealloc
+    mem_info->total_user_memory = HeapAreaSize;
+    mem_info->available_user_memory = g_state.heapalloc->available();
+    INFO(libs) << ssnprintf("sys_memory_get_user_memory_size(%x, %x)",
+                            mem_info->total_user_memory,
+                            mem_info->available_user_memory);
     return CELL_OK;
 }
 
@@ -88,30 +90,15 @@ int sys_tty_write(uint32_t ch,
     
     auto buf = g_state.mm->getMemoryPointer(buf_va, buf_len);
     if (ch == SYS_TTYP_PPU_STDOUT) {
-        if (g_state.callbacks->stdout) {
-            g_state.callbacks->stdout((char*)buf, buf_len);
-            return CELL_OK;
-        }
-        fwrite(buf, 1, buf_len, stdout);
-        fflush(stdout);
+        g_state.callbacks->stdout((char*)buf, buf_len);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_PPU_STDERR) {
-        if (g_state.callbacks->stderr) {
-            g_state.callbacks->stderr((char*)buf, buf_len);
-            return CELL_OK;
-        }
-        fwrite(buf, 1, buf_len, stderr);
-        fflush(stderr);
+        g_state.callbacks->stderr((char*)buf, buf_len);
         return CELL_OK;
     }
     if (ch == SYS_TTYP_SPU_STDOUT) {
-        if (g_state.callbacks->spustdout) {
-            g_state.callbacks->spustdout((char*)buf, buf_len);
-            return CELL_OK;
-        }
-        fwrite(buf, 1, buf_len, stdout);
-        fflush(stdout);
+        g_state.callbacks->spustdout((char*)buf, buf_len);
         return CELL_OK;
     }
     throw std::runtime_error(ssnprintf("unknown channel %d", ch));
@@ -312,7 +299,7 @@ public:
         : _val(val), _max(max) { }
         
     bool post(uint32_t val) {
-        boost::unique_lock<boost::mutex> lock(_m);
+        auto lock = boost::unique_lock(_m);
         if (_val == _max)
             return false;
         _val += val;
@@ -321,7 +308,7 @@ public:
     }
     
     bool wait(usecond_t timeout) {
-        boost::unique_lock<boost::mutex> lock(_m);
+        auto lock = boost::unique_lock(_m);
         if (!lock.owns_lock())
             return false;
         while (!_val) {
@@ -329,6 +316,11 @@ public:
         }
         _val--;
         return true;
+    }
+
+    unsigned value() {
+        auto lock = boost::unique_lock(_m);
+        return _val;
     }
 };
 
@@ -367,6 +359,12 @@ int32_t sys_semaphore_post(sys_semaphore_t sem, sys_semaphore_value_t val) {
     return CELL_EBUSY;
 }
 
+int32_t sys_semaphore_get_value(sys_semaphore_t sem, sys_semaphore_value_t* val) {
+    const auto& csem = semaphores.get(sem);
+    *val = csem->value();
+    return CELL_OK;
+}
+
 #define SYS_PPU_THREAD_CREATE_JOINABLE 0x0000000000000001
 #define SYS_PPU_THREAD_CREATE_INTERRUPT 0x0000000000000002
 
@@ -403,6 +401,11 @@ int32_t sys_ppu_thread_start(sys_ppu_thread_t id) {
 int32_t sys_ppu_thread_join(sys_ppu_thread_t thread_id, big_uint64_t* exit_code, Process* proc) {
     auto thread = proc->getThread(thread_id);
     *exit_code = thread->join();
+    return CELL_OK;
+}
+
+int32_t sys_ppu_thread_detach(sys_ppu_thread_t thread_id) {
+    WARNING(libs) << "sys_ppu_thread_detach not implemented";
     return CELL_OK;
 }
 
