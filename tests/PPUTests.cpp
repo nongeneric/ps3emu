@@ -2016,3 +2016,53 @@ TEST_CASE("vrfin v0,v0") {
     REQUIRE( th.r(0).fs(2) == 101.f );
     REQUIRE( th.r(0).fs(3) == 100.f );
 }
+
+TEST_CASE("vslb v0,v1,v0") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    PPUThread th;
+    for (int i = 0; i < 16; ++i) {
+        th.r(1).set_b(i, i * 2 + 13);
+    }
+    for (int i = 0; i < 16; ++i) {
+        th.r(0).set_b(i, i * 3);
+    }
+    uint8_t instr[] = { 0x10, 0x01, 0x01, 0x04 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    for (int i = 0; i < 16; ++i) {
+        REQUIRE( th.r(0).b(i) == (uint8_t)((i * 2 + 13) << ((i * 3) & 0b111)) );
+    }
+}
+
+TEST_CASE("vsum4ubs v0,v1,v0") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    PPUThread th;
+    th.r(1).set_xmm(_mm_set_epi8(
+        0, 7, 10, 22,
+        0xff, 0xff, 0xff, 0xff,
+        0x10, 0x20, 0x30, 0x40,
+        0xaa, 0xbb, 0xcc, 0xdd));
+    th.r(0).set_xmm(_mm_set_epi32(0x10101010, 0xffffffff, 0x00000000, 0xffff0000));
+    uint32_t sum8[] = {
+        (uint32_t)th.r(1).b(0) + (uint32_t)th.r(1).b(1) + (uint32_t)th.r(1).b(2) + (uint32_t)th.r(1).b(3),
+        (uint32_t)th.r(1).b(4) + (uint32_t)th.r(1).b(5) + (uint32_t)th.r(1).b(6) + (uint32_t)th.r(1).b(7),
+        (uint32_t)th.r(1).b(8) + (uint32_t)th.r(1).b(9) + (uint32_t)th.r(1).b(10) + (uint32_t)th.r(1).b(11),
+        (uint32_t)th.r(1).b(12) + (uint32_t)th.r(1).b(13) + (uint32_t)th.r(1).b(14) + (uint32_t)th.r(1).b(15),
+    };
+    uint64_t sum32[] = {
+        (uint64_t)sum8[0] + (uint32_t)th.r(0).w(0),
+        (uint64_t)sum8[1] + (uint32_t)th.r(0).w(1),
+        (uint64_t)sum8[2] + (uint32_t)th.r(0).w(2),
+        (uint64_t)sum8[3] + (uint32_t)th.r(0).w(3),
+    };
+    for (int i = 0; i < 4; ++i) {
+        if (sum32[i] > 0xffffffffull)
+            sum32[i] = 0xffffffffull;
+    }
+    uint8_t instr[] = { 0x10, 0x01, 0x06, 0x08 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    for (int i = 0; i < 4; ++i) {
+        REQUIRE( (uint32_t)th.r(0).w(i) == sum32[i] );
+    }
+}

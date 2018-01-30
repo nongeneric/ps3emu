@@ -72,7 +72,7 @@ int32_t cellPadGetInfo2(CellPadInfo2* info) {
 #define CELL_KB_STATUS_DISCONNECTED    (0)
 
 int32_t cellKbGetInfo(CellKbInfo* info) {
-    info->max_connect = 1;
+    info->max_connect = 0;
     info->now_connect = 0;
     for (int i = 0; i < CELL_KB_MAX_KEYBOARDS; ++i) {
         info->status[i] = CELL_KB_STATUS_DISCONNECTED;
@@ -83,6 +83,14 @@ int32_t cellKbGetInfo(CellKbInfo* info) {
 int32_t cellKbSetReadMode(uint32_t port_no, uint32_t rmode) {
     WARNING(libs) << "cellKbSetReadMode not implemented";
     return CELL_OK;
+}
+
+int32_t cellKbRead(uint32_t port_no, uint32_t data) {
+    return CELL_KB_ERROR_NO_DEVICE;
+}
+
+int32_t cellMouseGetData(uint32_t port_no, uint32_t data) {
+    return CELL_MOUSE_ERROR_NO_DEVICE;
 }
 
 int32_t cellMouseGetInfo(CellMouseInfo* info) {

@@ -3335,6 +3335,15 @@ PRINT(VSPLTISH, SIMDForm) {
 }
 EMU_REWRITE(VSPLTISH, SIMDForm, i->SIMM.s(), i->vD.u())
 
+PRINT(VSPLTISB, SIMDForm) {
+    *result = format_nn("vspltisb", i->vD, i->SIMM);
+}
+
+#define _VSPLTISB(_simms, _vd) { \
+    auto d = _mm_set1_epi8(_simms); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VSPLTISB, SIMDForm, i->SIMM.s(), i->vD.u())
 
 PRINT(VMRGHH, SIMDForm) {
     *result = format_nnn("vmrghh", i->vD, i->vA, i->vB);
@@ -3645,6 +3654,19 @@ PRINT(VCMPEQUW, SIMDForm) {
 }
 EMU_REWRITE(VCMPEQUW, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
+PRINT(VCMPEQUB, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpequb." : "vcmpequb", i->vD, i->vA, i->vB);
+}
+
+#define _VCMPEQUB(_va, _vb, _vd, _rc) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_cmpeq_epi8(a, b); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
+}
+EMU_REWRITE(VCMPEQUB, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VCMPGTFP, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpgtfp." : "vcmpgtfp", i->vD, i->vA, i->vB);
@@ -3658,6 +3680,24 @@ PRINT(VCMPGTFP, SIMDForm) {
     updateCRF(_mm_castps_si128(d), _rc); \
 }
 EMU_REWRITE(VCMPGTFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
+
+PRINT(VCMPGTUB, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpgtub." : "vcmpgtub", i->vD, i->vA, i->vB);
+}
+
+#define _VCMPGTUB(_va, _vb, _vd, _rc) { \
+    auto val = _mm_set1_epi8(0x80); \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    a = _mm_sub_epi8(a, val); \
+    b = _mm_sub_epi8(b, val); \
+    auto d = _mm_cmpgt_epi8(a, b); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
+}
+EMU_REWRITE(VCMPGTUB, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
 
 PRINT(VCMPGTUH, SIMDForm) {
     *result = format_nnn(i->Rc.u() ? "vcmpgtuh." : "vcmpgtuh", i->vD, i->vA, i->vB);
@@ -4045,6 +4085,57 @@ PRINT(VADDUHM, SIMDForm) {
 EMU_REWRITE(VADDUHM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 
+PRINT(VADDUBM, SIMDForm) {
+    *result = format_nnn("vaddubm", i->vD, i->vA, i->vB);
+}
+
+#define _VADDUBM(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_add_epi8(a, b); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VADDUBM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+
+PRINT(VSUBUBM, SIMDForm) {
+    *result = format_nnn("vsububm", i->vD, i->vA, i->vB);
+}
+
+#define _VSUBUBM(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_sub_epi8(a, b); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VSUBUBM, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+
+PRINT(VMINUB, SIMDForm) {
+    *result = format_nnn("vminub", i->vD, i->vA, i->vB);
+}
+
+#define _VMINUB(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_min_epu8(a, b); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VMINUB, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+PRINT(VMAXUB, SIMDForm) {
+    *result = format_nnn("vmaxub", i->vD, i->vA, i->vB);
+}
+
+#define _VMAXUB(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    auto d = _mm_max_epu8(a, b); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VMAXUB, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+
 PRINT(VPKSHUS, SIMDForm) {
     *result = format_nnn("vpkshus", i->vD, i->vA, i->vB);
 }
@@ -4083,6 +4174,26 @@ PRINT(VSLH, SIMDForm) {
 EMU_REWRITE(VSLH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 
+PRINT(VSLB, SIMDForm) {
+    *result = format_nnn("vslb", i->vD, i->vA, i->vB);
+}
+
+#define _VSLB(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    alignas(16) uint8_t abytes[16], bbytes[16]; \
+    b = _mm_and_si128(_mm_set1_epi8(0b111), b); \
+    _mm_store_si128((__m128i*)abytes, a); \
+    _mm_store_si128((__m128i*)bbytes, b); \
+    for (int i = 0; i < 16; ++i) { \
+        abytes[i] <<= bbytes[i]; \
+    } \
+    auto d = _mm_load_si128((__m128i*)abytes); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VSLB, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+
 PRINT(VSRAH, SIMDForm) {
     *result = format_nnn("vsrah", i->vD, i->vA, i->vB);
 }
@@ -4106,6 +4217,35 @@ PRINT(VSRAH, SIMDForm) {
     TH->r(_vd).set_xmm(d); \
 }
 EMU_REWRITE(VSRAH, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
+
+
+PRINT(VSUM4UBS, SIMDForm) {
+    *result = format_nnn("vsum4ubs", i->vD, i->vA, i->vB);
+}
+
+// TODO: SAT bit
+#define _VSUM4UBS(_va, _vb, _vd) { \
+    auto a = TH->r(_va).xmm(); \
+    auto b = TH->r(_vb).xmm(); \
+    alignas(16) uint8_t abytes[16]; \
+    alignas(16) uint32_t bwords[4]; \
+    _mm_store_si128((__m128i*)abytes, a); \
+    _mm_store_si128((__m128i*)bwords, b); \
+    alignas(16) uint32_t sums[4]; \
+    for (int i = 0; i < 4; ++i) { \
+        uint64_t sum = 0; \
+        for (int j = 4 * i; j < 4 * i + 4; ++j) { \
+            sum += abytes[j]; \
+        } \
+        sum += (uint64_t)bwords[i]; \
+        if (sum > 0xffffffff) \
+            sum = 0xffffffff; \
+        sums[i] = sum; \
+    } \
+    auto d = _mm_load_si128((__m128i*)sums); \
+    TH->r(_vd).set_xmm(d); \
+}
+EMU_REWRITE(VSUM4UBS, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u())
 
 
 PRINT(VUPKHSB, SIMDForm) {
@@ -4181,6 +4321,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                         case 198: invoke(VCMPEQFP);
                         case 646: invoke(VCMPGTUW);
                         case 582: invoke(VCMPGTUH);
+                        case 518: invoke(VCMPGTUB);
                         case 710: invoke(VCMPGTFP);
                         case 902: invoke(VCMPGTSW);
                         default:
@@ -4191,6 +4332,10 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 324: invoke(VSLH);
                                 case 270: invoke(VPKSHUS);
                                 case 64: invoke(VADDUHM);
+                                case 0: invoke(VADDUBM);
+                                case 1024: invoke(VSUBUBM);
+                                case 514: invoke(VMINUB);
+                                case 2: invoke(VMAXUB);
                                 case 832: invoke(VADDSHS);
                                 case 1856: invoke(VSUBSHS);
                                 case 1220: invoke(VXOR);
@@ -4198,6 +4343,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 588: invoke(VSPLTH);
                                 case 908: invoke(VSPLTISW);
                                 case 844: invoke(VSPLTISH);
+                                case 780: invoke(VSPLTISB);
                                 case 10: invoke(VADDFP);
                                 case 74: invoke(VSUBFP);
                                 case 970: invoke(VCTSXS);
@@ -4208,7 +4354,9 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 1152: invoke(VSUBUWM);
                                 case 1088: invoke(VSUBUHM);
                                 case 134: invoke(VCMPEQUW);
+                                case 6: invoke(VCMPEQUB);
                                 case 388: invoke(VSLW);
+                                case 260: invoke(VSLB);
                                 case 644: invoke(VSRW);
                                 case 842: invoke(VCFSX);
                                 case 140: invoke(VMRGHW);
@@ -4228,6 +4376,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 328: invoke(VMULOSH);
                                 case 132: invoke(VRLW);
                                 case 522: invoke(VRFIN);
+                                case 1544: invoke(VSUM4UBS);
                                 default: throw IllegalInstructionException();
                             }
                     }

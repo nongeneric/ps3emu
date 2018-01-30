@@ -52,9 +52,11 @@ enum CellPadButtonDataOffset {
     CELL_PAD_BTN_OFFSET_SENSOR_G       = 23
 };
 
-#define CELL_PAD_OK     CELL_OK
-#define CELL_KB_OK     CELL_OK
-#define CELL_MOUSE_OK     CELL_OK
+#define CELL_PAD_OK CELL_OK
+#define CELL_KB_OK CELL_OK
+#define CELL_KB_ERROR_NO_DEVICE 0x80121007
+#define CELL_MOUSE_ERROR_NO_DEVICE 0x80121207
+#define CELL_MOUSE_OK CELL_OK
 
 #define CELL_PAD_MAX_PORT_NUM (7)
 
@@ -87,6 +89,7 @@ int32_t cellKbEnd();
 int32_t cellKbSetCodeType(uint32_t port_no, uint32_t type);
 int32_t cellKbGetInfo(CellKbInfo* info);
 int32_t cellKbSetReadMode(uint32_t port_no, uint32_t rmode);
+int32_t cellKbRead(uint32_t port_no, uint32_t data);
 
 #define CELL_MAX_MICE 127
 typedef struct CellMouseInfo{
@@ -114,5 +117,6 @@ typedef struct CellPadActParam
 int32_t cellMouseInit(uint32_t max_connect);
 int32_t cellMouseEnd();
 int32_t cellMouseGetInfo(CellMouseInfo* info);
+int32_t cellMouseGetData(uint32_t port_no, uint32_t data);
 int32_t cellPadGetData(uint32_t port_no, CellPadData *data);
 int32_t cellPadSetActDirect(uint32_t port_no, CellPadActParam* param);

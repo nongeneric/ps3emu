@@ -3176,3 +3176,18 @@ TEST_CASE("libfs_general_stream") {
         "stream succeeded\n"
     );
 }
+
+TEST_CASE("ppu_threads_lwcond_2") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_lwcond_2/a.elf"},
+        "consumer started\n"
+        "consumer started\n"
+        "producers done\n"
+        "setting stop to 1\n"
+        "signalling\n"
+        "count: 100000\n"
+        "consumer started\n"
+        "producers done\n"
+        "setting stop to 1\n"
+        "count: 150000\n"
+    );
+}

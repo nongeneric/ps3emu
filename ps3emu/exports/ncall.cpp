@@ -283,6 +283,8 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(sceNpManagerGetAvatarUrl),
     ENTRY(cellGameDataCheckCreate2),
     ENTRY(sys_net_free_thread_context),
+    ENTRY(cellKbRead),
+    ENTRY(cellMouseGetData),
 };
 
 void PPUThread::ncall(uint32_t index) {

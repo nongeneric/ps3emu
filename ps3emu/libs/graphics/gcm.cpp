@@ -46,6 +46,7 @@ struct {
     uint32_t defaultContextDataEa;
     ps3_uintptr_t gCellGcmCurrentContext = 0;
     uint32_t defaultCommandBufferSize = 0;
+    uint32_t defaultCommandBufferSegment = 0;
     OffsetTable* offsetTable = nullptr;
     ps3_uintptr_t offsetTableEmuEa;
     uint32_t ioSize;
@@ -175,6 +176,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
             &emuGcmState.defaultContextDataEa);
     
     emuGcmState.defaultCommandBufferSize = cmdSize;
+    emuGcmState.defaultCommandBufferSegment = 8 * 1024;
     emuGcmState.gCellGcmCurrentContext = defaultGcmContextSymbolVa;
     setCurrentCommandBuffer(g_state.mm, emuGcmState.defaultContextDataEa);
     
@@ -388,13 +390,13 @@ emu_void_t cellGcmSetDefaultCommandBuffer(Process* proc) {
 uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) {
     __itt_event_start(emuGcmState.defaultCallbackEvent);
 
-    uint32_t kb8 = 8 * 1024;
-    assert(count < kb8 - 4);
+    uint32_t segment = emuGcmState.defaultCommandBufferSegment;
+    assert(count < segment - 4);
     auto ioBase = emuGcmState.offsetTable->offsetToEa(0);
     uint32_t nextBuffer = data->end + 4;
-    uint32_t nextSize = kb8;
+    uint32_t nextSize = segment;
     if (nextBuffer + nextSize - ioBase >= emuGcmState.defaultCommandBufferSize) {
-        nextSize = kb8 - gcmResetCommandsSize;
+        nextSize = segment - gcmResetCommandsSize;
         nextBuffer = ioBase + gcmResetCommandsSize;
     }
     
@@ -573,11 +575,11 @@ emu_void_t cellGcmSetSecondVFrequency(uint32_t freq) {
 }
 
 uint32_t cellGcmGetDefaultCommandWordSize() {
-    return 0x4000;
+    return emuGcmState.defaultCommandBufferSize / 4;
 }
 
 uint32_t cellGcmGetDefaultSegmentWordSize() {
-    return 0x2000;
+    return emuGcmState.defaultCommandBufferSegment;
 }
 
 }}
