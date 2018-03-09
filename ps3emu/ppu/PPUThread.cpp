@@ -141,7 +141,7 @@ void PPUThread::innerLoop() {
 void PPUThread::loop() {
     g_state.th = this;
     g_state.granule = &_granule;
-    _granule.dbgName = ssnprintf("ppu_%s_%d", _name, (unsigned)_id);
+    _granule.dbgName = ssnprintf("ppu_%s_%x", _name, (unsigned)_id);
     _tid = syscall(__NR_gettid);
     log_set_thread_name(_granule.dbgName);
     INFO(libs) << ssnprintf("thread loop started");
@@ -293,6 +293,10 @@ uint64_t ps3call_then(PPUThread* thread) {
 
 unsigned PPUThread::getId() {
     return _id;
+}
+
+pthread_t PPUThread::getHostId() {
+    return _thread.native_handle();
 }
 
 std::string PPUThread::getName() {

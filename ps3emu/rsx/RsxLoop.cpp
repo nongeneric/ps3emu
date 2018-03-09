@@ -638,9 +638,7 @@ void Rsx::CELL_GCM_NV4097_SET_OBJECT_impl(int index) {
     WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_SET_OBJECT";
 }
 
-void Rsx::CELL_GCM_NV4097_NO_OPERATION_impl(int index) {
-    WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_NO_OPERATION";
-}
+void Rsx::CELL_GCM_NV4097_NO_OPERATION_impl(int index) { }
 
 void Rsx::CELL_GCM_NV4097_NOTIFY_impl(int index) {
     WARNING(rsx) << "method not implemented: CELL_GCM_NV4097_NOTIFY";

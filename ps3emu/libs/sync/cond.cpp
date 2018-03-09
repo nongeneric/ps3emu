@@ -75,29 +75,31 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
 
     auto id = g_state.th->getId();
 
+    {
+        auto lock = boost::unique_lock(info->waitersMutex);
+        info->waiters.push_back(id);
+    }
+
     pthread_mutex_lock_on_exit externalLock(&info->m->mutex);
 
     auto lock = boost::unique_lock(info->waitersMutex);
-    info->waiters.push_back(id);
+    //info->waiters.push_back(id);
 
     auto check = [&] {
         auto it = std::find(begin(info->next), end(info->next), id);
         if (it == end(info->next))
             return false;
         info->next.erase(it);
-        it = std::find(begin(info->waiters), end(info->waiters), id);
-        assert(it != end(info->waiters));
-        info->waiters.erase(it);
         return true;
     };
 
     if (timeout == 0) {
         for (;;) {
-            info->cv.wait(lock);
             if (check()) {
                 __itt_sync_acquired(info.get());
                 return CELL_OK;
             }
+            info->cv.wait(lock);
         }
     } else {
         for (;;) {
@@ -128,7 +130,8 @@ int32_t sys_cond_signal(sys_cond_t cond) {
     boost::lock_guard<boost::mutex> lock(info->waitersMutex);
     if (info->waiters.empty())
         return CELL_OK;
-    info->next.push_back(info->waiters.back());
+    info->next.push_back(*begin(info->waiters));
+    info->waiters.erase(begin(info->waiters));
     info->cv.notify_all();
     return CELL_OK;
 }
@@ -147,6 +150,7 @@ int32_t sys_cond_signal_all(sys_cond_t cond) {
     boost::lock_guard<boost::mutex> lock(info->waitersMutex);
     for (auto waiter : info->waiters)
         info->next.push_back(waiter);
+    info->waiters.clear();
     info->cv.notify_all();
     return CELL_OK;
 }
@@ -168,6 +172,7 @@ int32_t sys_cond_signal_to(sys_cond_t cond, sys_ppu_thread_t ppu_thread_id) {
     if (it == end(info->waiters))
         return CELL_EPERM;
     info->next.push_back(ppu_thread_id);
+    info->waiters.erase(it);
     info->cv.notify_all();
     return CELL_OK;
 }

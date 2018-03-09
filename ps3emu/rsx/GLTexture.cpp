@@ -212,7 +212,7 @@ float remap(uint8_t f, uint32_t signedRemap, uint32_t unsignedRemap, bool sign, 
         if (signedRemap == CELL_GCM_TEXTURE_SIGNED_REMAP_NORMAL) {
             r /= 127;
         } else {
-            assert(signedRemap == CELL_GCM_TEXTURE_SIGNED_REMAP_CLAMPED);
+            //assert(signedRemap == CELL_GCM_TEXTURE_SIGNED_REMAP_CLAMPED);
             r = (r + 128.f) / 127.5f - 1.f;
         }
     } else if (gamma) {
@@ -222,7 +222,7 @@ float remap(uint8_t f, uint32_t signedRemap, uint32_t unsignedRemap, bool sign, 
         if (unsignedRemap == CELL_GCM_TEXTURE_UNSIGNED_REMAP_NORMAL) {
             r /= 255.f;
         } else {
-            assert(unsignedRemap == CELL_GCM_TEXTURE_UNSIGNED_REMAP_BIASED);
+            //assert(unsignedRemap == CELL_GCM_TEXTURE_UNSIGNED_REMAP_BIASED);
             r = (r - 128.f) / 255.f;
         }
     }
@@ -352,6 +352,15 @@ uint32_t GLTexture::read2d(
                 for (auto bx = 0u; bx < src.w(); ++bx) {
                     auto block = src.at(bx, by);
                     decode(block, &decoded[0]);
+                    auto a = print_hex(block, 16);
+                    std::string b;
+                    for (auto f4 : decoded) {
+                        b += ssnprintf("%0.3f ", f4.r);
+                        b += ssnprintf("%0.3f ", f4.g);
+                        b += ssnprintf("%0.3f ", f4.b);
+                        b += ssnprintf("%0.3f ", f4.a);
+                        b += "| ";
+                    }
                     for (int i = 0; i < 4; ++i) {
                         memcpy(dest.at(bx * 4, by * 4 + i),
                                &decoded[4 * i],
@@ -604,4 +613,9 @@ std::tuple<unsigned, unsigned> SwizzledTextureIterator::unswizzle(unsigned u,
         y |= ((offset >> (i * 2)) & 1) << i;
     }
     return std::make_tuple(x, y);
+}
+
+bool isTextureValid(RsxTextureInfo const& info) {
+    return info.width != 0 && info.width != 0xffff && info.height != 0 &&
+           info.height != 0xffff;
 }

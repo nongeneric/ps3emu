@@ -574,3 +574,18 @@ TEST_CASE("shader_rewriter_vertex_33") {
     auto str = printStatements(st);
     REQUIRE(str == "nip = 47;break;");
 }
+
+TEST_CASE("shader_rewriter_fragment_neg_abs") {
+    ASTContext context;
+    // 006|006: ADDH H0.z, -|H0.x|, {0x00000000(0), 0x00000000(0), 0x00000000(0), 0x00000000(0)}.y;
+    unsigned char instr[] = {
+        0x08, 0x80, 0x03, 0x40, 0x01, 0x00, 0x3c, 0x9e, 0xaa, 0x02, 0x00, 0x00, 0xc8, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    };
+
+    FragmentInstr fi;
+    fragment_dasm_instr(instr, fi);
+    auto st = MakeStatement(context, fi, 0);
+    auto str = printStatements(st);
+    REQUIRE(str == "h[0].z = (((-abs(h[0])).xxxx) + (fconst.c[0].yyyy)).z;");
+}

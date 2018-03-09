@@ -353,6 +353,10 @@ uint64_t SPUThread::getId() {
     return _id;
 }
 
+pthread_t SPUThread::getHostId() {
+    return _pthread;
+}
+
 std::string SPUThread::getName() {
     return _name;
 }

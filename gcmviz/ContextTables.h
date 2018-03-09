@@ -38,3 +38,10 @@ public:
     FragmentOperationsTreeItem();
     virtual GenericTableModel<RsxContext>* getTable(RsxContext* context) override;
 };
+
+class DisplayBufferContextTreeItem : public ContextTreeItem {
+    int _index;
+public:
+    DisplayBufferContextTreeItem(int index);
+    virtual GenericTableModel<RsxContext>* getTable(RsxContext* context) override;
+};

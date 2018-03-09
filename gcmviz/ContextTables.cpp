@@ -274,3 +274,20 @@ GenericTableModel<RsxContext>* FragmentOperationsTreeItem::getTable(RsxContext* 
             PRINT_ENUM(ops, clearMask)
         });
 }
+
+DisplayBufferContextTreeItem::DisplayBufferContextTreeItem(int index)
+    : ContextTreeItem(ssnprintf("%d", index)), _index(index) {}
+
+GenericTableModel<RsxContext>* DisplayBufferContextTreeItem::getTable(RsxContext* context) {
+    auto b = [=]() -> auto& {
+        return context->displayBuffers[_index];
+    };
+    return new GenericTableModel<RsxContext>(
+        context,
+        {
+            HEX(b(), offset)
+            DECHEX(b(), pitch)
+            DECHEX(b(), width)
+            DECHEX(b(), height)
+        });
+}

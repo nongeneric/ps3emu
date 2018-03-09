@@ -19,6 +19,8 @@ set(SRC
     TestUtils.cpp
     SPUDasmTests.cpp
     InstrDbTests.cpp
+    FragmentCacheTests.cpp
+    BitUtilsTests.cpp
 )
 
 add_executable(tests ${SRC})

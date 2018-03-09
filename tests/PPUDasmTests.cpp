@@ -521,6 +521,13 @@ TEST_CASE("") {
     REQUIRE(res == "vrlw v0,v0,v12");
 }
 
+TEST_CASE("mcrf_cr1_cr7") {
+    uint8_t instr[] = { 0x4c, 0x9c, 0x00, 0x00 };
+    std::string res;
+    ppu_dasm<DasmMode::Print>(instr, 0x205c8, &res);
+    REQUIRE(res == "mcrf cr1,cr7");
+}
+
 TEST_CASE("ppu_dasm_1") {
     uint8_t instr[] = { 
         0x11, 0x41, 0x03, 0x4c,

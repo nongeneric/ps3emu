@@ -15,6 +15,7 @@
 #include "Rsx.h"
 #include "ps3emu/TimedCounter.h"
 #include "VertexShaderCache.h"
+#include "FragmentShaderCache.h"
 #include "../shaders/ShaderGenerator.h"
 #include <boost/chrono.hpp>
 
@@ -38,10 +39,10 @@ struct TextureSamplerInfo {
 };
 
 struct DisplayBufferInfo {
-    ps3_uintptr_t offset;
-    uint32_t pitch;
-    uint32_t width;
-    uint32_t height;
+    ps3_uintptr_t offset = 0;
+    uint32_t pitch = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
 };
 
 enum class ScaleSettingsSurfaceType {
@@ -110,15 +111,6 @@ struct InlineSettings {
     uint32_t srcSizeY = 0;
     uint32_t destSizeX = 0;
     uint32_t destSizeY = 0;
-};
-
-struct FragmentShaderCacheKey {
-    std::vector<uint8_t> bytecode;
-    bool mrt;
-    inline bool operator<(FragmentShaderCacheKey const& other) const {
-        return std::tie(bytecode, mrt)
-             < std::tie(other.bytecode, other.mrt);
-    }
 };
 
 struct TextureCacheKey {
@@ -257,7 +249,7 @@ struct RsxContext {
     GLPersistentCpuBuffer localMemoryBuffer;
     GLPersistentCpuBuffer feedbackBuffer;
     Cache<TextureCacheKey, GLTexture, (256u << 20)> textureCache;
-    Cache<FragmentShaderCacheKey, FragmentShader, (20u << 20)> fragmentShaderCache;
+    FragmentShaderCache fragmentShaderCache;
     VertexShaderCache vertexShaderCache;
     uint32_t vBlankHandlerDescr = 0;
     uint32_t flipHandlerDescr = 0;

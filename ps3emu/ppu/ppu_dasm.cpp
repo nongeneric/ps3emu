@@ -3760,6 +3760,24 @@ PRINT(VCMPEQFP, SIMDForm) { // TODO: test
 EMU_REWRITE(VCMPEQFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
 
 
+PRINT(VCMPBFP, SIMDForm) {
+    *result = format_nnn(i->Rc.u() ? "vcmpbfp." : "vcmpbfp", i->vD, i->vA, i->vB);
+}
+
+#define _VCMPBFP(_va, _vb, _vd, _rc) { \
+    auto a = TH->r(_va).xmm_f(); \
+    auto b = TH->r(_vb).xmm_f(); \
+    auto le = _mm_cmple_ps(a, b); \
+    auto ge = _mm_cmpge_ps(a, _mm_sub_ps(_mm_set1_ps(0), b)); \
+    auto d = _mm_or_si128( \
+        _mm_andnot_si128(_mm_castps_si128(le), _mm_set1_epi32(1 << 31)), \
+        _mm_andnot_si128(_mm_castps_si128(ge), _mm_set1_epi32(1 << 30))); \
+    TH->r(_vd).set_xmm(d); \
+    updateCRF(d, _rc); \
+}
+EMU_REWRITE(VCMPBFP, SIMDForm, i->vA.u(), i->vB.u(), i->vD.u(), i->Rc.u())
+
+
 PRINT(VSRW, SIMDForm) {
     *result = format_nnn("vsrw", i->vD, i->vA, i->vB);
 }
@@ -4324,6 +4342,8 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                         case 518: invoke(VCMPGTUB);
                         case 710: invoke(VCMPGTFP);
                         case 902: invoke(VCMPGTSW);
+                        case 134: invoke(VCMPEQUW);
+                        case 6: invoke(VCMPEQUB);
                         default:
                             switch (simd->VX_XO.u()) {
                                 case 836: invoke(VSRAH);
@@ -4353,8 +4373,6 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 128: invoke(VADDUWM);
                                 case 1152: invoke(VSUBUWM);
                                 case 1088: invoke(VSUBUHM);
-                                case 134: invoke(VCMPEQUW);
-                                case 6: invoke(VCMPEQUB);
                                 case 388: invoke(VSLW);
                                 case 260: invoke(VSLB);
                                 case 644: invoke(VSRW);
@@ -4377,6 +4395,7 @@ void ppu_dasm(const void* instr, uint64_t cia, S* state) {
                                 case 132: invoke(VRLW);
                                 case 522: invoke(VRFIN);
                                 case 1544: invoke(VSUM4UBS);
+                                case 966: invoke(VCMPBFP);
                                 default: throw IllegalInstructionException();
                             }
                     }

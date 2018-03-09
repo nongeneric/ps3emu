@@ -308,22 +308,7 @@ void Rsx::ShaderProgram(uint32_t offset, uint32_t location) {
     _context->tracer.pushBlob(ptr, FragmentProgramSize);
     TRACE(ShaderProgram, offset, location);
 
-    auto info = get_fragment_bytecode_info(ptr);
-    auto fconst = (std::array<float, 4>*)_context->drawRingBuffer->current(fragmentConstBuffer);
-    _context->fragmentBytecode.resize(info.length * 16);
-    _context->fragmentConstCount = 0;
-    for (auto i = 0u; i < info.length; i += 16) {
-        auto it = begin(_context->fragmentBytecode) + i;
-        if (info.constMap[i / 16]) {
-            *fconst = read_fragment_imm_val(ptr + i);
-            fconst++;
-            _context->fragmentConstCount++;
-            std::fill(it, it + 16, 0);
-        }
-    }
     _context->fragmentShaderDirty = true;
-
-    INFO(rsx) << ssnprintf("%d fragment constants updated", _context->fragmentConstCount);
 }
 
 void Rsx::ViewportHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -542,7 +527,6 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     updateTextures();
     updateShaders();
     watchTextureCache();
-    watchShaderCache();
     resetCacheWatch();
     linkShaderProgram();
     updateScissor();
@@ -557,7 +541,7 @@ void Rsx::DrawArrays(unsigned first, unsigned count) {
     // Right after a gcm draw command completes, the next command might immediately
     // update buffers or shader constants. OpenGL draw commands are asynchronous
     // and as such need to be synchronized.
-    // OpenGL guarantees that all buffers are immediately available to change
+    // OpenGL guarantees that all buffers are immediately available for change
     // after a draw command, but this isn't true for persistent buffers.
     advanceBuffers();
 
@@ -718,15 +702,23 @@ void Rsx::DriverFlip(uint32_t value) {
         _context->commandNum = 0;
         _mode = RsxOperationMode::RunCapture;
         _context->tracer.enable(true);
+        updateDisplayBuffersForCapture();
     }
 
-    if (_context->frame > 0 && _shortTrace) {
+    if (_context->frame > 2 && _shortTrace) {
         _shortTrace = false;
         _mode = RsxOperationMode::Run;
         _context->tracer.enable(false);
     }
 
     resetContext();
+}
+
+void Rsx::updateDisplayBuffersForCapture() {
+    for (auto i = 0u; i < _context->displayBuffers.size(); ++i) {
+        auto& b = _context->displayBuffers[i];
+        setDisplayBuffer(i, b.offset, b.pitch, b.width, b.height);
+    }
 }
 
 void Rsx::drawStats() {
@@ -767,143 +759,34 @@ void Rsx::drawStats() {
 
     float total = 0;
 
-    {
-        auto [sum, count] = _textureCounter.value();
-        _context->statText.line(
-            500,
-            0,
-            ssnprintf("texture:       %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
+    _context->statText.move(500, 0);
+
+#define STAT_LINE(name, counter)                                                    \
+    {                                                                               \
+        auto[sum, count] = counter.value();                                         \
+        auto sumValue = boost::chrono::duration<float>(sum).count();                \
+        _context->statText.line(ssnprintf("%-14s %-8d  %-1.4f  %-1.6f",             \
+                                          name,                                     \
+                                          count,                                    \
+                                          sumValue,                                 \
+                                          sumValue / fpsCount));                    \
+        total += sumValue;                                                          \
     }
 
-    {
-        auto [sum, count] = _fragmentShaderCounter.value();
-        _context->statText.line(
-            ssnprintf("fragment sh:   %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _vertexShaderCounter.value();
-        _context->statText.line(
-            ssnprintf("vertex sh:     %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-
-    {
-        auto [sum, count] = _fragmentShaderRetrieveCounter.value();
-        _context->statText.line(
-            ssnprintf("fragment retr: %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _vertexShaderRetrieveCounter.value();
-        _context->statText.line(
-            ssnprintf("vertex retr:   %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _textureCacheCounter.value();
-        _context->statText.line(
-            ssnprintf("textureCache:  %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _shaderCacheCounter.value();
-        _context->statText.line(
-            ssnprintf("shaderCache:   %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _resetCacheCounter.value();
-        _context->statText.line(
-            ssnprintf("resetCache:    %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _linkShaderCounter.value();
-        _context->statText.line(
-            ssnprintf("linkShader:    %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _vdaCounter.value();
-        _context->statText.line(
-            ssnprintf("vda:           %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _waitingForIdleCounter.value();
-        _context->statText.line(
-            ssnprintf("waitForIdle:   %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _indexArrayProcessingCounter.value();
-        _context->statText.line(
-            ssnprintf("index copying: %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _loadTextureCounter.value();
-        _context->statText.line(
-            ssnprintf("load texture:  %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _callbackCounter.value();
-        _context->statText.line(
-            ssnprintf("callback:      %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
-
-    {
-        auto [sum, count] = _semaphoreAcquireCounter.value();
-        _context->statText.line(
-            ssnprintf("semaphore:     %-8d  %-1.4f",
-                      count,
-                      boost::chrono::duration<float>(sum).count()));
-        total += boost::chrono::duration<float>(sum).count();
-    }
+    STAT_LINE("texture", _textureCounter);
+    STAT_LINE("fragment sh", _fragmentShaderCounter);
+    STAT_LINE("vertex sh", _vertexShaderCounter);
+    STAT_LINE("fragment retr", _fragmentShaderRetrieveCounter);
+    STAT_LINE("vertex retr", _vertexShaderRetrieveCounter);
+    STAT_LINE("textureCache", _textureCacheCounter);
+    STAT_LINE("resetCache", _resetCacheCounter);
+    STAT_LINE("linkShader", _linkShaderCounter);
+    STAT_LINE("vda", _vdaCounter);
+    STAT_LINE("waitForIdle", _waitingForIdleCounter);
+    STAT_LINE("index copying", _indexArrayProcessingCounter);
+    STAT_LINE("load texture", _loadTextureCounter);
+    STAT_LINE("callback", _callbackCounter);
+    STAT_LINE("semaphore", _semaphoreAcquireCounter);
 
     _context->statText.line(
         ssnprintf("total time: %1.4f (real), %1.4f (frame adjusted)",
@@ -1014,17 +897,13 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     {
         RangeCloser r(&_indexArrayProcessingCounter);
 
-        auto source = ((uintptr_t)sourceBuffer->mapped() + _context->indexArray.offset);
+        auto source = (void*)((uintptr_t)sourceBuffer->mapped() + _context->indexArray.offset);
         auto dest = destBuffer->mapped();
 
         if (byteSize == 2) {
-            for (auto i = first; i < count; ++i) {
-                *((uint16_t*)dest + i) = *((big_uint16_t*)source + i);
-            }
+            fast_endian_reverse<2>(dest, source, count);
         } else {
-            for (auto i = first; i < count; ++i) {
-                *((uint32_t*)dest + i) = *((big_uint32_t*)source + i);
-            }
+            fast_endian_reverse<4>(dest, source, count);
         }
     }
 
@@ -1037,7 +916,6 @@ void Rsx::DrawIndexArray(uint32_t first, uint32_t count) {
     updateTextures();
     updateShaders();
     watchTextureCache();
-    watchShaderCache();
     resetCacheWatch();
     linkShaderProgram();
     updateScissor();
@@ -1092,9 +970,10 @@ void Rsx::updateShaders() {
     if (_context->fragmentShaderDirty) {
         _context->fragmentShaderDirty = false;
 
-         _fragmentShaderRetrieveCounter.openRange();
+        _fragmentShaderRetrieveCounter.openRange();
 
-        FragmentShaderCacheKey key{_context->fragmentBytecode, isMrt(_context->surface)};
+        auto fconst = (std::array<float, 4>*)_context->drawRingBuffer->current(fragmentConstBuffer);
+        auto key = _context->fragmentShaderCache.unzip(&_context->fragmentBytecode[0], fconst, isMrt(_context->surface));
         auto shader = _context->fragmentShaderCache.retrieve(key);
 
         _fragmentShaderRetrieveCounter.closeRange();
@@ -1112,10 +991,7 @@ void Rsx::updateShaders() {
                                                isMrt(_context->surface));
             shader = new FragmentShader(text.c_str());
             INFO(libs) << ssnprintf("Updated fragment shader (2):\n%s\n%s", text, shader->log());
-            auto updater = new SimpleCacheItemUpdater<FragmentShader> {
-                uint32_t(), (uint32_t)key.bytecode.size(), [](auto){}
-            };
-            _context->fragmentShaderCache.insert(key, shader, updater);
+            _context->fragmentShaderCache.insert(key, shader);
         }
         _context->fragmentShader = shader;
     }
@@ -1335,7 +1211,7 @@ void Rsx::updateTextures() {
     i = 0;
     auto fragmentSamplerUniform = (FragmentShaderSamplerUniform*)_context->drawRingBuffer->current(fragmentSamplersBuffer);
     for (auto& sampler : _context->fragmentTextureSamplers) {
-        if (sampler.enable && sampler.texture.width && sampler.texture.height) {
+        if (sampler.enable && isTextureValid(sampler.texture)) {
             auto textureUnit = i + FragmentTextureUnit;
             auto va = rsxOffsetToEa(sampler.texture.location, sampler.texture.offset);
             FramebufferTextureKey key{va, sampler.texture.width, sampler.texture.height, GL_RGBA8}; // GL_RGB32F
@@ -1613,6 +1489,7 @@ void Rsx::ShaderWindow(uint16_t height, uint8_t origin, uint16_t pixelCenters) {
     TRACE(ShaderWindow, height, origin, pixelCenters);
     if (height == 0)
         return;
+    assert(height == _context->surfaceClipHeight);
     assert(origin == CELL_GCM_WINDOW_ORIGIN_BOTTOM);
     assert(pixelCenters == CELL_GCM_WINDOW_PIXEL_CENTER_HALF);
     waitForIdle();
@@ -1846,7 +1723,6 @@ void Rsx::SemaphoreOffset(uint32_t offset) {
 
 void Rsx::invalidateCaches(uint32_t va, uint32_t size) {
     _context->textureCache.invalidate(va, size);
-    _context->fragmentShaderCache.invalidate(va, size);
 }
 
 uint32_t Rsx::getGet() {
@@ -1868,23 +1744,11 @@ void Rsx::watchTextureCache() {
     });
 }
 
-void Rsx::watchShaderCache() {
-    RangeCloser r(&_shaderCacheCounter);
-    _context->fragmentShaderCache.watch([&](auto va, auto size) {
-        return g_state.mm->modificationMap()->marked(va, size);
-    });
-    _context->fragmentShaderCache.syncAll();
-}
-
 void Rsx::resetCacheWatch() {
     RangeCloser r(&_resetCacheCounter);
     _context->textureCache.watch([&](auto va, auto size) {
         g_state.mm->modificationMap()->reset(va, size);
         //assert(!g_state.mm->modificationMap()->marked(va, size));
-        return false;
-    });
-    _context->fragmentShaderCache.watch([&](auto va, auto size) {
-        g_state.mm->modificationMap()->reset(va, size);
         return false;
     });
 }
@@ -2151,13 +2015,19 @@ void Rsx::transferImage() {
     FramebufferTextureKey key{sourceEa};
     auto res = _context->framebuffer->findTexture(key);
     if (res.texture) {
-        auto it =
-            br::find_if(_context->displayBuffers,
-                        [&](auto& buf) { return buf.offset == surface.destOffset; });
+        auto it = br::find_if(_context->displayBuffers, [&](auto& buf) {
+            return buf.offset == surface.destOffset;
+        });
         if (it != end(_context->displayBuffers)) {
             _context->surfaceLinks.insert({sourceEa, destEa});
         }
     }
+
+    if (br::find_if(_context->displayBuffers, [&](auto& buf) {
+        return buf.offset <= surface.destOffset &&
+               surface.destOffset < buf.offset + buf.pitch * buf.height;
+    }) != end(_context->displayBuffers))
+        return;
 
     auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;
@@ -2439,12 +2309,12 @@ void Rsx::GetReport(uint8_t type, uint32_t offset) {
 }
 
 void Rsx::updateScissor() {
-    auto w = _context->surface.scissor.width;
-    auto h = _context->surface.scissor.height;
-    auto x = _context->surface.scissor.x;
-    auto y = _context->surface.scissor.y;
-    glEnableb(GL_SCISSOR_TEST, w != 4096 || h != 4096);
-    glScissor(x, _context->surfaceClipHeight - (y + h), w, h);
+//    auto w = _context->surface.scissor.width;
+//    auto h = _context->surface.scissor.height;
+//    auto x = _context->surface.scissor.x;
+//    auto y = _context->surface.scissor.y;
+//    glEnableb(GL_SCISSOR_TEST, w != 4096 || h != 4096);
+//    glScissor(x, _context->surfaceClipHeight - (y + h), w, h);
 }
 
 void Rsx::ScissorHorizontal(uint16_t x, uint16_t w, uint16_t y, uint16_t h) {
@@ -2578,7 +2448,9 @@ void Rsx::setCallbackThread(CallbackThread* thread) {
 }
 
 void Rsx::terminateCallbackThread() {
-    _callbackThread->terminate();
+    if (_callbackThread) {
+        _callbackThread->terminate();
+    }
 }
 
 void Rsx::setUserHandler(uint32_t handler) {

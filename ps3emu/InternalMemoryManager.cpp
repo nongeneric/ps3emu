@@ -28,8 +28,10 @@ void* InternalMemoryManager::allocInternalMemory(uint32_t* ea,
     auto fitp = fit(_base);
     assert(fitp->check_sanity());
     auto ptr = fitp->allocate_aligned(size, alignment);
-    if (!ptr)
+    if (!ptr) {
+        *ea = 0;
         return nullptr;
+    }
     memset(ptr, 0, size);
     *ea = (uintptr_t)ptr - (uintptr_t)fitp + _base;
     g_state.mm->mark(*ea, size, false, _name);

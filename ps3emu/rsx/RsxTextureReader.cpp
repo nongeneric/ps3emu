@@ -453,8 +453,8 @@ void main(void) {
         }
     } else {
         uint a[8];
-        a[0] = (w0 >> 24) & 0xff;
-        a[1] = (w0 >> 16) & 0xff;
+        a[0] = w0 & 0xff;
+        a[1] = (w0 >> 8) & 0xff;
         if (a[0] > a[1]) {
             a[2] = (6 * a[0] + 1 * a[1]) / 7;
             a[3] = (5 * a[0] + 2 * a[1]) / 7;
@@ -470,18 +470,19 @@ void main(void) {
             a[6] = 0;
             a[7] = 0xff;
         }
-        uint index = w1;
-        for (int i = 9; i <= 0; i--) {
+        uint index = w0 >> 16;
+        for (int i = 0; i < 5; ++i) {
             colors[i].a = a[index & 7];
             index >>= 3;
         }
-        index = (w0 << 2) | index;
-        for (int i = 15; i < 9; i--) {
+        index |= w1 << 1;
+        for (int i = 5; i < 16; ++i) {
             colors[i].a = a[index & 7];
             index >>= 3;
         }
         uint w2 = read_aligned_le_32(blockOffset + 8);
         uint w3 = read_aligned_le_32(blockOffset + 12);
+
         decodeDXT1Color(w2, false);
         for (int i = 0; i < 16; i++) {
             colors[i].rgb = c[w3 & 3].rgb;
@@ -590,9 +591,11 @@ void initShader(Shader& shader, std::string text) {
     patchEnumValues<TextureRemapInput>(text);
     patchEnumValues<TextureRemapOutput>(text);
     shader = Shader(GL_COMPUTE_SHADER, text.c_str());
-//     std::cout << shader.source();
-//     std::cout << shader.log();
-    assert(shader.log().empty());
+    if (!shader.log().empty()) {
+        std::cout << shader.source();
+        std::cout << shader.log() << std::endl;
+        assert(false);
+    }
 }
 
 void RsxTextureReader::init() {

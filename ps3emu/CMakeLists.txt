@@ -70,6 +70,8 @@ set(SRC
     rsx/GLSampler.h
     rsx/VertexShaderCache.h
     rsx/VertexShaderCache.cpp
+    rsx/FragmentShaderCache.h
+    rsx/FragmentShaderCache.cpp
     rsx/GcmConstants.h
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
@@ -81,6 +83,8 @@ set(SRC
     profiler.cpp
     EmuCallbacks.h
     EmuCallbacks.cpp
+    utils/debug.h
+    utils/debug.cpp
     
     libs/sys.cpp
     libs/fs.cpp

@@ -1,25 +1,21 @@
 #pragma once
 
-#include <assert.h>
-
 #ifdef DEBUGPAUSE
-#include "ps3emu/ppu/ppu_dasm.h"
-#include "ps3emu/utils.h"
-#include "ps3emu/log.h"
+void emu_assert_failure(const char* expr,
+                        const char* prettyFunc,
+                        const char* file,
+                        int line);
 #define EMU_ASSERT(expr)                                                            \
     if (!(expr)) {                                                                  \
-        ERROR(libs) << ssnprintf("assert %s at %s, %s:%d\n",                        \
-                                 #expr,                                             \
-                                 __PRETTY_FUNCTION__,                               \
-                                 __FILE__,                                          \
-                                 __LINE__);                                         \
-        throw BreakpointException();                                                \
+        emu_assert_failure(#expr, __PRETTY_FUNCTION__, __FILE__, __LINE__);         \
     }
 #else
+#include <assert.h>
 #define EMU_ASSERT(expr) assert(expr)
 #endif
 
 #ifndef NDEBUG
+#include <assert.h>
 #define HARD_ASSERT(expr) assert(expr)
 #else
 #define HARD_ASSERT(expr) (void)(expr)

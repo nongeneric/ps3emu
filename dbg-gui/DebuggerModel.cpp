@@ -10,6 +10,7 @@
 #include "ps3emu/log.h"
 #include "ps3emu/libs/sync/mutex.h"
 #include "ps3emu/libs/sync/lwmutex.h"
+#include "ps3emu/libs/graphics/gcm.h"
 #include "ps3emu/execmap/ExecutionMapCollection.h"
 #include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/fileutils.h"
@@ -691,10 +692,17 @@ uint64_t DebuggerModel::evalExpr(std::string expr) {
     }
 }
 
+void DebuggerModel::dumpGcmContext() {
+    message(QString::fromStdString(dbgDumpGcmContext()));
+}
+
 void DebuggerModel::execSingleCommand(QString command) {
     auto name = command.section(':', 0, 0).trimmed();
     
-    if (name == "segments") {
+    if (name == "gcmcontext") {
+        dumpGcmContext();
+        return;
+    } if (name == "segments") {
         dumpSegments();
         return;
     } else if (name == "imports") {
@@ -729,6 +737,7 @@ void DebuggerModel::execSingleCommand(QString command) {
         for (auto th : _proc->dbgPPUThreads()) {
             _activeThread = th;
             printBacktrace();
+            this->message("\n");
         }
         return;
     } else if (name == "execmap-toggle") {
@@ -937,13 +946,14 @@ void DebuggerModel::dumpGroups() {
 
 void DebuggerModel::dumpThreads() {
     auto i = 0u;
-    emit message("PPU Threads (id, nip, state)");
+    emit message("PPU Threads (id, hostid, nip, state)");
     for (auto th : _proc->dbgPPUThreads()) {
         auto current = th == _activeThread;
-        emit message(QString::asprintf("[%03d]%s %08x  %08x %s %s",
+        emit message(QString::asprintf("[%03d]%s %08x %08x %08x %s %s",
                                        i,
                                        current ? "*" : " ",
                                        (uint32_t)th->getId(),
+                                       (uint32_t)th->getHostId(),
                                        (uint32_t)th->getNIP(),
                                        th->dbgIsPaused() ? "PAUSED" : "RUNNING",
                                        th->getName().c_str()));
@@ -953,11 +963,12 @@ void DebuggerModel::dumpThreads() {
         auto state = th->suspended() ? "SUSPENDED"
                    : th->dbgIsPaused() ? "PAUSED" 
                    : "RUNNING";
-        emit messagef("%s[%03d]%s %08x  %08x  %08x  %s  %s",
+        emit messagef("%s[%03d]%s %08x %08x %08x  %08x  %s  %s",
                       prefix,
                       i,
                       th == _activeSPUThread ? "*" : " ",
                       (uint32_t)th->getId(),
+                      (uint32_t)th->getHostId(),
                       th->getNip(),
                       th->getElfSource(),
                       state,

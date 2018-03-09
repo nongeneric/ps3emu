@@ -278,7 +278,6 @@ namespace ShaderRewriter {
                                 unsigned constIndex) {
         assert(n < i.opcode.op_count);
         auto& arg = i.arguments[n];
-        assert(arg.is_abs + arg.is_neg <= 1);
         Expression* expr = nullptr;
         if (i.opcode.tex && n == i.opcode.op_count - 1) {
             expr = context.make<IntegerLiteral>(i.tex_num);

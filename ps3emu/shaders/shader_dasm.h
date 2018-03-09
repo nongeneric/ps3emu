@@ -7,6 +7,7 @@
 #include <vector>
 #include <bitset>
 #include <boost/variant.hpp>
+#include <x86intrin.h>
 
 enum class clamp_t {
     R, H, X, B
@@ -266,7 +267,24 @@ int vertex_dasm_instr(const uint8_t* instr,
                       std::array<VertexInstr, 2>& res,
                       vertex_decoded_instr_t* decodedInstr = nullptr);
 std::string vertex_dasm(VertexInstr const& instr);
-std::array<float, 4> read_fragment_imm_val(const uint8_t* ptr);
+
+inline void rsx_load16(const void* ptr, void* outp, bool twoBytes) {
+    auto mask =
+        twoBytes
+            ? _mm_set_epi8(13, 12, 15, 14, 9, 8, 11, 10, 5, 4, 7, 6, 1, 0, 3, 2)
+            : _mm_set_epi8(14, 15, 12, 13, 10, 11, 8, 9, 6, 7, 4, 5, 2, 3, 0, 1);
+    auto val = _mm_lddqu_si128((__m128i*)ptr);
+    auto res = _mm_shuffle_epi8(val, mask);
+    _mm_store_si128((__m128i*)outp, res);
+}
+
+inline void read_fragment_imm_val(const void* ptr, void* outp) {
+    return rsx_load16(ptr, outp, false);
+}
+
+inline void read_fragment_instr(const void* ptr, void* outp) {
+    return rsx_load16(ptr, outp, true);
+}
 
 struct FragmentProgramInfo {
     std::bitset<512> constMap; // 1 means const

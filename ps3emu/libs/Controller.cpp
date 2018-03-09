@@ -53,12 +53,18 @@ bool isConnected(int i) {
 }
 
 int32_t cellPadGetInfo2(CellPadInfo2* info) {
+    static bool alreadyConnected = false;
     info->max_connect = 1;
     info->now_connect = 1;
     info->system_info = 0;
     for (int i = 0; i < std::min(SDL_NumJoysticks(), CELL_PAD_MAX_PORT_NUM); ++i) {
-        info->port_status[i] = isConnected(i) ? CELL_PAD_STATUS_CONNECTED
-                                              : CELL_PAD_STATUS_DISCONNECTED;
+        auto connected = isConnected(i);
+        info->port_status[i] = connected ? CELL_PAD_STATUS_CONNECTED
+                                         : CELL_PAD_STATUS_DISCONNECTED;
+        if (connected && !alreadyConnected) {
+            info->port_status[i] |= CELL_PAD_STATUS_ASSIGN_CHANGES;
+            alreadyConnected = true;
+        }
         info->port_setting[i] = CELL_PAD_SETTING_PRESS_ON;
         info->device_capability[i] =
             CELL_PAD_CAPABILITY_PS3_CONFORMITY | CELL_PAD_CAPABILITY_PRESS_MODE |
@@ -112,6 +118,9 @@ int32_t cellPadEnd() {
 CellPadData oldData = {0};
 
 int32_t cellPadGetData(uint32_t port_no, CellPadData* data) {
+    if (port_no != 0)
+        return CELL_PAD_ERROR_NO_DEVICE;
+
     SDL_GameControllerUpdate();
     auto handle = SDL_GameControllerOpen(port_no);
     

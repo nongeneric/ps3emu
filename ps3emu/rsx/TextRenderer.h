@@ -11,6 +11,7 @@ class TextRenderer {
 public:
     TextRenderer(int size);
     ~TextRenderer();
+    void move(unsigned x, unsigned y);
     void line(unsigned x, unsigned y, std::string_view text);
     void line(std::string_view text);
     void clear();

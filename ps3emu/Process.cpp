@@ -184,7 +184,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     _threadInitInfo.reset(new ThreadInitInfo());
     *_threadInitInfo = _elf->getThreadInitInfo();
     auto thread = _threads.back().get();
-    thread->setId(0, "main");
+    thread->setId(g_ppuThreadBaseId, "main");
     
     g_state.content = _contentManager.get();
     g_state.rsx = _rsx.get();
@@ -197,6 +197,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     auto vaArgs = storeArgs(args);
     thread->setGPR(3, args.size());
     thread->setGPR(4, vaArgs);
+    thread->setGPR(7, thread->getId());
     _threadIds.create(std::move(thread));
 }
 
@@ -296,6 +297,8 @@ Event Process::run() {
                 return th.get() == thread;
             });
             assert(it != end(_threads));
+            _stackBlocks->free(thread->getStackBase());
+            _threadIds.destroy(thread->getId());
             _threads.erase(it);
         };
         
@@ -394,8 +397,9 @@ uint64_t Process::createThread(uint32_t stackSize,
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     t->setGPR(3, arg);
     auto id = _threadIds.create(std::move(t));
-    INFO(libs) << ssnprintf("thread %d created", id);
     t->setId(id, name);
+    t->setGPR(7, id);
+    INFO(libs) << ssnprintf("thread %x created", id);
     if (start)
         t->run();
     return id;
@@ -449,6 +453,8 @@ void Process::initNewThread(PPUThread* thread,
                             uint32_t tls) {
     uint32_t stack;
     _stackBlocks->allocInternalMemory(&stack, stackSize + 0xf0, 64);
+    assert(stack < StackArea + StackAreaSize);
+    assert(stack > StackArea);
     thread->setStackInfo(stack, stackSize);
     
     // PPU_ABI-Specifications_e
@@ -463,7 +469,7 @@ void Process::initNewThread(PPUThread* thread,
     thread->setGPR(5, stack);
     thread->setGPR(6, 0);
     thread->setGPR(8, _threadInitInfo->tlsSegmentVa);
-    thread->setGPR(9, _threadInitInfo->tlsFileSize);
+    thread->setGPR(9, _threadInitInfo->tlsFileSize); // TODO: fix
     thread->setGPR(10, _threadInitInfo->tlsMemSize);
     thread->setGPR(12, DefaultMainMemoryPageSize);
     

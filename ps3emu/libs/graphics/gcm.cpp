@@ -215,7 +215,7 @@ uint32_t _cellGcmInitBody(ps3_uintptr_t defaultGcmContextSymbolVa,
     g_state.rsx->setCallbackThread(callbackThread);
     callbackThread->ps3callInit("gcm_intr", sink);
     
-    return g_state.th->getGPR(3);  
+    return g_state.th->getGPR(3);
 }
 
 uint32_t cellGcmGetTileInfo() {
@@ -288,8 +288,8 @@ void encodeFlipCommand(uint32_t contextEa,
     buf[i++] = 0;    
     buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_OFFSET, 1);
     buf[i++] = 0x30;
-    // here gcm acquires the semaphore that is released by RSX
-    // as there is no one to release the semaphore, just release it the second time
+    // here gcm acquires a semaphore that is released by RSX
+    // as there is no one to release the semaphore, just release it a second time
     buf[i++] = CELL_GCM_METHOD(CELL_GCM_NV406E_SEMAPHORE_RELEASE, 1);
     buf[i++] = 1;
     buf[i++] = CELL_GCM_CALL(0);
@@ -335,12 +335,17 @@ int32_t cellGcmSetTileInfo(uint8_t index,
                            uint16_t base,
                            uint8_t bank)
 {
-    INFO(libs) << __FUNCTION__;
     auto& info = (*emuGcmState.tileInfos)[index];
     info.tile = (location + 1) | (bank << 4) | ((offset / 0x10000) << 16) | (location << 31);
     info.limit = (((offset + size - 1) / 0x10000) << 16) | (location << 31);
     info.pitch = (pitch / 0x100) << 8;
     info.format = (base | (base + ((size - 1) / 0x10000)) << 13) | (comp << 26) | (1 << 30);
+
+    INFO(libs) << ssnprintf("cellGcmSetTileInfo(%x, %x, %x, %x)",
+                            info.tile,
+                            info.limit,
+                            info.pitch,
+                            info.format);
     return CELL_OK;
 }
 
@@ -409,17 +414,18 @@ uint32_t defaultContextCallback(TargetCellGcmContextData* data, uint32_t count) 
     }
     
     g_state.rsx->encodeJump(data->current, nextBuffer - ioBase);
-    
-    INFO(rsx) << ssnprintf("defaultContextCallback(nextSize = %x, nextBuffer = %x, "
-                           "jump = %x, end = %x, defsize = %x, count = %x, get = %x)",
-                           nextSize,
-                           nextBuffer - ioBase,
-                           data->current - ioBase,
-                           data->end - ioBase,
-                           emuGcmState.defaultCommandBufferSize,
-                           count,
-                           g_state.rsx->getGet());
-    
+
+    WARNING(rsx) << ssnprintf(
+        "defaultContextCallback(nextSize = %x, nextBuffer = %x, "
+        "jump = %x, end = %x, defsize = %x, count = %x, get = %x)",
+        nextSize,
+        nextBuffer - ioBase,
+        data->current - ioBase,
+        data->end - ioBase,
+        emuGcmState.defaultCommandBufferSize,
+        count,
+        g_state.rsx->getGet());
+
     data->begin = nextBuffer;
     data->current = nextBuffer;
     data->end = nextBuffer + nextSize - 4;
@@ -544,7 +550,7 @@ uint32_t cellGcmGetZcullInfo() {
 }
 
 int32_t cellGcmInitDefaultFifoMode(int32_t mode) {
-    //assert(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
+    //EMU_ASSERT(mode == CELL_GCM_DEFAULT_FIFO_MODE_TRADITIONAL);
     return CELL_OK;
 }
 
@@ -579,7 +585,7 @@ uint32_t cellGcmGetDefaultCommandWordSize() {
 }
 
 uint32_t cellGcmGetDefaultSegmentWordSize() {
-    return emuGcmState.defaultCommandBufferSegment;
+    return emuGcmState.defaultCommandBufferSegment / 4;
 }
 
 }}
@@ -678,4 +684,19 @@ void deserializeOffsetTable(std::vector<uint16_t> const& vec) {
             g_state.mm->provideMemory(ea, size, ptr);
         }
     }
+}
+
+std::string dbgDumpGcmContext() {
+    auto& state = emu::Gcm::emuGcmState;
+    auto context = state.defaultContext;
+    if (!context)
+        return "not initialized\n";
+    std::string res;
+    res += ssnprintf("  ea: %x (%llx)\n", emu::Gcm::emuGcmState.defaultContextDataEa, context);
+    res += ssnprintf("  begin: %x\n", context->begin);
+    res += ssnprintf("  end: %x\n", context->end);
+    res += ssnprintf("  current: %x\n", context->current);
+    res += ssnprintf("  callback: %x\n", context->callback);
+    res += ssnprintf("  left: %x\n", context->end - context->current);
+    return res;
 }

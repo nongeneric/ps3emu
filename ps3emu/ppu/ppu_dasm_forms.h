@@ -4,7 +4,7 @@
 
 using BD_t = BitField<16, 30, BitFieldType::Signed, 2>;
 using BF_t = BitField<6, 9, BitFieldType::CR>;
-using BFA_t = BitField<11, 13, BitFieldType::CR>;
+using BFA_t = BitField<11, 14, BitFieldType::CR>;
 using D_t = BitField<16, 32, BitFieldType::Signed>;
 using DS_t = BitField<16, 30, BitFieldType::Signed, 2>;
 using LI_t = BitField<6, 30, BitFieldType::Signed, 2>;

@@ -19,6 +19,7 @@ parser.add_argument('--patch', type=str)
 parser.add_argument('--find', type=str)
 parser.add_argument('--fnid', type=str)
 parser.add_argument('--eid', type=str)
+parser.add_argument('--db', type=str, default='fnids.db')
 args = parser.parse_args()
 
 fn_suffix = b'\x67\x59\x65\x99\x04\x25\x04\x90\x56\x64\x27\x49\x94\x89\x74\x1A'
@@ -37,7 +38,7 @@ def find(c, fnid):
     str = cur.fetchone()
     return str[0] if str else "none"
 
-c = sqlite3.connect('fnids.db')
+c = sqlite3.connect(args.db)
 
 if args.fnid:
     print("%08x" % calcfnid(args.fnid, fn_suffix))

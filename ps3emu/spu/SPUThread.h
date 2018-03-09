@@ -202,6 +202,7 @@ public:
     // TODO: removeInterruptHandler
     void setId(uint64_t id);
     uint64_t getId();
+    pthread_t getHostId();
     void connectQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
                       uint32_t portNumber);
     void bindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,

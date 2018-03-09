@@ -497,27 +497,30 @@ void fragment_dasm(FragmentInstr const& i, std::string& res) {
     }
 }
 
+void fragment_scan_instr(const uint8_t* instr, bool& isConst, bool& isLast) {
+    uint8_t buf[16];
+    read_fragment_instr(instr, buf);
+    auto i = (fragment_instr_t*)buf;
+    auto opcode = fragment_opcodes[i->Opcode()];
+    isConst = false;
+    for (int n = 0; n < opcode.op_count; ++n) {
+        if (i->OpType(n) == op_type_t::Const) {
+            isConst = true;
+            break;
+        }
+    }
+    isLast = i->b0.LastInstr.u();
+}
+
 int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
     uint8_t buf[16];
-    for (auto i = 0u; i < sizeof(buf); i += 4) {
-        buf[i + 0] = instr[i + 2];
-        buf[i + 1] = instr[i + 3];
-        buf[i + 2] = instr[i + 0];
-        buf[i + 3] = instr[i + 1];
-    }
-    
+    read_fragment_instr(instr, buf);
     auto i = (fragment_instr_t*)buf;
     auto opcode = fragment_opcodes[i->Opcode()];
 
     if (opcode.instr == fragment_op_t::IFE) {
         uint8_t buf[16];
-        for (auto i = 8u; i < sizeof(buf); i += 4) {
-            buf[i + 0] = instr[i + 1];
-            buf[i + 1] = instr[i + 0];
-            buf[i + 2] = instr[i + 3];
-            buf[i + 3] = instr[i + 2];
-        }
-        
+        read_fragment_imm_val(instr, buf);
         auto dw = (uint32_t*)&buf[0];
         res.elseLabel = (dw[2] >> 2) & 0x1ffff;
         res.endifLabel = (dw[3] >> 2) & 0x1ffff;
@@ -563,7 +566,7 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
         arg.swizzle.comp[3] = i->OpMaskW(n);
         if (arg.type == op_type_t::Const) {
             has_const = true;
-            arg.imm_val.f = read_fragment_imm_val(instr + 16);
+            read_fragment_imm_val(instr + 16, &arg.imm_val.f[0]);
         }
     }
     return has_const ? 32 : 16;
@@ -1101,30 +1104,15 @@ std::string vertex_dasm(const VertexInstr& instr) {
     return res + ";";
 }
 
-std::array<float, 4> read_fragment_imm_val(const uint8_t* ptr) {
-    union {
-        std::array<float, 4> f;
-        std::array<uint8_t, 16> u8;
-    } u;
-    static_assert(sizeof(u) == 16, "");
-    for (auto i = 0u; i < sizeof(u); i += 4) {
-        u.u8[i + 0] = ptr[i + 1];
-        u.u8[i + 1] = ptr[i + 0];
-        u.u8[i + 2] = ptr[i + 3];
-        u.u8[i + 3] = ptr[i + 2];
-    }
-    return u.f;
-}
-
 FragmentProgramInfo get_fragment_bytecode_info(const uint8_t* ptr) {
     auto pos = 0u;
     std::bitset<512> map;
     while (pos < 512 * 16) {
-        FragmentInstr fi;
-        auto len = fragment_dasm_instr(ptr + pos, fi);
-        map[pos / 16 + 1] = len == 32;
-        pos += len;
-        if (fi.is_last) {
+        bool isConst, isLast;
+        fragment_scan_instr(ptr + pos, isConst, isLast);
+        map[pos / 16 + 1] = isConst;
+        pos += isConst ? 32 : 16;
+        if (isLast) {
             break;
         }
     }

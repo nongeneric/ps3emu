@@ -70,6 +70,37 @@ inline uint8_t fast_endian_reverse(uint8_t val) {
     return val;
 }
 
+template <int Size>
+void fast_endian_reverse(void* dest, const void* src, unsigned count) {
+    static_assert(Size == 2 || Size == 4);
+    auto mask16 = _mm256_set_epi8(
+                30, 31, 28, 29, 26, 27, 24, 25,
+                22, 23, 20, 21, 18, 19, 16, 17,
+                14, 15, 12, 13, 10, 11, 8, 9,
+                6, 7, 4, 5, 2, 3, 0, 1);
+    auto mask32 = _mm256_set_epi8(
+                28, 29, 30, 31, 24, 25, 26, 27,
+                20, 21, 22, 23, 16, 17, 18, 19,
+                12, 13, 14, 15, 8, 9, 10, 11,
+                4, 5, 6, 7, 0, 1, 2, 3);
+    auto mask = Size == 2 ? mask16 : mask32;
+    auto lineCount = (count * Size) / 32;
+    for (auto i = 0u; i < lineCount; ++i) {
+        auto val = _mm256_lddqu_si256((__m256i*)src + i);
+        auto res = _mm256_shuffle_epi8(val, mask);
+        _mm256_storeu_si256((__m256i*)dest + i, res);
+    }
+    for (auto i = lineCount * 32; i < count * Size; i += Size) {
+        if (Size == 2) {
+            *(uint16_t*)((uint8_t*)dest + i) =
+                fast_endian_reverse(*(uint16_t*)((uint8_t*)src + i));
+        } else {
+            *(uint32_t*)((uint8_t*)dest + i) =
+                fast_endian_reverse(*(uint32_t*)((uint8_t*)src + i));
+        }
+    }
+}
+
 constexpr uint32_t constexpr_log2(uint32_t n, uint32_t p = 0) {
     return n <= 1 ? p : constexpr_log2(n / 2, p + 1);
 }

@@ -330,9 +330,13 @@ TextRenderer::TextRenderer(int size) : p(new impl(size)) {}
 
 TextRenderer::~TextRenderer() = default;
 
-void TextRenderer::line(unsigned x, unsigned y, std::string_view text) {
+void TextRenderer::move(unsigned x, unsigned y) {
     p->lineX = x;
     p->lineY = y + p->lineHeight; // approximately the baseline
+}
+
+void TextRenderer::line(unsigned x, unsigned y, std::string_view text) {
+    move(x, y);
     line(text);
 }
 

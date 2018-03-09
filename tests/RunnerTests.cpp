@@ -3191,3 +3191,15 @@ TEST_CASE("ppu_threads_lwcond_2") {
         "count: 150000\n"
     );
 }
+
+TEST_CASE("ppu_threads_main_thread_id") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_main_thread_id/a.elf"},
+        "thread id: 1000087 prio: 1000\n"
+    );
+}
+
+TEST_CASE("ppu_threads_cond_repeated_signal") {
+    test_interpreter_and_rewriter({"./binaries/ppu_threads_cond_repeated_signal/a.elf"},
+        "all done\n"
+    );
+}

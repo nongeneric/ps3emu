@@ -128,6 +128,8 @@ struct ModuleSegment {
     uint32_t size;
 };
 
+inline constexpr uint32_t g_ppuThreadBaseId = 0x1000087;
+
 class Process {
     ConcurrentBoundedQueue<ThreadEvent> _eventQueue;
     std::unique_ptr<ThreadInitInfo> _threadInitInfo;
@@ -142,7 +144,7 @@ class Process {
     boost::recursive_mutex _ppuThreadMutex;
     std::vector<std::shared_ptr<SPUThread>> _spuThreads;
     boost::recursive_mutex _spuThreadMutex;
-    IDMap<uint64_t, PPUThread*, 0> _threadIds;
+    IDMap<uint64_t, PPUThread*, g_ppuThreadBaseId> _threadIds;
     IDMap<uint32_t, std::shared_ptr<SPUThread>> _spuThreadIds;
     bool _firstRun = true;
     boost::chrono::high_resolution_clock::time_point _systemStart;

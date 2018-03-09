@@ -2066,3 +2066,37 @@ TEST_CASE("vsum4ubs v0,v1,v0") {
         REQUIRE( (uint32_t)th.r(0).w(i) == sum32[i] );
     }
 }
+
+TEST_CASE("mcrf_cr1_cr7_ppu") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    PPUThread th;
+    th.setCRF(7, 0b1010);
+    th.setCRF(1, 0b1100);
+    uint8_t instr[] = { 0x4c, 0x9c, 0x00, 0x00 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.getCRF(1) == 0b1010 );
+}
+
+TEST_CASE("vcmpbfp v1,v1,v0") {
+    MainMemory mm;
+    g_state.mm = &mm;
+    PPUThread th;
+    th.r(1).set_xmm_f(_mm_set_ps(10, 20, -30, 0));
+    th.r(0).set_xmm_f(_mm_set_ps(10, 10, -20, -5));
+    uint8_t instr[] = { 0x10, 0x21, 0x03, 0xC6 };
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.r(1).w(0) == 0b00 << 30 );
+    REQUIRE( th.r(1).w(1) == 0b10 << 30 );
+    REQUIRE( th.r(1).w(2) == 0b01 << 30 );
+    REQUIRE( th.r(1).w(3) == 0b11 << 30 );
+
+    auto nan = std::nanf("");
+    th.r(1).set_xmm_f(_mm_set_ps(nan, 20, nan, nan));
+    th.r(0).set_xmm_f(_mm_set_ps(10, nan, -20, nan));
+    ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
+    REQUIRE( th.r(1).w(0) == 0b11 << 30 );
+    REQUIRE( th.r(1).w(1) == 0b11 << 30 );
+    REQUIRE( th.r(1).w(2) == 0b11 << 30 );
+    REQUIRE( th.r(1).w(3) == 0b11 << 30 );
+}

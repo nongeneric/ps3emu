@@ -151,3 +151,5 @@ uint8_t ext8(BF bf) {
     uint8_t val = bf.u();
     return (val << (8 - BF::W)) | (val >> (2 * BF::W - 8));
 }
+
+bool isTextureValid(RsxTextureInfo const& info);

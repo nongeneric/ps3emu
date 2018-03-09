@@ -1,5 +1,6 @@
 #include "TextureRenderer.h"
 #include "GLTexture.h"
+#include "ps3emu/ImageUtils.h"
 
 TextureRenderer::TextureRenderer() {
     auto fragmentCode = R""(
@@ -45,14 +46,15 @@ void TextureRenderer::render(GLSimpleTexture* tex) {
 
     auto samplerIndex = 20;
     glBindTextureUnit(samplerIndex, tex->handle());
+    _sampler.setMinFilter(GL_NEAREST);
+    _sampler.setMagFilter(GL_NEAREST);
     glBindSampler(samplerIndex, _sampler.handle());
-    glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glSamplerParameteri(_sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     _pipeline.bind();
 
     glDisable(GL_CULL_FACE);
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_SCISSOR_TEST);
     glViewport(0, 0, tex->width(), tex->height());
     glDepthRange(0, 1);
     glDrawArrays(GL_TRIANGLES, 0, 6);

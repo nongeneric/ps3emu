@@ -380,6 +380,7 @@ public:
 
     void setId(unsigned id, std::string name);
     unsigned getId();
+    pthread_t getHostId();
     std::string getName();
     void ncall(uint32_t index);
     void scall();

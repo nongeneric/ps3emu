@@ -3085,7 +3085,7 @@ static void find_coreGL(void) {
 }
 
 int gladLoadGLLoader(GLADloadproc load) {
-	GLVersion.major = 0; GLVersion.minor = 0;
+    GLVersion.major = 0; GLVersion.minor = 0;
 	glGetString = (PFNGLGETSTRINGPROC)load("glGetString");
 	if(glGetString == NULL) return 0;
 	if(glGetString(GL_VERSION) == NULL) return 0;

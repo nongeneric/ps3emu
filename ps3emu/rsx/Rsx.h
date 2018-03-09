@@ -274,7 +274,6 @@ class Rsx {
     TimedCounter _vertexShaderRetrieveCounter;
     TimedCounter _fragmentShaderRetrieveCounter;
     TimedCounter _textureCacheCounter;
-    TimedCounter _shaderCacheCounter;
     TimedCounter _resetCacheCounter;
     TimedCounter _linkShaderCounter;
     TimedCounter _vdaCounter;
@@ -297,7 +296,6 @@ class Rsx {
     uint32_t _drawCount = 0;
     
     void watchTextureCache();
-    void watchShaderCache();
     void resetCacheWatch();
     void invalidateCaches(uint32_t va, uint32_t size);
     void waitForIdle();
@@ -853,6 +851,7 @@ class Rsx {
     void startCopy2d();
     void beginTransformFeedback();
     void endTransformFeedback();
+    void updateDisplayBuffersForCapture();
     
 public:
     Rsx();

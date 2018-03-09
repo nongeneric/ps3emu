@@ -804,7 +804,8 @@ void MainWindowModel::update() {
     }
     
     if (context->fragmentShader) {
-        FragmentShaderCacheKey key{context->fragmentBytecode, isMrt(context->surface)};
+        auto fconst = (std::array<float, 4>*)context->drawRingBuffer->current(fragmentConstBuffer);
+        auto key = context->fragmentShaderCache.unzip(&context->fragmentBytecode[0], fconst, isMrt(context->surface));
         auto shader = context->fragmentShaderCache.retrieve(key);
         if (shader) {
             auto sizes = getFragmentSamplerSizes(context);
@@ -975,7 +976,14 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     QList<QTreeWidgetItem*> items;
     items.append(new SurfaceContextTreeItem());
     items.append(new FragmentOperationsTreeItem());
-    
+
+    auto displayBuffers = new QTreeWidgetItem();
+    displayBuffers->setText(0, "Display Buffers");
+    for (auto i = 0u; i < 8; ++i) {
+        displayBuffers->addChild(new DisplayBufferContextTreeItem(i));
+    }
+    items.append(displayBuffers);
+
     auto vertexSamplers = new QTreeWidgetItem();
     vertexSamplers->setText(0, "Vertex Samplers");
     for (auto i = 0u; i < 4; ++i) {

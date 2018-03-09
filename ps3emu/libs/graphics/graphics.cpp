@@ -19,6 +19,15 @@ void Window::init() {
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         throw std::runtime_error("opengl function loading failed");
     }
+
+    GLint major, minor;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+
+    if (major < 4 || (major == 4 && minor < 5)) {
+        throw std::runtime_error("bad opengl version");
+    }
+
     glfwSwapInterval(-1);
 }
 
