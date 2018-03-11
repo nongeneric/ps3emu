@@ -10,7 +10,7 @@
 #include "ps3emu/libs/sync/event_flag.h"
 #include "ps3emu/libs/memoryContainer.h"
 #include "ps3emu/libs/perf.h"
-#include "ps3emu/ppu/CallbackThread.h"
+#include "ps3emu/libs/graphics/gcm.h"
 #include "ps3emu/log.h"
 
 void PPUThread::scall() {
@@ -164,6 +164,15 @@ void PPUThread::scall() {
         case 820: wrap(sys_fs_fsync, this); break;
         case 840: wrap(sys_fs_disk_free, this); break;
         case 822: wrap(sys_fs_fget_block_size, this); break;
+        case 675: wrap(emu::Gcm::sys_rsx_device_map, this); break;
+        case 668: wrap(emu::Gcm::sys_rsx_memory_allocate, this); break;
+        case 670: wrap(emu::Gcm::sys_rsx_context_allocate, this); break;
+        case 671: wrap(emu::Gcm::sys_rsx_context_free, this); break;
+        case 669: wrap(emu::Gcm::sys_rsx_memory_free, this); break;
+        case 672: wrap(emu::Gcm::sys_rsx_context_iomap, this); break;
+        case 673: wrap(emu::Gcm::sys_rsx_context_iounmap, this); break;
+        case 674: wrap(emu::Gcm::sys_rsx_context_attribute, this); break;
+        case 677: wrap(emu::Gcm::sys_rsx_attribute, this); break;
         default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
     }
 }

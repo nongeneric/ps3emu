@@ -32,8 +32,6 @@ set(SRC
     ppu/PPUThread.cpp
     ppu/InterruptPPUThread.h
     ppu/InterruptPPUThread.cpp
-    ppu/CallbackThread.h
-    ppu/CallbackThread.cpp
     ContentManager.h
     ContentManager.cpp
     InternalMemoryManager.h
@@ -104,7 +102,6 @@ set(SRC
     libs/sync/queue.cpp
     libs/sync/event_flag.cpp
     libs/graphics/gcm.cpp
-    libs/graphics/gcm_buffers.cpp
     libs/graphics/sysutil_sysparam.cpp
     libs/graphics/graphics.cpp
     libs/graphics/GL/src/glad.c

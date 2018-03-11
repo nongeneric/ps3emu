@@ -13,7 +13,6 @@
 #include "ps3emu/exports/splicer.h"
 #include "InternalMemoryManager.h"
 #include "ps3emu/BBCallMap.h"
-#include <boost/range/algorithm.hpp>
 #include <boost/filesystem.hpp>
 #include <map>
 #include <dlfcn.h>
@@ -355,10 +354,10 @@ std::tuple<prx_export_t*, int> ELFLoader::exports() {
 bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     auto name = prx->shortName();
     if (name == "liblv2.prx" || name == "libsre.prx" || name == "libsync2.prx" ||
-        name == "libfiber.prx") {
+        name == "libfiber.prx" || name == "libgcm_sys.sprx.elf") {
         return true;
     }
-    if (name == "libgcm_sys.sprx.elf" || name == "libsysutil_game.sprx.elf" ||
+    if (name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libio.sprx.elf" ||
         name == "libaudio.sprx.elf" ||
         name == "libsysutil_np_trophy.sprx.elf" ||

@@ -10,6 +10,7 @@
 #include "ps3emu/shaders/ShaderGenerator.h"
 #include "ps3emu/TimedCounter.h"
 #include "ps3emu/profiler.h"
+#include "ps3emu/libs/sync/queue.h"
 #include "GLQuery.h"
 #include "GLFramebuffer.h"
 #include "RsxTextureReader.h"
@@ -235,14 +236,13 @@ class GLBuffer;
 class FragmentShader;
 struct RsxTextureInfo;
 class GLPersistentCpuBuffer;
-class CallbackThread;
 class Rsx {
     static RsxOperationMode _mode;
     uint32_t* _get = nullptr;
     uint32_t* _put = nullptr;
     uint32_t* _ref = nullptr;
     std::atomic<uint32_t> _ret = 0;
-    std::atomic<bool> _isFlipInProgress;
+    big_uint32_t* _isFlipInProgress = nullptr;
     std::atomic<int64_t> _lastFlipTime;
     bool _shutdown = false;
     bool _initialized = false;
@@ -264,7 +264,6 @@ class Rsx {
     bool _shortTrace = false;
     RsxTextureReader* _textureReader;
     std::map<MethodMapEntry*, TimedCounter> _perfMap;
-    std::unique_ptr<CallbackThread> _callbackThread;
     GLQuery _transformFeedbackQuery;
     TimedCounter _fpsCounter;
     TimedCounter _idleCounter;
@@ -285,6 +284,8 @@ class Rsx {
     std::vector<MethodMapEntry> _methodMap;
     __itt_string_handle* _loopProfilerTask;
     __itt_domain* _profilerDomain;
+    sys_event_queue_t _callbackQueue;
+    sys_event_port_t _callbackQueuePort;
 
     // loop
     const uint32_t* _currentGet = nullptr;
@@ -840,7 +841,7 @@ class Rsx {
     void parseTextureBorderColor(int argi, int index);
     void parseTextureImageRect(int argi, int index);
 
-    void invokeHandler(uint32_t descrEa, uint32_t arg);
+    void invokeHandler(uint32_t num, uint32_t arg);
     void drawStats();
     void advanceBuffers();
     
@@ -867,20 +868,11 @@ public:
     void setRef(uint32_t ref);
     void setLabel(int index, uint32_t value, bool waitForIdle = true);
     bool isFlipInProgress() const;
-    void setFlipStatus();
-    void resetFlipStatus();
+    void setFlipStatus(bool inProgress);
     void setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress);
-    void setDisplayBuffer(uint8_t id,
-                          uint32_t offset,
-                          uint32_t pitch,
-                          uint32_t width,
-                          uint32_t height);
-    void init();
-    void setCallbackThread(CallbackThread* thread);
-    void terminateCallbackThread();
+    void setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t height);
+    void init(sys_event_queue_t callbackQueue);
     void encodeJump(ps3_uintptr_t va, uint32_t destOffset);
-    void setVBlankHandler(uint32_t descrEa);
-    void setFlipHandler(uint32_t descrEa);
     void updateOffsetTableForReplay();
     void sendCommand(GcmCommandReplayInfo info);
     bool receiveCommandCompletion();
@@ -890,7 +882,6 @@ public:
     void captureFrames();
     void resetContext();
     int64_t interpret(uint32_t get, const uint32_t* read);
-    void setUserHandler(uint32_t handler);
 };
 
 MemoryLocation gcmEnumToLocation(uint32_t enumValue);

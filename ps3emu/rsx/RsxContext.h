@@ -251,15 +251,12 @@ struct RsxContext {
     Cache<TextureCacheKey, GLTexture, (256u << 20)> textureCache;
     FragmentShaderCache fragmentShaderCache;
     VertexShaderCache vertexShaderCache;
-    uint32_t vBlankHandlerDescr = 0;
-    uint32_t flipHandlerDescr = 0;
     MemoryLocation reportLocation;
     uint32_t surfaceClipWidth = 0;
     uint32_t surfaceClipHeight = 0;
     uint16_t frequencyDividerOperation = 0;
     FragmentOps fragmentOps;
     GcmCullFace cullFace;
-    uint32_t userHandler = 0;
     FragmentShaderControl fragmentShaderControl;
     bool pointSizeVertexOutputEnabled = false;
     float pointSize = 0;

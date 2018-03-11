@@ -692,17 +692,10 @@ uint64_t DebuggerModel::evalExpr(std::string expr) {
     }
 }
 
-void DebuggerModel::dumpGcmContext() {
-    message(QString::fromStdString(dbgDumpGcmContext()));
-}
-
 void DebuggerModel::execSingleCommand(QString command) {
     auto name = command.section(':', 0, 0).trimmed();
-    
-    if (name == "gcmcontext") {
-        dumpGcmContext();
-        return;
-    } if (name == "segments") {
+
+    if (name == "segments") {
         dumpSegments();
         return;
     } else if (name == "imports") {

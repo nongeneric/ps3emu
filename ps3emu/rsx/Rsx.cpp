@@ -6,7 +6,6 @@
 #include "GLFramebuffer.h"
 #include "GLTexture.h"
 #include "../Process.h"
-#include "../ppu/CallbackThread.h"
 #include "../MainMemory.h"
 #include "../ELFLoader.h"
 #include "../shaders/ShaderGenerator.h"
@@ -45,15 +44,23 @@ namespace br = boost::range;
 
 typedef std::array<float, 4> glvec4_t;
 
+enum RsxHandlers {
+    RSX_HANDLER_QUEUE = 0b01000000,
+    RSX_HANDLER_VBLANK = 0b00000010,
+    RSX_HANDLER_FLIP = 0b00010000,
+    RSX_HANDLER_USER = 0b10000000,
+};
+
 Rsx::Rsx()
-    : _isFlipInProgress(false),
-      _lastFlipTime(0),
+    : _lastFlipTime(0),
       _transformFeedbackQuery(0),
       _idleCounter(boost::chrono::seconds(1)) {
     auto regs = (uint32_t*)g_state.mm->getMemoryPointer(GcmControlRegisters, 12);
     _put = regs;
     _get = regs + 1;
     _ref = regs + 2;
+    auto flipStatusVa = 0x40201100u;
+    _isFlipInProgress = (big_uint32_t*)g_state.mm->getMemoryPointer(flipStatusVa, 4);
 }
 
 Rsx::~Rsx() {
@@ -106,6 +113,13 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
     RangeCloser r(&_semaphoreAcquireCounter);
+
+    // here gcm acquires a semaphore that is released by RSX
+    // as there is no one to release the semaphore, just release it a second time
+    if (_activeSemaphoreHandle == 0x56616661 && offset == 0x30 && value == 1) {
+        g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
+    }
+
     while (g_state.mm->load32(GcmLabelBaseOffset + offset) != value) {
         ums_sleep(1);
     }
@@ -578,16 +592,8 @@ void Rsx::InlineArray(uint32_t offset, unsigned count) {
     DrawArrays(0, count * 4 / stride);
 }
 
-bool Rsx::isFlipInProgress() const {
-    return _isFlipInProgress;
-}
-
-void Rsx::setFlipStatus() {
-    _isFlipInProgress = false;
-}
-
-void Rsx::resetFlipStatus() {
-    _isFlipInProgress = true;
+void Rsx::setFlipStatus(bool inProgress) {
+    *_isFlipInProgress = inProgress ? 0 : 0x80000000;
 }
 
 struct VertexShaderViewportUniform {
@@ -601,12 +607,11 @@ void Rsx::setGcmContext(uint32_t ioSize, ps3_uintptr_t ioAddress) {
     _gcmIoAddress = ioAddress;
 }
 
-void Rsx::invokeHandler(uint32_t descrEa, uint32_t arg) {
-    fdescr descr;
-    g_state.mm->readMemory(descrEa, &descr, sizeof(descr));
-    assert(_callbackThread);
-    RangeCloser r(&_callbackCounter);
-    _callbackThread->schedule({arg}, descr.tocBase, descr.va);
+void Rsx::invokeHandler(uint32_t num, uint32_t arg) {
+    if (!_callbackQueue)
+        return;
+    g_state.mm->store32(0x402012cc, arg, g_state.granule);
+    sys_event_port_send(_callbackQueuePort, 0, num, 0);
 }
 
 void Rsx::resetContext() {
@@ -632,7 +637,7 @@ int64_t Rsx::getLastFlipTime() {
 void Rsx::DriverQueue(uint32_t id) {
     TRACE(DriverQueue, id);
     _context->flipBuffer = id;
-    _isFlipInProgress = true;
+    setFlipStatus(true);
 }
 
 void Rsx::DriverFlip(uint32_t value) {
@@ -683,18 +688,12 @@ void Rsx::DriverFlip(uint32_t value) {
     }
 #endif
 
-    _isFlipInProgress = false;
+    setFlipStatus(false);
 
     // RSX releases the semaphore here
     this->setLabel(1, 0, false);
 
-    if (_context->vBlankHandlerDescr) {
-        invokeHandler(_context->vBlankHandlerDescr, 1);
-    }
-
-    if (_context->flipHandlerDescr) {
-        invokeHandler(_context->flipHandlerDescr, 1);
-    }
+    invokeHandler(RSX_HANDLER_VBLANK | RSX_HANDLER_FLIP, 0);
 
     if (_frameCapturePending) {
         _frameCapturePending = false;
@@ -717,7 +716,7 @@ void Rsx::DriverFlip(uint32_t value) {
 void Rsx::updateDisplayBuffersForCapture() {
     for (auto i = 0u; i < _context->displayBuffers.size(); ++i) {
         auto& b = _context->displayBuffers[i];
-        setDisplayBuffer(i, b.offset, b.pitch, b.width, b.height);
+        setDisplayBuffer(i, b.offset, b.height);
     }
 }
 
@@ -1254,10 +1253,18 @@ void Rsx::updateTextures() {
     }
 }
 
-void Rsx::init() {
+void Rsx::init(sys_event_queue_t callbackQueue) {
     INFO(rsx) << "waiting for rsx loop to initialize";
     _profilerDomain = __itt_domain_create("rsx");
     _loopProfilerTask = __itt_string_handle_create("loop");
+    _callbackQueue = callbackQueue;
+
+    if (_callbackQueue) {
+        auto res = sys_event_port_create(&_callbackQueuePort, SYS_EVENT_PORT_LOCAL, 0);
+        assert(!res); (void)res;
+        res = sys_event_port_connect_local(_callbackQueuePort, _callbackQueue);
+        assert(!res);
+    }
 
     boost::unique_lock<boost::mutex> lock(_initMutex);
     _thread.reset(new boost::thread([=]{ loop(); }));
@@ -1539,12 +1546,12 @@ void Rsx::ContextDmaZeta(uint32_t context) {
     _context->surface.depthLocation = gcmEnumToLocation(context);
 }
 
-void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t pitch, uint32_t width, uint32_t height) {
-    TRACE(setDisplayBuffer, id, offset, pitch, width, height);
+void Rsx::setDisplayBuffer(uint8_t id, uint32_t offset, uint32_t height) {
+    TRACE(setDisplayBuffer, id, offset, height);
     auto& buffer = _context->displayBuffers[id];
     buffer.offset = offset;
-    buffer.pitch = pitch;
-    buffer.width = width;
+    buffer.width = height * 16 / 9;
+    buffer.pitch = 4 * buffer.width;
     buffer.height = height;
 }
 
@@ -1713,7 +1720,6 @@ void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
     INFO(rsx) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
     waitForIdle();
     g_state.mm->store32(_context->semaphoreOffset + GcmLabelBaseOffset, value, g_state.granule);
-    __sync_synchronize();
 }
 
 void Rsx::SemaphoreOffset(uint32_t offset) {
@@ -1751,14 +1757,6 @@ void Rsx::resetCacheWatch() {
         //assert(!g_state.mm->modificationMap()->marked(va, size));
         return false;
     });
-}
-
-void Rsx::setVBlankHandler(uint32_t descrEa) {
-    _context->vBlankHandlerDescr = descrEa;
-}
-
-void Rsx::setFlipHandler(uint32_t descrEa) {
-    _context->flipHandlerDescr = descrEa;
 }
 
 void Rsx::OffsetDestin(uint32_t offset) {
@@ -2443,22 +2441,8 @@ void Rsx::captureFrames() {
     _shortTrace = true;
 }
 
-void Rsx::setCallbackThread(CallbackThread* thread) {
-    _callbackThread.reset(thread);
-}
-
-void Rsx::terminateCallbackThread() {
-    if (_callbackThread) {
-        _callbackThread->terminate();
-    }
-}
-
-void Rsx::setUserHandler(uint32_t handler) {
-    _context->userHandler = handler;
-}
-
 void Rsx::DriverInterrupt(uint32_t cause) {
-    invokeHandler(_context->userHandler, cause);
+    invokeHandler(RSX_HANDLER_USER, cause);
 }
 
 void Rsx::PointSize(float size) {

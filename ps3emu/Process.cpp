@@ -93,7 +93,7 @@ int32_t executeExportedFunction(uint32_t imageBase,
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
     assert(segment != end(segments));
     auto elfName = segment->elf->shortName();
-    for (auto elf : { "libaudio.sprx.elf", "libgcm_sys.sprx.elf", "libsysutil.sprx.elf" }) {
+    for (auto elf : { "libaudio.sprx.elf", "libsysutil.sprx.elf" }) {
         if (elf == elfName) {
             INFO(libs) << ssnprintf("ignoring function %s for module %s", name, elfName);
             return CELL_OK;
@@ -315,7 +315,6 @@ Event Process::run() {
             switch (ev->event) {
                 case PPUThreadEvent::Started: return PPUThreadStartedEvent{ev->thread};
                 case PPUThreadEvent::ProcessFinished: {
-                    _rsx->terminateCallbackThread();
                     dbgPause(false);
                     {
                         boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);

@@ -124,11 +124,10 @@ void Rsx::setRef(uint32_t ref) {
 
 void Rsx::loop() {
     initGcm();
-    setGet(0);
-    setPut(0);
+    setGet(gcmResetCommandsSize);
+    setPut(gcmResetCommandsSize);
     setRef(0xffffffff);
     _ret = 0;
-    _isFlipInProgress = false;
     log_set_thread_name("rsx_loop");
     INFO(rsx) << "rsx loop started, waiting for updates";
     if (_mode == RsxOperationMode::Replay) {

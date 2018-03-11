@@ -30,6 +30,22 @@ inline void MainMemory::store(ps3_uintptr_t va,
                               typename IntTraits<Len>::Type value,
                               ReservationGranule* granule)
 {
+#if 0
+    if constexpr(Len == 4) {
+        if (va == GcmControlRegisters) {
+            WARNING(libs) << ssnprintf("rsx_reg_put: %x (nip: %x)", value, g_state.th->getNIP());
+        }
+        if (va == GcmControlRegisters + 4) {
+            WARNING(libs) << ssnprintf("rsx_reg_get: %x (nip: %x)", value, g_state.th->getNIP());
+        }
+        if (va == GcmControlRegisters + 8) {
+            WARNING(libs) << ssnprintf("rsx_reg_ref: %x (nip: %x)", value, g_state.th->getNIP());
+        }
+        if (va == 0x40201100) {
+            WARNING(libs) << ssnprintf("rsx_reg_flip_status: %x (nip: %x)", value, g_state.th->getNIP());
+        }
+    }
+#endif
     auto reversed = fast_endian_reverse(value);
     if (unlikely(writeSpecialMemory(va, &reversed, Len)))
         return;

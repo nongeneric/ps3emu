@@ -895,15 +895,10 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         _proc.reset(new Process());
         _rsx.reset(new Rsx());
         g_state.rsx = _rsx.get();
-        _rsx->init();
+        _rsx->init(0);
         _rsx->resetContext();
         g_state.mm->mark(RsxFbBaseAddr, GcmLocalMemorySize, false, "gcmviz");
         g_state.mm->mark(HeapArea, 256u << 20, false, "gcmviz");
-        uint32_t last = gcmInitCommandsSize - 4; // except the reset call
-        for (auto get = 0u; get != last;) {
-            auto ptr = (uint32_t*)&gcmInitCommands[get];
-            get += _rsx->interpret(get, ptr);
-        }
     }
     
     std::vector<GcmCommand> commands;

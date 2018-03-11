@@ -93,7 +93,6 @@ class DebuggerModel : public QWidget, public IEmuCallbacks {
     void printBacktrace();
     void dumpExecutionMap();
     void dumpSpuExecutionMaps();
-    void dumpGcmContext();
     uint64_t evalExpr(std::string expr);
     bool _isRunning = false;
     bool _updateUIWhenRunning = true;
