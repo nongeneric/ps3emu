@@ -40,3 +40,6 @@ int32_t cellAudioOutGetState(uint32_t audioOut,
                              CellAudioOutState* state);
 int32_t cellAudioOutGetNumberOfDevice(uint32_t audioOut);
 int32_t cellVideoOutGetNumberOfDevice(uint32_t videoOut);
+int32_t cellAudioOutGetConfiguration(uint32_t audioOut,
+                                     CellAudioOutConfiguration* config,
+                                     uint32_t* option);

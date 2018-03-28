@@ -9,6 +9,7 @@
 #include "ps3emu/state.h"
 #include "ps3emu/profiler.h"
 #include <execinfo.h>
+#include <stdio.h>
 
 namespace {
     thread_local std::string thread_name;
@@ -24,8 +25,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, int areas, log
     active_areas = areas;
 
     auto fileName = "/tmp/ps3.log";
-    if (boost::filesystem::exists(fileName))
-        boost::filesystem::remove(fileName);
+    fclose(fopen(fileName, "w+"));
 
     std::vector<spdlog::sink_ptr> sinks;
     if (sink_flags & log_console) {

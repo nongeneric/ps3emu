@@ -125,3 +125,4 @@ int32_t sceNpTrophyGetRequiredDiskSpace(SceNpTrophyContext context,
                                         SceNpTrophyHandle handle,
                                         big_uint64_t* reqspace,
                                         uint64_t options);
+int32_t sceNpTrophyDestroyHandle(SceNpTrophyHandle handle);

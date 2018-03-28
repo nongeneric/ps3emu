@@ -52,8 +52,7 @@ enum RsxHandlers {
 };
 
 Rsx::Rsx()
-    : _lastFlipTime(0),
-      _transformFeedbackQuery(0),
+    : _transformFeedbackQuery(0),
       _idleCounter(boost::chrono::seconds(1)) {
     auto regs = (uint32_t*)g_state.mm->getMemoryPointer(GcmControlRegisters, 12);
     _put = regs;
@@ -61,6 +60,8 @@ Rsx::Rsx()
     _ref = regs + 2;
     auto flipStatusVa = 0x40201100u;
     _isFlipInProgress = (big_uint32_t*)g_state.mm->getMemoryPointer(flipStatusVa, 4);
+    auto lastFlipTimeVa = 0x402010f8u;
+    _lastFlipTime = (big_uint64_t*)g_state.mm->getMemoryPointer(lastFlipTimeVa, 4);
 }
 
 Rsx::~Rsx() {
@@ -117,6 +118,10 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     // here gcm acquires a semaphore that is released by RSX
     // as there is no one to release the semaphore, just release it a second time
     if (_activeSemaphoreHandle == 0x56616661 && offset == 0x30 && value == 1) {
+        g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
+    }
+
+    if (_activeSemaphoreHandle == 0x66616661 && offset == 0x5a0 && value == 1) {
         g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
     }
 
@@ -630,10 +635,6 @@ void Rsx::resetContext() {
     }
 }
 
-int64_t Rsx::getLastFlipTime() {
-    return _lastFlipTime;
-}
-
 void Rsx::DriverQueue(uint32_t id) {
     TRACE(DriverQueue, id);
     _context->flipBuffer = id;
@@ -674,7 +675,7 @@ void Rsx::DriverFlip(uint32_t value) {
     _fpsCounter.openRange(counter_clock_t::now());
     _fpsCounter.closeRange(counter_clock_t::now());
 
-    _lastFlipTime = g_state.proc->getTimeBaseMicroseconds().count();
+    *_lastFlipTime = g_state.proc->getTimeBase();
     _context->frame++;
     _context->commandNum = 0;
 
@@ -796,7 +797,7 @@ void Rsx::drawStats() {
 }
 
 void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count) {
-    assert(count % 4 == 0);
+    //assert(count % 4 == 0);
     auto size = count * sizeof(float);
 
     static std::vector<uint8_t> source;

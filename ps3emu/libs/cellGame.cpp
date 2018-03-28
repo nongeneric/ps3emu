@@ -52,6 +52,16 @@ int32_t cellGameGetParamString(uint32_t id, ps3_uintptr_t buf, uint32_t bufsize,
     return CELL_OK;
 }
 
+int32_t cellGameGetParamInt(uint32_t id, big_int32_t* value) {
+    auto sfo = g_state.content->sfo();
+    auto entry = std::find_if(begin(sfo), end(sfo), [=] (auto& entry) {
+        return entry.id == id;
+    });
+    assert(entry != end(sfo));
+    *value = boost::get<uint32_t>(entry->data);
+    return CELL_OK;
+}
+
 int32_t cellGameBootCheck(big_uint32_t* type,
                           big_uint32_t* attributes,
                           CellGameContentSize* size,
@@ -91,5 +101,10 @@ int32_t cellGameDataCheckCreate2(uint32_t type,
     auto size = g_state.memalloc->internalAllocU<4, CellGameContentSize>(&va);
     cellGameDataCheck(type, dirName, size.get(), g_state.proc);
     th->ps3call(*cb, {(uint64_t)arg, (uint64_t)va}, sink);
+    return CELL_OK;
+}
+
+int32_t cellGameGetSizeKB(big_int32_t* sizeKB) {
+    *sizeKB = 15 << 20; // 15GB
     return CELL_OK;
 }

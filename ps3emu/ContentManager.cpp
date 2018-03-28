@@ -94,9 +94,9 @@ struct sfo_header {
 static_assert(sizeof(sfo_header) == 20, "");
 
 enum class entry_fmt_t : uint16_t {
-    utf8_not_null_terminated,
-    utf8_null_terminated,
-    integer
+    utf8_not_null_terminated = 0x304,
+    utf8_null_terminated = 0x204,
+    integer = 0x404
 };
 
 struct sfo_index_table_entry {

@@ -279,6 +279,13 @@ uint32_t sys_rsx_context_attribute(uint32_t rsx_ctx_id,
             arg_2,
             arg_3);
         // do nothing
+    } else if (pkg_id == RSX_CONTEXT_ATTR_SECOND_VFREQUENCY) {
+        INFO(libs) << ssnprintf(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_SECOND_VFREQUENCY, %x, %x, %x)",
+            arg_1,
+            arg_2,
+            arg_3);
+        // do nothing
     } else {
         EMU_ASSERT(false);
     }

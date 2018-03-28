@@ -380,3 +380,8 @@ int32_t sceNpTrophyGetTrophyUnlockState(SceNpTrophyContext,
     memcpy(flags, &set, 16);
     return CELL_OK;
 }
+
+int32_t sceNpTrophyDestroyHandle(SceNpTrophyHandle handle) {
+    // TODO: handle
+    return CELL_OK;
+}

@@ -62,3 +62,5 @@ int32_t cellGameDataCheckCreate2(uint32_t type,
                                  uint32_t memContainer,
                                  PPUThread* th,
                                  boost::context::continuation* sink);
+int32_t cellGameGetParamInt(uint32_t id, big_int32_t* value);
+int32_t cellGameGetSizeKB(big_int32_t* sizeKB);

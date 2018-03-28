@@ -119,3 +119,14 @@ int32_t cellVideoOutGetNumberOfDevice(uint32_t videoOut) {
     assert(videoOut == CELL_AUDIO_OUT_PRIMARY);
     return 1;
 }
+
+int32_t cellAudioOutGetConfiguration(uint32_t audioOut,
+                                     CellAudioOutConfiguration* config,
+                                     uint32_t* option) {
+    assert(audioOut == CELL_AUDIO_OUT_PRIMARY);
+    assert(option == 0);
+    config->channel = 2;
+    config->encoder = CELL_AUDIO_OUT_CODING_TYPE_LPCM;
+    config->downMixer = CELL_AUDIO_OUT_DOWNMIXER_NONE;
+    return CELL_OK;
+}
