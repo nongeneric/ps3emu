@@ -5,6 +5,7 @@
 #include "ps3emu/ELFLoader.h"
 #include "ps3emu/enum.h"
 #include <array>
+#include <optional>
 
 class Process;
 class PPUThread;
@@ -21,6 +22,12 @@ typedef struct sys_page_attr {
     big_uint32_t page_size;
     big_uint32_t pad;
 } sys_page_attr_t;
+
+struct SharedMemoryInfo {
+    uint64_t id;
+    uint32_t size;
+    uint32_t va;
+};
 
 #define SYS_MEMORY_PROT_READ_ONLY        0x0000000000080000ULL
 #define SYS_MEMORY_PROT_READ_WRITE       0x0000000000040000ULL
@@ -220,7 +227,7 @@ int32_t sys_prx_load_module_list(int32_t n,
                                  uint64_t flags,
                                  uint64_t pOpt,
                                  ps3_uintptr_t idlist);
-int32_t sys_mmapper_allocate_shared_memory(uint32_t id,
+int32_t sys_mmapper_allocate_shared_memory(uint64_t id,
                                            uint32_t size,
                                            uint32_t alignment,
                                            big_uint32_t* mem);
@@ -249,3 +256,4 @@ emu_void_t _sys_memcpy(uint64_t dest, uint64_t src, uint64_t size, MainMemory* m
 emu_void_t _sys_memset(uint64_t dest, uint64_t value, uint64_t size, MainMemory* mm);
 
 uint32_t emuEmptyModuleStart();
+std::optional<SharedMemoryInfo> emuFindSharedMemoryInfo(uint64_t id);

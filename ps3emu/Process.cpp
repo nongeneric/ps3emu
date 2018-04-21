@@ -8,6 +8,7 @@
 #include "state.h"
 #include "Config.h"
 #include "ps3emu/libs/sync/queue.h"
+#include "ps3emu/libs/audio/libaudio.h"
 #include "ps3emu/HeapMemoryAlloc.h"
 #include "ps3emu/utils/debug.h"
 #include "ps3emu/profiler.h"
@@ -58,8 +59,7 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* fname) {
         return 0;
     }
     auto elfName = segment->elf->shortName();
-    for (auto name : {"libaudio.sprx.elf",
-                      "libgcm_sys.sprx.elf",
+    for (auto name : {"libgcm_sys.sprx.elf",
                       "libsysutil.sprx.elf",
                       "libsysutil_np_trophy.sprx.elf",
                       "libsysutil_game.sprx.elf",
@@ -149,6 +149,8 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
         ERROR(libs) << ssnprintf("SDL initialization failed: %s", SDL_GetError());
         exit(1);
     }
+
+    initAudio();
     
     g_profiler_process_domain = __itt_domain_create("proc");
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,

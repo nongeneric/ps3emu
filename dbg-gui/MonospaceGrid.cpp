@@ -1,4 +1,5 @@
 #include "MonospaceGrid.h"
+#include "ps3emu/utils/ranges.h"
 #include <QPainter>
 #include <QPen>
 #include <QFont>
@@ -140,9 +141,8 @@ bool intersects(ArrowInfo a, ArrowInfo b) {
 }
 
 void MonospaceGrid::drawArrows(std::vector<ArrowInfo> arrows, QPainter& painter) {
-    std::sort(begin(arrows), end(arrows), [](auto l, auto r) {
-        return std::max(l.from, l.to) - std::min(l.from, l.to) <
-               std::max(r.from, r.to) - std::min(r.from, r.to);
+    ranges::sort(arrows, std::less<>(), [](auto& x) {
+        return std::max(x.from, x.to) - std::min(x.from, x.to);
     });
     std::map<int, std::vector<ArrowInfo>> lines;
     for (auto a : arrows) {

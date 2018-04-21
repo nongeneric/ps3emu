@@ -35,6 +35,7 @@ typedef big_uint64_t sys_ipc_key_t;
 #define CELL_EPERM -2147418103     /* 0x80010009 */
 #define CELL_EDEADLK -2147418104   /* 0x80010008 */
 #define CELL_EBUSY -2147418102     /* 0x8001000A */
+#define CELL_EEXIST -2147418092    /* 0x80010014 */
 
 struct cstring_ptr_t {
     std::string str;

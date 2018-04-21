@@ -14,6 +14,7 @@
 #include "ps3emu/ImageUtils.h"
 #include "ps3emu/state.h"
 #include "ps3emu/int.h"
+#include "ps3emu/utils/ranges.h"
 #include <atomic>
 #include <vector>
 #include <fstream>
@@ -741,9 +742,7 @@ void Rsx::drawStats() {
         auto [sum, count] = counter.value();
         vec.push_back({entry, count, sum});
     }
-    std::sort(begin(vec), end(vec), [&](auto& a, auto& b) {
-        return std::get<2>(a) > std::get<2>(b);
-    });
+    ranges::sort(vec, std::less<>(), [](auto& x) { return std::get<2>(x); });
 
     int i = 0;
     for (auto& [entry, count, sum] : vec) {

@@ -6,6 +6,7 @@
 #include "ps3emu/ContentManager.h"
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/fileutils.h"
+#include "ps3emu/utils/ranges.h"
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include "string.h"
@@ -262,10 +263,8 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
     set->indicator = setIndicatorVa;
     
     auto files = get_files(dirPath.string(), "(?!" + paramSfoName + ").*", false);
-    std::sort(begin(files), end(files), [&](auto& a, auto& b) {
-        auto aname = boost::filesystem::path(a).filename().string();
-        auto bname = boost::filesystem::path(b).filename().string();
-        return aname < bname;
+    ranges::sort(files, std::less<>(), [](auto& x) {
+        return boost::filesystem::path(x).filename().string();
     });
     auto fileList = (CellSaveDataFileStat*)g_state.memalloc->allocInternalMemory(
         &fileListVa,

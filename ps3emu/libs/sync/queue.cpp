@@ -60,8 +60,11 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
                                sys_ipc_key_t event_queue_key,
                                uint32_t size) {
     assert(1 <= size && size < 128);
-    // TODO: handle unique key
-    //assert(event_queue_key == SYS_EVENT_QUEUE_LOCAL);
+    if (event_queue_key != SYS_EVENT_QUEUE_LOCAL) {
+        if (getQueueByKey(event_queue_key)) {
+            return CELL_EEXIST;
+        }
+    }
     assert(attr->attr_protocol == SYS_SYNC_PRIORITY ||
            attr->attr_protocol == SYS_SYNC_FIFO);
     auto info = std::make_shared<queue_info>();
@@ -110,7 +113,7 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
     th->setGPR(7, event.data3);
     if (info->log) {
         INFO(libs) << ssnprintf(
-            "completed sys_event_queue_receive(%s[%x]): %x, %x, %x, %x",
+            "completed sys_event_queue_receive(%s[%x]): %llx, %llx, %llx, %llx",
             info->name,
             equeue_id,
             event.source,
@@ -287,4 +290,9 @@ sys_event_queue_t getQueueByKey(sys_ipc_key_t key) {
 
 void disableLogging(sys_event_queue_t queue) {
     queues.get(queue)->log = false;
+}
+
+sys_event_t sysQueueReceive(sys_event_queue_t equeue_id) {
+    auto info = queues.get(equeue_id);
+    return info->queue->receive(0);
 }

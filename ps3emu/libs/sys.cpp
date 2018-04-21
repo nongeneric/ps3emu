@@ -21,6 +21,10 @@
 #include <memory>
 #include <map>
 
+namespace {
+    std::vector<SharedMemoryInfo> g_sharedMemoryInfos;
+}
+
 void init_sys_lib() {
     INFO(libs) << __FUNCTION__;
 }
@@ -554,17 +558,23 @@ int32_t sys_prx_load_module_list(int32_t n,
     return CELL_OK;
 }
 
-int32_t sys_mmapper_allocate_shared_memory(uint32_t id,
+int32_t sys_mmapper_allocate_shared_memory(uint64_t id,
                                            uint32_t size,
                                            uint32_t alignment,
                                            big_uint32_t* mem) {
-    INFO(libs) << ssnprintf("sys_mmapper_allocate_shared_memory(%08x, %08x, %02x)",
-                            id,
-                            size,
-                            alignment);
+    if (emuFindSharedMemoryInfo(id))
+        return CELL_EEXIST;
+    alignment = 1u << (31 - __builtin_clz(alignment));
     uint32_t va;
     g_state.memalloc->allocInternalMemory(&va, size, alignment);
     *mem = va;
+    INFO(libs) << ssnprintf(
+        "sys_mmapper_allocate_shared_memory(%llx, %08x, %02x, va=%x)",
+        id,
+        size,
+        alignment,
+        va);
+    g_sharedMemoryInfos.push_back({id, size, va});
     return CELL_OK;
 }
 
@@ -630,4 +640,13 @@ emu_void_t _sys_memcpy(uint64_t dest, uint64_t src, uint64_t size, MainMemory* m
 emu_void_t _sys_memset(uint64_t dest, uint64_t value, uint64_t size, MainMemory* mm) {
     mm->setMemory(dest, value, size);
     return emu_void;
+}
+
+std::optional<SharedMemoryInfo> emuFindSharedMemoryInfo(uint64_t id) {
+    auto it = std::find_if(begin(g_sharedMemoryInfos),
+                           end(g_sharedMemoryInfos),
+                           [&](auto& info) { return info.id == id; });
+    if (it == end(g_sharedMemoryInfos))
+        return {};
+    return *it;
 }

@@ -4,3 +4,6 @@
 [submodule "thirdparty/xxHash"]
 	path = thirdparty/xxHash
 	url = https://github.com/Cyan4973/xxHash.git
+[submodule "thirdparty/cmcstl2"]
+	path = thirdparty/cmcstl2
+	url = https://github.com/CaseyCarter/cmcstl2.git

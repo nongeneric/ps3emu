@@ -94,6 +94,10 @@ set(SRC
     libs/spu/sysSpu.cpp
     libs/audio/configuration.cpp
     libs/audio/libaudio.cpp
+    libs/audio/pulse.h
+    libs/audio/pulse.cpp
+    libs/audio/AudioAttributes.h
+    libs/audio/AudioAttributes.cpp
     libs/sync/lwmutex.cpp
     libs/sync/mutex.cpp
     libs/sync/cond.cpp

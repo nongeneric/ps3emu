@@ -46,6 +46,15 @@ inline void MainMemory::store(ps3_uintptr_t va,
         }
     }
 #endif
+
+#if 0
+    if constexpr(Len == 4 || Len == 8) {
+        if (value == 0x10118000 || value == 0x10102c10 || value == 0x10102c00) {
+            WARNING(libs) << ssnprintf("write %llx to %x from %x", (uint64_t)value, va, g_state.th->getNIP());
+        }
+    }
+#endif
+
     auto reversed = fast_endian_reverse(value);
     if (unlikely(writeSpecialMemory(va, &reversed, Len)))
         return;

@@ -92,4 +92,5 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        uint8_t* spup);
 
 sys_event_queue_t getQueueByKey(sys_ipc_key_t key);
+sys_event_t sysQueueReceive(sys_event_queue_t equeue_id);
 void disableLogging(sys_event_queue_t queue);

@@ -21,6 +21,7 @@ set(SRC
     InstrDbTests.cpp
     FragmentCacheTests.cpp
     BitUtilsTests.cpp
+    LibaudioTests.cpp
 )
 
 add_executable(tests ${SRC})

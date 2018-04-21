@@ -18,6 +18,7 @@
 #include "ps3emu/spu/SPUGroupManager.h"
 #include "ps3emu/BBCallMap.h"
 #include "ps3tool-core/Rewriter.h"
+#include "ps3emu/utils/ranges.h"
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
@@ -26,7 +27,6 @@
 #include <boost/thread/locks.hpp>
 #include <boost/filesystem.hpp>
 #include <set>
-
 
 class GridModelChangeTracker {
     MonospaceGridModel* _model;
@@ -1060,9 +1060,7 @@ void printFrequencies(FILE* f, std::map<std::string, int>& counts) {
     for (auto p : counts) {
         sorted.push_back(p);
     }
-    std::sort(begin(sorted), end(sorted), [](auto a, auto b) {
-        return b.second < a.second;
-    });
+    ranges::sort(sorted, std::less<>(), [](auto x) { return x.second; });
     for (auto p : sorted) {
         fprintf(f, "#%-10s%-5d\n", p.first.c_str(), p.second);
     }

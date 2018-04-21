@@ -13,6 +13,7 @@
 #include "ps3emu/exports/splicer.h"
 #include "InternalMemoryManager.h"
 #include "ps3emu/BBCallMap.h"
+#include "ps3emu/utils/ranges.h"
 #include <boost/filesystem.hpp>
 #include <map>
 #include <dlfcn.h>
@@ -287,7 +288,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         encodeNCall(g_state.mm, codeVa, index);
         g_state.bbcallMap->set(codeVa, 0);
     }
-    
+
     // install logging proxies
     if (!rewriter) {
         auto [exports, nexports] = this->exports();
@@ -299,27 +300,43 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 auto name = fnidName ? *fnidName : ssnprintf("fnid_%08X", fnids[j]);
                 std::string libname;
                 readString(g_state.mm, exports[i].name, libname);
-                auto replacement = std::find_if(begin(replacements), end(replacements), [&](auto& r) {
+                auto replacement = ranges::find_if(replacements, [&](auto& r) {
                     return r.name == name && r.lib == libname;
                 });
                 if (replacement != end(replacements))
                     continue;
-                if (name == "sys_ppu_thread_get_id")
+                if (name == "sys_ppu_thread_get_id" || name == "cellGcmGetFlipStatus")
                     continue;
                 auto codeVa = g_state.mm->load32(stubs[j]);
                 auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
                               name == "cellSyncMutexTryLock";
-                auto log = [=](auto message) {
-                    if (isSync) {
-                        INFO(libs, sync) << message;
-                    } else {
-                        INFO(libs) << message;
-                    }
+                std::function<void(std::string&&)> log = [=](auto message) {
+                    INFO(libs) << message;
                 };
+                if (isSync) {
+                    log = [=](auto message) {
+                        INFO(libs, sync) << message;
+                    };
+                }
+                std::function<std::string(PPUThread*)> getPreInfo = [](auto th){
+                    return ssnprintf("%llx", th->getGPR(3));
+                };
+                auto getPostInfo = getPreInfo;
+                if (name == "cellAudioGetPortBlockTag" || name == "cellAudioGetPortTimestamp") {
+                    static thread_local uint32_t tsVa = 0;
+                    getPreInfo = [=](auto th) {
+                        tsVa = th->getGPR(5);
+                        return ssnprintf("%d, %lld, ...", (uint32_t)th->getGPR(3), th->getGPR(4));
+                    };
+                    getPostInfo = [=](auto th) {
+                        auto ts = g_state.mm->load64(tsVa);
+                        return ssnprintf("%llx, %lld", (uint32_t)th->getGPR(3), ts);
+                    };
+                }
                 spliceFunction(codeVa, [=] {
-                    log(ssnprintf("proxy [%08x] %s.%s(%llx)", codeVa, libname, name, g_state.th->getGPR(3)));
+                    log(ssnprintf("proxy [%08x] %s.%s(%s)", codeVa, libname, name, getPreInfo(g_state.th)));
                 }, [=] {
-                    log(ssnprintf("proxy [%08x] %s.%s -> %llx", codeVa, libname, name, g_state.th->getGPR(3)));
+                    log(ssnprintf("proxy [%08x] %s.%s -> %s", codeVa, libname, name, getPostInfo(g_state.th)));
                 });
             }
         }
@@ -359,7 +376,6 @@ bool isSymbolWhitelisted(ELFLoader* prx, uint32_t id) {
     }
     if (name == "libsysutil_game.sprx.elf" ||
         name == "libsysutil.sprx.elf" || name == "libio.sprx.elf" ||
-        name == "libaudio.sprx.elf" ||
         name == "libsysutil_np_trophy.sprx.elf" ||
         name == "libsysutil_np.sprx.elf" || name == "libsysutil_np2.sprx.elf" ||
         name == "libnetctl.sprx.elf" || name == "libnet.sprx.elf" ||

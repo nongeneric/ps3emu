@@ -216,7 +216,7 @@ CellFsErrno getDirectoryEntries(int32_t fd,
                                 uint32_t entries_size,
                                 uint32_t* data_count)
 {
-    INFO(libs) << ssnprintf("cellFsGetDirectoryEntries(%d, ...)", fd);
+    INFO(libs) << ssnprintf("getDirectoryEntries(%d, ...)", fd);
     auto info = dirMap.get(fd);
     auto entry = readdir(info->dir);
     if (entry) {
@@ -267,12 +267,13 @@ struct fcntl_free_space_t {
 };
 
 CellFsErrno sys_fs_fcntl(int32_t fd, uint32_t cmd, uint32_t data, uint32_t size) {
-    INFO(libs) << ssnprintf("sys_fs_fcntl(%x, %x, %x, %x)", fd, cmd, data, size);
     if (fd == -1 && cmd == 0xe0000017) {
         g_state.mm->store32(data + 0x20, 0, g_state.granule);
+        return CELL_OK;
     }
     if (fd != -1 && cmd == 0xc0000008) {
         g_state.mm->store32(data + 0x20, 0, g_state.granule);
+        return CELL_OK;
     }
     if (cmd == 0xe0000012) {
         fcntl_direntries_t config;
@@ -298,6 +299,7 @@ CellFsErrno sys_fs_fcntl(int32_t fd, uint32_t cmd, uint32_t data, uint32_t size)
         g_state.mm->writeMemory(data, &config, size);
         return CELL_OK;
     }
+    WARNING(libs) << ssnprintf("unknown sys_fs_fcntl(%x, %x, %x, %x)", fd, cmd, data, size);
     return CELL_OK;
 }
 
