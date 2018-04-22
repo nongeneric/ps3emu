@@ -1,7 +1,7 @@
 #include "ps3emu/rsx/FragmentShaderCache.h"
 #include "xxhash.h"
 
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 TEST_CASE("fragment_cache_basic") {
     uint8_t raw[] {

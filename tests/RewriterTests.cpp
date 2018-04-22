@@ -5,7 +5,7 @@
 #include "ps3emu/spu/SPUDasm.h"
 #include "ps3tool-core/Rewriter.h"
 #include "TestUtils.h"
-#include <catch/catch.hpp>
+#include <catch.hpp>
 #include <boost/filesystem.hpp>
 #include <string>
 #include <sstream>

@@ -1,4 +1,4 @@
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 #include "ps3emu/libs/audio/AudioAttributes.h"
 #include <vector>

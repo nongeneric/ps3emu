@@ -1,5 +1,5 @@
 #include "ps3emu/int.h"
-#include <catch/catch.hpp>
+#include <catch.hpp>
 #include <vector>
 
 TEST_CASE("fast_reverse_tests") {

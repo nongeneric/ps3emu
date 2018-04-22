@@ -1,4 +1,4 @@
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 #include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/RewriterUtils.h"

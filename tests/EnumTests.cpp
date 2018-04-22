@@ -1,5 +1,5 @@
 #include "ps3emu/enum.h"
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 ENUMF(TestEnum, (A, 1), (B, 2), (C, 4), (D, 2 | 4))
 ENUMF(TestEnum2, (A, 0), (B, 1))

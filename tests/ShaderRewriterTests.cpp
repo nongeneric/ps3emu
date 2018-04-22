@@ -1,6 +1,6 @@
 #include "../ps3emu/shaders/shader_dasm.h"
 #include "../ps3emu/shaders/ShaderRewriter.h"
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 using namespace ShaderRewriter;
 
@@ -392,7 +392,7 @@ TEST_CASE("shader_rewriter_dph") {
     };
     
     std::array<VertexInstr, 2> res;
-    auto count = vertex_dasm_instr(instr, res);
+    vertex_dasm_instr(instr, res);
     auto st = MakeStatement(context, res[0], 0);
     auto str = printStatements(st);
     REQUIRE( str == "r[0].y = dot(vec4((v_in[0].xyzx).xyz, 1), r[4]);" );
@@ -431,7 +431,7 @@ TEST_CASE("shader_rewriter_cond_y") {
     };
     
     std::array<VertexInstr, 2> res;
-    auto count = vertex_dasm_instr(instr, res);
+    vertex_dasm_instr(instr, res);
     auto st = MakeStatement(context, res[0], 0);
     auto str = printStatements(st);
     REQUIRE(str == "r[3].y = mix(r[3], (r[5].xxxx), notEqual((c[0]), vec4(0))).y;");

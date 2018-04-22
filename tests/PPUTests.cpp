@@ -9,7 +9,7 @@
 #include "ps3emu/TimedCounter.h"
 #include <vector>
 #include <atomic>
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 TEST_CASE("modification_map_simple") {
     ModificationMap<32, 1024> map;
