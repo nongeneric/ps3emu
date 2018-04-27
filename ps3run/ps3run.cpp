@@ -9,6 +9,7 @@
 #include <boost/algorithm/string.hpp>
 #include "stdio.h"
 #include <signal.h>
+#include <iostream>
 
 using namespace boost::program_options;
 

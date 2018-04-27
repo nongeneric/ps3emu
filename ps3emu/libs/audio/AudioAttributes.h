@@ -45,7 +45,7 @@ class AudioAttributes {
 
 public:
     static constexpr unsigned portHwBase = 5;
-    static constexpr unsigned fixedLatency = 18;
+    static constexpr unsigned fixedLatency = 10;
 
     AudioAttributes() = default;
     AudioAttributes(uint8_t* mem);

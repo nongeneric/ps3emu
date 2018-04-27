@@ -5,10 +5,11 @@
 #include "Config.h"
 #include "ps3emu/state.h"
 #include "ps3emu/Config.h"
+#include <QApplication>
 #include <boost/program_options.hpp>
 #include <string>
+#include <iostream>
 #include <stdint.h>
-#include <QApplication>
 
 using namespace boost::program_options;
 

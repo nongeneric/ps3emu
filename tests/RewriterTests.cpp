@@ -6,7 +6,7 @@
 #include "ps3tool-core/Rewriter.h"
 #include "TestUtils.h"
 #include <catch.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <string>
 #include <sstream>
 #include <stdio.h>

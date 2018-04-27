@@ -18,13 +18,13 @@
 #include <GLFW/glfw3.h>
 #include <boost/thread/locks.hpp>
 #include <boost/range/algorithm.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <optional>
 #include "log.h"
 #include <set>
 #include <cstdlib>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 ELFLoader* Process::elfLoader() {
     return _elf.get();

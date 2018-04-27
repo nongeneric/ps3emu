@@ -22,10 +22,10 @@
 #include "Config.h"
 #include <QStringList>
 #include "stdio.h"
-#include <boost/regex.hpp>
+#include <regex>
 #include <boost/range/algorithm.hpp>
 #include <boost/thread/locks.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <set>
 
 class GridModelChangeTracker {
@@ -827,9 +827,9 @@ void DebuggerModel::execSingleCommand(QString command) {
             return;
         } else if (name == "put") {
             auto id = command.section(':', 2, 2).trimmed().toStdString();
-            boost::regex rxgpr("r([0-9]+)");
-            boost::smatch m;
-            if (boost::regex_match(id, m, rxgpr)) {
+            std::regex rxgpr("r([0-9]+)");
+            std::smatch m;
+            if (std::regex_match(id, m, rxgpr)) {
                 auto n = std::stoul(m[1]);
                 if (n <= 31) {
                     _activeThread->setGPR(n, exprVal);

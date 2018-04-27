@@ -1,7 +1,7 @@
 #include <catch.hpp>
 
 #include "TestUtils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <vector>
 
 TEST_CASE("simple_printf") {
@@ -2641,7 +2641,7 @@ TEST_CASE("spu_generic_test2") {
 
 TEST_CASE("sysutil_save_basic_auto_only", TAG_SERIAL) {
     auto savedir = "./binaries/sysutil_save_basic_auto_only/SAVEDATA";
-    boost::filesystem::remove_all(savedir);
+    std::filesystem::remove_all(savedir);
     auto output = startWaitGetOutput({"./binaries/sysutil_save_basic_auto_only/USRDIR/a.elf"});
     REQUIRE( output ==
         "thr_auto_save() start\n"

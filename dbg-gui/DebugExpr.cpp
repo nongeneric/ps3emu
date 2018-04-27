@@ -6,10 +6,8 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/state.h"
 #include <memory>
-#include <boost/regex.hpp>
+#include <regex>
 #include <boost/endian/arithmetic.hpp>
-
-using namespace boost;
 
 enum class TokenType {
     LeftSquareBracket,
@@ -71,28 +69,28 @@ public:
 };
 
 Token makeToken(std::string const& text, int start) {
-    std::vector<std::tuple<regex, TokenType>> rules {
-        std::make_tuple(regex("\\["), TokenType::LeftSquareBracket),
-        std::make_tuple(regex("\\]"), TokenType::RightSquareBracket),
-        std::make_tuple(regex("\\("), TokenType::LeftParen),
-        std::make_tuple(regex("\\)"), TokenType::RightParen),
-        std::make_tuple(regex("=="), TokenType::Equals),
-        std::make_tuple(regex("="), TokenType::Assign),
-        std::make_tuple(regex("(#|0x)[0-9a-fA-F]+"), TokenType::Hex),
-        std::make_tuple(regex("[0-9]+"), TokenType::Int),
-        std::make_tuple(regex("\\+"), TokenType::Plus),
-        std::make_tuple(regex("-"), TokenType::Minus),
-        std::make_tuple(regex("\\*"), TokenType::Mul),
-        std::make_tuple(regex("/"), TokenType::Div),
-        std::make_tuple(regex("[_a-zA-Z][a-zA-Z0-9]*"), TokenType::ID)
+    std::vector<std::tuple<std::regex, TokenType>> rules {
+        std::make_tuple(std::regex("\\["), TokenType::LeftSquareBracket),
+        std::make_tuple(std::regex("\\]"), TokenType::RightSquareBracket),
+        std::make_tuple(std::regex("\\("), TokenType::LeftParen),
+        std::make_tuple(std::regex("\\)"), TokenType::RightParen),
+        std::make_tuple(std::regex("=="), TokenType::Equals),
+        std::make_tuple(std::regex("="), TokenType::Assign),
+        std::make_tuple(std::regex("(#|0x)[0-9a-fA-F]+"), TokenType::Hex),
+        std::make_tuple(std::regex("[0-9]+"), TokenType::Int),
+        std::make_tuple(std::regex("\\+"), TokenType::Plus),
+        std::make_tuple(std::regex("-"), TokenType::Minus),
+        std::make_tuple(std::regex("\\*"), TokenType::Mul),
+        std::make_tuple(std::regex("/"), TokenType::Div),
+        std::make_tuple(std::regex("[_a-zA-Z][a-zA-Z0-9]*"), TokenType::ID)
     };
     for (auto& r : rules) {
-        regex rx;
+        std::regex rx;
         TokenType type;
         std::tie(rx, type) = r;
-        smatch m;
+        std::smatch m;
         if (regex_search(begin(text) + start, end(text), m, rx,
-            regex_constants::match_continuous)) {
+            std::regex_constants::match_continuous)) {
             auto len = std::distance(m[0].first, m[0].second);
             return Token(type, text.substr(start, len), start, len);
         }
@@ -159,8 +157,8 @@ public:
     std::string name;
     
     uint64_t eval(PPUThread* th) override {
-        regex rxgpr("r([0-9]+)");
-        smatch m;
+        std::regex rxgpr("r([0-9]+)");
+        std::smatch m;
         if (regex_match(name, m, rxgpr)) {
             auto n = std::stoul(m[1]);
             if (n <= 31) {
@@ -177,8 +175,8 @@ public:
     }
     
     uint64_t eval(SPUThread* th) override {
-        regex rxgpr("r([0-9]+)(b|h|w|d)([0-9]+)");
-        smatch m;
+        std::regex rxgpr("r([0-9]+)(b|h|w|d)([0-9]+)");
+        std::smatch m;
         if (regex_match(name, m, rxgpr)) {
             auto n = std::stoul(m[1]);
             auto type = m[2];

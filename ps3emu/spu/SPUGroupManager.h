@@ -24,7 +24,7 @@ struct ThreadGroup {
 };
 
 struct PriorityComparer {
-    inline bool operator()(ThreadGroup* x, ThreadGroup* y) {
+    inline bool operator()(ThreadGroup* x, ThreadGroup* y) const {
         return std::tie(x->priority, x->id) < std::tie(y->priority, y->id);
     }
 };

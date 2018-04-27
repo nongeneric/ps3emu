@@ -3,12 +3,12 @@
 #include "ps3emu/Config.h"
 #include "ps3emu/state.h"
 #include "ps3emu/utils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 #include <assert.h>
 #include <map>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 enum class MountPoint {
     GameData,
@@ -69,7 +69,7 @@ std::string ContentManager::toHost(std::string_view path) {
     if (type == MountPoint::HostAbsolute) {
         relative += 3;
     }
-    boost::filesystem::path exe(_elfPath);
+    std::filesystem::path exe(_elfPath);
     auto elfdir = exe.parent_path();
     auto approot = elfdir.parent_path();
     switch (type) {

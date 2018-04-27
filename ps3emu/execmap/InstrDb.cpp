@@ -4,12 +4,12 @@
 #include "ps3emu/state.h"
 #include "ps3emu/Config.h"
 #include "ps3emu/utils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <assert.h>
 #include <set>
 
 using namespace sql;
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 namespace {
 namespace db {

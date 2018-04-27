@@ -4,10 +4,10 @@
 #include <map>
 #include <string>
 #include <iostream>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
+#include <filesystem>
+#include <regex>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 void HandleSplitLog(SplitLogCommand const& command) {
     create_directories(command.output);
@@ -19,9 +19,9 @@ void HandleSplitLog(SplitLogCommand const& command) {
 
     std::map<std::string, std::ofstream> files;
     std::string line;
-    boost::regex rx(" \\[(.*?)\\] ");
+    std::regex rx(" \\[(.*?)\\] ");
     while (std::getline(f, line)) {
-        boost::smatch m;
+        std::smatch m;
         std::string name = "general";
         if (regex_search(line, m, rx)) {
             name = m.str(1);

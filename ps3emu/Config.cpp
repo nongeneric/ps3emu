@@ -2,10 +2,10 @@
 
 #include "ps3emu/utils.h"
 #include <json.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 using namespace nlohmann;
 
 Config::Config() {

@@ -14,7 +14,7 @@
 #include "InternalMemoryManager.h"
 #include "ps3emu/BBCallMap.h"
 #include "ps3emu/utils/ranges.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <map>
 #include <dlfcn.h>
 
@@ -168,7 +168,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
     db.open();
     std::map<uint32_t, uint32_t> bbBytes;
     for (auto& x86path : x86paths) {
-        if (!boost::filesystem::exists(x86path))
+        if (!std::filesystem::exists(x86path))
             throw std::runtime_error("x86 doesn't exist");
         auto handle = dlopen(x86path.c_str(), RTLD_NOW);
         if (handle) {
@@ -593,7 +593,7 @@ std::string ELFLoader::elfName() {
 }
 
 std::string ELFLoader::shortName() {
-    return boost::filesystem::path(_elfName).filename().string();
+    return std::filesystem::path(_elfName).filename().string();
 }
 
 Elf64_be_Phdr* ELFLoader::pheaders() {

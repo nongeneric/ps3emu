@@ -5,8 +5,8 @@
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 #include <zlib.h>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
+#include <filesystem>
+#include <regex>
 #include <optional>
 #include <boost/algorithm/string.hpp>
 
@@ -20,7 +20,7 @@
 #include <numeric>
 
 using namespace boost::endian;
-using namespace boost::filesystem;
+using namespace std::filesystem;
 using namespace boost;
 
 #pragma pack(1)
@@ -182,13 +182,13 @@ std::vector<key_info_t> read_keys(path data_path) {
         return {};
     }
     
-    regex rx_header("\\[(.*?)\\]");
-    regex rx_pair("(.*?)=(.*)");
+    std::regex rx_header("\\[(.*?)\\]");
+    std::regex rx_pair("(.*?)=(.*)");
     
     std::vector<key_info_t> keys;
     key_info_t key;
     for (std::string line; std::getline(f, line); ) {
-        smatch m;
+        std::smatch m;
         if (regex_match(line, m, rx_header)) {
             keys.push_back(key);
             key = key_info_t();

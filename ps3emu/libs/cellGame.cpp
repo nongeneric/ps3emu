@@ -3,11 +3,11 @@
 #include "../ContentManager.h"
 #include "../MainMemory.h"
 #include "ps3emu/InternalMemoryManager.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "../log.h"
 #include "ps3emu/state.h"
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 namespace {
     void init(CellGameContentSize* size, Process* proc) {

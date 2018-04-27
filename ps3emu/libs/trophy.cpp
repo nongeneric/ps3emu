@@ -7,7 +7,7 @@
 #include "ps3emu/fileutils.h"
 #include "libsysutil.h"
 #include <pugixml.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <assert.h>
@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <bitset>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 using namespace pugi;
 using namespace std::literals;
 

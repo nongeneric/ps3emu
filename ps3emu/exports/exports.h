@@ -84,10 +84,11 @@ struct get_arg<ArgN, T, typename boost::enable_if< boost::is_pointer<T> >::type>
 
 template <typename T, typename N>
 constexpr auto make_n_tuple(T t, N n) {
-    return hana::eval_if(n == 0_c,
-        [&](auto _) { return t; },
-        [&](auto _) { return hana::append(make_n_tuple(t, n - 1_c), n - 1_c); }
-    );
+    if constexpr(n == 0_c) {
+        return t;
+    } else {
+        return hana::append(make_n_tuple(t, n - 1_c), n - 1_c);
+    }
 }
 
 template <typename R, typename... Args>

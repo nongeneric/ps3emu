@@ -11,13 +11,13 @@
 #include "ps3emu/HeapMemoryAlloc.h"
 #include "ps3tool-core/NinjaScript.h"
 #include <boost/endian/arithmetic.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include <vector>
 #include <algorithm>
 #include <fstream>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 using namespace boost::endian;
 using namespace boost::algorithm;
 

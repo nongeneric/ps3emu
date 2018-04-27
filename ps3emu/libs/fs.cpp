@@ -14,10 +14,10 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <dirent.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread.hpp>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 class contentManager;
 
 namespace {
@@ -96,8 +96,8 @@ CellFsErrno sys_fs_open(cstring_ptr_t path,
                         uint64_t mode,
                         uint32_t arg,
                         uint64_t size) {
-    auto hostPath = g_state.content->toHost(path.str);
-    if (extension(hostPath) == ".sdat")
+    std::filesystem::path hostPath = g_state.content->toHost(path.str);
+    if (hostPath.extension() == ".sdat")
         hostPath += ".decrypted";
     auto f = openFile(hostPath.c_str(), flags);
     if (f) {

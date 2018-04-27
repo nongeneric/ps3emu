@@ -2,7 +2,7 @@
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/utils.h"
 #include "TestUtils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include <string>
 #include <stdio.h>

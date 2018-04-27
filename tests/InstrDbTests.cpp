@@ -3,10 +3,10 @@
 #include "ps3emu/execmap/InstrDb.h"
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/utils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <stdlib.h>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 TEST_CASE("instrdb_simple") {
     auto path = ssnprintf("/tmp/instr_%d.db", getpid());

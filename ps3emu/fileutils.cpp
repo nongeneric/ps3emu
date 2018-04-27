@@ -1,27 +1,27 @@
 #include "fileutils.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
+#include <filesystem>
+#include <regex>
 #include <stdio.h>
 #include <stdexcept>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 namespace {
   
     template <typename Iterator, bool Files>
     std::vector<std::string> get_files(std::string_view path,
                                 std::string_view rxPattern) {
-        boost::regex rx(begin(rxPattern));
+        std::regex rx(begin(rxPattern));
         std::vector<std::string> res;
         for (Iterator i(begin(path)); i != Iterator(); ++i) {
             if (Files && !is_regular_file(i->status()))
                 continue;
             if (!Files && !is_directory(i->status()))
                 continue;
-            boost::cmatch m;
-            if (!boost::regex_match(i->path().filename().string().c_str(), m, rx))
+            std::cmatch m;
+            if (!std::regex_match(i->path().filename().string().c_str(), m, rx))
                 continue;
             res.push_back(i->path().string());
         }

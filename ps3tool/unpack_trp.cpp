@@ -2,10 +2,10 @@
 #include "ps3emu/int.h"
 #include "ps3emu/fileutils.h"
 #include "ps3emu/utils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 constexpr uint32_t magicValue = 0xdca24d00;
 

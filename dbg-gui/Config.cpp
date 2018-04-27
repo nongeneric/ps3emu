@@ -1,15 +1,15 @@
 #include "Config.h"
 
 #include <cereal/archives/json.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 #include <assert.h>
 #include <cstdlib>
 
 namespace {
  
-    boost::filesystem::path configPath() {
-        boost::filesystem::path home = std::getenv("HOME");
+    std::filesystem::path configPath() {
+        std::filesystem::path home = std::getenv("HOME");
         return home / ".ps3emu/debug.json";
     }
 
@@ -21,7 +21,7 @@ DbgConfig& DbgConfigLoader::config() {
 
 void DbgConfigLoader::load() {
     auto path = configPath();
-    if (boost::filesystem::exists(path)) {
+    if (std::filesystem::exists(path)) {
         std::ifstream f(path.string());
         assert(f.is_open());
         cereal::JSONInputArchive archive(f);

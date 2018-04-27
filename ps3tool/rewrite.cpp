@@ -16,7 +16,7 @@
 #include "ps3emu/execmap/InstrDb.h"
 
 #include <boost/endian/arithmetic.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include <boost/variant.hpp>
 #include <iostream>
@@ -31,7 +31,7 @@
 
 using namespace boost::algorithm;
 using namespace boost::endian;
-using namespace boost::filesystem;
+namespace fs = std::filesystem;
 
 auto mainText =
 R"(#include "{headerName}.h"
@@ -693,7 +693,7 @@ void printMain(std::string name, std::vector<SegmentInfo> const& segments) {
     assert(f.is_open());
 
     std::string text = mainText;
-    replace_first(text, "{headerName}", basename(name));
+    replace_first(text, "{headerName}", fs::path(name).stem().string());
     f << text, 
     
     f << "extern \"C\" {\n";
@@ -757,7 +757,7 @@ void printNinja(std::string name, std::vector<SegmentInfo> const& segments) {
     script.rule("compile", compileRule());
     script.rule("link", linkRule());
     std::string objects;
-    auto baseName = basename(name);
+    auto baseName = fs::path(name).stem().string();
     for (auto i = 0u; i < segments.size(); ++i) {
         auto in = ssnprintf("%s.segment_%d.cpp", baseName, i);
         auto out = ssnprintf("%s.segment_%d.o", baseName, i);
@@ -787,7 +787,7 @@ void HandleRewrite(RewriteCommand const& command) {
         g_state.memalloc = &memalloc;
     }
     
-    std::ofstream log("/tmp/" + path(command.elf).filename().string() + "_rewriter_log");
+    std::ofstream log("/tmp/" + fs::path(command.elf).filename().string() + "_rewriter_log");
     assert(log.is_open());
     
     std::vector<SegmentInfo> segmentInfos;
@@ -806,6 +806,6 @@ void HandleRewrite(RewriteCommand const& command) {
     printNinja(ninjaName, segmentInfos);
     for (auto i = 0u; i < segmentInfos.size(); ++i) {
         auto segmentName = ssnprintf("%s.segment_%d.cpp", command.cpp, i);
-        printSegment(basename(headerName), segmentName, segmentInfos[i]);
+        printSegment(fs::path(headerName).stem(), segmentName, segmentInfos[i]);
     }
 }

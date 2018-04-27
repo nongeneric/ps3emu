@@ -7,12 +7,12 @@
 #include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/fileutils.h"
 #include "ps3emu/utils/ranges.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include "string.h"
 #include <sys/stat.h>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 struct CellSaveDataCBResult {
     big_int32_t result;
@@ -170,7 +170,7 @@ std::string getFileName(CellSaveDataFileSet* set) {
 }
 
 std::tuple<std::string, unsigned> parseFileName(std::string path) {
-    auto name = boost::filesystem::path(path).filename().string();
+    auto name = std::filesystem::path(path).filename().string();
     if (name == "ICON0.PNG")
         return {name, CELL_SAVEDATA_FILETYPE_CONTENT_ICON0};
     if (name == "ICON1.PAM")
@@ -264,7 +264,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
     
     auto files = get_files(dirPath.string(), "(?!" + paramSfoName + ").*", false);
     ranges::sort(files, std::less<>(), [](auto& x) {
-        return boost::filesystem::path(x).filename().string();
+        return std::filesystem::path(x).filename().string();
     });
     auto fileList = (CellSaveDataFileStat*)g_state.memalloc->allocInternalMemory(
         &fileListVa,

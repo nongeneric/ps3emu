@@ -3,9 +3,9 @@
 #include "ps3emu/fileutils.h"
 #include "ps3tool-core/Rewriter.h"
 #include <iostream>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
-using namespace boost::filesystem;
+namespace fs = std::filesystem;
 
 void HandleFindSpuElfs(FindSpuElfsCommand const& command) {
     auto body = read_all_bytes(command.elf);
@@ -13,7 +13,7 @@ void HandleFindSpuElfs(FindSpuElfsCommand const& command) {
     if (elfs.empty()) {
         return;
     }
-    auto filename = basename(command.elf);
+    auto filename = fs::path(command.elf).stem();
     std::cout << ssnprintf("%d embedded elfs found in %s\n", elfs.size(), filename);
     for (auto& elf : elfs) {
         auto tmppath = ssnprintf("/tmp/%s_%x_spu.elf", filename, elf.startOffset);

@@ -1,6 +1,6 @@
 #include <sqlite3.h>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/tuple/tuple.hpp>
 
 #include <boost/hana.hpp>
@@ -9,6 +9,7 @@
 #include <vector>
 #include <cstdint>
 #include <iostream>
+#include <assert.h>
 
 namespace sql {
 

@@ -2,11 +2,11 @@
 
 #include "ps3emu/utils.h"
 #include "ps3emu/log.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include <stdlib.h>
 
-using namespace boost::filesystem;
+using namespace std::filesystem;
 
 std::string ps3toolPath() {
     return ssnprintf("%s/ps3tool/ps3tool", getenv("PS3_BIN"));
