@@ -239,6 +239,8 @@ int32_t sys_mmapper_search_and_map(uint32_t start_addr,
                                    uint32_t mem_id,
                                    uint64_t flags,
                                    big_uint32_t* alloc_addr);
+int32_t sys_mmapper_unmap_shared_memory(sys_addr_t start_addr, uint32_t mem_id);
+int32_t sys_mmapper_free_shared_memory(sys_addr_t start_addr);
 
 struct sys_prx_get_module_list_t {
     big_uint64_t size;

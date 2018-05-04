@@ -19,12 +19,15 @@ namespace {
 
 ENUM(AudioControlCommand,
     (INIT, 0x01),
+    (QUIT, 0x04),
     (UNK, 0x80),
-    (UNK1, 0x2),
+    (QUIT2, 0x2),
     (PORT_CREATE, 0x3),
     (PORT_CONFIG, 0x86),
     (PORT_OPEN, 0x87),
+    (PORT_LEVEL, 0x85),
     (PORT_START, 0x89),
+    (PORT_CLOSE, 0x88),
     (SET_NOTIFY_QUEUE, 0x84)
 )
 
@@ -114,8 +117,8 @@ void initAudio() {
             } else if (command == AudioControlCommand::PORT_CREATE) {
                 ack(curPortId);
                 curPortId++;
-            } else if (command == AudioControlCommand::UNK1) {
-                assert(false);
+            } else if (command == AudioControlCommand::QUIT2) {
+                ack(0, 0);
             } else if (command == AudioControlCommand::PORT_CONFIG) {
                 uint32_t size = event.data1;
                 uint32_t base = (uint64_t)event.data2 >> 32;
@@ -157,11 +160,20 @@ void initAudio() {
                     pulse->start(control.Id.u());
                 } else {
                     pulse->stop(control.Id.u());
+                    ack(0, 0);
                 }
             } else if (command == AudioControlCommand::SET_NOTIFY_QUEUE) {
                 auto notifyQueueKey = event.data2;
                 pulse->setNotifyQueue(notifyQueueKey);
                 ack(0, 0);
+            } else if (command == AudioControlCommand::PORT_LEVEL) {
+                WARNING(libs) << "AudioControlCommand::PORT_LEVEL not implemented";
+                ack(0, 0);
+            } else if (command == AudioControlCommand::PORT_CLOSE) {
+                WARNING(libs) << "AudioControlCommand::PORT_CLOSE not implemented";
+                ack(0, 0);
+            } else if (command == AudioControlCommand::QUIT) {
+                pulse->quit();
             } else {
                 assert(false);
             }

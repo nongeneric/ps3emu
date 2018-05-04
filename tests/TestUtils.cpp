@@ -53,7 +53,8 @@ bool rewrite_and_compile_spu(std::string elf, std::string cppPath) {
 
 void test_interpreter_and_rewriter(std::vector<std::string> args,
                                    std::string expected,
-                                   bool rewriterOnly) {
+                                   bool rewriterOnly,
+                                   std::vector<std::string> ps3runArgs) {
     auto id = getpid();
     auto spuSoPath = ssnprintf("/tmp/ps3_spu_%d_spu.x86.so", id);
     auto spuCppPath = ssnprintf("/tmp/ps3_spu_%d_spu", id);
@@ -65,6 +66,10 @@ void test_interpreter_and_rewriter(std::vector<std::string> args,
     }
     REQUIRE( rewrite_and_compile(args[0], cppPath) );
     REQUIRE( rewrite_and_compile_spu(args[0], spuCppPath) );
-    auto output = startWaitGetOutput(args, {"--x86", soPath, "--x86", spuSoPath});
+    ps3runArgs.push_back("--x86");
+    ps3runArgs.push_back(soPath);
+    ps3runArgs.push_back("--x86");
+    ps3runArgs.push_back(spuSoPath);
+    auto output = startWaitGetOutput(args, ps3runArgs);
     REQUIRE( output == expected );
 }

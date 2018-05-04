@@ -601,6 +601,18 @@ int32_t sys_mmapper_search_and_map(uint32_t start_addr,
     return CELL_OK;
 }
 
+int32_t sys_mmapper_unmap_shared_memory(sys_addr_t start_addr, uint32_t mem_id) {
+    INFO(libs) << ssnprintf(
+        "sys_mmapper_unmap_shared_memory(%08x, %08x)", start_addr, mem_id);
+    return CELL_OK;
+}
+
+int32_t sys_mmapper_free_shared_memory(sys_addr_t start_addr) {
+    INFO(libs) << ssnprintf("sys_mmapper_free_shared_memory(%08x)", start_addr);
+    g_state.memalloc->free(start_addr);
+    return CELL_OK;
+}
+
 #define SYS_MODULE_STOP_LEVEL_USER	0x00000000
 #define SYS_MODULE_STOP_LEVEL_SYSTEM	0x00004000
 

@@ -22,6 +22,7 @@ public:
     std::string prxStorePath;
     std::string configDirPath;
     std::vector<SysPrxInfo> sysPrxInfos;
+    bool captureAudio = false;
     
     void save();
 };

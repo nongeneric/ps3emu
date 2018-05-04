@@ -25,6 +25,12 @@ typedef struct CellAudioOutState {
     CellAudioOutSoundMode soundMode;
 } CellAudioOutState;
 
+ENUM(CellAudioOutCopyControl,
+    (CELL_AUDIO_OUT_COPY_CONTROL_COPY_FREE, 0),
+    (CELL_AUDIO_OUT_COPY_CONTROL_COPY_ONCE, 1),
+    (CELL_AUDIO_OUT_COPY_CONTROL_COPY_NEVER, 2));
+
+int32_t cellAudioOutSetCopyControl(uint32_t audioOut, CellAudioOutCopyControl control);
 int32_t cellAudioOutGetSoundAvailability(uint32_t audioOut,
                                          uint32_t type,
                                          uint32_t fs,

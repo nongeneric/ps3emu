@@ -164,9 +164,10 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         }
     }
     
+    std::map<uint32_t, uint32_t> bbBytes;
+
     InstrDb db;
     db.open();
-    std::map<uint32_t, uint32_t> bbBytes;
     for (auto& x86path : x86paths) {
         if (!std::filesystem::exists(x86path))
             throw std::runtime_error("x86 doesn't exist");

@@ -65,6 +65,11 @@ typedef enum CellAudioOutSpeakerLayout {
     CELL_AUDIO_OUT_SPEAKER_LAYOUT_8CH_LREClrxy = 0x40000000
 } CellAudioOutSpeakerLayout;
 
+int32_t cellAudioOutSetCopyControl(uint32_t audioOut, CellAudioOutCopyControl control) {
+    assert(audioOut == CELL_AUDIO_OUT_PRIMARY);
+    return CELL_OK;
+}
+
 int32_t cellAudioOutGetSoundAvailability(uint32_t audioOut,
                                          uint32_t type,
                                          uint32_t fs,

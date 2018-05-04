@@ -122,6 +122,8 @@ void PPUThread::scall() {
         case 332: wrap(sys_mmapper_allocate_shared_memory, this); break;
         case 330: wrap(sys_mmapper_allocate_address, this); break;
         case 337: wrap(sys_mmapper_search_and_map, this); break;
+        case 335: wrap(sys_mmapper_unmap_shared_memory, this); break;
+        case 329: wrap(sys_mmapper_free_shared_memory, this); break;
         case 494: wrap(sys_prx_get_module_list, this); break;
         case 482: wrap(sys_prx_stop_module, this); break;
         case 483: wrap(sys_prx_unload_module, this); break;
@@ -173,6 +175,6 @@ void PPUThread::scall() {
         case 673: wrap(emu::Gcm::sys_rsx_context_iounmap, this); break;
         case 674: wrap(emu::Gcm::sys_rsx_context_attribute, this); break;
         case 677: wrap(emu::Gcm::sys_rsx_attribute, this); break;
-        default: throw std::runtime_error(ssnprintf("unknown syscall %d", index));
+        default: ERROR(libs) << ssnprintf("unknown syscall %d", index); exit(1);
     }
 }

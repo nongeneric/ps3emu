@@ -161,6 +161,10 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
                                  std::vector<unsigned>* usedConsts,
                                  bool feedback)
 {
+    for (auto size : samplerSizes) {
+        assert(size != 0); (void)size;
+    }
+
     std::string res;
     auto line = [&](auto&& s) { res += s; res += "\n"; };
     line("#version 450 core");

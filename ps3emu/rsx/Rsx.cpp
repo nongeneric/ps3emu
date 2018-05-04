@@ -1003,10 +1003,18 @@ void Rsx::updateShaders() {
         _vertexShaderRetrieveCounter.openRange();
 
         std::array<int, 4> samplerSizes = {
-            _context->vertexTextureSamplers[0].texture.dimension,
-            _context->vertexTextureSamplers[1].texture.dimension,
-            _context->vertexTextureSamplers[2].texture.dimension,
-            _context->vertexTextureSamplers[3].texture.dimension
+            _context->vertexTextureSamplers[0].enable
+                ? _context->vertexTextureSamplers[0].texture.dimension
+                : 2,
+            _context->vertexTextureSamplers[1].enable
+                ? _context->vertexTextureSamplers[1].texture.dimension
+                : 2,
+            _context->vertexTextureSamplers[2].enable
+                ? _context->vertexTextureSamplers[2].texture.dimension
+                : 2,
+            _context->vertexTextureSamplers[3].enable
+                ? _context->vertexTextureSamplers[3].texture.dimension
+                : 2,
         };
 
         std::array<uint8_t, 16> arraySizes;

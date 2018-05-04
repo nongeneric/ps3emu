@@ -221,7 +221,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
     
     strncpy(get->dir.dirName,
             dirName.str.c_str(),
-            CELL_SAVEDATA_DIRNAME_SIZE);
+            CELL_SAVEDATA_DIRNAME_SIZE - 1);
     
     if (!isNew) {
         struct stat dirStat;
@@ -242,16 +242,16 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
     if (title && subtitle && attribute && listParam) {
         strncpy(get->getParam.title,
                 std::get<std::string>(*title).c_str(),
-                CELL_SAVEDATA_SYSP_TITLE_SIZE);
+                CELL_SAVEDATA_SYSP_TITLE_SIZE - 1);
         strncpy(get->getParam.detail,
                 std::get<std::string>(*detail).c_str(),
-                CELL_SAVEDATA_SYSP_DETAIL_SIZE);
+                CELL_SAVEDATA_SYSP_DETAIL_SIZE - 1);
         strncpy(get->getParam.subTitle,
                 std::get<std::string>(*subtitle).c_str(),
-                CELL_SAVEDATA_SYSP_SUBTITLE_SIZE);
+                CELL_SAVEDATA_SYSP_SUBTITLE_SIZE - 1);
         strncpy(get->getParam.listParam,
                 std::get<std::string>(*listParam).c_str(),
-                CELL_SAVEDATA_SYSP_LPARAM_SIZE);
+                CELL_SAVEDATA_SYSP_LPARAM_SIZE - 1);
         get->getParam.attribute = std::get<uint32_t>(*attribute);
     }
     

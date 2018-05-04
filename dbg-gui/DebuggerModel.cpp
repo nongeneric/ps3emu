@@ -1183,7 +1183,8 @@ void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
         while (fscanf(scriptf, "%c %X\n", &command, &va) == 2) {
             if (command == 's') {
                 printf("skipping to %x\n", va);
-                runto(va);
+                setSoftBreak(va);
+                runHandler(RunCommand());
             } else {
                 printf("tracing to %x\n", va);
                 ppuTraceTo(f, va, counts);

@@ -35,6 +35,7 @@ class PulseBackend {
     boost::mutex _notifyQueueM;
     boost::condition_variable _notifyQueueCV;
     AudioAttributes* _attributes;
+    std::atomic<bool> _stop = false;
 
     void waitContext();
     void playbackLoop();
@@ -45,4 +46,5 @@ public:
     void start(unsigned id);
     void stop(unsigned id);
     void setNotifyQueue(uint64_t key);
+    void quit();
 };

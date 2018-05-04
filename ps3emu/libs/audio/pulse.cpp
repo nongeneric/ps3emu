@@ -2,6 +2,9 @@
 #include "ps3emu/AffinityManager.h"
 #include "ps3emu/log.h"
 #include "ps3emu/Process.h"
+#include "ps3emu/Config.h"
+#include <pthread.h>
+#include <sched.h>
 #include <assert.h>
 
 using namespace boost::chrono;
@@ -82,6 +85,10 @@ void PulseBackend::stop(unsigned id) {
     //assert(false);
 }
 
+void PulseBackend::quit() {
+    _stop = true;
+}
+
 void PulseBackend::setNotifyQueue(uint64_t key) {
     auto lock = boost::unique_lock(_notifyQueueM);
     _notifyQueue = getQueueByKey(key);
@@ -114,13 +121,39 @@ uint32_t calcBlockSize(unsigned channels) {
 void PulseBackend::playbackLoop() {
     std::vector<uint8_t> tempDest;
 
-    for (;;) {
+    std::array<FILE*, 8> fCapture;
+    if (g_state.config->captureAudio) {
+        for (auto i = 0u; i < fCapture.size(); ++i) {
+            fCapture[i] = fopen(ssnprintf("/tmp/ps3emu_audio_port%d.bin", i).c_str(), "w");
+        }
+    }
+
+    while (!_stop) {
         auto past = steady_clock::now();
 
         sys_event_port_t notifyPort = 0;
         {
             auto lock = boost::unique_lock(_notifyQueueM);
             notifyPort = _notifyQueuePort;
+        }
+
+        for (auto& [id, port] : _ports) {
+            (void)id;
+            auto lock = boost::unique_lock(*port.mutex);
+            if (!port.started)
+                continue;
+            auto prevBlock = _attributes->getReadIndex(id);
+            auto curBlock = (prevBlock + 1) % port.basic.blocks;
+            _attributes->setReadIndex(id, curBlock);
+
+            // a little delay, to simulate ps3
+            auto delta = 20000 * g_state.proc->getFrequency() / 1000000;
+            _attributes->insertTimestamp(g_state.proc->getTimeBase() - delta);
+        }
+
+        if (notifyPort) {
+            INFO(libs) << ssnprintf("audioLoop notifying");
+            sys_event_port_send(notifyPort, 0, 0, 0);
         }
 
         bool shouldSpeedUp = false;
@@ -131,10 +164,10 @@ void PulseBackend::playbackLoop() {
             if (!port.started)
                 continue;
 
-            auto prevBlock = _attributes->getReadIndex(id);
+            auto curBlock = _attributes->getReadIndex(id);
             auto blockSize = calcBlockSize(port.basic.channels);
             auto toWrite = CELL_AUDIO_BLOCK_SAMPLES * 2 * sizeof(float);
-            auto src = (big_uint64_t*)(port.basic.ptr + prevBlock * blockSize);
+            auto src = (big_uint64_t*)(port.basic.ptr + curBlock * blockSize);
             tempDest.resize(toWrite);
             auto dest = (big_uint64_t*)&tempDest[0];
             if (port.basic.channels == 8) {
@@ -153,17 +186,19 @@ void PulseBackend::playbackLoop() {
                                        nullptr,
                                        0,
                                        PA_SEEK_RELATIVE);
-            assert(!res); (void)res;
+
+            if (g_state.config->captureAudio) {
+                auto f = fCapture[id - AudioAttributes::portHwBase];
+                fwrite(&tempDest[0], 1, tempDest.size(), f);
+            }
+
+            (void)res;
+            if (res) {
+                ERROR(libs) << ssnprintf("libaudio fatal: %s", pa_strerror(res));
+                exit(1);
+            }
             auto sizeLeft = pa_stream_writable_size(port.pulseStream);
             shouldSpeedUp |= sizeLeft > 2 * blockSize;
-
-            auto curBlock = (prevBlock + 1) % port.basic.blocks;
-            _attributes->setReadIndex(id, curBlock);
-            _attributes->insertTimestamp(g_state.proc->getTimeBase());
-        }
-
-        if (notifyPort) {
-            sys_event_port_send(notifyPort, 0, 0, 0);
         }
 
         auto wait = duration_cast<microseconds>(duration<unsigned, boost::ratio<256, 48000>>(1));
@@ -172,7 +207,7 @@ void PulseBackend::playbackLoop() {
         if (elapsed < wait) {
             wait -= elapsed;
             if (shouldSpeedUp) {
-                wait -= milliseconds(2);
+                wait -= milliseconds(1);
             }
             boost::this_thread::sleep_for(wait);
         }

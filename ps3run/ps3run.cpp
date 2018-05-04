@@ -79,6 +79,7 @@ int main(int argc, char* argv[]) {
             ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),
                 "rewritten and compiled x86 so file")
             ("capture-rsx", bool_switch()->default_value(false), "capture rsx")
+            ("capture-audio", bool_switch()->default_value(false), "capture audio")
             ;
         variables_map console_vm;
         store(parse_command_line(argc, argv, consoleDescr), console_vm);
@@ -88,6 +89,7 @@ int main(int argc, char* argv[]) {
         }
         notify(console_vm);
         captureRsx = console_vm["capture-rsx"].as<bool>();
+        g_state.config->captureAudio = console_vm["capture-audio"].as<bool>();
         
     } catch(std::exception& e) {
         std::cout << "can't parse program options:\n";

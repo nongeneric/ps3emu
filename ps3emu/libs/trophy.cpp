@@ -180,10 +180,10 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
     auto trophyconf = trop.child("trophyconf");
     strncpy(context.gameDetails.title,
             trophyconf.child("title-name").text().get(),
-            SCE_NP_TROPHY_NAME_MAX_SIZE);
+            SCE_NP_TROPHY_NAME_MAX_SIZE - 1);
     strncpy(context.gameDetails.description,
             trophyconf.child("title-detail").text().get(),
-            SCE_NP_TROPHY_DESCR_MAX_SIZE);
+            SCE_NP_TROPHY_DESCR_MAX_SIZE - 1);
     for (auto t = trophyconf.child("trophy"); t; t = t.next_sibling("trophy")) {
         auto id = t.attribute("id").as_int();
         auto& trophy = context.trophies.at(id);
@@ -292,10 +292,10 @@ int32_t sceNpTrophyGetTrophyInfo(SceNpTrophyContext,
     if (details) {
         details->trophyId = trophy.id;
         details->trophyGrade = trophy.grade;
-        strncpy(details->name, trophy.name.c_str(), SCE_NP_TROPHY_NAME_MAX_SIZE);
+        strncpy(details->name, trophy.name.c_str(), SCE_NP_TROPHY_NAME_MAX_SIZE - 1);
         strncpy(details->description,
                 trophy.detail.c_str(),
-                SCE_NP_TROPHY_DESCR_MAX_SIZE);
+                SCE_NP_TROPHY_DESCR_MAX_SIZE - 1);
         details->hidden = trophy.hidden;
     }
     if (data) {
