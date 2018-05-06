@@ -398,8 +398,8 @@ void Rsx::DepthFunc(GcmOperator zf) {
 
 void Rsx::CullFaceEnable(bool enable) {
     TRACE(CullFaceEnable, enable);
-    _context->isCullFaceEnabled = enable;
-    glEnableb(GL_CULL_FACE, enable);
+    //_context->isCullFaceEnabled = enable;
+    //glEnableb(GL_CULL_FACE, enable);
 }
 
 void Rsx::FrontFace(GcmFrontFace dir) {
@@ -1642,8 +1642,9 @@ void Rsx::updateViewPort() {
     auto f = _context->viewPort.zmax;
     auto n = _context->viewPort.zmin;
 
-    if (n == 0 && f == 0)
-        return;
+    if (n == 0 && f == 0) {
+        f = 1;
+    }
 
     auto glDepth = (n == 0 && f == 1) ? GL_ZERO_TO_ONE
                  : (n == -1 && f == 1) ? GL_NEGATIVE_ONE_TO_ONE

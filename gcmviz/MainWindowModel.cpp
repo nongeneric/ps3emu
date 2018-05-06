@@ -971,6 +971,7 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     QList<QTreeWidgetItem*> items;
     items.append(new SurfaceContextTreeItem());
     items.append(new FragmentOperationsTreeItem());
+    items.append(new ViewPortContextTreeItem());
 
     auto displayBuffers = new QTreeWidgetItem();
     displayBuffers->setText(0, "Display Buffers");

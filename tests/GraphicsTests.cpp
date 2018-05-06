@@ -292,3 +292,8 @@ TEST_CASE("edge_fragment_patch_sample") {
     runAndWait("./binaries/edge_fragment_patch_sample/a.elf", false, true);
     compareLastFrame("./binaries/edge_fragment_patch_sample/ps3frame0.png", 0);
 }
+
+TEST_CASE("np_basic_render") {
+    runAndWait("./binaries/np_basic_render/a.elf", false, true);
+    compareLastFrame("./binaries/np_basic_render/ps3frame0.png", 0);
+}

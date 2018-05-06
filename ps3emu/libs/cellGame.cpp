@@ -14,9 +14,11 @@ namespace {
         auto gb2 = 2 * 1024 * 1024;
         auto cm = g_state.content;
         auto host = cm->toHost(cm->contentDir().c_str());
-        size->hddFreeSizeKB = space(host).available / 1024;
-        size->sizeKB = -1; // not calculated
-        size->sysSizeKB = gb2;
+        if (size) {
+            size->hddFreeSizeKB = space(host).available / 1024;
+            size->sizeKB = -1; // not calculated
+            size->sysSizeKB = gb2;
+        }
     }
 }
 

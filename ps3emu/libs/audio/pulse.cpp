@@ -19,11 +19,9 @@ using namespace boost::chrono;
 #define CELL_AUDIO_BLOCK_SAMPLES 256
 
 struct pulseLock {
-    pa_threaded_mainloop* _loop;
+    pa_threaded_mainloop* _loop = nullptr;
 
-    inline explicit pulseLock(pa_threaded_mainloop* loop) : _loop(loop) {}
-
-    inline pulseLock() {
+    inline explicit pulseLock(pa_threaded_mainloop* loop) : _loop(loop) {
         pa_threaded_mainloop_lock(_loop);
     }
 
@@ -31,6 +29,29 @@ struct pulseLock {
         pa_threaded_mainloop_unlock(_loop);
     }
 };
+
+void pa_state_cb(pa_context* c, void* userdata) {
+    pa_context_state_t state;
+    auto pa_ready = static_cast<int*>(userdata);
+    state = pa_context_get_state(c);
+    switch (state) {
+        case PA_CONTEXT_FAILED:
+        case PA_CONTEXT_TERMINATED: *pa_ready = 2; break;
+        case PA_CONTEXT_READY: *pa_ready = 1; break;
+        default: break;
+    }
+}
+
+void PulseBackend::waitContext() {
+    int status = 0;
+    pa_context_set_state_callback(_pulseContext, pa_state_cb, &status);
+    pa_threaded_mainloop_start(_pulseMainLoop);
+    while (!status) ums_sleep(1000);
+    if (status == 2) {
+        ERROR(libs) << ssnprintf("context connection failed");
+        exit(1);
+    }
+}
 
 PulseBackend::PulseBackend(AudioAttributes* attributes) : _attributes(attributes) {
     _pulseSpec = { PA_SAMPLE_FLOAT32BE, 48000, 2 };
@@ -44,7 +65,6 @@ PulseBackend::PulseBackend(AudioAttributes* attributes) : _attributes(attributes
         ERROR(libs) << ssnprintf("context connection failed %s", pa_strerror(res));
         exit(1);
     }
-    pa_threaded_mainloop_start(_pulseMainLoop);
     waitContext();
 }
 
@@ -99,19 +119,6 @@ void PulseBackend::setNotifyQueue(uint64_t key) {
     res = sys_event_port_connect_local(_notifyQueuePort, _notifyQueue);
     assert(!res);
     _notifyQueueCV.notify_all();
-}
-
-void PulseBackend::waitContext() {
-    for (;;) {
-        //pulseLock lock(_pulseMainLoop);
-        auto state = pa_context_get_state(_pulseContext);
-        if (state == PA_CONTEXT_READY)
-            return;
-        if (state == PA_CONTEXT_FAILED || state == PA_CONTEXT_TERMINATED) {
-            ERROR(libs) << ssnprintf("context connection failed");
-            exit(1);
-        }
-    }
 }
 
 uint32_t calcBlockSize(unsigned channels) {
@@ -179,6 +186,8 @@ void PulseBackend::playbackLoop() {
             }
 
             memset(src, 0, blockSize);
+
+            pulseLock plock(_pulseMainLoop);
 
             auto res = pa_stream_write(port.pulseStream,
                                        &tempDest[0],

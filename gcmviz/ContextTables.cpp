@@ -291,3 +291,26 @@ GenericTableModel<RsxContext>* DisplayBufferContextTreeItem::getTable(RsxContext
             DECHEX(b(), height)
         });
 }
+
+
+ViewPortContextTreeItem::ViewPortContextTreeItem() : ContextTreeItem("ViewPort") { }
+
+GenericTableModel<RsxContext>* ViewPortContextTreeItem::getTable(RsxContext* context) {
+    auto& vp = context->viewPort;
+    return new GenericTableModel<RsxContext>(
+        context,
+        {
+            FLOAT(vp, x)
+            FLOAT(vp, y)
+            FLOAT(vp, width)
+            FLOAT(vp, height)
+            FLOAT(vp, zmin)
+            FLOAT(vp, zmax)
+            FLOAT(vp, scale[0])
+            FLOAT(vp, scale[1])
+            FLOAT(vp, scale[2])
+            FLOAT(vp, offset[0])
+            FLOAT(vp, offset[1])
+            FLOAT(vp, offset[2])
+        });
+}

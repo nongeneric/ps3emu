@@ -45,3 +45,9 @@ public:
     DisplayBufferContextTreeItem(int index);
     virtual GenericTableModel<RsxContext>* getTable(RsxContext* context) override;
 };
+
+class ViewPortContextTreeItem : public ContextTreeItem {
+public:
+    ViewPortContextTreeItem();
+    virtual GenericTableModel<RsxContext>* getTable(RsxContext* context) override;
+};
