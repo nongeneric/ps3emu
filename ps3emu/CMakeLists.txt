@@ -83,6 +83,10 @@ set(SRC
     EmuCallbacks.cpp
     utils/debug.h
     utils/debug.cpp
+    utils/BZipFile.h
+    utils/BZipFile.cpp
+    utils/TraceFile.h
+    utils/TraceFile.cpp
     
     libs/sys.cpp
     libs/fs.cpp

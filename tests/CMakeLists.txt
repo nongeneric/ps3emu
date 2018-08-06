@@ -22,6 +22,9 @@ set(SRC
     FragmentCacheTests.cpp
     BitUtilsTests.cpp
     LibaudioTests.cpp
+    DbgTests.cpp
+    ../dbg-gui/DebugExpr.h
+    ../dbg-gui/DebugExpr.cpp
 )
 
 add_executable(tests ${SRC})

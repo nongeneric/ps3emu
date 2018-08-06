@@ -240,3 +240,5 @@ public:
     inline std::atomic<uint32_t>& spuStatus() { return _spuStatus; }
     inline std::atomic<uint32_t>& interrupt() { return _interrupt2; }
 };
+
+const char* classIdToString(int id);

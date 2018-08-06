@@ -8,6 +8,7 @@
 
 import sys
 import argparse
+import bz2
 
 class Trace:
     nip = None
@@ -45,15 +46,26 @@ if args.rebase:
     imagebase = int(args.rebase, 16)
 
 if args.changes:
-    traces = []
     lineNum = 1
-    with open(args.changes) as f:
-        for line in f.readlines():
+    with open(args.changes) as fobj:
+        f = fobj
+        if args.changes.endswith('.bz2'):
+            f = bz2.open(args.changes)
+        c = None
+        n = None
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            line = line.decode()
             try:
-                comment = line.find('#')
-                if comment != -1:
-                    line = line[0:comment]
-                if comment == 0 or line.strip() == '':
+                i = line.find('#')
+                if i != -1:
+                    comment = line[i + 1:].strip()
+                    line = line[0:i].strip()
+                else:
+                    comment = ''
+                if line == '':
                     continue
                 split = line.split(';')
                 trace = Trace()
@@ -69,17 +81,25 @@ if args.changes:
                 else:
                     trace.regs = parse_regs(split[1:34])
                     trace.vregs = parse_regs(split[34:-1])
-                traces.append(trace)
                 lineNum += 1
+                          
+                c = n
+                n = trace
+                    
+                changed = []
+                rnames = ['r' + str(x) for x in range(0, len(n.regs))]
+                vnames = ['v' + str(x) for x in range(0, len(n.vregs))]
+                if c:
+                    for creg, nreg, name in zip(c.regs, n.regs, rnames):
+                        if creg != nreg: changed.append((name, nreg))
+                    for creg, nreg, name in zip(c.vregs, n.vregs, vnames):
+                        if creg != nreg: changed.append((name, nreg))
+                else:
+                    for nreg, name in zip(n.regs, rnames):
+                        changed.append((name, nreg))
+                    for nreg, name in zip(n.vregs, vnames):
+                        changed.append((name, nreg))
+                print(hex(n.nip), [(name, hex(x)) for name, x in changed], '"' + comment + '"')
+                
             except:
-                pass
-            
-    for c, n in zip(traces, traces[1:]):
-        changed = []
-        rnames = ['r' + str(x) for x in range(0, len(n.regs))]
-        vnames = ['v' + str(x) for x in range(0, len(n.vregs))]
-        for creg, nreg, name in zip(c.regs, n.regs, rnames):
-            if creg != nreg: changed.append((name, nreg))
-        for creg, nreg, name in zip(c.vregs, n.vregs, vnames):
-            if creg != nreg: changed.append((name, nreg))
-        print(hex(n.nip), [(name, hex(x)) for name, x in changed])
+                raise

@@ -2981,6 +2981,17 @@ TEST_CASE("spu_thread_group_2") {
     );
 }
 
+TEST_CASE("spu_thread_group_5") {
+    test_interpreter_and_rewriter({"./binaries/spu_thread_group_5/a.elf"},
+        "Initializing SPUs\n"
+        "Creating an event queue.\n"
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "All SPU threads have been successfully initialized.\n"
+        "Exiting.\n"
+    );
+}
+
 TEST_CASE("ps3call_tests") {
     test_interpreter_and_rewriter({"./binaries/ps3call_tests/a.elf"},
         "main\n"
@@ -3201,5 +3212,279 @@ TEST_CASE("ppu_threads_main_thread_id") {
 TEST_CASE("ppu_threads_cond_repeated_signal") {
     test_interpreter_and_rewriter({"./binaries/ppu_threads_cond_repeated_signal/a.elf"},
         "all done\n"
+    );
+}
+
+TEST_CASE("hash_spurs_sum") {
+    test_interpreter_and_rewriter({"./binaries/hash_spurs_sum/a.elf", "/app_home file"},
+        "SPU Sum samples\n"
+        "-----------------------------------------------------------------------\n"
+        "SPU Sum MD5:\n"
+        "Waiting for mounting on /app_home\n"
+        "Waiting for mounting done\n"
+        "Hash result is: e6db0be0d1c01bd33b585b5811933d71\n"
+        "-----------------------------------------------------------------------\n"
+        "SPU Sum SHA-1:\n"
+        "Waiting for mounting on /app_home\n"
+        "Waiting for mounting done\n"
+        "Hash result is: 3da70be8a81a250c498e2c7cff4ad65cde5efd9d\n"
+        "-----------------------------------------------------------------------\n"
+        "SPU Sum SHA-224:\n"
+        "Waiting for mounting on /app_home\n"
+        "Waiting for mounting done\n"
+        "Hash result is: 3fd869b9d94722ec638b5bf713d51d8a02efcf176fa57a21fe74fc85\n"
+        "-----------------------------------------------------------------------\n"
+        "SPU Sum SHA-256:\n"
+        "Waiting for mounting on /app_home\n"
+        "Waiting for mounting done\n"
+        "Hash result is: b803c8f777b1bdd18ea9abaf4dbc4d05b5634d94db8a2fb086823d007a88d6e3\n"
+        "-----------------------------------------------------------------------\n"
+        "SPU Sum SHA-384:\n"
+        "Waiting for mounting on /app_home\n"
+        "Waiting for mounting done\n"
+        "Hash result is: ad1f41e1a0fefda8316220b1e1404d219e0b45c4fe83f503ce6cdeee9a0be93c607d39ef49ab394e10eefbbd04d4b835\n"
+        "-----------------------------------------------------------------------\n"
+        "SPU Sum SHA-512:\n"
+        "Waiting for mounting on /app_home\n"
+        "Waiting for mounting done\n"
+        "Hash result is: ba1cf3f5b23254cc9e63bfe77acfe418ee80e9a68169a347f43ba7cff6b9fc140d0552249834637040e632b5283326cc68fcba507b99216e523a20c6d866ba4c\n"
+        "PPU: wait for taskset shutdown...\n"
+        "PPU: finished.\n"
+    );
+}
+
+TEST_CASE("spu_thread_group_6") {
+    test_interpreter_and_rewriter({"./binaries/spu_thread_group_6/a.elf"},
+        "Initializing SPUs\n"
+        "Creating an event queue.\n"
+        "Creating an SPU thread group.\n"
+        "Initializing SPU thread 0\n"
+        "Conencting SPU thread (0) to the SPU thread user event.\n"
+        "All SPU threads have been successfully initialized.\n"
+        "The resultant signal = 1.\n"
+        "SPU thread 0's exit status = 3\n"
+        "The resultant signal = 1.\n"
+        "SPU thread 0's exit status = 3\n"
+        "The resultant signal = 1.\n"
+        "SPU thread 0's exit status = 3\n"
+        "The resultant signal = 1.\n"
+        "SPU thread 0's exit status = 3\n"
+        "The resultant signal = 1.\n"
+        "SPU thread 0's exit status = 3\n"
+        "Exiting.\n"
+    );
+}
+
+TEST_CASE("job_call_ret_next") {
+    test_interpreter_and_rewriter({"./binaries/job_call_ret_next/a.elf"},
+        "job main\n"
+        "job sub1\n"
+        "job sub2\n"
+        "job next\n"
+    );
+}
+
+TEST_CASE("job_cpp_virtual") {
+    test_interpreter_and_rewriter({"./binaries/job_cpp_virtual/a.elf"},
+        "Constructor for Base\n"
+        "Constructor for Derived\n"
+        "*** job_virtual(PIC) started\n"
+        "[auto instance]\n"
+        "Constructor for Base\n"
+        "Constructor for Derived\n"
+        "This is Derived val=2\n"
+        "[global instance]\n"
+        "This is Derived val=2\n"
+        "[static instance]\n"
+        "Constructor for Base\n"
+        "Constructor for Derived\n"
+        "Constructor for StaticDerived\n"
+        "This is StaticDerived val=3\n"
+        "[placement new]\n"
+        "Constructor for Base\n"
+        "Constructor for Derived\n"
+        "This is Derived val=2\n"
+        "*** job_virtual(PIC) completed\n"
+        "Destructor for Derived\n"
+        "Destructor for Base\n"
+        "Destructor for StaticDerived\n"
+        "Destructor for Derived\n"
+        "Destructor for Base\n"
+        "Destructor for Derived\n"
+        "Destructor for Base\n"
+        "job_shutdown\n"
+        " ****** shutdown : eaJobChain=ffffffffffffffff\n"
+    );
+}
+
+TEST_CASE("job_double_buffer") {
+    test_interpreter_and_rewriter({"./binaries/job_double_buffer/a.elf"},
+        "uniform = 2a700f3d\n"
+        "uniform = 135ab93d\n"
+    );
+}
+
+TEST_CASE("job_guard_and_next") {
+    test_interpreter_and_rewriter({"./binaries/job_guard_and_next/a.elf"},
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+        "job1 hello\n"
+    );
+}
+
+TEST_CASE("job_joblist") {
+    test_interpreter_and_rewriter({"./binaries/job_joblist/a.elf"},
+        "Waiting for the event flag\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        "job hello\n"
+        " ****** event sender : ev=30f00\n"
+    );
+}
+
+//TEST_CASE("job_stall_successor") {
+//    test_interpreter_and_rewriter({"./binaries/job_stall_successor/a.elf"},
+//        "DMA in job TEST\n"
+//        "  elapsed time = 0(us)\n"
+//        "DMA in job w/Restart TEST\n"
+//        "  elapsed time = 0(us)\n"
+//    );
+//}
+
+TEST_CASE("job_sync_label") {
+    test_interpreter_and_rewriter({"./binaries/job_sync_label/a.elf"},
+        "TEST with SYNC command\n"
+        "  elapsed time = 0(us)\n"
+        "TEST with SYNC_LABEL command\n"
+        "  elapsed time = 0(us)\n"
+    );
+}
+
+TEST_CASE("job_urgent_call") {
+    test_interpreter_and_rewriter({"./binaries/job_urgent_call/a.elf"},
+        "notify\n"
+        " ****** event sender : ev=0, counter=0\n"
+        "notify\n"
+        " ****** event sender : ev=0, counter=1\n"
+        "notify\n"
+        " ****** event sender : ev=0, counter=2\n"
+        "notify\n"
+        " ****** event sender : ev=0, counter=3\n"
+        "notify\n"
+        " ****** event sender : ev=0, counter=4\n"
     );
 }

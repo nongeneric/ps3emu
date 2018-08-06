@@ -13,3 +13,7 @@ int32_t cellNetCtlNetStartDialogLoadAsync(
     INFO(libs) << ssnprintf("cellNetCtlNetStartDialogLoadAsync(%x)", param->type);
     return CELL_OK;
 }
+
+emu_void_t cellNetCtlTerm() {
+    return emu_void;
+}

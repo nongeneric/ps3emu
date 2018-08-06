@@ -778,6 +778,7 @@ void printNinja(std::string name, std::vector<SegmentInfo> const& segments) {
 }
 
 void HandleRewrite(RewriteCommand const& command) {
+    g_state.init();
     MainMemory mm;
     if (!g_state.mm) {
         g_state.mm = &mm;

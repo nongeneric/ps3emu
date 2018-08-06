@@ -114,8 +114,9 @@ T align(T n, unsigned alignment) {
 template <typename Container, typename Pred>
 void erase_if(Container& container, Pred pred) {
     auto it = std::find_if(begin(container), end(container), pred);
-    assert(it != end(container));
-    container.erase(it);
+    if (it != end(container)) {
+        container.erase(it);
+    }
 }
 
 template <typename Iter, typename IsEmptyPred>

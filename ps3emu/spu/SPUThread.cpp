@@ -9,10 +9,13 @@
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/spu/SPUGroupManager.h"
 #include "ps3emu/AffinityManager.h"
+#include "ps3emu/utils/ranges.h"
+#include "ps3emu/utils/TraceFile.h"
 #include "SPUDasm.h"
-#include <boost/range/algorithm.hpp>
 #include <stdio.h>
 #include <xmmintrin.h>
+
+#define TRACE_ENABLED 1
 
 void SPUThread::run(bool suspended) {
     assert(!_needsJoin);
@@ -69,11 +72,18 @@ void SPUThread::loop(OneTimeEvent* event) {
 
     waitSuspended();
     
-//     auto traceFilePath = ssnprintf("/tmp/spu_trace_%s", _name);
-//     auto tf = fopen(traceFilePath.c_str(), "w");
-//     bool trace = false;
-//     int instrTraced = 0;
+#if TRACE_ENABLED
+    auto traceFilePath = ssnprintf("/tmp/spu_trace_%s.bz2", _name);
+    auto tf = std::make_unique<TraceFile>(traceFilePath);
+    bool trace = false;
+    int instrTraced = 0;
+#endif
     
+#ifdef DEBUG
+    uint64_t dbgCounter = 0;
+    std::array<uint32_t, 1000> dbgTrace = {0};
+#endif
+
     for (;;) {
 #ifdef DEBUGPAUSE
         if (_singleStep) {
@@ -88,32 +98,17 @@ void SPUThread::loop(OneTimeEvent* event) {
         try {
             cia = getNip();
 
-//             if (cia == 0x1cfc)
-//                 trace = true;
-//             if (cia == 0x1c44)
-//                 trace = false;
-//            
-//             if (trace)
-//             {
-//                 instrTraced++;
-//                 if ((instrTraced % 10000) == 0) {
-//                     fclose(tf);
-//                     tf = fopen(traceFilePath.c_str(), "w");
-//                     instrTraced = 0;
-//                 }
-//                 
-//                 fprintf(tf, "pc:%08x;", cia);
-//                 for (auto i = 0u; i < 128; ++i) {
-//                     auto v = r(i);
-//                     fprintf(tf, "r%03d:%08x%08x%08x%08x;", i, 
-//                             v.w<0>(),
-//                             v.w<1>(),
-//                             v.w<2>(),
-//                             v.w<3>());
-//                 }
-//                 fputs("\n", tf);
-//                 fflush(tf);
-//             }
+#ifdef DEBUG
+            dbgTrace[dbgCounter % dbgTrace.size()] = cia;
+            dbgCounter++;
+#endif
+
+#if TRACE_ENABLED
+            if (trace) {
+                instrTraced++;
+                tf->append(this);
+            }
+#endif
 
             uint32_t instr = *(uint32_t*)ptr(cia);
             uint32_t segment, label;
@@ -127,6 +122,9 @@ void SPUThread::loop(OneTimeEvent* event) {
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Breakpoint);
         } catch (IllegalInstructionException& e) {
+#if TRACE_ENABLED
+            tf.reset();
+#endif
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::InvalidInstruction);
             break;
@@ -293,7 +291,7 @@ void SPUThread::handleInterrupt(uint32_t interruptValue) {
     
     // throw or send
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
-    auto info = boost::find_if(_eventQueuesToPPU, [=](auto& i) {
+    auto info = ranges::find_if(_eventQueuesToPPU, [=](auto& i) {
         return i.port == port;
     });
     assert(info != end(_eventQueuesToPPU));
@@ -308,7 +306,7 @@ void SPUThread::handleReceiveEvent() {
     INFO(spu) << "receive event";
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
     uint32_t port = _channels.mmio_read(SPU_Out_MBox);
-    auto info = boost::find_if(_eventQueuesToSPU, [=](auto& i) {
+    auto info = ranges::find_if(_eventQueuesToSPU, [=](auto& i) {
         return i.port == port;
     });
     assert(info != end(_eventQueuesToSPU));
@@ -320,9 +318,10 @@ void SPUThread::handleReceiveEvent() {
 }
 
 void SPUThread::connectQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
-                                   uint32_t portNumber) {
+                             uint32_t portNumber) {
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
     _eventQueuesToPPU.push_back({portNumber, queue});
+
 }
 
 void SPUThread::bindQueue(std::shared_ptr<IConcurrentQueue<sys_event_t>> queue,
@@ -343,9 +342,7 @@ void SPUThread::disconnectQueue(uint32_t portNumber) {
 
 bool SPUThread::isQueuePortAvailableToConnect(uint32_t portNumber) {
     boost::lock_guard<boost::mutex> lock(_eventQueuesMutex);
-    auto it = boost::find_if(_eventQueuesToPPU, [=](auto& i) {
-        return i.port == portNumber;
-    });
+    auto it = ranges::find(_eventQueuesToPPU, portNumber, &EventQueueInfo::port);
     return it == end(_eventQueuesToPPU);
 }
 

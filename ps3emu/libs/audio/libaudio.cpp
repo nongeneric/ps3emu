@@ -168,7 +168,8 @@ void initAudio() {
                 ack(0, 0);
             } else if (command == AudioControlCommand::PORT_LEVEL) {
                 WARNING(libs) << "AudioControlCommand::PORT_LEVEL not implemented";
-                ack(0, 0);
+                if (control.Ack.u())
+                    ack(0, 0);
             } else if (command == AudioControlCommand::PORT_CLOSE) {
                 WARNING(libs) << "AudioControlCommand::PORT_CLOSE not implemented";
                 ack(0, 0);

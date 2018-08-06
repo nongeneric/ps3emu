@@ -781,6 +781,9 @@ void DebuggerModel::execSingleCommand(QString command) {
         } else if (name == "bp") {
             setSoftBreak(exprVal);
             return;
+        } else if (name == "bp_spu_elf") {
+            setSPUSoftBreak(exprVal);
+            return;
         } else if (name == "mwbp") {
             bool ok;
             auto size = command.section(':', 2, 2).toInt(&ok, 16);
@@ -1054,41 +1057,27 @@ void DebuggerModel::toggleFPR() {
     _gprModel->toggleFPR();
 }
 
-void printFrequencies(FILE* f, std::map<std::string, int>& counts) {
-    fprintf(f, "#\n#instruction frequencies:\n");
+void printFrequencies(TraceFile& f, std::map<std::string, int>& counts) {
+    f.append(ssnprintf("#\n#instruction frequencies:\n"));
     std::vector<std::pair<std::string, int>> sorted;
     for (auto p : counts) {
         sorted.push_back(p);
     }
     ranges::sort(sorted, std::less<>(), [](auto x) { return x.second; });
     for (auto p : sorted) {
-        fprintf(f, "#%-10s%-5d\n", p.first.c_str(), p.second);
+        f.append(ssnprintf("#%-10s%-5d\n", p.first.c_str(), p.second));
     }
 }
 
-void DebuggerModel::spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
+void DebuggerModel::spuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
     ps3_uintptr_t nip;
-    std::string str;
+    std::string name;
     _activeSPUThread->singleStepBreakpoint(true);
     while ((nip = _activeSPUThread->getNip()) != va) {
         auto instr = _activeSPUThread->ptr(nip);
-        SPUDasm<DasmMode::Print>(instr, nip, &str);
-        std::string name;
         SPUDasm<DasmMode::Name>(instr, nip, &name);
         counts[name]++;
-        
-        fprintf(f, "pc:%08x;", nip);
-        for (auto i = 0u; i < 128; ++i) {
-            auto v = _activeSPUThread->r(i);
-            fprintf(f, "r%03d:%08x%08x%08x%08x;", i, 
-                    v.w<0>(),
-                    v.w<1>(),
-                    v.w<2>(),
-                    v.w<3>());
-        }
-        fprintf(f, " #%s\n", str.c_str());
-        
-        fflush(f);
+        f.append(_activeSPUThread);
         for (;;) {
             auto ev = _proc->run();
             if (boost::get<SPUSingleStepBreakpointEvent>(&ev))
@@ -1101,7 +1090,7 @@ void DebuggerModel::spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
 void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
     auto tracefile = "/tmp/ps3trace-spu";
     auto traceScript = "/tmp/ps3trace-spu-script";
-    auto f = fopen(tracefile, "w");
+    TraceFile f(tracefile);
     std::map<std::string, int> counts;
     
     auto scriptf = fopen(traceScript, "r");
@@ -1121,44 +1110,24 @@ void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
     }
     
     printFrequencies(f, counts);
-    
-    fclose(f);
+
     if (scriptf) {
         fclose(scriptf);
     }
     message(QString("trace completed and saved to ") + tracefile);
 }
 
-void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
+void DebuggerModel::ppuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::string, int>& counts) {
     ps3_uintptr_t nip;
-    std::string str;
+    std::string name;
     _updateUIWhenRunning = false;
     _activeThread->singleStepBreakpoint(true);
     while ((nip = _activeThread->getNIP()) != va) {
         uint32_t instr;
         g_state.mm->readMemory(nip, &instr, sizeof instr);
-        ppu_dasm<DasmMode::Print>(&instr, nip, &str);
-        std::string name;
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
         counts[name]++;
-        
-        fprintf(f, "pc:%08x;", nip);
-        for (auto i = 0u; i < 32; ++i) {
-            auto r = _activeThread->getGPR(i);
-            fprintf(f, "r%d:%08x%08x;", i, (uint32_t)(r >> 32), (uint32_t)r);
-        }
-        fprintf(f, "r%d:%08x%08x;", 32, 0, (uint32_t)_activeThread->getLR());
-        for (auto i = 0u; i < 32; ++i) {
-            auto r = _activeThread->r(i);
-            fprintf(f, "v%d:%08x%08x%08x%08x;", i, 
-                    (uint32_t)r.w(0),
-                    (uint32_t)r.w(1),
-                    (uint32_t)r.w(2),
-                    (uint32_t)r.w(3));
-        }
-        fprintf(f, " #%s\n", str.c_str());
-        fflush(f);
-        
+        f.append(_activeThread);
         for (;;) {
             auto ev = _proc->run();
             if (boost::get<PPUSingleStepBreakpointEvent>(&ev))
@@ -1173,7 +1142,7 @@ void DebuggerModel::ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, 
 
 void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
     auto tracefile = "/tmp/ps3trace";
-    auto f = fopen(tracefile, "w");
+    TraceFile f(tracefile);
     auto traceScript = "/tmp/ps3trace-ppu-script";
     std::map<std::string, int> counts;
     
@@ -1193,8 +1162,7 @@ void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
     } else {
         ppuTraceTo(f, va, counts);
     }
-    
-    fclose(f);
+
     if (scriptf)
         fclose(scriptf);
     message(QString("trace completed and saved to ") + tracefile);
@@ -1248,6 +1216,28 @@ void DebuggerModel::setSoftBreak(ps3_uintptr_t va) {
     _softBreaks.push_back({va, bytes});
 }
 
+void DebuggerModel::setSPUSoftBreak(ps3_uintptr_t mainElfVa) {
+    auto bytes = g_state.mm->load32(mainElfVa);
+
+    SPUForm i { bytes };
+    if (i.OP11.u() == SPU_STOPD_OPCODE && i.StopAndSignalType.u() > 0) {
+        messagef("breakpoint already set");
+        return;
+    }
+
+    i.OP11.set(SPU_STOPD_OPCODE);
+
+    auto index = _mainElfSpuBreaks.create({bytes, mainElfVa});
+    if (index >= 1u << decltype(SPUForm::StopAndSignalType)::W) {
+        messagef("too many breakpoints");
+        _mainElfSpuBreaks.destroy(index);
+        return;
+    }
+    i.OP11.set(SPU_STOPD_OPCODE);
+    i.StopAndSignalType.set(index);
+    g_state.mm->store32(mainElfVa, i.u, g_state.granule);
+}
+
 void DebuggerModel::clearSoftBreaks() {
     auto breaks = _softBreaks;
     for (auto& bp : breaks) {
@@ -1289,20 +1279,32 @@ void DebuggerModel::trySetPendingSPUBreaks() {
 }
 
 void DebuggerModel::clearSPUSoftBreak(ps3_uintptr_t va) {
+    auto ptr = (big_uint32_t*)_activeSPUThread->ptr(va);
     auto it = std::find_if(
         begin(_spuBreaks), end(_spuBreaks), [=](auto b) { return b.va == va; });
     if (it == end(_spuBreaks)) {
-        emit message(
-            QString::fromStdString(ssnprintf("there is no spu breakpoint at %x", va)));
+        SPUForm i{*ptr};
+        if (i.OP11.u() == SPU_STOPD_OPCODE) {
+            auto index = i.StopAndSignalType.u();
+            messagef("main elf spu breakpoint at %x (index %x)", va, index);
+            auto info = _mainElfSpuBreaks.try_get(index);
+            if (!info) {
+                messagef("unknown breakpoint", va, index);
+                return;
+            }
+            *ptr = info->bytes;
+            return;
+        }
+
+        messagef("there is no spu breakpoint at %x", va);
         _activeSPUThread->setNip(_activeSPUThread->getNip() + 4);
         return;
     }
     if (!_activeSPUThread) {
-        emit message("can't clear spu breakpoint without active spu thread");
+        message("can't clear spu breakpoint without active spu thread");
         return;
     }
     if (!it->isPending) {
-        auto ptr = (big_uint32_t*)_activeSPUThread->ptr(va);
         *ptr = it->bytes;
     }
     _spuBreaks.erase(it);

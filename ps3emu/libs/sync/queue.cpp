@@ -9,8 +9,12 @@
 #include "ps3emu/log.h"
 #include "ps3emu/state.h"
 #include "ps3emu/Process.h"
+#include "ps3emu/utils/ranges.h"
+#include "ps3emu/spu/SPUThread.h"
 #include <boost/thread.hpp>
 #include <algorithm>
+
+#define CELL_EISCONN (-26)
 
 namespace {    
     using IQueue = IConcurrentQueue<sys_event_t>;
@@ -18,6 +22,7 @@ namespace {
     struct queue_info {
         std::shared_ptr<IQueue> queue;
         std::string name;
+        std::vector<std::tuple<std::shared_ptr<SPUThread>, uint32_t>> connectedSpuThreads;
         uint64_t key;
         bool log = true;
     };
@@ -89,7 +94,12 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
 }
 
 int32_t sys_event_queue_destroy(sys_event_queue_t equeue_id, int32_t mode) {
+    INFO(libs) << ssnprintf("sys_event_queue_destroy(id = %x, mode = %x)", equeue_id, mode);
     // TODO: wakeup threads and make them return ECANCELED
+    auto info = queues.get(equeue_id);
+    for (auto& [th, port] : info->connectedSpuThreads) {
+        th->disconnectQueue(port);
+    }
     queues.destroy(equeue_id);
     return CELL_OK;
 }
@@ -214,9 +224,12 @@ int32_t sys_spu_thread_connect_event(uint32_t thread_id,
         info->name,
         eq,
         spup);
+    if (spup > 63)
+        return CELL_EINVAL;
     assert(et == SYS_SPU_THREAD_EVENT_USER);
     auto thread = g_state.proc->getSpuThread(thread_id);
     thread->connectQueue(info->queue, spup);
+    info->connectedSpuThreads.push_back({thread, spup});
     return CELL_OK;
 }
 
@@ -260,28 +273,32 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                                                        sys_event_queue_t eq,
                                                        uint64_t req,
                                                        uint8_t* spup) {
+    if (req == 0)
+        return CELL_EINVAL;
     auto info = queues.get(eq);
-    INFO(libs) << ssnprintf("sys_spu_thread_group_connect_event_all_threads"
-                            "(group=%d, queue=%s[%x], req=%016llx)", 
-                            group_id, info->name, eq, req);
+    auto message = ssnprintf("sys_spu_thread_group_connect_event_all_threads"
+                             "(group=%d, queue=%s[%x], req=%016llx)",
+                             group_id, info->name, eq, req);
     auto group = findThreadGroup(group_id);
     for (auto i = 0u; i < 64; ++i) {
         if (((1ull << i) & req) == 0)
             continue;
-        auto available = std::all_of(begin(group->threads), end(group->threads), [=](auto& th) {
+        auto available = ranges::all_of(group->threads, [=](auto th) {
             return th->isQueuePortAvailableToConnect(i);
         });
         if (available) {
             for (auto& th : group->threads) {
                 th->connectQueue(info->queue, i);
+                auto thPtr = g_state.proc->getSpuThread(th->getId());
+                info->connectedSpuThreads.push_back({thPtr, i});
             }
             *spup = i;
-            INFO(libs) << ssnprintf("connected to spup %d", i);
+            INFO(libs) << ssnprintf("%s [connected to spup %x]", message, i);
             return CELL_OK;
         }
     }
-    assert(false);
-    return -1;
+    INFO(libs) << ssnprintf("%s [FAILED]", message);
+    return CELL_EISCONN;
 }
 
 sys_event_queue_t getQueueByKey(sys_ipc_key_t key) {

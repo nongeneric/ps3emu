@@ -28,6 +28,13 @@ inline std::string format_nn(const char* mnemonic, OP1 op1, OP2 op2) {
                      op2.prefix(), op2.native());
 }
 
+template <typename OP2>
+inline std::string format_sn(const char* mnemonic, const char* op1, OP2 op2) {
+    return ssnprintf("%s %s,%s%d", mnemonic,
+                     op1,
+                     op2.prefix(), op2.native());
+}
+
 template <typename OP1>
 inline std::string format_nu(const char* mnemonic, OP1 op1, uint64_t u) {
     return ssnprintf("%s %s%d,0x%" PRIx64, mnemonic, 
@@ -67,6 +74,15 @@ inline std::string format_br_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3
     return ssnprintf("%s %s%d,%s%d(%s%d)", mnemonic, 
                      op1.prefix(), op1.native(), 
                      op2.prefix(), op2.native(),
+                     op3.prefix(), op3.native()
+    );
+}
+
+template <typename OP1, typename OP3>
+inline std::string format_br_nin(const char* mnemonic, OP1 op1, int op2, OP3 op3) {
+    return ssnprintf("%s %s%d,%d(%s%d)", mnemonic,
+                     op1.prefix(), op1.native(),
+                     op2,
                      op3.prefix(), op3.native()
     );
 }

@@ -9,5 +9,6 @@ struct CellNetCtlNetStartDialogParam {
 };
 
 int32_t cellNetCtlInit();
+emu_void_t cellNetCtlTerm();
 int32_t cellNetCtlNetStartDialogLoadAsync(
     const CellNetCtlNetStartDialogParam* param);

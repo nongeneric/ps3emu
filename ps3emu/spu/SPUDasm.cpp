@@ -1,7 +1,6 @@
 #include "SPUDasm.h"
 
 #include "SPUThread.h"
-#include "../BitField.h"
 #include "../dasm_utils.h"
 #include "../utils.h"
 #include <boost/endian/conversion.hpp>
@@ -23,30 +22,6 @@
 #include <boost/preprocessor/list/rest_n.hpp>
 
 using namespace boost::endian;
-
-using I16_t = BitField<9, 25, BitFieldType::Signed>;
-
-union SPUForm {
-    BitField<0, 4> OP4;
-    BitField<0, 7> OP7;
-    BitField<0, 6> OP6;
-    BitField<0, 8> OP8;
-    BitField<0, 9> OP9;
-    BitField<0, 10> OP10;
-    BitField<0, 11> OP11;
-    BitField<11, 18, BitFieldType::GPR> RB;
-    BitField<18, 25, BitFieldType::GPR> RA;
-    BitField<25, 32, BitFieldType::GPR> RC;
-    BitField<25, 32, BitFieldType::GPR> RT;
-    BitField<4, 11, BitFieldType::GPR> RT_ABC;
-    BitField<18, 25, BitFieldType::Channel> CA;
-    BitField<11, 18, BitFieldType::Signed> I7;
-    BitField<10, 18, BitFieldType::Signed> I8;
-    BitField<8, 18, BitFieldType::Signed> I10;
-    I16_t I16;
-    BitField<7, 25, BitFieldType::Signed> I18;
-    BitField<18, 32> StopAndSignalType;
-};
 
 #define EMU(name) inline void emulate##name(SPUForm* i, uint32_t cia, SPUThread* thread)
 #define INVOKE(name) invoke_impl<M>(#name, print##name, emulate##name, rewrite##name, &x, cia, state); return
@@ -191,7 +166,7 @@ inline void assertNotNaN(R128 r) {
 }
 
 PRINT(lqd) {
-    *result = format_br_nnn("lqd", i->RT, i->I10, i->RA);
+    *result = format_br_nin("lqd", i->RT, i->I10 << 4, i->RA);
 }
 
 #define _lqd(_i10_4, _ra, _rt) { \
@@ -251,7 +226,7 @@ EMU_REWRITE(lqr, cia_lsa(i->I16, cia), i->RT.u())
 
 
 PRINT(stqd) {
-    *result = format_br_nnn("stqd", i->RT, i->I10, i->RA);
+    *result = format_br_nin("stqd", i->RT, i->I10 << 4, i->RA);
 }
 
 #define _stqd(_i10_4, _ra, _rt) { \
@@ -3038,9 +3013,8 @@ PRINT(dsync) {
 }
 EMU_REWRITE(dsync, 0)
 
-
 PRINT(rdch) {
-    *result = format_nn("rdch", i->CA, i->RT);
+    *result = format_sn("rdch", classIdToString(i->CA.u()), i->RT);
 }
 
 #define _rdch(_ca, _rt) { \
@@ -3051,7 +3025,7 @@ EMU_REWRITE(rdch, i->CA.u(), i->RT.u())
 
 
 PRINT(rchcnt) {
-    *result = format_nn("rchcnt", i->CA, i->RT);
+    *result = format_sn("rchcnt", classIdToString(i->CA.u()), i->RT);
 }
 
 #define _rchcnt(_ca, _rt) { \
@@ -3062,7 +3036,7 @@ EMU_REWRITE(rchcnt, i->CA.u(), i->RT.u())
 
 
 PRINT(wrch) {
-    *result = format_nn("wrch", i->CA, i->RT);
+    *result = format_sn("wrch", classIdToString(i->CA.u()), i->RT);
 }
 
 #define _wrch(_ca, _rt, _cia) { \
@@ -3204,7 +3178,7 @@ void SPUDasm(const void* instr, uint32_t cia, S* state) {
         case 0b01110111010: INVOKE(fscrwr);
         case 0b01110011000: INVOKE(fscrrd);
         case 0b00000000000: INVOKE(stop);
-        case 0b00101000000: INVOKE(stopd);
+        case SPU_STOPD_OPCODE: INVOKE(stopd);
         case 0b00000000001: INVOKE(lnop);
         case 0b01000000001: INVOKE(nop);
         case 0b00000000010: INVOKE(sync);

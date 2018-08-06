@@ -58,6 +58,7 @@ void sigint_handler(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+    g_state.init();
     std::string elfPath, elfArgs, verbosity, filter, sinks, format, area;
     bool captureRsx;
     options_description consoleDescr("Allowed options");

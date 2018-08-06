@@ -13,6 +13,7 @@
 #include "ps3emu/state.h"
 #include "ps3emu/spu/SPUChannels.h"
 #include <boost/range/algorithm.hpp>
+#include <boost/algorithm/string.hpp>
 #include <array>
 #include <vector>
 #include <stdio.h>
@@ -252,6 +253,7 @@ int32_t sys_spu_thread_group_create(sys_spu_thread_group_t* id,
 }
 
 void initThread(MainMemory* mm, SPUThread* thread, const sys_spu_image_t* image) {
+    memset(thread->ls(0), 0, LocalStorageSize);
     spuImageMap(mm, image, thread->ptr(0));
     thread->setNip(image->entry_point);
     thread->setElfSource(image->segs);
@@ -273,8 +275,9 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
     INFO(libs) << ssnprintf("sys_spu_thread_initialize() source=%x", img->segs);
     auto group = groups.get(group_id);
     std::string name;
-    name.resize(attr->nsize);
+    name.resize(attr->nsize - 1);
     g_state.mm->readMemory(attr->name, &name[0], attr->nsize);
+    boost::replace_all(name, "/", "_");
     auto id = proc->createSpuThread(name);
     auto th = proc->getSpuThread(id).get();
     group->threads.push_back(th);
@@ -309,6 +312,7 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
     auto [c, s] = g_state.spuGroupManager->join(group.get());
     *cause = c;
     *status = s;
+    INFO(libs) << ssnprintf("sys_spu_thread_group_join(%s) returned %x, %x", group->name, c, s);
     return CELL_OK;
 }
 

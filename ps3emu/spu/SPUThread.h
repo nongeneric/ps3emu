@@ -145,6 +145,10 @@ public:
     
     template <typename V>
     inline R128& r(V i) {
+        if (getUValue(i) == 98) {
+            int i = 0;
+            i++;
+        }
         return _rs[getUValue(i)];
     }
     

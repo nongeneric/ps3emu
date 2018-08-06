@@ -75,7 +75,7 @@ int32_t sceNpDrmIsAvailable2_proxy(const SceNpDrmKey *k_licensee, ps3_uintptr_t 
 
 tbb::concurrent_vector<NCallEntry> ncallTable {
     ENTRY(EmuInitLoadedPrxModules),
-    EMPTY(),
+    ENTRY(cellNetCtlTerm),
     ENTRY(_sys_process_atexitspawn),
     ENTRY(_sys_process_at_Exitspawn),
     ENTRY(sys_prx_exitspawn_with_level),

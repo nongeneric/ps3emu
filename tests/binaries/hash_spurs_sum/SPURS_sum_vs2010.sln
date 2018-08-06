@@ -1,0 +1,25 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SPURS_sum", "SPURS_sum.vcxproj", "{D378970B-4725-40BC-8DBD-DF2298D3E56A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|PS3 = Debug|PS3
+		Release|PS3 = Release|PS3
+		SNC Debug|PS3 = SNC Debug|PS3
+		SNC Release|PS3 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.Debug|PS3.ActiveCfg = Debug|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.Debug|PS3.Build.0 = Debug|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.Release|PS3.ActiveCfg = Release|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.Release|PS3.Build.0 = Release|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.SNC Debug|PS3.ActiveCfg = SNC Debug|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.SNC Debug|PS3.Build.0 = SNC Debug|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.SNC Release|PS3.ActiveCfg = SNC Release|PS3
+		{D378970B-4725-40BC-8DBD-DF2298D3E56A}.SNC Release|PS3.Build.0 = SNC Release|PS3
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

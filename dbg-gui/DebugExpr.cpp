@@ -22,7 +22,8 @@ enum class TokenType {
     Minus,
     Plus,
     Mul,
-    Div
+    Div,
+    _EOF
 };
 
 std::string printTokenType(TokenType type) {
@@ -41,6 +42,7 @@ std::string printTokenType(TokenType type) {
         CASE(Plus)
         CASE(Mul)
         CASE(Div)
+        CASE(_EOF)
     }
 #undef CASE
     throw std::runtime_error("");
@@ -109,6 +111,7 @@ std::vector<Token> tokenize(std::string const& text) {
             tokens.push_back(token);
         }
     }
+    tokens.push_back(Token(TokenType::_EOF, "", text.size(), 0));
     return tokens;
 }
 
@@ -320,7 +323,7 @@ public:
         while (type() == TokenType::Plus || type() == TokenType::Minus) {
             auto op = type();
             next();
-            auto right = expect(&Parser::term);
+            auto right = expect(&Parser::expr);
             left = _context.make<BinaryOpExpr>(op, left, right);
         }
         return left;
@@ -360,7 +363,7 @@ public:
         while (type() == TokenType::Mul || type() == TokenType::Div) {
             auto op = type();
             next();
-            auto right = expect(&Parser::factor);
+            auto right = expect(&Parser::expr);
             left = _context.make<BinaryOpExpr>(op, left, right);
         }
         return left;

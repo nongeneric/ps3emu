@@ -20,16 +20,17 @@
 #include <iostream>
 #include <fstream>
 #include <tuple>
-#include <boost/tokenizer.hpp>
 
 struct State {
     std::map<std::string, uint64_t> r64;
     std::map<std::string, R128> r128;
+    std::map<std::string, std::tuple<uint32_t, uint32_t>> modified;
 };
 
 struct Change {
     uint32_t offset;
     State effect;
+    std::string comment;
     std::optional<State> complete;
 };
 
@@ -37,11 +38,24 @@ class Parser {
     bool _spu = false;
     
     uint32_t parseOffset(auto& it) {
-        return std::stoi(*it++, nullptr, 16);
+        auto s = it;
+        while (isalnum(*it)) it++;
+        std::string str(s, it + 1);
+        return std::stoi(str, nullptr, 16);
     }
     
     char parseChar(auto& it) {
-         return (*it++)[0];
+         return *it++;
+    }
+
+    std::string parseEscaped(auto& it) {
+        auto c = parseChar(it);
+        auto escape = c;
+        std::string r;
+        while ((c = parseChar(it)) != escape) {
+            r += c;
+        }
+        return r;
     }
     
     R128 toR128(std::string str) {
@@ -61,10 +75,16 @@ class Parser {
         while (c != ']') {
             if (c == ',') {
                 c = parseChar(it);
+                assert(c == ' ');
+                c = parseChar(it);
             }
             assert(c == '(');
-            auto key = *it++;
-            auto val = *it++;
+            auto key = parseEscaped(it);
+            c = parseChar(it);
+            assert(c == ',');
+            c = parseChar(it);
+            assert(c == ' ');
+            auto val = parseEscaped(it);
             c = parseChar(it);
             assert(c == ')');
             c = parseChar(it);
@@ -78,40 +98,53 @@ class Parser {
         }
         return state;
     }
-     
+
     Change parseChange(auto& it) {
         auto offset = parseOffset(it);
+        auto c = parseChar(it);
+        assert(c == ' ');
         auto state = parseState(it);
-        return {offset, state};
+        c = parseChar(it);
+        assert(c == ' ');
+        auto comment = parseEscaped(it);
+        return {offset, state, comment};
     }
     
 public:
     Parser(bool spu) : _spu(spu) { }
     
     std::vector<Change> parse(std::string const& text) {
-        boost::char_delimiters_separator<char> sep(true, "[]()", " ,\n'");
-        boost::tokenizer<boost::char_delimiters_separator<char>> tok(text, sep);
         std::vector<Change> changes;
-        for (auto it = begin(tok); it != end(tok);) {
+        int i = 0;
+        for (auto it = begin(text); it != end(text);) {
+            if (i == 0) {
+                parseChange(it); // ignore initial complete state
+                parseChar(it);
+            }
             changes.push_back(parseChange(it));
+            auto c = parseChar(it);
+            assert(c == '\n');
+            i++;
         }
         return changes;
     }
 };
 
-void mergeState(State& state, State const& effect) {
+void mergeState(State& state, State const& effect, uint32_t changeIndex, uint32_t changeOffset) {
     for (auto& [k, v] : effect.r64) {
         state.r64[k] = v;
+        state.modified[k] = {changeIndex, changeOffset};
     }
     for (auto& [k, v] : effect.r128) {
         state.r128[k] = v;
+        state.modified[k] = {changeIndex, changeOffset};
     }
 }
 
 void makeKeyChanges(std::vector<Change>& changes) {
     State state;
     for (auto i = 0u; i < changes.size(); i++) {
-        mergeState(state, changes[i].effect);
+        mergeState(state, changes[i].effect, i, changes[i].offset);
         if (i % 50 == 0) {
             changes[i].complete = state;
         }
@@ -129,7 +162,7 @@ State getState(std::vector<Change> const& changes, int n) {
         }
     }
     for (int i = start; i <= n; ++i) {
-        mergeState(state, changes[i].effect);
+        mergeState(state, changes[i].effect, i, changes[i].offset);
     }
     return state;
 }
@@ -186,11 +219,12 @@ public:
         if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
             return QVariant();
         switch (section) {
-            case 0: return "Offset";
-            case 1: return "Bytecode";
-            case 2: return "Instruction";
-            case 3: return "Left";
-            case 4: return "Right";
+            case 0: return "#";
+            case 1: return "Offset";
+            case 2: return "Bytecode";
+            case 3: return "Instruction";
+            case 4: return "Left";
+            case 5: return "Right";
         }
         return {};
     }
@@ -207,13 +241,15 @@ public:
             return {};
         switch (index.column()) {
             case 0:
-                return QString::fromStdString(ssnprintf("%x", _left[index.row()].offset));
+                return QString::fromStdString(ssnprintf("%d", index.row()));
             case 1:
-            case 2: {
+                return QString::fromStdString(ssnprintf("%x", _left[index.row()].offset));
+            case 2:
+            case 3: {
                 try {
                     auto offset = _left[index.row()].offset;
                     if (offset + 4 < _dump.size()) {
-                        if (index.column() == 1) {
+                        if (index.column() == 2) {
                             return QString::fromStdString(print_hex(&_dump[offset], 4));
                         } else {
                             auto instr = *(uint32_t*)&_dump[offset];
@@ -225,14 +261,16 @@ public:
                             }
                             return QString::fromStdString(str);
                         }
+                    } else if (index.column() == 3) {
+                        return QString::fromStdString(_left[index.row()].comment);
                     }
                 } catch (...) {
                     return "error";
                 }
                 return {};
             }
-            case 3: return QString::fromStdString(printState(_left[index.row()].effect));
-            case 4: return QString::fromStdString(printState(_right[index.row()].effect));
+            case 4: return QString::fromStdString(printState(_left[index.row()].effect));
+            case 5: return QString::fromStdString(printState(_right[index.row()].effect));
         }
         return {};
     }
@@ -252,6 +290,7 @@ std::string printR128(R128 const& r, bool isFloat) {
 class StateModel : public QAbstractItemModel {
     std::vector<std::tuple<std::string, R128>> _r128;
     std::vector<std::tuple<std::string, int64_t>> _r64;
+    std::map<std::string, std::tuple<uint32_t, uint32_t>> _modified;
     
 public:
     StateModel(State const& state) {
@@ -261,6 +300,7 @@ public:
         for (auto& [k, v] : state.r64) {
             _r64.push_back({k, v});
         }
+        _modified = state.modified;
         auto pred = [](auto& a, auto& b) {
             auto anum = std::stoi(std::get<0>(a).substr(1));
             auto bnum = std::stoi(std::get<0>(b).substr(1));
@@ -271,7 +311,7 @@ public:
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 3;
+        return 4;
     }
     
     QModelIndex index(int row,
@@ -293,6 +333,7 @@ public:
             case 0: return "Register";
             case 1: return "Hex";
             case 2: return "Float";
+            case 3: return "Modified";
         }
         return {};
     }
@@ -300,6 +341,7 @@ public:
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return {};
+        std::string regName;
         if ((uint32_t)index.row() < _r64.size()) {
             auto& [name, r] = _r64[index.row()];
             switch (index.column()) {
@@ -307,19 +349,44 @@ public:
                 case 1: return QString::fromStdString(ssnprintf("%016llx", r, false));
                 case 2: return QString::fromStdString(ssnprintf("%016llx", r, true));
             }
+            regName = name;
         } else {
             auto& [name, r] = _r128[index.row() - _r64.size()];
             switch (index.column()) {
                 case 0: return QString::fromStdString(name);
                 case 1: return QString::fromStdString(printR128(r, false));
                 case 2: return QString::fromStdString(printR128(r, true));
-            }            
+            }
+            regName = name;
+        }
+        if (index.column() == 3) {
+            auto it = _modified.find(regName);
+            if (it == end(_modified))
+                return "";
+            auto [index, offset] = it->second;
+            return QString::fromStdString(ssnprintf("%08x | %d", offset, index));
         }
         return {};
     }
     
     QModelIndex parent(const QModelIndex& child) const override {
         return {};
+    }
+
+    uint32_t getModifiedIndex(const QModelIndex& index) const {
+        std::string regName;
+        if ((uint32_t)index.row() < _r64.size()) {
+            auto& [name, _] = _r64[index.row()];
+            regName = name;
+        } else {
+            auto& [name, _] = _r128[index.row() - _r64.size()];
+            regName = name;
+        }
+        auto it = _modified.find(regName);
+        if (it == end(_modified))
+            return 0;
+        auto [res, _] = it->second;
+        return res;
     }
 };
 
@@ -362,6 +429,14 @@ void HandleTraceViz(TraceVizCommand const& command) {
     for (int i = 3; i < 5; ++i) {
         list->setColumnWidth(i, 320);
     }
+
+    QObject::connect(badStateView, &QTableView::doubleClicked, [&](auto current) {
+        if (current == QModelIndex() || current.column() != 3)
+            return;
+        auto model = dynamic_cast<StateModel*>(badStateView->model());
+        auto index = model->getModifiedIndex(current);
+        list->selectRow(index);
+    });
 
     QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [&](auto current) {
         if (current == QModelIndex())

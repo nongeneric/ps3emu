@@ -189,23 +189,18 @@ void PulseBackend::playbackLoop() {
 
             pulseLock plock(_pulseMainLoop);
 
-            auto res = pa_stream_write(port.pulseStream,
-                                       &tempDest[0],
-                                       tempDest.size(),
-                                       nullptr,
-                                       0,
-                                       PA_SEEK_RELATIVE);
+            pa_stream_write(port.pulseStream,
+                            &tempDest[0],
+                            tempDest.size(),
+                            nullptr,
+                            0,
+                            PA_SEEK_RELATIVE);
 
             if (g_state.config->captureAudio) {
                 auto f = fCapture[id - AudioAttributes::portHwBase];
                 fwrite(&tempDest[0], 1, tempDest.size(), f);
             }
 
-            (void)res;
-            if (res) {
-                ERROR(libs) << ssnprintf("libaudio fatal: %s", pa_strerror(res));
-                exit(1);
-            }
             auto sizeLeft = pa_stream_writable_size(port.pulseStream);
             shouldSpeedUp |= sizeLeft > 2 * blockSize;
         }

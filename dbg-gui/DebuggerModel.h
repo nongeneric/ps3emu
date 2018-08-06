@@ -3,6 +3,8 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/libs/ConcurrentBoundedQueue.h"
 #include "ps3emu/EmuCallbacks.h"
+#include "ps3emu/IDMap.h"
+#include "ps3emu/utils/TraceFile.h"
 #include "MonospaceGrid.h"
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
@@ -24,6 +26,11 @@ struct SPUBreakInfo {
     bool isPending;
     uint32_t elfSource;
     ps3_uintptr_t va;
+};
+
+struct MainElfSPUBreakInfo {
+    uint32_t bytes;
+    uint32_t mainElfVa;
 };
 
 struct LoadElfCommand {
@@ -56,6 +63,7 @@ class DebuggerModel : public QWidget, public IEmuCallbacks {
     std::unique_ptr<Process> _proc;
     std::vector<SoftBreakInfo> _softBreaks;
     std::vector<SPUBreakInfo> _spuBreaks;
+    IDMap<uint32_t, MainElfSPUBreakInfo> _mainElfSpuBreaks;
     boost::thread _debugThread;
     ConcurrentBoundedQueue<DebugCommand> _debugThreadQueue;
     bool _elfLoaded = false;
@@ -63,8 +71,8 @@ class DebuggerModel : public QWidget, public IEmuCallbacks {
     std::string _moduleToWait;
     void log(std::string str);
     void traceTo(ps3_uintptr_t va);
-    void spuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts);
-    void ppuTraceTo(FILE* f, ps3_uintptr_t va, std::map<std::string, int>& counts);
+    void spuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::string, int>& counts);
+    void ppuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::string, int>& counts);
     void spuTraceTo(ps3_uintptr_t va);
     void ppuTraceTo(ps3_uintptr_t va);
     void updateUI();
@@ -73,6 +81,7 @@ class DebuggerModel : public QWidget, public IEmuCallbacks {
     void clearSoftBreak(ps3_uintptr_t va);
     void clearSoftBreaks();
     void setSPUSoftBreak(uint32_t elfSource, ps3_uintptr_t va);
+    void setSPUSoftBreak(ps3_uintptr_t mainElfVa);
     void clearSPUSoftBreak(ps3_uintptr_t va);
     void trySetPendingSPUBreaks();
     void switchThread(PPUThread* ppu);

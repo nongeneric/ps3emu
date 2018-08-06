@@ -37,7 +37,7 @@ constexpr uint64_t mask(int x, int y) {
 }
 
 enum class BitFieldType {
-    Signed, Unsigned, GPR, Channel, CR, FPR, Vector, None
+    Signed, Unsigned, GPR, CR, FPR, Vector, None
 };
 
 template <int Pos, int Next, BitFieldType T = BitFieldType::None, int Shift = 0>
@@ -73,7 +73,6 @@ public:
     constexpr const char* prefix() const {
         return T == BitFieldType::CR ? "cr"
              : T == BitFieldType::GPR ? "r"
-             : T == BitFieldType::Channel ? "ch"
              : T == BitFieldType::FPR ? "f"
              : T == BitFieldType::Vector ? "v"
              : "";
