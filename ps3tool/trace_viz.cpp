@@ -101,7 +101,7 @@ class Parser {
 
     Change parseChange(auto& it) {
         auto offset = parseOffset(it);
-        auto c = parseChar(it);
+        [[ maybe_unused ]] auto c = parseChar(it);
         assert(c == ' ');
         auto state = parseState(it);
         c = parseChar(it);
@@ -122,7 +122,7 @@ public:
                 parseChar(it);
             }
             changes.push_back(parseChange(it));
-            auto c = parseChar(it);
+            [[ maybe_unused ]] auto c = parseChar(it);
             assert(c == '\n');
             i++;
         }

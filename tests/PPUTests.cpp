@@ -1698,19 +1698,19 @@ TEST_CASE("fctiwz f1,f2") {
     uint8_t instr[] = { 0xfc, 0x20, 0x10, 0x1e };
     th.setFPRd(2, 0);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getFPR(1) & 0xffffffff) == 0 );    
+    REQUIRE( (int32_t)th.getFPR(1) == 0 );
     th.setFPRd(2, 3.14);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getFPR(1) & 0xffffffff) == 3 );    
+    REQUIRE( (int32_t)th.getFPR(1) == 3 );
     th.setFPRd(2, -3.14);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getFPR(1) & 0xffffffff) == -3 );
+    REQUIRE( (int32_t)th.getFPR(1) == -3 );
     th.setFPRd(2, 4294967295.);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getFPR(1) & 0xffffffff) == 0x7fffffff );
+    REQUIRE( (int32_t)th.getFPR(1) == 0x7fffffff );
     th.setFPRd(2, -4294967295.);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (th.getFPR(1) & 0xffffffff) == 0x80000000 );
+    REQUIRE( (int32_t)th.getFPR(1) == 0x80000000 );
 }
 
 TEST_CASE("fixed logical") {
