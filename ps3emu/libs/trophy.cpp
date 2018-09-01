@@ -94,8 +94,8 @@ std::optional<path> emuDir() {
         if (is_directory(dir)) {
             for (auto& nested : directory_iterator(dir)) {
                 if (!is_directory(nested))
-                        continue;
-                if (nested.path().filename() != "TROPHY.TRPEMU" || !is_directory(nested)) {
+                    continue;
+                if (nested.path().filename() != "TROPHY.TRPEMU") {
                     ERROR(libs) << "TROPHY.TRPEMU dir not found";
                     return {};
                 }

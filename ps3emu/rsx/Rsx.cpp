@@ -2063,7 +2063,7 @@ void Rsx::transferImage() {
             auto destPixelPtr = dest +
                 (isSwizzle ? swizzleIter.swizzleAddress(destX, destY, 0) * destPixelSize
                            : (destY * surface.pitch + destX * destPixelSize));
-            uint32_t srcPixel = *(big_uint32_t*)srcPixelPtr;
+            uint32_t srcPixel = fast_endian_reverse(*(uint32_t*)srcPixelPtr);
             uint32_t destPixel = srcPixel;
             if (sourcePixelSize != destPixelSize) {
                 if (sourcePixelSize == 2) {
@@ -2081,9 +2081,9 @@ void Rsx::transferImage() {
                 }
             }
             if (destPixelSize == 2) {
-                *(big_uint16_t*)destPixelPtr = destPixel >> 16;
+                *(uint16_t*)destPixelPtr = fast_endian_reverse(uint16_t(destPixel >> 16));
             } else {
-                *(big_uint32_t*)destPixelPtr = destPixel;
+                *(uint32_t*)destPixelPtr = fast_endian_reverse(destPixel);
             }
         }
     }
