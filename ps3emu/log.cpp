@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_sinks.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <sys/prctl.h>
 #include "ps3emu/ppu/PPUThread.h"
 #include "ps3emu/spu/SPUThread.h"
@@ -42,6 +44,7 @@ void log_init(int sink_flags, log_severity_t severity, int types, int areas, log
     } else {
         spdlog::set_pattern("%v");
     }
+    spdlog::flush_every(std::chrono::seconds(3));
 }
 
 void log_set_thread_name(std::string name) {
