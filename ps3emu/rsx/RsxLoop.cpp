@@ -970,8 +970,8 @@ void Rsx::CELL_GCM_NV4097_SET_DEPTH_BOUNDS_MAX_impl(int index) {
 }
 
 void Rsx::CELL_GCM_NV4097_SET_CLIP_MIN_impl(int index) {
-    ClipMin(union_cast<uint32_t, float>(readarg(1)),
-            union_cast<uint32_t, float>(readarg(2)));
+    ClipMin(bit_cast<float>(readarg(1)),
+            bit_cast<float>(readarg(2)));
 }
 
 void Rsx::CELL_GCM_NV4097_SET_CLIP_MAX_impl(int index) {
@@ -1121,14 +1121,14 @@ void Rsx::CELL_GCM_NV4097_ZCULL_SYNC_impl(int index) {
 }
 
 void Rsx::CELL_GCM_NV4097_SET_VIEWPORT_OFFSET_impl(int index) {
-    ViewportOffset(union_cast<uint32_t, float>(readarg(1)),
-                   union_cast<uint32_t, float>(readarg(2)),
-                   union_cast<uint32_t, float>(readarg(3)),
-                   union_cast<uint32_t, float>(readarg(4)),
-                   union_cast<uint32_t, float>(readarg(5)),
-                   union_cast<uint32_t, float>(readarg(6)),
-                   union_cast<uint32_t, float>(readarg(7)),
-                   union_cast<uint32_t, float>(readarg(8)));
+    ViewportOffset(bit_cast<float>(readarg(1)),
+                   bit_cast<float>(readarg(2)),
+                   bit_cast<float>(readarg(3)),
+                   bit_cast<float>(readarg(4)),
+                   bit_cast<float>(readarg(5)),
+                   bit_cast<float>(readarg(6)),
+                   bit_cast<float>(readarg(7)),
+                   bit_cast<float>(readarg(8)));
 }
 
 void Rsx::CELL_GCM_NV4097_SET_VIEWPORT_SCALE_impl(int index) {
@@ -1477,10 +1477,10 @@ void Rsx::CELL_GCM_NV4097_SET_TEXTURE_BORDER_COLOR_impl(int index) {
 void Rsx::CELL_GCM_NV4097_SET_VERTEX_DATA4F_M_impl(int index) {
     VertexData4fM(
         index,
-        union_cast<uint32_t, float>(readarg(1)),
-        union_cast<uint32_t, float>(readarg(2)),
-        union_cast<uint32_t, float>(readarg(3)),
-        union_cast<uint32_t, float>(readarg(4))
+        bit_cast<float>(readarg(1)),
+        bit_cast<float>(readarg(2)),
+        bit_cast<float>(readarg(3)),
+        bit_cast<float>(readarg(4))
     );
 }
 
@@ -1611,7 +1611,7 @@ void Rsx::CELL_GCM_NV4097_SET_SCULL_CONTROL_impl(int index) {
 }
 
 void Rsx::CELL_GCM_NV4097_SET_POINT_SIZE_impl(int index) {
-    PointSize(union_cast<uint32_t, float>(readarg(1)));
+    PointSize(bit_cast<float>(readarg(1)));
 }
 
 void Rsx::CELL_GCM_NV4097_SET_POINT_PARAMS_ENABLE_impl(int index) {

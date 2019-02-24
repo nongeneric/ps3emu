@@ -63,17 +63,13 @@ std::string ssnprintf(const char* f, Args... args) {
     return ssnprintf_buf;
 }
 
-template <typename S, typename D>
-union union_cast {
-    static_assert(sizeof(S) == sizeof(D), "invalid cast");
-    union_cast(S s) : _s(s) { }
-    operator D() const {
-        return _d;
-    }
-private:
-    S _s;
-    D _d;
-};
+template <class D, class S>
+D bit_cast(const S& from) {
+    static_assert(sizeof(D) == sizeof(S));
+    D to;
+    memcpy(&to, &from, sizeof(D));
+    return to;
+}
 
 inline slow_uint128_t make128(uint64_t low, uint64_t high) {
     slow_uint128_t i = low;

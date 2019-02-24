@@ -2019,6 +2019,9 @@ void Rsx::transferImage() {
     auto src = g_state.mm->getMemoryPointer(sourceEa, 1);
     auto dest = g_state.mm->getMemoryPointer(destEa, 1);
 
+    if (scale.clipW == 1024 && scale.clipH == 720)
+        return;
+
     FramebufferTextureKey key{sourceEa};
     auto res = _context->framebuffer->findTexture(key);
     if (res.texture) {
@@ -2027,6 +2030,7 @@ void Rsx::transferImage() {
         });
         if (it != end(_context->displayBuffers)) {
             _context->surfaceLinks.insert({sourceEa, destEa});
+            return;
         }
     }
 

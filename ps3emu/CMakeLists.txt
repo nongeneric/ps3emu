@@ -161,4 +161,5 @@ target_link_libraries(ps3emu
     dl
     pugixml
     stdc++fs
+    bz2
 )

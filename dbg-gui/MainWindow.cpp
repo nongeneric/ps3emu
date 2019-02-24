@@ -11,6 +11,11 @@
 #include <QTextEdit>
 #include <QLineEdit>
 #include <QKeyEvent>
+#include <QAbstractItemView>
+
+class LogTableView : public QAbstractItemView {
+
+};
 
 MainWindow::~MainWindow() { }
 

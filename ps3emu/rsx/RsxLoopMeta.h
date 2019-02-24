@@ -37,7 +37,7 @@ template <typename T> struct DbColumnType {
 
 template<> struct DbColumnType<float> {
     static float convert(uint32_t value) {
-        return union_cast<uint32_t, float>(value);
+        return bit_cast<float>(value);
     }
 };
 

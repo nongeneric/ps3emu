@@ -450,13 +450,13 @@ public:
         } else {
             switch (index.column()) {
                 case 1: return QString::fromStdString(ssnprintf("%g", 
-                    (float)union_cast<uint32_t, float>( std::get<1>(_values[i])[0] )));
+                    bit_cast<float>( std::get<1>(_values[i])[0] )));
                 case 2: return QString::fromStdString(ssnprintf("%g", 
-                    (float)union_cast<uint32_t, float>( std::get<1>(_values[i])[1] )));
+                    bit_cast<float>( std::get<1>(_values[i])[1] )));
                 case 3: return QString::fromStdString(ssnprintf("%g", 
-                    (float)union_cast<uint32_t, float>( std::get<1>(_values[i])[2] )));
+                    bit_cast<float>( std::get<1>(_values[i])[2] )));
                 case 4: return QString::fromStdString(ssnprintf("%g", 
-                    (float)union_cast<uint32_t, float>( std::get<1>(_values[i])[3] )));
+                    bit_cast<float>( std::get<1>(_values[i])[3] )));
             }
         }
         return QVariant();
@@ -684,9 +684,9 @@ public:
         }
         
         if (_info.type == VertexInputType::f32) {
-            float fValue = union_cast<uint32_t, float>(endian_reverse(*(uint32_t*)&_buffer[valueOffset]));
+            float fValue = bit_cast<float>(endian_reverse(*(uint32_t*)&_buffer[valueOffset]));
             if (!_be) {
-                fValue = union_cast<uint32_t, float>(*(uint32_t*)&_buffer[valueOffset]);
+                fValue = bit_cast<float>(*(uint32_t*)&_buffer[valueOffset]);
             }
             return QString::fromStdString(ssnprintf("%g", fValue));
         }
@@ -718,9 +718,9 @@ public:
             PreviewVertex v = {0};
             for (auto j = 0; j < std::min<int>(3, _info.size); ++j) {
                 if (_be) {
-                    v.xyz[j] = union_cast<uint32_t, float>(endian_reverse(component[j]));
+                    v.xyz[j] = bit_cast<float>(endian_reverse(component[j]));
                 } else {
-                    v.xyz[j] = union_cast<uint32_t, float>(component[j]);
+                    v.xyz[j] = bit_cast<float>(component[j]);
                 }
             }
             ptr += _info.stride;

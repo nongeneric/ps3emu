@@ -131,7 +131,7 @@ void initAudio() {
                     readIndex);
                 ack(0, 0, 0, 0, readIndex);
             } else if (command == AudioControlCommand::PORT_OPEN) {
-                float level = union_cast<uint32_t, float>(event.data1);
+                float level = bit_cast<float>(static_cast<uint32_t>(event.data1));
                 uint32_t blocks = (uint64_t)event.data2 & 0xffff;
                 uint32_t channels = ((uint64_t)event.data2 >> 16) & 0xffff;
                 uint32_t addr = (uint64_t)event.data2 >> 32;

@@ -130,21 +130,21 @@ public:
     void store128(ps3_uintptr_t va, uint128_t value, ReservationGranule* granule);
     
     inline void storef(ps3_uintptr_t va, float value, ReservationGranule* granule) {
-        store32(va, union_cast<float, uint32_t>(value), granule);
+        store32(va, bit_cast<uint32_t>(value), granule);
     }
     
     inline void stored(ps3_uintptr_t va, double value, ReservationGranule* granule) {
-        store64(va, union_cast<double, uint64_t>(value), granule);
+        store64(va, bit_cast<uint64_t>(value), granule);
     }
     
     inline float loadf(ps3_uintptr_t va) {
         auto f = load32(va);
-        return union_cast<uint32_t, float>(f);
+        return bit_cast<float>(f);
     }
     
     inline double loadd(ps3_uintptr_t va) {
          auto f = load64(va);
-         return union_cast<uint64_t, double>(f);
+         return bit_cast<double>(f);
     }
     
     inline auto modificationMap() {

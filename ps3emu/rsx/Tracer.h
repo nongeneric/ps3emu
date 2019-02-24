@@ -180,7 +180,7 @@ template <> struct ConvertType<MemoryLocation> {
 
 template <> struct ConvertType<float> {
     static uint32_t convert(float value) {
-        return union_cast<float, uint32_t>(value);
+        return bit_cast<uint32_t>(value);
     }
 };
 

@@ -305,7 +305,7 @@ ConcreteBasicBlock transformBasicBlock(BasicBlock const& block) {
                   : (name == "STD" || name == "LDZ") ? 8u
                   : 0u;
         if (size) {
-            DForm_3 i = union_cast<uint32_t, DForm_3>(instr);
+            DForm_3 i = bit_cast<DForm_3>(instr);
             auto ra = i.RA.u();
             auto rs = i.RS.u();
             auto d = i.D.s();

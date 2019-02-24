@@ -102,10 +102,10 @@ CellFsErrno sys_fs_open(cstring_ptr_t path,
     auto f = openFile(hostPath.c_str(), flags);
     if (f) {
         *fd = fileMap.create(f);
-        INFO(libs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) %d", path.str, hostPath, flags, (uint32_t)*fd);
+        INFO(libs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) %d", path.str, hostPath.string(), flags, (uint32_t)*fd);
         return CELL_OK;
     }
-    INFO(libs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) FAILED", path.str, hostPath, flags);
+    INFO(libs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) FAILED", path.str, hostPath.string(), flags);
     return toCellErrno(errno);
 }
 

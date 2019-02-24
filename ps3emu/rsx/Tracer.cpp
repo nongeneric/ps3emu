@@ -67,7 +67,7 @@ std::string printArgDecimal(GcmCommandArg const& arg) {
         case GcmArgType::None: return ssnprintf("NONE(#%x)", arg.value);
         case GcmArgType::Bool: return arg.value ? "True" : "False";
         case GcmArgType::Float: {
-            float value = union_cast<uint32_t, float>(arg.value);
+            float value = bit_cast<float>(arg.value);
             return ssnprintf("%g", value);
         }
         case GcmArgType::Int32:
