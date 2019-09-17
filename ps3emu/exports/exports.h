@@ -6,7 +6,7 @@
 #include "ps3emu/libs/sys_defs.h"
 
 #include <boost/hana.hpp>
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
 
 namespace hana = boost::hana;
 using namespace hana::literals;
@@ -92,7 +92,7 @@ constexpr auto make_n_tuple(T t, N n) {
 }
 
 template <typename R, typename... Args>
-constexpr auto make_type_tuple(std::function<R(Args...)> f) {
+constexpr auto make_type_tuple(std::function<R(Args...)>) {
     return hana::make_tuple(hana::type_c<Args>...);
 }
 
@@ -101,7 +101,8 @@ constexpr auto make_type_tuple(R (*)(Args...)) {
     return hana::make_tuple(hana::type_c<Args>...);
 }
 
-constexpr bool containsContinuationArgument(auto types) {
+template <class T>
+constexpr bool containsContinuationArgument(T types) {
     auto argCount = hana::int_c<hana::length(types)>;
     if constexpr(argCount.value > 0) {
         if constexpr(types[argCount - 1_c] == hana::type_c<boost::context::continuation*>) {
@@ -113,7 +114,7 @@ constexpr bool containsContinuationArgument(auto types) {
 
 template <typename F>
 auto wrap(F f, PPUThread* th) {
-    auto types = make_type_tuple(f);
+    constexpr decltype(make_type_tuple(f)) types;
     auto argCount = hana::int_c<hana::length(types)>;
     auto ns = make_n_tuple(hana::make_tuple(), argCount);
     auto pairs = hana::zip(ns, types);

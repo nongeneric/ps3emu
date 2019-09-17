@@ -28,6 +28,6 @@ public:
 
 inline void bbcallmap_dasm(uint32_t val, uint32_t& segment, uint32_t& label) {
     BBCallForm form { val };
-    segment = form.Segment.u();
-    label = form.Label.u();
+    segment = form.Segment_u();
+    label = form.Label_u();
 }

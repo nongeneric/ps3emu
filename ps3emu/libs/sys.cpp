@@ -316,7 +316,7 @@ public:
         if (!lock.owns_lock())
             return false;
         while (!_val) {
-            _cv.timed_wait(lock, boost::posix_time::microseconds(timeout));
+            _cv.timed_wait(lock, boost::posix_time::microseconds(static_cast<uint64_t>(timeout)));
         }
         _val--;
         return true;

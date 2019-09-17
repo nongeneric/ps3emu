@@ -51,11 +51,10 @@ std::string printTokenType(TokenType type) {
 class Token {
     TokenType _type;
     std::string _val;
-    int _start;
     int _len;
 public:
     Token(TokenType type, std::string val, int start, int len)
-        : _type(type), _val(val), _start(start), _len(len) { }
+        : _type(type), _val(val), _len(len) { }
         
     std::string val() const {
         return _val;
@@ -119,7 +118,7 @@ class Expr {
 public:
     virtual uint64_t eval(PPUThread* th) = 0;
     virtual uint64_t eval(SPUThread* th) = 0;
-    ~Expr() { }
+    virtual ~Expr() = default;
 };
 
 class BinaryOpExpr : public Expr {

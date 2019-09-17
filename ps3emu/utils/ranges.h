@@ -1,6 +1,4 @@
 #pragma once
 
-#include "experimental/ranges/algorithm"
-#include "experimental/ranges/iterator"
-
-namespace ranges = std::experimental::ranges;
+#include <range/v3/range.hpp>
+#include <range/v3/algorithm.hpp>

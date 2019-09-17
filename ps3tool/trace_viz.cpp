@@ -35,20 +35,22 @@ struct Change {
 };
 
 class Parser {
+    using Iter = std::string::const_iterator;
+
     bool _spu = false;
     
-    uint32_t parseOffset(auto& it) {
+    uint32_t parseOffset(Iter& it) {
         auto s = it;
         while (isalnum(*it)) it++;
         std::string str(s, it + 1);
         return std::stoi(str, nullptr, 16);
     }
     
-    char parseChar(auto& it) {
+    char parseChar(Iter& it) {
          return *it++;
     }
 
-    std::string parseEscaped(auto& it) {
+    std::string parseEscaped(Iter& it) {
         auto c = parseChar(it);
         auto escape = c;
         std::string r;
@@ -67,7 +69,7 @@ class Parser {
         return r;
     }
     
-    State parseState(auto& it) {
+    State parseState(Iter& it) {
         auto c = parseChar(it);
         assert(c == '[');
         c = parseChar(it);
@@ -99,7 +101,7 @@ class Parser {
         return state;
     }
 
-    Change parseChange(auto& it) {
+    Change parseChange(Iter& it) {
         auto offset = parseOffset(it);
         [[ maybe_unused ]] auto c = parseChar(it);
         assert(c == ' ');

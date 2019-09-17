@@ -106,7 +106,9 @@ class CustomDSFVisitor : public boost::default_dfs_visitor {
 public:
     CustomDSFVisitor(std::function<void(typename G::vertex_descriptor)> discover)
         : _discover(discover) {}
-    void discover_vertex(auto v, G const&) {
+
+    template <class V>
+    void discover_vertex(V v, G const&) {
         _discover(v);
     }
 };
@@ -125,7 +127,8 @@ Graph removeInvalidVertices(G& graph) {
     return r;
 }
 
-Graph removeVertices(Graph& graph, auto removeIf) {
+template <class F>
+Graph removeVertices(Graph& graph, F removeIf) {
     auto transposed = boost::make_reverse_graph(graph);
     CustomDSFVisitor<decltype(transposed)> visitor([&](auto v) { transposed[v].p->invalid = true; });
     std::vector<boost::default_color_type> colors(num_vertices(transposed));
@@ -141,8 +144,8 @@ Graph removeVertices(Graph& graph, auto removeIf) {
     return removeInvalidVertices(graph);
 }
 
-template<typename C>
-C graphToBlocks(auto const& graph) {
+template <class C, class G>
+C graphToBlocks(const G& graph) {
     C blocks;
     for (auto [v, vend] = vertices(graph); v != vend; ++v) {
         blocks.insert(end(blocks), graph[*v].p->block);

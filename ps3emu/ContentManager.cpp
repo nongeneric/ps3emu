@@ -79,7 +79,7 @@ std::string ContentManager::toHost(std::string_view path) {
         case MountPoint::Bluray: return absolute(approot / ".." / relative).string();
         case MountPoint::GameData: return absolute(approot / relative).string();
         case MountPoint::SystemCache: return absolute(approot / "sys_cache" / relative).string();
-        case MountPoint::DevFlash: return absolute(g_state.config->prxStorePath / relative).string();
+        case MountPoint::DevFlash: return absolute(std::filesystem::path(g_state.config->prxStorePath) / relative).string();
         default: throw std::runtime_error("unknown mount point");
     }
 }

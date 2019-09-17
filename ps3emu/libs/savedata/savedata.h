@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ps3emu/libs/sys.h"
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
 
 struct CellSaveDataSetBuf {
     big_uint32_t dirListMax;

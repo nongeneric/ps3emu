@@ -32,15 +32,15 @@ typedef struct {
 
 }
 
-union MethodHeader {
-    uint32_t val;
-    BitField<0, 3> prefix;
-    BitField<3, 14> count;
-    BitField<14, 16> suffix;
-    BitField<16, 32> offset;
-    BitField<3, 32> jumpoffset;
-    BitField<0, 30> calloffset;
-    BitField<30, 32> callsuffix;
+struct MethodHeader {
+    uint32_t value;
+    BIT_FIELD(prefix, 0, 3)
+    BIT_FIELD(count, 3, 14)
+    BIT_FIELD(suffix, 14, 16)
+    BIT_FIELD(offset, 16, 32)
+    BIT_FIELD(jumpoffset, 3, 32)
+    BIT_FIELD(calloffset, 0, 30)
+    BIT_FIELD(callsuffix, 30, 32)
 };
 
 ENUM(GcmBlendEquation,

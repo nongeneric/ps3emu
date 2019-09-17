@@ -52,7 +52,14 @@ class BitField {
 public:
     static constexpr int P = Pos;
     static constexpr int W = Next - Pos;
-    
+
+    BitField(const BitField<Pos, Next, T, Shift>&) = default;
+    BitField(uint32_t value = 0) : _v(value) {}
+
+    constexpr uint32_t full() const {
+        return _v;
+    }
+
     constexpr uint32_t u() const {
         return v();
     }
@@ -87,6 +94,18 @@ public:
         _v = (_v & ~mask<32>(P, P + W - 1)) | field;
     }
 };
+
+#define BIT_FIELD(name, ...) \
+    using name##_t = BitField<__VA_ARGS__>; \
+    inline auto name() { return name##_t(value); } \
+    inline auto name##_u() { return name().u(); } \
+    inline auto name##_s() { return name().s(); } \
+    inline auto name##_native() { return name().native(); } \
+    inline void name##_set(uint32_t v) { \
+        auto t = name(); \
+        t.set(v); \
+        value = t.full(); \
+    }
 
 template <typename N>
 constexpr uint8_t bit_test(uint64_t number, int width, N pos) {

@@ -156,8 +156,9 @@ struct SegmentInfo {
     std::vector<BasicBlockInfo> blocks;
 };
 
+template <class F>
 std::tuple<std::optional<uint32_t>, uint32_t> outOfPartTargets(
-    BasicBlock const& block, std::vector<BasicBlock> const& part, auto analyze)
+    BasicBlock const& block, std::vector<BasicBlock> const& part, F analyze)
 {
     auto info = analyze(block.start + block.len - 4);
     auto find = [&](uint32_t target) {
@@ -305,10 +306,10 @@ ConcreteBasicBlock transformBasicBlock(BasicBlock const& block) {
                   : (name == "STD" || name == "LDZ") ? 8u
                   : 0u;
         if (size) {
-            DForm_3 i = bit_cast<DForm_3>(instr);
-            auto ra = i.RA.u();
-            auto rs = i.RS.u();
-            auto d = i.D.s();
+            DForm_3 i{instr};
+            auto ra = i.RA_u();
+            auto rs = i.RS_u();
+            auto d = i.D_s();
             auto isLoad = name[0] == 'L';
             LoadStoreStatement st{simple, {{rs, size}}, ra, d, isLoad};
             res.statements.push_back(st);
@@ -490,11 +491,12 @@ std::tuple<uint32_t, std::vector<EmbeddedElfInfo>> mapEmbeddedElfs(
     return {vaBase, elfs};
 }
 
+template <class F>
 std::vector<BasicBlock> CollectSpuSegmentBasicBlocks(
     std::vector<uint32_t> const& leads,
     Elf32_be_Phdr const& segment,
     std::ofstream& log,
-    auto spuElfVaToParentVaInCurrentSegment)
+    F spuElfVaToParentVaInCurrentSegment)
 {
     auto segmentLeads = selectSubset(leads, segment.p_vaddr, segment.p_filesz);
     
@@ -558,7 +560,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
             copySegments.push_back(elfSegment[i]);
         }
         
-        auto spuElfVaToParentVaInCurrentSegment = [&](uint32_t va, Elf32_be_Phdr const& segment) {
+        auto spuElfVaToParentVaInCurrentSegment = [&, vaBase=vaBase](uint32_t va, Elf32_be_Phdr const& segment) {
             assert(subset<uint32_t>(va, 4, segment.p_vaddr, segment.p_filesz));
             auto spuElfOffset = va - segment.p_vaddr + segment.p_offset;
             return vaBase + elf.startOffset + spuElfOffset;
@@ -659,7 +661,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
     return infos;
 }
 
-std::string entrySignature(auto& segment) {
+std::string entrySignature(const SegmentInfo& segment) {
     return ssnprintf("void entryPoint_%s(%sThread* thread, int label%s)",
                      segment.suffix,
                      segment.isSpu ? "SPU" : "PPU",

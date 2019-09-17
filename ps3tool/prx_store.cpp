@@ -149,6 +149,7 @@ void rewritePrxStore() {
 
 void HandlePrxStore(PrxStoreCommand const& command) {
     MainMemory mm;
+    g_state.init();
     g_state.mm = &mm;
     auto internalAlloc = std::make_unique<InternalMemoryManager>(
         EmuInternalArea, EmuInternalAreaSize, "");

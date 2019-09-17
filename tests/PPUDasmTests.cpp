@@ -18,43 +18,44 @@ TEST_CASE("bitfield_common") {
 }
 
 TEST_CASE("bitfield_write") {
-    union {
-        uint32_t val;
-        BitField<0, 8> bf1;
-        BitField<8, 16> bf2;
-        BitField<16, 32> bf3;
-    } f = { 0 };
-    f.bf1.set(0x4f);
-    f.bf2.set(0x12);
-    f.bf3.set(0xabcd);
-    REQUIRE( f.val == 0x4f12abcd );
-    REQUIRE( f.bf2.u() == 0x12 );
+    struct {
+        uint32_t value;
+        BIT_FIELD(bf1, 0, 8)
+        BIT_FIELD(bf2, 8, 16)
+        BIT_FIELD(bf3, 16, 32)
+    } f{0};
+
+    f.bf1_set(0x4f);
+    f.bf2_set(0x12);
+    f.bf3_set(0xabcd);
+    REQUIRE( f.value == 0x4f12abcd );
+    REQUIRE( f.bf2_u() == 0x12 );
 }
 
 TEST_CASE("bitfield_write_2") {
     union {
-        uint32_t val;
-        BitField<0, 5> r;
-        BitField<5, 11> g;
-        BitField<11, 16> b;
+        uint32_t value;
+        BIT_FIELD(r, 0, 5)
+        BIT_FIELD(g, 5, 11)
+        BIT_FIELD(b, 11, 16)
     } f { 0 };
-    f.r.set(2);
-    f.g.set(4);
-    f.b.set(2);
-    REQUIRE( f.r.u() == 2 );
-    REQUIRE( f.g.u() == 4 );
-    REQUIRE( f.b.u() == 2 );
-    REQUIRE( f.val == 0x10820000 );
+    f.r_set(2);
+    f.g_set(4);
+    f.b_set(2);
+    REQUIRE( f.r_u() == 2 );
+    REQUIRE( f.g_u() == 4 );
+    REQUIRE( f.b_u() == 2 );
+    REQUIRE( f.value == 0x10820000 );
 }
 
 TEST_CASE("bitfield_write_3") {
     union {
-        uint32_t val;
-        BitField<10, 13> f;
+        uint32_t value;
+        BIT_FIELD(f, 10, 13)
     } f { 0 };
-    f.f.set(-1);
-    REQUIRE( f.f.u() == 0b111 );
-    REQUIRE( f.val == 0x380000 );
+    f.f_set(-1);
+    REQUIRE( f.f_u() == 0b111 );
+    REQUIRE( f.value == 0x380000 );
 }
 
 

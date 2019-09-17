@@ -171,8 +171,9 @@ struct StolenFuncInfo {
 class RewriterStore {
     unsigned _ppuModule = 0;
     unsigned _spuModule = 0;
-    std::array<RewrittenSegment, 1u << decltype(BBCallForm::Segment)::W> _ppuModules;
-    std::array<RewrittenSegment, 1u << decltype(BBCallForm::Segment)::W> _spuModules;
+
+    std::array<RewrittenSegment, 1u << BBCallForm::Segment_t::W> _ppuModules;
+    std::array<RewrittenSegment, 1u << BBCallForm::Segment_t::W> _spuModules;
     
 public:
     inline unsigned addPPU(const RewrittenSegment *segment) {

@@ -10,7 +10,8 @@
 #include <boost/endian/arithmetic.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread.hpp>
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
+#include <boost/context/continuation.hpp>
 #include <stdint.h>
 #include <functional>
 #include <atomic>
@@ -393,7 +394,7 @@ public:
                      std::initializer_list<uint64_t> args,
                      boost::context::continuation* sink);
     virtual void setArg(uint64_t arg);
-    ~PPUThread() = default;
+    virtual ~PPUThread() = default;
     void raiseModuleLoaded(uint32_t imageBase);
     unsigned getTid();
 };

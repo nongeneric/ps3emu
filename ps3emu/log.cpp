@@ -64,18 +64,29 @@ void log_unconditional(log_severity_t severity, log_type_t type, log_area_t area
     if (severity == log_error) {
         backtrace = print_backtrace();
     }
-    auto const& formatted = ssnprintf("%s %s%s%s: %s%s",
-                                      type == log_spu ? "SPU" :
-                                      type == log_libs ? "LIB" :
-                                      type == log_debugger ? "DBG" :
-                                      type == log_rsx ? "RSX"
-                                      : "?",
+    auto typeStr = type == log_spu ? "SPU"
+                 : type == log_libs ? "LIB"
+                 : type == log_debugger ? "DBG"
+                 : type == log_rsx ? "RSX"
+                 : "?";
+    auto severityStr = severity == log_info ? "INFO"
+                     : severity == log_warning ? "WARNING"
+                     : severity == log_error ? "ERROR"
+                     : "?";
+    auto areaStr = area == log_trace ? "trace"
+                 : area == log_perf ? "perf"
+                 : area == log_cache ? "cache"
+                 : area == log_sync ? "sync"
+                 : area == log_audio ? "audio"
+                 : area == log_fs ? "fs"
+                 : area == log_proxy ? "proxy"
+                 : "?";
+    auto const& formatted = ssnprintf("%s %s %s%s%s: %s%s",
+                                      typeStr,
+                                      areaStr,
                                       thread_name,
                                       nip,
-                                      severity == log_info ? "INFO" :
-                                      severity == log_warning ? "WARNING" :
-                                      severity == log_error ? "ERROR"
-                                      : "?",
+                                      severityStr,
                                       message,
                                       backtrace);
     logger->info(formatted);

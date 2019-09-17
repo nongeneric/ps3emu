@@ -3,7 +3,7 @@
 #include "ps3emu/Process.h"
 #include "ps3emu/spu/SPUGroupManager.h"
 #include "../sys_defs.h"
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
 
 using sys_spu_thread_t = big_uint32_t;
 using sys_spu_thread_group_t = big_uint32_t;

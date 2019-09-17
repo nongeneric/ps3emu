@@ -7,7 +7,7 @@
 #include "libs/ConcurrentBoundedQueue.h"
 #include "OneTimeEvent.h"
 
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
 #include <boost/chrono.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>

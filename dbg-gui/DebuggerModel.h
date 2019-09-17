@@ -43,7 +43,7 @@ struct RunCommand {
 };
 
 struct TraceToCommand {
-    uint32_t to;
+    uint32_t to{};
 };
 
 using DebugCommand = boost::variant<LoadElfCommand, RunCommand, TraceToCommand>;

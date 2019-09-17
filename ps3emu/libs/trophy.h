@@ -3,7 +3,7 @@
 #include "sys.h"
 #include <optional>
 #include <array>
-#include <boost/context/all.hpp>
+#include <boost/context/continuation.hpp>
 
 typedef big_int32_t SceNpTrophyId;
 typedef big_uint32_t SceNpTrophyContext;

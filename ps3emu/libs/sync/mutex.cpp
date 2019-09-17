@@ -46,7 +46,7 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     
     info->id = mutexes.create(info);
     *mutex_id = info->id;
-    INFO(libs) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
+    INFO(libs, sync) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
 
     __itt_sync_create(info.get(), "mutex", attr->name, 0);
 
@@ -54,7 +54,7 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
 }
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
-    INFO(libs) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
+    INFO(libs, sync) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
     auto info = mutexes.try_get(mutex_id);
     if (!info) {
         return CELL_ESRCH;

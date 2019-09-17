@@ -2,395 +2,372 @@
 
 #include "ps3emu/BitField.h"
 
-using BD_t = BitField<16, 30, BitFieldType::Signed, 2>;
-using BF_t = BitField<6, 9, BitFieldType::CR>;
-using BFA_t = BitField<11, 14, BitFieldType::CR>;
-using D_t = BitField<16, 32, BitFieldType::Signed>;
-using DS_t = BitField<16, 30, BitFieldType::Signed, 2>;
-using LI_t = BitField<6, 30, BitFieldType::Signed, 2>;
-using RA_t = BitField<11, 16, BitFieldType::GPR>;
-using RB_t = BitField<16, 21, BitFieldType::GPR>;
-using RS_t = BitField<6, 11, BitFieldType::GPR>;
-using RT_t = BitField<6, 11, BitFieldType::GPR>;
-using SI_t = BitField<16, 32, BitFieldType::Signed>;
-using UI_t = BitField<16, 32, BitFieldType::Unsigned>;
-using BO_t = BitField<6, 11>;
-using BI_t = BitField<11, 16>;
-using FXM_t = BitField<12, 20>;
-using FRA_t = BitField<11, 16, BitFieldType::FPR>;
-using FRB_t = BitField<16, 21, BitFieldType::FPR>;
-using FRC_t = BitField<21, 26, BitFieldType::FPR>;
-using FRS_t = BitField<6, 11, BitFieldType::FPR>;
-using FRT_t = BitField<6, 11, BitFieldType::FPR>;
-using Rc_t = BitField<31, 32>;
-using FLM_t = BitField<7, 15>;
-using FLM_t = BitField<7, 15>;
-using OPCD_t = BitField<0, 6>;
-
-union IForm {
-    uint32_t u32;
-    OPCD_t OPCD;
-    LI_t LI;
-    BitField<30, 31> AA;
-    BitField<31, 32> LK;
+struct FormBase {
+    uint32_t value{};
 };
 
-union BForm {
-    BO_t BO;
-    BI_t BI;
-    BD_t BD;
-    BitField<30, 31> AA;
-    BitField<31, 32> LK;
-    
-    BitField<6, 7> BO0;
-    BitField<7, 8> BO1;
-    BitField<8, 9> BO2;
-    BitField<9, 10> BO3;
+struct IForm : public FormBase {
+    BIT_FIELD(OPCD, 0, 6)
+    BIT_FIELD(LI, 6, 30, BitFieldType::Signed, 2)
+    BIT_FIELD(AA, 30, 31)
+    BIT_FIELD(LK, 31, 32)
 };
 
-union XLForm_1 {
-    BitField<6, 11> BT;
-    BitField<11, 16> BA;
-    BitField<16, 21> BB;
-    BitField<21, 31> XO;
+struct BForm : public FormBase {
+    BIT_FIELD(BO, 6, 11)
+    BIT_FIELD(BI, 11, 16)
+    BIT_FIELD(BD, 16, 30, BitFieldType::Signed, 2)
+    BIT_FIELD(AA, 30, 31)
+    BIT_FIELD(LK, 31, 32)
+    BIT_FIELD(BO0, 6, 7)
+    BIT_FIELD(BO1, 7, 8)
+    BIT_FIELD(BO2, 8, 9)
+    BIT_FIELD(BO3, 9, 10)
 };
 
-union XLForm_2 {
-    BO_t BO;
-    BI_t BI;;
-    BitField<19, 21> BH;
-    BitField<31, 32> LK;
-    
-    BitField<6, 7> BO0;
-    BitField<7, 8> BO1;
-    BitField<8, 9> BO2;
-    BitField<9, 10> BO3;
+struct XLForm_1 : public FormBase {
+    BIT_FIELD(BT, 6, 11)
+    BIT_FIELD(BA, 11, 16)
+    BIT_FIELD(BB, 16, 21)
+    BIT_FIELD(XO, 21, 31)
 };
 
-union XLForm_3 {
-    BF_t BF;
-    BFA_t BFA;
+struct XLForm_2 : public FormBase {
+    BIT_FIELD(BO, 6, 11)
+    BIT_FIELD(BI, 11, 16)
+    BIT_FIELD(BH, 19, 21)
+    BIT_FIELD(LK, 31, 32)
+
+    BIT_FIELD(BO0, 6, 7)
+    BIT_FIELD(BO1, 7, 8)
+    BIT_FIELD(BO2, 8, 9)
+    BIT_FIELD(BO3, 9, 10)
 };
 
-union XForm_1 {
-    RT_t RT;
-    RA_t RA;
-    RB_t RB;
-    BitField<21, 31> XO;
+struct XLForm_3 : public FormBase {
+    BIT_FIELD(BF, 6, 9, BitFieldType::CR)
+    BIT_FIELD(BFA, 11, 14, BitFieldType::CR)
 };
 
-union XForm_6 {
-    RS_t RS;
-    RA_t RA;
-    RB_t RB;
-    Rc_t Rc;
+struct XForm_1 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(XO, 21, 31)
 };
 
-union XForm_8 {
-    RS_t RS;
-    RA_t RA;
-    RB_t RB;
+struct XForm_6 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XForm_10 {
-    RS_t RS;
-    RA_t RA;
-    BitField<16, 21> SH;
-    Rc_t Rc;
+struct XForm_8 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
 };
 
-union XForm_11 {
-    RS_t RS;
-    RA_t RA;
-    Rc_t Rc;
+struct XForm_10 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(SH, 16, 21)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XForm_16 {
-    BF_t BF;
-    BitField<10, 11> L;
-    RA_t RA;
-    RB_t RB;
+struct XForm_11 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XForm_17 {
-    BF_t BF;
-    FRA_t FRA;
-    FRB_t FRB;
+struct XForm_16 : public FormBase {
+    BIT_FIELD(BF, 6, 9, BitFieldType::CR)
+    BIT_FIELD(L, 10, 11)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
 };
 
-union XForm_24 {
-    BitField<9, 11> L;
+struct XForm_17 : public FormBase {
+    BIT_FIELD(BF, 6, 9, BitFieldType::CR)
+    BIT_FIELD(FRA, 11, 16, BitFieldType::FPR)
+    BIT_FIELD(FRB, 16, 21, BitFieldType::FPR)
 };
 
-union XForm_25 {
-    BitField<6, 11> TO;
-    RA_t RA;
-    RB_t RB;
+struct XForm_24 : public FormBase {
+    BIT_FIELD(L, 9, 11)
 };
 
-union XForm_26 {
-    FRT_t FRT;
-    RA_t RA;
-    RB_t RB;
+struct XForm_25 : public FormBase {
+    BIT_FIELD(TO, 6, 11)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
 };
 
-union XForm_27 {
-    FRT_t FRT;
-    FRB_t FRB;
-    Rc_t Rc;
+struct XForm_26 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
 };
 
-union XForm_28 {
-    FRT_t FRT;
-    Rc_t Rc;
+struct XForm_27 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(FRB, 16, 21, BitFieldType::FPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XForm_29 {
-    FRT_t FRS;
-    RA_t RA;
-    RB_t RB;
+struct XForm_28 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XForm_31 {
-    RA_t RA;
-    RB_t RB;
+struct XForm_29 : public FormBase {
+    BIT_FIELD(FRS, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
 };
 
-union XFLForm {
-    FLM_t FLM;
-    FRB_t FRB;
-    Rc_t Rc;
+struct XForm_31 : public FormBase {
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
 };
 
-union DForm_1 {
-    RT_t RT;
-    RA_t RA;
-    D_t D;
+struct XFLForm : public FormBase {
+    BIT_FIELD(FLM, 7, 15)
+    BIT_FIELD(FRB, 16, 21, BitFieldType::FPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union DForm_2 {
-    RT_t RT;
-    RA_t RA;
-    SI_t SI;
+struct DForm_1 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(D, 16, 32, BitFieldType::Signed)
 };
 
-union DForm_3 {
-    RS_t RS;
-    RA_t RA;
-    D_t D;
+struct DForm_2 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(SI, 16, 32, BitFieldType::Signed)
 };
 
-union DForm_4 {
-    RS_t RS;
-    RA_t RA;
-    UI_t UI;
+struct DForm_3 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(D, 16, 32, BitFieldType::Signed)
 };
 
-union DForm_5 {
-    BF_t BF;
-    BitField<10, 11> L;
-    RA_t RA;
-    SI_t SI;
+struct DForm_4 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(UI, 16, 32, BitFieldType::Unsigned)
 };
 
-union DForm_6 {
-    BF_t BF;
-    BitField<10, 11> L;
-    RA_t RA;
-    UI_t UI;
+struct DForm_5 : public FormBase {
+    BIT_FIELD(BF, 6, 9, BitFieldType::CR)
+    BIT_FIELD(L, 10, 11)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(SI, 16, 32, BitFieldType::Signed)
 };
 
-union DSForm_1 {
-    RT_t RT;
-    RA_t RA;
-    DS_t DS;
-    BitField<30, 32> XO;
+struct DForm_6 : public FormBase {
+    BIT_FIELD(BF, 6, 9, BitFieldType::CR)
+    BIT_FIELD(L, 10, 11)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(UI, 16, 32, BitFieldType::Unsigned)
 };
 
-union DSForm_2 {
-    RS_t RS;
-    RA_t RA;
-    DS_t DS;
-    BitField<30, 32> XO;
+struct DSForm_1 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(DS, 16, 30, BitFieldType::Signed, 2)
+    BIT_FIELD(XO, 30, 32)
 };
 
-union DForm_8 {
-    FRT_t FRT;
-    RA_t RA;
-    D_t D;
+struct DSForm_2 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(DS, 16, 30, BitFieldType::Signed, 2)
+    BIT_FIELD(XO, 30, 32)
 };
 
-union DForm_9 {
-    FRS_t FRS;
-    RA_t RA;
-    D_t D;
+struct DForm_8 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(D, 16, 32, BitFieldType::Signed)
 };
 
-union XOForm_1 {
-    RT_t RT;
-    RA_t RA;
-    RB_t RB;
-    BitField<21, 22> OE;
-    BitField<22, 31> XO;
-    Rc_t Rc;
+struct DForm_9 : public FormBase {
+    BIT_FIELD(FRS, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(D, 16, 32, BitFieldType::Signed)
 };
 
-union XOForm_3 {
-    RT_t RT;
-    RA_t RA;
-    BitField<21, 22> OE;
-    Rc_t Rc;
+struct XOForm_1 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(OE, 21, 22)
+    BIT_FIELD(XO, 22, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XFXForm_1 {
-    RT_t RT;
-    BitField<11, 21> spr;
-    BitField<21, 31> XO;
+struct XOForm_3 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(OE, 21, 22)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union XFXForm_2 {
-    RT_t RT;
-    BitField<11, 21> tbr;
+struct XFXForm_1 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(spr, 11, 21)
+    BIT_FIELD(XO, 21, 31)
 };
 
-union XFXForm_3 {
-    RT_t RT;
-    BitField<11, 12> _0;
+struct XFXForm_2 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(tbr, 11, 21)
 };
 
-union XFXForm_5 {
-    RS_t RS;
-    FXM_t FXM;
+struct XFXForm_3 : public FormBase {
+    BIT_FIELD(RT, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(_0, 11, 12)
 };
 
-union XFXForm_7 {
-    RS_t RS;
-    BitField<11, 21> spr;
+struct XFXForm_5 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(FXM, 12, 20)
 };
 
-union XFXForm_6 {
-    RS_t RS;
-    BitField<11, 12> _1;
-    FXM_t FXM;
+struct XFXForm_7 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(spr, 11, 21)
 };
 
-union MDForm_1 {
-    RS_t RS;
-    RA_t RA;
-    BitField<16, 21> sh04;
-    BitField<21, 26> mb04;
-    BitField<26, 27> mb5;
-    BitField<27, 30> XO;
-    BitField<30, 31> sh5;
-    Rc_t Rc;
+struct XFXForm_6 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(_1, 11, 12)
+    BIT_FIELD(FXM, 12, 20)
 };
 
-union MDForm_2 {
-    RS_t RS;
-    RA_t RA;
-    BitField<16, 21> sh04;
-    BitField<21, 26> me04;
-    BitField<26, 27> me5;
-    BitField<30, 31> sh5;
-    Rc_t Rc;
+struct MDForm_1 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(sh04, 16, 21)
+    BIT_FIELD(mb04, 21, 26)
+    BIT_FIELD(mb5, 26, 27)
+    BIT_FIELD(XO, 27, 30)
+    BIT_FIELD(sh5, 30, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union MDSForm_1 {
-    RS_t RS;
-    RA_t RA;
-    RB_t RB;
-    BitField<21, 27> mb;
-    BitField<27, 31> XO;
-    Rc_t Rc;
+struct MDForm_2 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(sh04, 16, 21)
+    BIT_FIELD(me04, 21, 26)
+    BIT_FIELD(me5, 26, 27)
+    BIT_FIELD(sh5, 30, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union MDSForm_2 {
-    RS_t RS;
-    RA_t RA;
-    RB_t RB;
-    BitField<21, 27> me;
-    BitField<27, 31> XO;
-    Rc_t Rc;
+struct MDSForm_1 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(mb, 21, 27)
+    BIT_FIELD(XO, 27, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union MForm_1 {
-    RS_t RS;
-    RA_t RA;
-    RB_t RB;
-    BitField<21, 26> mb;
-    BitField<26, 31> me;
-    Rc_t Rc;
+struct MDSForm_2 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(me, 21, 27)
+    BIT_FIELD(XO, 27, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union MForm_2 {
-    RS_t RS;
-    RA_t RA;
-    BitField<16, 21> SH;
-    BitField<21, 26> mb;
-    BitField<26, 31> me;
-    Rc_t Rc;
+struct MForm_1 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(RB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(mb, 21, 26)
+    BIT_FIELD(me, 26, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union SCForm {
-    BitField<20, 27> LEV;
-    BitField<30, 31> _1;
+struct MForm_2 : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(SH, 16, 21)
+    BIT_FIELD(mb, 21, 26)
+    BIT_FIELD(me, 26, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union NCallForm {
-    BitField<6, 32> idx;
+struct SCForm : public FormBase {
+    BIT_FIELD(LEV, 20, 27)
+    BIT_FIELD(_1, 30, 31)
 };
 
-union XSForm {
-    RS_t RS;
-    RA_t RA;
-    BitField<16, 21> sh04;
-    BitField<21, 30> XO;
-    BitField<30, 31> sh5;
-    Rc_t Rc;
+struct NCallForm : public FormBase {
+    BIT_FIELD(idx, 6, 32)
 };
 
-union AForm_1 {
-    FRT_t FRT;
-    FRA_t FRA;
-    FRB_t FRB;
-    FRC_t FRC;
-    BitField<26, 31> XO;
-    Rc_t Rc;
+struct XSForm : public FormBase {
+    BIT_FIELD(RS, 6, 11, BitFieldType::GPR)
+    BIT_FIELD(RA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(sh04, 16, 21)
+    BIT_FIELD(XO, 21, 30)
+    BIT_FIELD(sh5, 30, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union AForm_2 {
-    FRT_t FRT;
-    FRA_t FRA;
-    FRB_t FRB;
-    Rc_t Rc;
+struct AForm_1 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(FRA, 11, 16, BitFieldType::FPR)
+    BIT_FIELD(FRB, 16, 21, BitFieldType::FPR)
+    BIT_FIELD(FRC, 21, 26, BitFieldType::FPR)
+    BIT_FIELD(XO, 26, 31)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union AForm_3 {
-    FRT_t FRT;
-    FRA_t FRA;
-    FRC_t FRC;
-    Rc_t Rc;
+struct AForm_2 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(FRA, 11, 16, BitFieldType::FPR)
+    BIT_FIELD(FRB, 16, 21, BitFieldType::FPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union AForm_4 {
-    FRT_t FRT;
-    FRB_t FRB;
-    Rc_t Rc;
+struct AForm_3 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(FRA, 11, 16, BitFieldType::FPR)
+    BIT_FIELD(FRC, 21, 26, BitFieldType::FPR)
+    BIT_FIELD(Rc, 31, 32)
 };
 
-union SIMDForm {
-    RA_t rA;
-    RB_t rB;
-    BitField<21, 22> Rc;
-    BitField<11, 16, BitFieldType::Vector> vA;
-    BitField<16, 21, BitFieldType::Vector> vB;
-    BitField<21, 26, BitFieldType::Vector> vC;
-    BitField<6, 11, BitFieldType::Vector> vD;
-    BitField<6, 11, BitFieldType::Vector> vS;
-    BitField<22, 26, BitFieldType::Unsigned> SHB;
-    BitField<11, 16, BitFieldType::Signed> SIMM;
-    BitField<11, 16> UIMM;
-    BitField<26, 32> VA_XO;
-    BitField<21, 32> VX_XO;
-    BitField<22, 32> VXR_XO;
+struct AForm_4 : public FormBase {
+    BIT_FIELD(FRT, 6, 11, BitFieldType::FPR)
+    BIT_FIELD(FRB, 16, 21, BitFieldType::FPR)
+    BIT_FIELD(Rc, 31, 32)
+};
+
+struct SIMDForm : public FormBase {
+    BIT_FIELD(rA, 11, 16, BitFieldType::GPR)
+    BIT_FIELD(rB, 16, 21, BitFieldType::GPR)
+    BIT_FIELD(Rc, 21, 22)
+    BIT_FIELD(vA, 11, 16, BitFieldType::Vector)
+    BIT_FIELD(vB, 16, 21, BitFieldType::Vector)
+    BIT_FIELD(vC, 21, 26, BitFieldType::Vector)
+    BIT_FIELD(vD, 6, 11, BitFieldType::Vector)
+    BIT_FIELD(vS, 6, 11, BitFieldType::Vector)
+    BIT_FIELD(SHB, 22, 26, BitFieldType::Unsigned)
+    BIT_FIELD(SIMM, 11, 16, BitFieldType::Signed)
+    BIT_FIELD(UIMM, 11, 16)
+    BIT_FIELD(VA_XO, 26, 32)
+    BIT_FIELD(VX_XO, 21, 32)
+    BIT_FIELD(VXR_XO, 22, 32)
 };

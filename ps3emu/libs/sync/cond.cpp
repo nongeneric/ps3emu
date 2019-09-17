@@ -33,12 +33,12 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
     info->name = attr->name;
     // TODO: error handling
     *cond_id = cvs.create(std::move(info));
-    INFO(libs) << ssnprintf("sys_cond_create(%d, %x, %s)", *cond_id, mutex, attr->name);
+    INFO(libs, sync) << ssnprintf("sys_cond_create(%d, %x, %s)", *cond_id, mutex, attr->name);
     return CELL_OK;
 }
 
 int32_t sys_cond_destroy(sys_cond_t cond) {
-    INFO(libs) << ssnprintf("sys_cond_destroy(%x)", cond);
+    INFO(libs, sync) << ssnprintf("sys_cond_destroy(%x)", cond);
     auto optinfo = cvs.try_get(cond);
     if (!optinfo)
         return CELL_ESRCH;

@@ -279,9 +279,10 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
         for (auto& file : files) {
             auto [name, type] = parseFileName(files[i]);
             fileList[i].fileType = type;
+            assert(name.size() < CELL_SAVEDATA_FILENAME_SIZE);
             strncpy(fileList[i].fileName,
                 name.c_str(),
-                CELL_SAVEDATA_FILENAME_SIZE);
+                CELL_SAVEDATA_FILENAME_SIZE - 1);
             struct stat fileStat;
             stat(file.c_str(), &fileStat);
             get->sizeKB += fileStat.st_size;

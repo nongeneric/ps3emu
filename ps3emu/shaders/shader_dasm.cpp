@@ -872,7 +872,7 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
                     ref = regnum;
                 }
                 auto mask = instr.mask_selector ? instr.mask1 : instr.mask2;
-                res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+                res.mask = dest_mask_t::fromInt16(mask);
                 res.args[res_arg] = vertex_arg_output_ref_t { ref };
                 res_arg++;
             }
@@ -881,12 +881,12 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
             if (instr.addr_data_reg_num != 63 || instr.mask_selector || instr.output_reg_num == 31) {
                 auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask2;
                 if (instr.dest_reg_num == 63) {
-                    res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+                    res.mask = dest_mask_t::fromInt16(mask);
                     res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0 };
                 } else if (opcode->addr_reg) {
                     res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.dest_reg_num, mask };
                 } else {
-                    res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+                    res.mask = dest_mask_t::fromInt16(mask);
                     res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
                         instr.dest_reg_num,
                         false,
@@ -901,7 +901,7 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
             if (opcode->addr_reg) {
                 res.args[res_arg] = vertex_arg_address_reg_ref_t { instr.addr_data_reg_num, mask };
             } else {
-                res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+                res.mask = dest_mask_t::fromInt16(mask);
                 res.args[res_arg] = vertex_arg_temp_reg_ref_t { 
                     instr.addr_data_reg_num,
                     false,
@@ -912,7 +912,7 @@ int vertex_dasm_slot(vertex_decoded_instr_t instr, int slot, VertexInstr& res) {
             res_arg++;
         } else if ((!instr.mask_selector || instr.output_reg_num == 31) && !opcode->control) {
             auto mask = opcode->instr == vertex_op_t::PSH ? 0xf : instr.mask1;
-            res.mask = { mask & 8, mask & 4, mask & 2, mask & 1 };
+            res.mask = dest_mask_t::fromInt16(mask);
             res.args[res_arg] = vertex_arg_cond_reg_ref_t { 0 };
             res_arg++;
         }

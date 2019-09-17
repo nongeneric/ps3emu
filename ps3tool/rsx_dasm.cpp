@@ -21,27 +21,27 @@ void HandleRsxDasm(RsxDasmCommand const& command) {
         
         MethodHeader header{raw};
         std::cout << ssnprintf("%04x %08x ", get, raw);
-        if (header.val == 0) {
+        if (header.value == 0) {
             std::cout << "NOP";
             continue;
         }
-        if (header.prefix.u() == 1) {
-            auto offset = header.jumpoffset.u();
+        if (header.prefix_u() == 1) {
+            auto offset = header.jumpoffset_u();
             std::cout << ssnprintf("JUMP %x\n", offset);
             continue;
         }
-        if (header.callsuffix.u() == 2) {
-            auto offset = header.calloffset.u() << 2;
+        if (header.callsuffix_u() == 2) {
+            auto offset = header.calloffset_u() << 2;
             std::cout << ssnprintf("CALL %x\n", offset);
             continue;
         }
-        if (header.val == 0x20000) {
+        if (header.value == 0x20000) {
             std::cout << "[RET]\n";
             continue;
         }
         std::cout << ssnprintf(
-            "%-5x %-6x %-6x", header.count.u(), header.prefix.u(), header.offset.u());
-        for (auto i = 0u; i < header.count.u(); ++i) {
+            "%-5x %-6x %-6x", header.count_u(), header.prefix_u(), header.offset_u());
+        for (auto i = 0u; i < header.count_u(); ++i) {
             if (!f.read((char*)&raw, sizeof(raw))) {
                 std::cout << "unexpected EOF\n";
                 return;

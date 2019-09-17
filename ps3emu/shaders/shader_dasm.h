@@ -116,6 +116,10 @@ enum class vertex_op_t {
 };
 
 struct dest_mask_t {
+    static dest_mask_t fromInt16(uint16_t mask) {
+        return { (mask & 8) != 0, (mask & 4) != 0, (mask & 2) != 0, (mask & 1) != 0 };
+    }
+
     std::array<bool, 4> val;
     inline int arity() const {
         return val[0] + val[1] + val[2] + val[3];

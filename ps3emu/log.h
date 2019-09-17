@@ -9,7 +9,15 @@
 #include <string>
 
 enum log_severity_t { log_info, log_warning, log_error };
-enum log_area_t { log_trace = 1, log_perf = 2, log_cache = 4, log_sync = 8 };
+enum log_area_t {
+    log_trace = 1,
+    log_perf = 2,
+    log_cache = 4,
+    log_sync = 8,
+    log_audio = 16,
+    log_fs = 32,
+    log_proxy = 64
+};
 enum log_type_t { log_spu = 1, log_rsx = 2, log_libs = 4, log_debugger = 8 };
 enum log_sink_t { log_file = 1, log_console = 2 };
 enum log_format_t { log_date, log_simple };

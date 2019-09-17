@@ -1998,11 +1998,11 @@ void Rsx::Nv3089SetColorConversion(uint32_t conv,
     s.dtdy = dtdy;
 }
 
-union r6g6b5_t {
-    uint32_t val;
-    BitField<0, 5> r;
-    BitField<5, 11> g;
-    BitField<11, 16> b;
+struct r6g6b5_t {
+    uint32_t value;
+    BIT_FIELD(r, 0, 5)
+    BIT_FIELD(g, 5, 11)
+    BIT_FIELD(b, 11, 16)
 };
 
 void Rsx::transferImage() {
@@ -2073,15 +2073,15 @@ void Rsx::transferImage() {
                 if (sourcePixelSize == 2) {
                     r6g6b5_t in { srcPixel };
                     destPixel = (0xff << 24)
-                              | (ext8(in.r) << 16)
-                              | (ext8(in.g) << 8)
-                              | ext8(in.b);
+                              | (ext8(in.r()) << 16)
+                              | (ext8(in.g()) << 8)
+                              | ext8(in.b());
                 } else {
                     r6g6b5_t out { 0 };
-                    out.r.set(((srcPixel >> 16) & 0xff) * 32 / 255);
-                    out.g.set(((srcPixel >> 8) & 0xff) * 64 / 255);
-                    out.b.set((srcPixel & 0xff) * 32 / 255);
-                    destPixel = out.val;
+                    out.r_set(((srcPixel >> 16) & 0xff) * 32 / 255);
+                    out.g_set(((srcPixel >> 8) & 0xff) * 64 / 255);
+                    out.b_set((srcPixel & 0xff) * 32 / 255);
+                    destPixel = out.value;
                 }
             }
             if (destPixelSize == 2) {

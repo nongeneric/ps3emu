@@ -13,27 +13,27 @@
 
 using I16_t = BitField<9, 25, BitFieldType::Signed>;
 
-union SPUForm {
-    uint32_t u;
-    BitField<0, 4> OP4;
-    BitField<0, 7> OP7;
-    BitField<0, 6> OP6;
-    BitField<0, 8> OP8;
-    BitField<0, 9> OP9;
-    BitField<0, 10> OP10;
-    BitField<0, 11> OP11;
-    BitField<11, 18, BitFieldType::GPR> RB;
-    BitField<18, 25, BitFieldType::GPR> RA;
-    BitField<25, 32, BitFieldType::GPR> RC;
-    BitField<25, 32, BitFieldType::GPR> RT;
-    BitField<4, 11, BitFieldType::GPR> RT_ABC;
-    BitField<18, 25> CA;
-    BitField<11, 18, BitFieldType::Signed> I7;
-    BitField<10, 18, BitFieldType::Signed> I8;
-    BitField<8, 18, BitFieldType::Signed> I10;
-    I16_t I16;
-    BitField<7, 25, BitFieldType::Signed> I18;
-    BitField<18, 32> StopAndSignalType;
+struct SPUForm {
+    uint32_t value;
+    BIT_FIELD(OP4, 0, 4)
+    BIT_FIELD(OP7, 0, 7)
+    BIT_FIELD(OP6, 0, 6)
+    BIT_FIELD(OP8, 0, 8)
+    BIT_FIELD(OP9, 0, 9)
+    BIT_FIELD(OP10, 0, 10)
+    BIT_FIELD(OP11, 0, 11)
+    BIT_FIELD(RB, 11, 18, BitFieldType::GPR)
+    BIT_FIELD(RA, 18, 25, BitFieldType::GPR)
+    BIT_FIELD(RC, 25, 32, BitFieldType::GPR)
+    BIT_FIELD(RT, 25, 32, BitFieldType::GPR)
+    BIT_FIELD(RT_ABC, 4, 11, BitFieldType::GPR)
+    BIT_FIELD(CA, 18, 25)
+    BIT_FIELD(I7, 11, 18, BitFieldType::Signed)
+    BIT_FIELD(I8, 10, 18, BitFieldType::Signed)
+    BIT_FIELD(I10, 8, 18, BitFieldType::Signed)
+    BIT_FIELD(I16, 9, 25, BitFieldType::Signed)
+    BIT_FIELD(I18, 7, 25, BitFieldType::Signed)
+    BIT_FIELD(StopAndSignalType, 18, 32)
 };
 
 inline constexpr uint32_t SPU_STOPD_OPCODE = 0b00101000000;

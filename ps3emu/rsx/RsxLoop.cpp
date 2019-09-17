@@ -54,33 +54,33 @@ float fixedUint9ToFloat(uint32_t val) {
 int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     MethodHeader header { fast_endian_reverse(read[0]) };
     
-    if (header.val == 0) {
-        assert(header.count.u() == 0);
+    if (header.value == 0) {
+        assert(header.count_u() == 0);
         INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, getPut());
         return 4;
     }
 
-    _currentCount = header.count.u();
+    _currentCount = header.count_u();
     _currentGet = read;
     _currentGetValue = get;
-    auto offset = header.offset.u();
+    auto offset = header.offset_u();
 
-    if (header.prefix.u() == 1) {
-        auto offset = header.jumpoffset.u();
+    if (header.prefix_u() == 1) {
+        auto offset = header.jumpoffset_u();
         if (offset != get) { // don't log on busy wait
             INFO(rsx) << ssnprintf("rsx jump to %x", offset);
         }
         return offset - get;
     }
 
-    if (header.callsuffix.u() == 2) {
-        auto offset = header.calloffset.u() << 2;
+    if (header.callsuffix_u() == 2) {
+        auto offset = header.calloffset_u() << 2;
         _ret = get + 4;
         INFO(rsx) << ssnprintf("rsx call %x to %x", get, offset);
         return offset - get;
     }
 
-    if (header.val == 0x20000) {
+    if (header.value == 0x20000) {
         INFO(rsx) << ssnprintf("rsx ret to %x", _ret.load());
         if (!get) {
             ERROR(rsx) << "rsx ret to 0, command buffer corruption is likely";
@@ -101,7 +101,7 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     (this->*(entry.handler))(entry.index);
     __itt_task_end(_profilerDomain);
 
-    auto len = (header.count.u() + 1) * 4;
+    auto len = (header.count_u() + 1) * 4;
     assert(len != 0);
     return len;
 }
@@ -205,9 +205,9 @@ void Rsx::shutdown() {
 void Rsx::encodeJump(ps3_uintptr_t va, uint32_t destOffset) {
     assert((destOffset & 3) == 0);
     MethodHeader header { 0 };
-    header.prefix.set(1);
-    header.jumpoffset.set(destOffset);
-    g_state.mm->store32(va, header.val, g_state.granule);
+    header.prefix_set(1);
+    header.jumpoffset_set(destOffset);
+    g_state.mm->store32(va, header.value, g_state.granule);
 }
 
 void Rsx::sendCommand(GcmCommandReplayInfo info) {

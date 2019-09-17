@@ -33,7 +33,8 @@ std::string printGroup(ThreadGroup* group) {
     return ssnprintf("%s [p%d] %s", group->name, group->priority, threads);
 }
 
-std::string printGroups(auto& groups) {
+template <class T>
+std::string printGroups(T& groups) {
     std::string res;
     for (auto group : groups) {
         res += printGroup(group) + " ";

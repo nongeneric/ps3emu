@@ -54,6 +54,9 @@ struct AdaptType<boost::endian::big_int16_t> {
 
 template <typename... Args>
 std::string ssnprintf(const char* f, Args... args) {
+    if (!f) {
+        f = "";
+    }
     auto len = snprintf(0, 0, f, AdaptType<decltype(args)>().adapt(args)...);
     ssnprintf_buf.resize(len);
     len = snprintf(&ssnprintf_buf[0],

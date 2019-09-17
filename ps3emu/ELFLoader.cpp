@@ -312,7 +312,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
                               name == "cellSyncMutexTryLock";
                 std::function<void(std::string&&)> log = [=](auto message) {
-                    INFO(libs) << message;
+                    INFO(libs, proxy) << message;
                 };
                 if (isSync) {
                     log = [=](auto message) {

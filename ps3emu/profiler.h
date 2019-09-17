@@ -3,30 +3,31 @@
 #ifdef VTUNE_ENABLED
 #include <ittnotify.h>
 #else
-#define __itt_thread_set_name(a)
-#define __itt_domain_create(a) nullptr
-#define __itt_pause()
-#define __itt_resume()
-#define __itt_detach()
-#define __itt_task_begin(a, b, c, d)
-#define __itt_task_end(a)
-#define __itt_string_handle_create(a) nullptr
-#define __itt_null __itt_id()
-#define __itt_frame_begin_v3(a, b)
-#define __itt_frame_end_v3(a, b)
-#define __itt_sync_create(a, b, c, d)
-#define __itt_sync_destroy(a)
-#define __itt_sync_prepare(a)
-#define __itt_sync_cancel(a)
-#define __itt_sync_acquired(a)
-#define __itt_sync_releasing(a)
-#define __itt_event_create(a, b) { }
-#define __itt_event_start(a)
-#define __itt_event_end(a)
 struct __itt_domain { };
 struct __itt_string_handle { };
 struct __itt_id { };
 struct __itt_event { };
+inline constexpr int __itt_null = 0;
+inline void __itt_thread_set_name(const void*) {}
+inline __itt_domain* __itt_domain_create(const void*) { return nullptr; }
+inline void __itt_pause() {}
+inline void __itt_resume() {}
+inline void __itt_detach() {}
+inline void __itt_task_begin(const void*, int, int, const void*) {}
+inline void __itt_task_end(const void*) {}
+inline __itt_string_handle* __itt_string_handle_create(const void*) { return nullptr; }
+inline void __itt_id() {}
+inline void __itt_frame_begin_v3(const void*, const void*) {}
+inline void __itt_frame_end_v3(const void*, const void*) {}
+inline void __itt_sync_create(const void*, const void*, const void*, const void*) {}
+inline void __itt_sync_destroy(const void*) {}
+inline void __itt_sync_prepare(const void*) {}
+inline void __itt_sync_cancel(const void*) {}
+inline void __itt_sync_acquired(const void*) {}
+inline void __itt_sync_releasing(const void*) {}
+inline void __itt_event_create(const void*, const void*) { }
+inline void __itt_event_start(const void*) {}
+inline void __itt_event_end(const void*) {}
 #endif
 
 extern __itt_domain* g_profiler_process_domain;

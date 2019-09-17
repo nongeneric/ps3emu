@@ -79,7 +79,7 @@ TEST_CASE("playaudio", TAG_SERIAL) {
     REQUIRE(actual.size() > 1500 * 1024);
     actual.erase(begin(actual), begin(actual) + 1024 * 100);
     actual.erase(end(actual) - 1024 * 100, end(actual));
-    auto it = ranges::search(expected, actual);
+    auto it = std::search(begin(expected), end(expected), begin(actual), end(actual));
     bool found = it != end(expected);
     REQUIRE(found);
 }

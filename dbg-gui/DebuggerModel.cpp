@@ -1220,22 +1220,22 @@ void DebuggerModel::setSPUSoftBreak(ps3_uintptr_t mainElfVa) {
     auto bytes = g_state.mm->load32(mainElfVa);
 
     SPUForm i { bytes };
-    if (i.OP11.u() == SPU_STOPD_OPCODE && i.StopAndSignalType.u() > 0) {
+    if (i.OP11_u() == SPU_STOPD_OPCODE && i.StopAndSignalType_u() > 0) {
         messagef("breakpoint already set");
         return;
     }
 
-    i.OP11.set(SPU_STOPD_OPCODE);
+    i.OP11_set(SPU_STOPD_OPCODE);
 
     auto index = _mainElfSpuBreaks.create({bytes, mainElfVa});
-    if (index >= 1u << decltype(SPUForm::StopAndSignalType)::W) {
+    if (index >= 1u << SPUForm::StopAndSignalType_t::W) {
         messagef("too many breakpoints");
         _mainElfSpuBreaks.destroy(index);
         return;
     }
-    i.OP11.set(SPU_STOPD_OPCODE);
-    i.StopAndSignalType.set(index);
-    g_state.mm->store32(mainElfVa, i.u, g_state.granule);
+    i.OP11_set(SPU_STOPD_OPCODE);
+    i.StopAndSignalType_set(index);
+    g_state.mm->store32(mainElfVa, i.value, g_state.granule);
 }
 
 void DebuggerModel::clearSoftBreaks() {
@@ -1284,8 +1284,8 @@ void DebuggerModel::clearSPUSoftBreak(ps3_uintptr_t va) {
         begin(_spuBreaks), end(_spuBreaks), [=](auto b) { return b.va == va; });
     if (it == end(_spuBreaks)) {
         SPUForm i{*ptr};
-        if (i.OP11.u() == SPU_STOPD_OPCODE) {
-            auto index = i.StopAndSignalType.u();
+        if (i.OP11_u() == SPU_STOPD_OPCODE) {
+            auto index = i.StopAndSignalType_u();
             messagef("main elf spu breakpoint at %x (index %x)", va, index);
             auto info = _mainElfSpuBreaks.try_get(index);
             if (!info) {

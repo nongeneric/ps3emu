@@ -4,7 +4,7 @@
 #include "../../constants.h"
 #include "sysutil_sysparam.h"
 #include <boost/endian/arithmetic.hpp>
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
 #include <vector>
 #include "ps3emu/enum.h"
 

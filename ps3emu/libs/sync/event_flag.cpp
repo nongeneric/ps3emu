@@ -24,7 +24,7 @@ int32_t sys_event_flag_create(big_uint32_t* id,
     flag->name = attr->name;
     flag->value = init;
     *id = map.create(flag);
-    INFO(libs) << ssnprintf("sys_event_flag_create(%x, %x, %s)", *id, init, std::string(attr->name, 8));
+    INFO(libs, sync) << ssnprintf("sys_event_flag_create(%x, %x, %s)", *id, init, std::string(attr->name, 8));
     return CELL_OK;
 }
 
@@ -57,7 +57,7 @@ int32_t sys_event_flag_wait(uint32_t id,
 }
 
 int32_t sys_event_flag_set(uint32_t id, uint64_t bitptn) {
-    INFO(libs) << ssnprintf("sys_event_flag_set(%x, %llx)", id, bitptn);
+    INFO(libs, sync) << ssnprintf("sys_event_flag_set(%x, %llx)", id, bitptn);
     auto flag = map.get(id);
     boost::unique_lock<boost::mutex> lock(flag->m);
     flag->value |= bitptn;
@@ -66,7 +66,7 @@ int32_t sys_event_flag_set(uint32_t id, uint64_t bitptn) {
 }
 
 int32_t sys_event_flag_get(uint32_t id, big_uint64_t* value) {
-    INFO(libs) << ssnprintf("sys_event_flag_set(%x)", id);
+    INFO(libs, sync) << ssnprintf("sys_event_flag_set(%x)", id);
     auto flag = map.get(id);
     boost::unique_lock<boost::mutex> lock(flag->m);
     *value = flag->value;
@@ -74,7 +74,7 @@ int32_t sys_event_flag_get(uint32_t id, big_uint64_t* value) {
 }
 
 int32_t sys_event_flag_clear(uint32_t id, uint64_t bitptn) {
-    INFO(libs) << ssnprintf("sys_event_flag_set(%x, %llx)", id, bitptn);
+    INFO(libs, sync) << ssnprintf("sys_event_flag_set(%x, %llx)", id, bitptn);
     auto flag = map.get(id);
     boost::unique_lock<boost::mutex> lock(flag->m);
     flag->value &= bitptn;

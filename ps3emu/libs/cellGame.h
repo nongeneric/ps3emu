@@ -2,7 +2,7 @@
 
 #include "sys_defs.h"
 #include "../Process.h"
-#include <boost/context/all.hpp>
+#include <boost/context/detail/fcontext.hpp>
 #include <array>
 
 struct CellGameContentSize {

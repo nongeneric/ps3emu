@@ -177,28 +177,28 @@ struct InstructionInfo {
 #define BB_CALL_OPCODE 0b111101
 #define SPU_BB_CALL_OPCODE 0b100100
 
-union BBCallForm {
-    uint32_t val;
-    BitField<0, 6> OPCD;
-    BitField<6, 17> Segment;
-    BitField<17, 32> Label;
+struct BBCallForm {
+    BIT_FIELD(OPCD, 0, 6)
+    BIT_FIELD(Segment, 6, 17)
+    BIT_FIELD(Label, 17, 32)
+    uint32_t value;
 };
 
 inline uint32_t asm_bb_call(unsigned opcode, uint32_t segment, uint32_t label) {
-    assert((1u << decltype(BBCallForm::Segment)::W) > segment);
-    assert((1u << decltype(BBCallForm::Label)::W) > label);
+    assert((1u << decltype(std::declval<BBCallForm>().Segment())::W) > segment);
+    assert((1u << decltype(std::declval<BBCallForm>().Label())::W) > label);
     BBCallForm instr { 0 };
-    instr.OPCD.set(opcode);
-    instr.Segment.set(segment);
-    instr.Label.set(label);
-    return instr.val;
+    instr.OPCD_set(opcode);
+    instr.Segment_set(segment);
+    instr.Label_set(label);
+    return instr.value;
 }
 
 inline bool dasm_bb_call(unsigned opcode, uint32_t instr, uint32_t& segment, uint32_t& label) {
     BBCallForm form { instr };
-    if (form.OPCD.u() == opcode) {
-        segment = form.Segment.u();
-        label = form.Label.u();
+    if (form.OPCD_u() == opcode) {
+        segment = form.Segment_u();
+        label = form.Label_u();
         return true;
     }
     return false;
