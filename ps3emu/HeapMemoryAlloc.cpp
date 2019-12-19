@@ -5,6 +5,7 @@
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/constants.h"
 #include <assert.h>
+#include <boost/align.hpp>
 
 static auto kb64 = 64u << 10u;
 
@@ -14,7 +15,7 @@ HeapMemoryAlloc::HeapMemoryAlloc() : _map(HeapAreaSize / kb64), _available(HeapA
 
 std::tuple<uint8_t*, uint32_t> HeapMemoryAlloc::alloc(uint32_t size, uint32_t alignment) {
     assert(alignment == (1u << 20u) || alignment == kb64);
-    auto pages = ::align(size, kb64) / kb64;
+    auto pages = boost::alignment::align_up(size, kb64) / kb64;
     auto lock = boost::unique_lock(_m);
     auto it = findGap(
         begin(_map), end(_map), pages, alignment / kb64, [&](auto it) { return !*it; });

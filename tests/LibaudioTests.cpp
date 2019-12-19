@@ -52,7 +52,7 @@ TEST_CASE("audioattributes_test") {
 }
 
 TEST_CASE("playaudio", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/playaudio/a.elf"},
+    test_interpreter_and_rewriter({testPath("playaudio/a.elf")},
         "cellSysmoduleInitialize() : 0\n"
         "[Audio environment: 2-ch]\n"
         "cellAudioInit() : 0\n"
@@ -74,7 +74,7 @@ TEST_CASE("playaudio", TAG_SERIAL) {
         "cellAudioPortClose() : 0\n"
         "cellAudioQuit() : 0\n", true, { "--capture-audio" }
     );
-    auto expected = read_all_bytes("./binaries/playaudio/host_root/usr/local/cell/sample_data/sound/waveform/Sample-48k-stereo.raw");
+    auto expected = read_all_bytes(testPath("playaudio/host_root/usr/local/cell/sample_data/sound/waveform/Sample-48k-stereo.raw"));
     auto actual = read_all_bytes("/tmp/ps3emu_audio_port0.bin");
     REQUIRE(actual.size() > 1500 * 1024);
     actual.erase(begin(actual), begin(actual) + 1024 * 100);

@@ -1,10 +1,11 @@
 #pragma once
 
-#include <boost/endian/arithmetic.hpp>
 #include "constants.h"
-#include <string>
-#include <stdio.h>
+#include <boost/align.hpp>
+#include <boost/endian/arithmetic.hpp>
 #include <inttypes.h>
+#include <stdio.h>
+#include <string>
 
 namespace {
     thread_local std::string ssnprintf_buf;
@@ -104,12 +105,6 @@ bool subset(T sub, T sublen, T a, T alen) {
     return sub >= a && sub + sublen <= a + alen;
 }
 
-template <typename T>
-T align(T n, unsigned alignment) {
-    assert(alignment > 0 && (alignment & (alignment - 1)) == 0);
-    return (n + alignment - 1) & (~(alignment - 1));
-}
-
 template <typename Container, typename Pred>
 void erase_if(Container& container, Pred pred) {
     auto it = std::find_if(begin(container), end(container), pred);
@@ -126,7 +121,7 @@ Iter findGap(Iter begin, Iter end, unsigned width, unsigned alignment, IsEmptyPr
     while (lower <= end) {
         if (count == 0) {
             auto index = std::distance(begin, current);
-            index = ::align(index, alignment);
+            index = boost::alignment::align_up(index, alignment);
             current = begin + index;
         }
         if (isEmpty(current)) {

@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
-cmake_policy(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 
 project(ps3emu-root)
 include_directories(${ps3emu-root_SOURCE_DIR})
@@ -32,7 +31,8 @@ set(CMAKE_AR gcc-ar)
 set(CMAKE_RANLIB gcc-ranlib)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(EMU_CONFIGURATION_ADDRESS_SANITIZER "address and undefined sanitizers")
+option(EMU_CONFIGURATION_ADDRESS_SANITIZER "address sanitizer")
+option(EMU_CONFIGURATION_UNDEFINED_SANITIZER "undefined sanitizer")
 option(EMU_CONFIGURATION_THREAD_SANITIZER "thread sanitizer")
 option(EMU_CONFIGURATION_DEBUG "debug")
 option(EMU_CONFIGURATION_TESTS "tests")
@@ -56,6 +56,9 @@ set(CMAKE_CXX_FLAGS "-Wall -Werror -march=native ${CMAKE_CXX_FLAGS}")
 
 if(${EMU_CONFIGURATION_ADDRESS_SANITIZER})
     set(CMAKE_CXX_FLAGS "-fsanitize=address ${CMAKE_CXX_FLAGS}")
+endif()
+
+if(${EMU_CONFIGURATION_UNDEFINED_SANITIZER})
     set(CMAKE_CXX_FLAGS "-fsanitize=undefined ${CMAKE_CXX_FLAGS}")
 endif()
 
@@ -106,11 +109,18 @@ if(${EMU_CONFIGURATION_PAUSE})
     add_definitions(-DDEBUGPAUSE)
 endif()
 
+include_directories("${CMAKE_BINARY_DIR}")
+include_directories("${CMAKE_SOURCE_DIR}")
 include_directories(SYSTEM ${FREETYPE2_INCLUDE_DIRS})
 include_directories(SYSTEM thirdparty/cereal/include)
 include_directories(SYSTEM thirdparty/xxHash)
 include_directories(SYSTEM thirdparty/range-v3/include)
 include_directories(SYSTEM thirdparty/Catch2/single_include)
+
+configure_file (
+    "${CMAKE_SOURCE_DIR}/ps3emu/build-config.h.in"
+    "${CMAKE_BINARY_DIR}/ps3emu/build-config.h"
+)
 
 add_subdirectory(ps3emu)
 add_subdirectory(ps3tool-core)

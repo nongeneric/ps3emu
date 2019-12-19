@@ -3,6 +3,7 @@
 #include "ps3emu/fileutils.h"
 #include "ps3emu/ppu/ppu_dasm.h"
 #include "ps3emu/spu/SPUDasm.h"
+#include "ps3emu/build-config.h"
 #include "ps3tool-core/Rewriter.h"
 #include "TestUtils.h"
 #include <catch.hpp>
@@ -14,34 +15,20 @@
 #include <unistd.h>
 
 TEST_CASE("rewriter_simple") {
-    auto id = getpid();
-    auto soPath = ssnprintf("/tmp/ps3_x86_%d.x86.so", id);
-    auto cppPath = ssnprintf("/tmp/ps3_x86_%d", id);
-    std::string output;
-    auto line = rewrite(
-        "./binaries/rewriter_simple/a.elf",
-        cppPath, {});
-    auto res = exec(line, output);
-    REQUIRE(res);
-    line = compile(cppPath + ".ninja");
-    res = exec(line, output);
-    REQUIRE(res);
-    
-    output = startWaitGetOutput({"./binaries/rewriter_simple/a.elf"}, {"--x86", soPath});
-    REQUIRE( output ==
-        "test1 ep: 1022c\n"
-        "test1 res: 1416\n"
-        "test2 ep: 10314 1039c\n"
-        "test2 res: -5\n"
-        "test3 ep: 10418 1045c(ignore)\n"
-        "test3 res: 382\n"
-        "test4 ep: 10484 104c8(ignore) 10518\n"
-        "test4 res: 98\n"
-        "test5 ep: 1053c\n"
-        "test5 res: 2008\n"
-        "test6 ep: 105ac\n"
-        "test6 res: 17\n"
-        "test0 ep: 10654\n"
+    test_interpreter_and_rewriter({testPath("rewriter_simple/a.elf")},
+                                  "test1 ep: 1022c\n"
+                                  "test1 res: 1416\n"
+                                  "test2 ep: 10314 1039c\n"
+                                  "test2 res: -5\n"
+                                  "test3 ep: 10418 1045c(ignore)\n"
+                                  "test3 res: 382\n"
+                                  "test4 ep: 10484 104c8(ignore) 10518\n"
+                                  "test4 res: 98\n"
+                                  "test5 ep: 1053c\n"
+                                  "test5 res: 2008\n"
+                                  "test6 ep: 105ac\n"
+                                  "test6 res: 17\n"
+                                  "test0 ep: 10654\n"
     );
 }
 
@@ -158,7 +145,7 @@ TEST_CASE("rewriter_block_discovery_3") {
 }
 
 TEST_CASE("spu_rewriter_discover_elfs") {
-    auto vec = read_all_bytes("./binaries/spurs_task_queue/a.elf");
+    auto vec = read_all_bytes(testPath("spurs_task_queue/a.elf"));
     auto infos = discoverEmbeddedSpuElfs(vec);
     REQUIRE( infos.size() == 2 );
     REQUIRE( infos[0].startOffset == 0x12880 );
@@ -166,7 +153,7 @@ TEST_CASE("spu_rewriter_discover_elfs") {
     REQUIRE( infos[1].startOffset == 0x13e00 );
     REQUIRE( ((intptr_t)infos[1].header - (intptr_t)&vec[0]) == 0x13e00 );
     
-    vec = read_all_bytes("./binaries/spurs_minimal_pm/hello_work_unit.elf");
+    vec = read_all_bytes(testPath("spurs_minimal_pm/hello_work_unit.elf"));
     infos = discoverEmbeddedSpuElfs(vec);
     REQUIRE( infos.size() == 1 );
     REQUIRE( infos[0].startOffset == 0 );
@@ -241,22 +228,7 @@ TEST_CASE("spu_rewriter_block_discovery_1") {
 }
 
 TEST_CASE("spu_rewriter_simple") {
-    auto id = getpid();
-    auto soPath = ssnprintf("/tmp/ps3_x86spu_%d.x86.so", id);
-    auto cppPath = ssnprintf("/tmp/ps3_x86spu_%d", id);
-    std::string output;
-    auto line = rewrite(
-        "./binaries/spurs_task_hello/a.elf",
-        cppPath,
-        "--spu");
-    auto res = exec(line, output);
-    REQUIRE(res);
-    line = compile(cppPath + ".ninja");
-    res = exec(line, output);
-    REQUIRE(res);
-    
-    output = startWaitGetOutput({"./binaries/spurs_task_hello/a.elf"}, {"--x86", soPath});
-    REQUIRE( output ==
+    test_interpreter_and_rewriter({testPath("spurs_task_hello/a.elf")},
         "SPU: Hello world!\n"
     );
 }

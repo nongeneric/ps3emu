@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <map>
 #include <dlfcn.h>
+#include <boost/align.hpp>
 
 using namespace boost::endian;
 
@@ -145,7 +146,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         if (imageBase && index == 1) {
             assert(_header->e_phnum == 3);
             auto ph0 = _pheaders[0];
-            prxPh1Va = va = ::align(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
+            prxPh1Va = va = boost::alignment::align_up(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
         }
         
         INFO(libs) << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
@@ -301,6 +302,11 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 auto name = fnidName ? *fnidName : ssnprintf("fnid_%08X", fnids[j]);
                 std::string libname;
                 readString(g_state.mm, exports[i].name, libname);
+
+                // leads to crashes
+                if (libname == "cellFiber")
+                    continue;
+
                 auto replacement = ranges::find_if(replacements, [&](auto& r) {
                     return r.name == name && r.lib == libname;
                 });

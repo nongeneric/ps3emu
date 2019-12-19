@@ -566,7 +566,9 @@ int fragment_dasm_instr(const uint8_t* instr, FragmentInstr& res) {
         arg.swizzle.comp[3] = i->OpMaskW(n);
         if (arg.type == op_type_t::Const) {
             has_const = true;
-            read_fragment_imm_val(instr + 16, &arg.imm_val.f[0]);
+            alignas(16) uint8_t buf[16];
+            read_fragment_imm_val(instr + 16, buf);
+            memcpy(&arg.imm_val.f[0], buf, sizeof buf);
         }
     }
     return has_const ? 32 : 16;

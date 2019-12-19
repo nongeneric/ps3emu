@@ -68,8 +68,11 @@ def dump_elapsed_times(times, prev_times):
         json.dump(d, f)
         
 def read_elapsed_times():
-    with open(TimesFileName, 'r') as f:
-        return json.load(f)
+    try:
+        with open(TimesFileName, 'r') as f:
+            return json.load(f)
+    except:
+        return []
 
 async def run_tests():
     output, code = await read_output(['--list-tests'])

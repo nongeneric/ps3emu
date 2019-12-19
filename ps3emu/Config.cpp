@@ -50,3 +50,9 @@ void Config::save() {
     std::ofstream f(_configPath);
     f << j.dump(4);
 }
+
+std::string getTestOutputDir() {
+    auto path = "/tmp/ps3emu_tests";
+    create_directories(path);
+    return path;
+}

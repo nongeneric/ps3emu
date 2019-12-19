@@ -213,6 +213,11 @@ void SPUGroupManager::notifyThreadStopped(SPUThread* thread, SPUThreadExitCause 
                                   to_string(cause));
     auto lock = boost::lock_guard(_mutex);
     auto group = thread->group();
+
+    // raw thread
+    if (!group)
+        return;
+
     group->causes[thread] = cause;
     if (!anyRunning(group)) {
         auto running = std::find(begin(_running), end(_running), group);

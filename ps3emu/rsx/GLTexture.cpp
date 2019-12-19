@@ -1,8 +1,9 @@
 #include "GLTexture.h"
 #include "DXT.h"
-#include "../MainMemory.h"
-#include "../log.h"
 #include "GcmConstants.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/log.h"
+#include <boost/align.hpp>
 
 using namespace glm;
 
@@ -406,7 +407,7 @@ void GLTexture::update(std::vector<uint8_t>& blob) {
             pos += read2d(&blob[pos], [&](unsigned level, unsigned w, unsigned h, glm::vec4* ptr) {
                 glTextureSubImage3D(_handle, level, 0, 0, layer, w, h, 1, GL_RGBA, GL_FLOAT, ptr);
             });
-            pos = ::align(pos, 128);
+            pos = boost::alignment::align_up(pos, 128);
         }
     } else {
         read2d(&blob[0], [&](unsigned level, unsigned w, unsigned h, glm::vec4* ptr) {

@@ -10,6 +10,7 @@
 #include <boost/property_map/vector_property_map.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/transpose_graph.hpp>
+#include <boost/align.hpp>
 #include <optional>
 #include <set>
 #include <algorithm>
@@ -256,7 +257,7 @@ std::vector<BasicBlock> discoverBasicBlocks(
             }
         }
         for (auto b : newBreaks) {
-            auto aligned = ::align(b, 4u);
+            auto aligned = boost::alignment::align_up(b, 4u);
             if (breaks.inrange(aligned)) {
                 SplitBlocks(blocks, aligned);
             }

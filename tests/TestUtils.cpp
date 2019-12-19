@@ -1,6 +1,8 @@
 #include <QProcess>
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/utils.h"
+#include "ps3emu/build-config.h"
+#include "ps3emu/Config.h"
 #include "TestUtils.h"
 #include <filesystem>
 #include <boost/algorithm/string.hpp>
@@ -28,6 +30,8 @@ std::string startWaitGetOutput(std::vector<std::string> args,
         throw std::runtime_error("can't start process");
     if (!proc.waitForFinished(180 * 1000))
         throw std::runtime_error("process timed out");
+    if (proc.exitCode())
+        throw std::runtime_error("process exited with error");
     return QString(proc.readAll()).toStdString();
 }
 
@@ -56,10 +60,10 @@ void test_interpreter_and_rewriter(std::vector<std::string> args,
                                    bool rewriterOnly,
                                    std::vector<std::string> ps3runArgs) {
     auto id = getpid();
-    auto spuSoPath = ssnprintf("/tmp/ps3_spu_%d_spu.x86.so", id);
-    auto spuCppPath = ssnprintf("/tmp/ps3_spu_%d_spu", id);
-    auto soPath = ssnprintf("/tmp/ps3_%d.x86.so", id);
-    auto cppPath = ssnprintf("/tmp/ps3_%d", id);
+    auto spuSoPath = ssnprintf("%s/ps3_%d%s.so", getTestOutputDir(), id, g_rewriterSpuExtension);
+    auto spuCppPath = ssnprintf("%s/ps3_%d%s", getTestOutputDir(), id, g_rewriterSpuExtension);
+    auto soPath = ssnprintf("%s/ps3_%d%s.so", getTestOutputDir(), id, g_rewriterPpuExtension);
+    auto cppPath = ssnprintf("%s/ps3_%d%s", getTestOutputDir(), id, g_rewriterPpuExtension);
     if (!rewriterOnly) {
         auto output = startWaitGetOutput(args);
         REQUIRE( output == expected );
@@ -72,4 +76,8 @@ void test_interpreter_and_rewriter(std::vector<std::string> args,
     ps3runArgs.push_back(spuSoPath);
     auto output = startWaitGetOutput(args, ps3runArgs);
     REQUIRE( output == expected );
+}
+
+std::string testPath(const char* relative) {
+    return ssnprintf("%s/tests/binaries/%s", g_ps3sources, relative);
 }

@@ -2,6 +2,7 @@
 
 #include "ps3emu/utils.h"
 #include "ps3emu/log.h"
+#include "ps3emu/build-config.h"
 #include <filesystem>
 #include <boost/algorithm/string.hpp>
 #include <stdlib.h>
@@ -9,7 +10,7 @@
 using namespace std::filesystem;
 
 std::string ps3toolPath() {
-    return ssnprintf("%s/ps3tool/ps3tool", getenv("PS3_BIN"));
+    return ssnprintf("%s/ps3tool/ps3tool", g_ps3bin);
 }
 
 std::string rewrite(std::string elf, std::string cpp, std::string args) {
@@ -30,15 +31,15 @@ std::string compileRule() {
         ""
 #endif
     ;
-    auto line = ssnprintf("g++ -c -fPIC -std=c++17 %s $opt $trace -march=native -isystem%s $in -o $out",
-        memoryProtection, include
+    auto line = ssnprintf("%s -c -fPIC -std=c++17 %s $opt $trace -march=native -isystem%s $in -o $out",
+        g_compiler, memoryProtection, include
     );
     return line;
 }
 
 std::string linkRule() {
-    auto lib = std::string(getenv("PS3_BIN")) + "/ps3emu";
-    return ssnprintf("g++ -shared $in -L%s -lps3emu -o $out", lib);
+    auto lib = std::string(g_ps3bin) + "/ps3emu";
+    return ssnprintf("%s -shared $in -L%s -lps3emu -o $out", g_compiler, lib);
 }
 
 std::string compile(std::string ninja) {

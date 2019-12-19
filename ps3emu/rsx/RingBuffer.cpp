@@ -1,6 +1,7 @@
 #include "RingBuffer.h"
 #include "string.h"
 #include "ps3emu/utils.h"
+#include <boost/align.hpp>
 
 RingBuffer::RingBuffer(size_t count, std::vector<RingBufferEntryInfo> infos)
     : _infos(infos), _currentIndex(0)
@@ -10,7 +11,7 @@ RingBuffer::RingBuffer(size_t count, std::vector<RingBufferEntryInfo> infos)
 
     auto offset = 0ul;
     for (auto& info : _infos) {
-        info.size = align(info.size, alignment);
+        info.size = boost::alignment::align_up(info.size, alignment);
         _offsets.push_back(offset);
         offset += info.size;
     }

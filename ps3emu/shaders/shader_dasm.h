@@ -1,12 +1,14 @@
 #pragma once
 
-#include "../BitField.h"
-#include <string>
-#include <stdint.h>
+#include "ps3emu/BitField.h"
+#include "ps3emu/utils.h"
 #include <array>
-#include <vector>
 #include <bitset>
+#include <boost/align.hpp>
 #include <boost/variant.hpp>
+#include <stdint.h>
+#include <string>
+#include <vector>
 #include <x86intrin.h>
 
 enum class clamp_t {
@@ -279,6 +281,7 @@ inline void rsx_load16(const void* ptr, void* outp, bool twoBytes) {
             : _mm_set_epi8(14, 15, 12, 13, 10, 11, 8, 9, 6, 7, 4, 5, 2, 3, 0, 1);
     auto val = _mm_lddqu_si128((__m128i*)ptr);
     auto res = _mm_shuffle_epi8(val, mask);
+    assert(boost::alignment::is_aligned(reinterpret_cast<uintptr_t>(outp), sizeof res));
     _mm_store_si128((__m128i*)outp, res);
 }
 

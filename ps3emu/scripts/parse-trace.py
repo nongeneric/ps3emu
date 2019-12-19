@@ -57,7 +57,9 @@ if args.changes:
             line = f.readline()
             if not line:
                 break
-            line = line.decode()
+            try:
+                line = line.decode()
+            except: pass
             try:
                 i = line.find('#')
                 if i != -1:

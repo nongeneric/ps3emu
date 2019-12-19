@@ -1,21 +1,23 @@
 #include "ps3tool.h"
 
-#include "ps3emu/state.h"
 #include "ps3emu/Config.h"
 #include "ps3emu/ELFLoader.h"
-#include "ps3emu/utils.h"
-#include "ps3emu/fileutils.h"
-#include "ps3emu/RewriterUtils.h"
-#include "ps3emu/MainMemory.h"
-#include "ps3emu/InternalMemoryManager.h"
 #include "ps3emu/HeapMemoryAlloc.h"
+#include "ps3emu/InternalMemoryManager.h"
+#include "ps3emu/MainMemory.h"
+#include "ps3emu/RewriterUtils.h"
+#include "ps3emu/build-config.h"
+#include "ps3emu/fileutils.h"
+#include "ps3emu/state.h"
+#include "ps3emu/utils.h"
 #include "ps3tool-core/NinjaScript.h"
+#include <algorithm>
+#include <boost/algorithm/string.hpp>
+#include <boost/align.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <filesystem>
-#include <boost/algorithm/string.hpp>
-#include <vector>
-#include <algorithm>
 #include <fstream>
+#include <vector>
 
 using namespace std::filesystem;
 using namespace boost::endian;
@@ -81,7 +83,7 @@ void mapPrxStore() {
         ELFLoader elf;
         elf.load(prxPath.string());
         auto stolen = elf.map([&](auto va, auto size, auto) {
-            imageBase = ::align(va + size, 1 << 10);
+            imageBase = boost::alignment::align_up(va + size, 1 << 10);
         }, imageBase, {}, &rewriterStore, true);
         
         info->size = imageBase - info->imageBase;
@@ -106,36 +108,39 @@ void rewritePrxStore() {
     
     NinjaScript rewriteScript;
     auto ps3tool = ps3toolPath();
-    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $in --image-base $imagebase");
-    rewriteScript.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $in.spu --image-base $imagebase");
+    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $cpp --image-base $imagebase");
+    rewriteScript.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $cpp --image-base $imagebase");
     
     NinjaScript buildScript;
     buildScript.variable("trace", "");
     
+    auto external = prxStorePath / "sys" / "external";
+    auto buildPath = external / g_buildName;
+    create_directories(buildPath);
+
     for (auto& prxInfo : prxInfos) {
-        auto prxPath = (prxStorePath / "sys" / "external" / prxInfo.name).string();
+        auto prxPath = (external / prxInfo.name).string();
         assert(exists(prxPath));
         
-        auto imagebaseVar = std::make_tuple("imagebase", ssnprintf("%x", prxInfo.imageBase));
-        
+        std::tuple imagebaseVar("imagebase", ssnprintf("%x", prxInfo.imageBase));
+
         if (prxInfo.loadx86) {
-            auto out = prxPath + ".ninja";
-            rewriteScript.statement("rewrite-ppu", prxPath, out, {imagebaseVar});
+            auto out = buildPath / (prxInfo.name + ".ninja");
+            std::tuple cppVar{"cpp", (buildPath / (prxInfo.name)).string()};
+            rewriteScript.statement("rewrite-ppu", prxPath, out, {imagebaseVar, cppVar});
             buildScript.subninja(out);
-            buildScript.defaultStatement(prxInfo.name + ".x86.so");
         }
         
         if (prxInfo.loadx86spu) {
-            auto out = prxPath + ".spu.ninja";
-            rewriteScript.statement("rewrite-spu", prxPath, out, {imagebaseVar});
+            auto out = buildPath / (prxInfo.name + ".spu.ninja");
+            std::tuple cppVar{"cpp", (buildPath / (prxInfo.name + ".spu")).string()};
+            rewriteScript.statement("rewrite-spu", prxPath, out, {imagebaseVar, cppVar});
             buildScript.subninja(out);
-            buildScript.defaultStatement(prxInfo.name + ".spu.x86.so");
         }
     }
-    
-    auto relative = prxStorePath / "sys" / "external";
-    write_all_text(rewriteScript.dump(), (relative / "rewrite.ninja").string());
-    write_all_text(buildScript.dump(), (relative / "build.ninja").string());
+
+    write_all_text(rewriteScript.dump(), (buildPath / "rewrite.ninja").string());
+    write_all_text(buildScript.dump(), (buildPath / "build.ninja").string());
     
     write_all_lines({
         "#!/bin/bash",
@@ -144,7 +149,7 @@ void rewritePrxStore() {
         "ninja-build -f rewrite.ninja -j 3",
         "ninja-build -f build.ninja -t clean",
         "ninja-build -f build.ninja"
-    }, (relative / "build.sh").string());
+    }, (buildPath / "build.sh").string());
 }
 
 void HandlePrxStore(PrxStoreCommand const& command) {

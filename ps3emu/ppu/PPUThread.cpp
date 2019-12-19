@@ -36,6 +36,8 @@ PPUThread::PPUThread(std::function<void(PPUThread*, PPUThreadEvent, std::any)> e
       _priority(1000),
       _id(-1) {
 
+    assert(eventHandler);
+
     for(auto& r : _GPR)
         r = 0;
     for(auto& r : _FPR)

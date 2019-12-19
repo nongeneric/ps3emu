@@ -5,17 +5,17 @@
 #include <vector>
 
 TEST_CASE("simple_printf") {
-    test_interpreter_and_rewriter({"./binaries/simple_printf/a.elf"}, "some output\n");
+    test_interpreter_and_rewriter({testPath("simple_printf/a.elf")}, "some output\n");
 }
 
 TEST_CASE("bubblesort") {
     test_interpreter_and_rewriter(
-        {"./binaries/bubblesort/a.elf", "5", "17", "30", "-1", "20", "12", "100", "0"},
+        {testPath("bubblesort/a.elf"), "5", "17", "30", "-1", "20", "12", "100", "0"},
         "args: 5 17 30 -1 20 12 100 0 \nsorted: -1 0 5 12 17 20 30 100 \n");
 }
 
 TEST_CASE("md5") {
-    auto output = startWaitGetOutput({"./binaries/md5/a.elf", "-x"});
+    auto output = startWaitGetOutput({testPath("md5/a.elf"), "-x"});
     REQUIRE( output ==
         "MD5 test suite results:\n\n"
         "d41d8cd98f00b204e9800998ecf8427e \"\"\n\n"
@@ -29,7 +29,7 @@ TEST_CASE("md5") {
 }
 
 TEST_CASE("printf") {
-    auto output = startWaitGetOutput({"./binaries/printf/a.elf", "-x"});
+    auto output = startWaitGetOutput({testPath("printf/a.elf"), "-x"});
     REQUIRE( output ==
         "    0\n"
         "123456789\n"
@@ -63,7 +63,7 @@ TEST_CASE("printf") {
 }
 
 TEST_CASE("fcmpconv") {
-    auto output = startWaitGetOutput({"./binaries/fcmpconv/a.elf"});
+    auto output = startWaitGetOutput({testPath("fcmpconv/a.elf")});
     REQUIRE( output == 
         "b > c: 0\n"
         "b < c: 1\n"
@@ -82,7 +82,7 @@ TEST_CASE("fcmpconv") {
 }
 
 TEST_CASE("matrixmul") {
-    auto output = startWaitGetOutput({"./binaries/matrixmul/a.elf"});
+    auto output = startWaitGetOutput({testPath("matrixmul/a.elf")});
     REQUIRE( output == 
         "mul3 = 1.851600e+01\n"
         "isnan(NAN)         = 1\n"
@@ -131,7 +131,7 @@ TEST_CASE("matrixmul") {
 }
 
 TEST_CASE("dtoa") {
-    auto output = startWaitGetOutput({"./binaries/dtoa/a.elf"});
+    auto output = startWaitGetOutput({testPath("dtoa/a.elf")});
     REQUIRE( output == 
         "3.13 = 3.13\n"
         "0.02380113 = 0.02380113\n"
@@ -143,7 +143,7 @@ TEST_CASE("dtoa") {
 }
 
 TEST_CASE("float_printf") {
-    auto output = startWaitGetOutput({"./binaries/float_printf/a.elf"});
+    auto output = startWaitGetOutput({testPath("float_printf/a.elf")});
     REQUIRE( output == 
         "18.516 = 1.851600e+01\n"
         "float = 4.179412e-01\n"
@@ -152,12 +152,12 @@ TEST_CASE("float_printf") {
 }
 
 TEST_CASE("gcm_context_size") {
-    auto output = startWaitGetOutput({"./binaries/gcm_context_size/a.elf"});
+    auto output = startWaitGetOutput({testPath("gcm_context_size/a.elf")});
     REQUIRE( output ==  "1bff\n" );
 }
 
 TEST_CASE("gcm_memory_mapping") {
-    auto output = startWaitGetOutput({"./binaries/gcm_memory_mapping/a.elf"});
+    auto output = startWaitGetOutput({testPath("gcm_memory_mapping/a.elf")});
     REQUIRE( output == 
         "host_addr to offset: 0\n"
         "offset 0 to address == host_addr?: 1\n"
@@ -166,7 +166,7 @@ TEST_CASE("gcm_memory_mapping") {
 }
 
 TEST_CASE("hello_simd") {
-    auto output = startWaitGetOutput({"./binaries/hello_simd/a.elf"});
+    auto output = startWaitGetOutput({testPath("hello_simd/a.elf")});
     REQUIRE( output == 
         "vector: 2,2,2,2\n"
         "x: 2\n"
@@ -226,7 +226,7 @@ TEST_CASE("hello_simd") {
 }
 
 TEST_CASE("basic_large_cmdbuf") {
-    auto output = startWaitGetOutput({"./binaries/basic_large_cmdbuf/a.elf"});
+    auto output = startWaitGetOutput({testPath("basic_large_cmdbuf/a.elf")});
     REQUIRE( output ==  
         "end - begin = 6ffc\n"
         "success\n"
@@ -234,12 +234,12 @@ TEST_CASE("basic_large_cmdbuf") {
 }
 
 TEST_CASE("ppu_threads") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads/a.elf")});
     REQUIRE( output == "exitstatus: 3; i: 4000\n" );
 }
 
 TEST_CASE("ppu_threads_tls") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_tls/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_tls/a.elf")});
     REQUIRE( output == 
         "exitstatus: 125055; i: 4000\n"
         "primary thread tls_int: 500\n"
@@ -247,17 +247,17 @@ TEST_CASE("ppu_threads_tls") {
 }
 
 TEST_CASE("ppu_threads_atomic_inc") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_atomic_inc/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_atomic_inc/a.elf")});
     REQUIRE( output == "exitstatus: 1; i: 80000\n" );
 }
 
 TEST_CASE("ppu_threads_atomic_single_lwarx") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_atomic_single_lwarx/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_atomic_single_lwarx/a.elf")});
     REQUIRE( output == "5, 3\n" );
 }
 
 TEST_CASE("ppu_cellgame") {
-    auto output = startWaitGetOutput({"./binaries/ppu_cellgame/USRDIR/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_cellgame/USRDIR/a.elf")});
     REQUIRE( output == 
         "title: GameUpdate Utility Sample\n"
         "gamedir: EMUGAME\n"
@@ -268,7 +268,7 @@ TEST_CASE("ppu_cellgame") {
 }
 
 TEST_CASE("ppu_cellSysutil") {
-    auto output = startWaitGetOutput({"./binaries/ppu_cellSysutil/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_cellSysutil/a.elf")});
     REQUIRE( output == 
         "CELL_SYSUTIL_SYSTEMPARAM_ID_LANG = 1\n"
         "CELL_SYSUTIL_SYSTEMPARAM_ID_ENTER_BUTTON_ASSIGN = 1\n"
@@ -293,7 +293,7 @@ TEST_CASE("ppu_cellSysutil") {
 }
 
 TEST_CASE("ppu_threads_lwmutex_lwcond") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_lwmutex_lwcond/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_lwmutex_lwcond/a.elf")},
         "test_lwmutex: 0; i: 4000\n"
         "test_lwmutex_recursive: 0; i: 4000\n"
         "test_lwcond: 5015; i: 0\n"
@@ -301,7 +301,7 @@ TEST_CASE("ppu_threads_lwmutex_lwcond") {
 }
 
 TEST_CASE("ppu_threads_mutex_cond") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_mutex_cond/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_mutex_cond/a.elf")});
     REQUIRE( output == 
         "test_mutex: 0; i: 4000\n"
         "test_mutex_recursive: 0; i: 4000\n"
@@ -310,7 +310,7 @@ TEST_CASE("ppu_threads_mutex_cond") {
 }
 
 TEST_CASE("ppu_threads_rwlock") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_rwlock/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_rwlock/a.elf")});
     REQUIRE( output == 
         "test_rwlock_w: 0; i: 4000\n"
         "test_lwmutex: 40; i: 10\n"
@@ -318,7 +318,7 @@ TEST_CASE("ppu_threads_rwlock") {
 }
 
 TEST_CASE("ppu_threads_queue") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_queue/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_queue/a.elf")});
     REQUIRE( output == 
         "test_correctness(1): 0; i: 481200\n"
         "test_correctness(0): 0; i: 481200\n"
@@ -326,7 +326,7 @@ TEST_CASE("ppu_threads_queue") {
 }
 
 TEST_CASE("ppu_threads_lwcond_init") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_lwcond_init/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_lwcond_init/a.elf")});
     REQUIRE( output == 
         "sys_lwmutex_t.recursive_count 0\n"
         "sys_lwmutex_t.attribute 22\n"
@@ -337,7 +337,7 @@ TEST_CASE("ppu_threads_lwcond_init") {
 }
 
 TEST_CASE("ppu_syscache") {
-    auto output = startWaitGetOutput({"./binaries/ppu_syscache/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_syscache/a.elf")});
     REQUIRE( output == 
         "cellSysCacheMount() : 0x0  sysCachePath:[/dev_hdd1]\n"
         "cellSysCacheClear Ok\n"
@@ -350,7 +350,7 @@ TEST_CASE("ppu_syscache") {
 }
 
 TEST_CASE("ppu_threads_is_stack") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_is_stack/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_is_stack/a.elf")});
     REQUIRE( output == 
         "main thread: 1100\n"
         "other thread: 1100\n"
@@ -358,7 +358,7 @@ TEST_CASE("ppu_threads_is_stack") {
 }
 
 TEST_CASE("ppu_fs_readdir") {
-    auto output = startWaitGetOutput({"./binaries/ppu_fs_readdir/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_fs_readdir/a.elf")});
     REQUIRE( output == 
         "type: 1, namelen: 1, name: .\n"
         "type: 1, namelen: 2, name: ..\n"
@@ -376,7 +376,7 @@ TEST_CASE("ppu_fs_readdir") {
 }
 
 TEST_CASE("ppu_fios") {
-    auto output = startWaitGetOutput({"./binaries/ppu_fios/USRDIR/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_fios/USRDIR/a.elf")});
     REQUIRE( output ==
         "FiosSimple build date : Jan  4 2016 09:39:06\n"
         "FiosSimple start.\n"
@@ -391,7 +391,7 @@ TEST_CASE("ppu_fios") {
 }
 
 TEST_CASE("ppu_hash") {
-    test_interpreter_and_rewriter({"./binaries/ppu_hash/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_hash/a.elf")},
         "md5 0 b1a49029323448bf6407b94ad6f6f2cf\n"
         "sha1 0 6eb89053fa6048876d0210e5524b55752908af55\n"
         "sha224 0 2d47a0c20145d4ee365abd1de270b9b8747f7574c664f5db8179d86b\n"
@@ -402,7 +402,7 @@ TEST_CASE("ppu_hash") {
 }
 
 TEST_CASE("ppu_simd_math") {
-    auto output = startWaitGetOutput({"./binaries/ppu_simd_math/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_simd_math/a.elf")});
     REQUIRE( output == 
         "Vector3(01): 5.280, 5.280, 5.280\n"
         "Vector3(02): 1.900, 1.900, 1.900\n"
@@ -501,7 +501,7 @@ TEST_CASE("ppu_simd_math") {
 }
 
 TEST_CASE("spu_getting_argp") {
-    test_interpreter_and_rewriter({"./binaries/spu_getting_argp/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_getting_argp/a.elf")},
                                   "Creating an SPU thread group.\n"
                                   "Initializing SPU thread 0\n"
                                   "All SPU threads have been successfully initialized.\n"
@@ -513,7 +513,7 @@ TEST_CASE("spu_getting_argp") {
 }
 
 TEST_CASE("raw_spu_printf") {
-    test_interpreter_and_rewriter({"./binaries/raw_spu_printf/a.elf"},
+    test_interpreter_and_rewriter({testPath("raw_spu_printf/a.elf")},
                                   "Initializing SPUs\n"
                                   "sys_raw_spu_create succeeded. raw_spu number is 0\n"
                                   "Hello, World 1\n"
@@ -522,7 +522,7 @@ TEST_CASE("raw_spu_printf") {
 }
 
 TEST_CASE("gcm_memory") {
-    auto output = startWaitGetOutput({"./binaries/gcm_memory/a.elf"});
+    auto output = startWaitGetOutput({testPath("gcm_memory/a.elf")});
     REQUIRE( output == 
         "* vidmem base: 0xc0000000\n"
         "* vidmem size: 0xf900000\n"
@@ -615,7 +615,7 @@ TEST_CASE("gcm_memory") {
 }
 
 TEST_CASE("gcm_transfer") {
-    auto output = startWaitGetOutput({"./binaries/gcm_transfer/a.elf"});
+    auto output = startWaitGetOutput({testPath("gcm_transfer/a.elf")});
     REQUIRE( output == 
         "success 100\n"
         "success 100()\n"
@@ -645,14 +645,14 @@ TEST_CASE("gcm_transfer") {
 }
 
 TEST_CASE("opengl_hash") {
-    auto output = startWaitGetOutput({"./binaries/opengl_hash/a.elf"});
+    auto output = startWaitGetOutput({testPath("opengl_hash/a.elf")});
     REQUIRE( output == 
         "hash: 1d0\n"
     );
 }
 
 TEST_CASE("raw_spu_opengl_dma") {
-    test_interpreter_and_rewriter({"./binaries/raw_spu_opengl_dma/a.elf"},
+    test_interpreter_and_rewriter({testPath("raw_spu_opengl_dma/a.elf")},
         "Initializing SPUs\n"
         "sys_raw_spu_create succeeded. raw_spu number is 0\n"
         "waiting for _jsAsyncCopyQ\n"
@@ -666,7 +666,7 @@ TEST_CASE("raw_spu_opengl_dma") {
 }
 
 TEST_CASE("ppu_dcbz") {
-    auto output = startWaitGetOutput({"./binaries/ppu_dcbz/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_dcbz/a.elf")});
     REQUIRE( output == 
         "0000000000000000000000000000000000000000000000000000000000000000\n"
         "0000000000000000000000000000000000000000000000000000000000000000\n"
@@ -712,14 +712,14 @@ TEST_CASE("ppu_dcbz") {
 }
 
 TEST_CASE("ppu_float_cmp") {
-    auto output = startWaitGetOutput({"./binaries/ppu_float_cmp/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_float_cmp/a.elf")});
     REQUIRE( output == 
         "1 1 1 0 0 0 1 0 "
     );
 }
 
 TEST_CASE("ppu_sraw") {
-    auto output = startWaitGetOutput({"./binaries/ppu_sraw/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_sraw/a.elf")});
     REQUIRE( output == 
         "1000\n"
         "1000\n"
@@ -730,7 +730,7 @@ TEST_CASE("ppu_sraw") {
 }
 
 TEST_CASE("ppu_fs") {
-    auto output = startWaitGetOutput({"./binaries/ppu_fs/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_fs/a.elf")});
     REQUIRE( output == 
         "FILE 0:\n"
         "\t_Mode = 161\n"
@@ -806,7 +806,7 @@ TEST_CASE("ppu_fs") {
 }
 
 TEST_CASE("pngdec_ppu") {
-    auto output = startWaitGetOutput({"./binaries/pngdec_ppu/a.elf"});
+    auto output = startWaitGetOutput({testPath("pngdec_ppu/a.elf")});
     REQUIRE( output == 
         "* displayInit: displayInit: create display ... WIDTH=1280, HEIGHT=720\n"
         "* createModules: cellPngDecCreate() returned CELL_OK\n"
@@ -847,13 +847,13 @@ TEST_CASE("pngdec_ppu") {
 }
 
 TEST_CASE("spurs_task_hello") {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_hello/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_hello/a.elf")},
         "SPU: Hello world!\n"
     );
 }
 
 TEST_CASE("spu_generic_test") {
-    auto output = startWaitGetOutput({"./binaries/spu_generic_test/a.elf"});
+    auto output = startWaitGetOutput({testPath("spu_generic_test/a.elf")});
     REQUIRE( output == 
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
@@ -1253,7 +1253,7 @@ TEST_CASE("spu_generic_test") {
 }
 
 TEST_CASE("spu_sync_mutex") {
-    test_interpreter_and_rewriter({"./binaries/spu_sync_mutex/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_sync_mutex/a.elf")},
          "Creating an SPU thread group.\n"
          "Initializing SPU thread 0\n"
          "Initializing SPU thread 1\n"
@@ -1269,7 +1269,7 @@ TEST_CASE("spu_sync_mutex") {
 }
 
 TEST_CASE("prx_simple_c") {
-    auto output = startWaitGetOutput({"./binaries/prx_simple_c/a.elf"});
+    auto output = startWaitGetOutput({testPath("prx_simple_c/a.elf")});
     REQUIRE( output ==
         "simple-main:start\n"
         "arg0 = 0, arg1 = 2, arg2 = 4, modres = 1\n"
@@ -1278,7 +1278,7 @@ TEST_CASE("prx_simple_c") {
 }
 
 TEST_CASE("prx_call") {
-    auto output = startWaitGetOutput({"./binaries/prx_call/a.elf"});
+    auto output = startWaitGetOutput({testPath("prx_call/a.elf")});
     REQUIRE( output ==
         "call-prx-main:start\n"
         "call_import start\n"
@@ -1288,7 +1288,7 @@ TEST_CASE("prx_call") {
 }
 
 TEST_CASE("prx_library_c") {
-    auto output = startWaitGetOutput({"./binaries/prx_library_c/a.elf"});
+    auto output = startWaitGetOutput({testPath("prx_library_c/a.elf")});
     REQUIRE( output ==
         "library-c-main:start\n"
         "load val=3\n"
@@ -1300,7 +1300,7 @@ TEST_CASE("prx_library_c") {
 }
 
 TEST_CASE("spu_queue") {
-    auto output = startWaitGetOutput({"./binaries/spu_queue/a.elf"});
+    auto output = startWaitGetOutput({testPath("spu_queue/a.elf")});
     REQUIRE( output ==
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
@@ -1317,7 +1317,7 @@ TEST_CASE("spu_queue") {
 }
 
 TEST_CASE("spu_image") {
-    auto output = startWaitGetOutput({"./binaries/spu_image/a.elf"});
+    auto output = startWaitGetOutput({testPath("spu_image/a.elf")});
     REQUIRE( output ==
         "type: 00000000\n"
         "entry point: 00003050\n"
@@ -1342,14 +1342,14 @@ TEST_CASE("spu_image") {
 }
 
 TEST_CASE("fiber_hello") {
-    test_interpreter_and_rewriter({"./binaries/fiber_hello/a.elf"},
+    test_interpreter_and_rewriter({testPath("fiber_hello/a.elf")},
         "Hello, fiber!\n"
         "## libfiber : sample_fiber_hello SUCCEEDED ##\n"
     );
 }
 
 TEST_CASE("ppu_threads_event_flag", TAG_SERIAL) {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_event_flag/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_event_flag/a.elf")});
     REQUIRE( output ==
         "p = 8008, flag = 8005\n"
         "flag value: 8000\n"
@@ -1367,7 +1367,7 @@ TEST_CASE("ppu_threads_event_flag", TAG_SERIAL) {
 }
 
 TEST_CASE("spurs_task_signal", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_signal/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_signal/a.elf")},
         "SPU: Signal task start!\n"
         "SPU: Waiting for a signal....\n"
         "SPU: Receiving a signal succeeded.\n"
@@ -1376,7 +1376,7 @@ TEST_CASE("spurs_task_signal", TAG_SERIAL) {
 }
 
 TEST_CASE("spurs_task_yield", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_yield/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_yield/a.elf")},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
         "Task#1 exited with code 0\n"
@@ -1389,7 +1389,7 @@ TEST_CASE("spurs_task_yield", TAG_SERIAL) {
 }
 
 TEST_CASE("spurs_task_semaphore", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_semaphore/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_semaphore/a.elf")},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
         "Task#1 exited with code 0\n"
@@ -1399,7 +1399,7 @@ TEST_CASE("spurs_task_semaphore", TAG_SERIAL) {
 }
 
 TEST_CASE("spurs_task_event_flag", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_event_flag/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_event_flag/a.elf")},
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
         "Task#1 exited with code 0\n"
@@ -1423,7 +1423,7 @@ TEST_CASE("spurs_task_event_flag", TAG_SERIAL) {
 }
 
 TEST_CASE("spu_thread_group_0_sample_sync_queue", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/sample_sync_queue/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sync_queue/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1448,7 +1448,7 @@ TEST_CASE("spu_thread_group_0_sample_sync_queue", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sync_mutex", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/sample_sync_mutex/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sync_mutex/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1468,7 +1468,7 @@ TEST_CASE("sample_sync_mutex", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sync_lfqueue", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/sample_sync_lfqueue/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sync_lfqueue/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1483,7 +1483,7 @@ TEST_CASE("sample_sync_lfqueue", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sync_barrier", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/sample_sync_barrier/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sync_barrier/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1505,7 +1505,7 @@ TEST_CASE("sample_sync_barrier", TAG_SERIAL) {
 }
 
 TEST_CASE("sample_sheap_allocate") {
-    test_interpreter_and_rewriter({"./binaries/sample_sheap_allocate/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sheap_allocate/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1520,7 +1520,7 @@ TEST_CASE("sample_sheap_allocate") {
 }
 
 TEST_CASE("sample_sheap_key_buffer") {
-    test_interpreter_and_rewriter({"./binaries/sample_sheap_key_buffer/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sheap_key_buffer/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1598,7 +1598,7 @@ TEST_CASE("sample_sheap_key_buffer") {
 }
 
 TEST_CASE("sample_sheap_key_mutex", TAG_SERIAL) {
-    test_interpreter_and_rewriter({"./binaries/sample_sheap_key_mutex/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_sheap_key_mutex/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1617,7 +1617,7 @@ TEST_CASE("sample_sheap_key_mutex", TAG_SERIAL) {
 }
 
 TEST_CASE("libatomic_xor64") {
-    test_interpreter_and_rewriter({"./binaries/libatomic_xor64/a.elf"},
+    test_interpreter_and_rewriter({testPath("libatomic_xor64/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1640,7 +1640,7 @@ TEST_CASE("libatomic_xor64") {
 }
 
 TEST_CASE("libatomic_semaphore") {
-    test_interpreter_and_rewriter({"./binaries/libatomic_semaphore/a.elf"},
+    test_interpreter_and_rewriter({testPath("libatomic_semaphore/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "Initializing SPU thread 1\n"
@@ -1657,7 +1657,7 @@ TEST_CASE("libatomic_semaphore") {
 }
 
 TEST_CASE("sample_ovis_auto") {
-    test_interpreter_and_rewriter({"./binaries/sample_ovis_auto/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_ovis_auto/a.elf")},
         "spu_initialize\n"
         "elf=20d00\n"
         "Creating an SPU thread group.\n"
@@ -1693,7 +1693,7 @@ TEST_CASE("sample_ovis_auto") {
 }
 
 TEST_CASE("sample_ovis_manual") {
-    test_interpreter_and_rewriter({"./binaries/sample_ovis_manual/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_ovis_manual/a.elf")},
         "spu_initialize\n"
         "elf=20d00\n"
         "Creating an SPU thread group.\n"
@@ -1729,7 +1729,7 @@ TEST_CASE("sample_ovis_manual") {
 }
 
 TEST_CASE("sample_ovis_manual_function") {
-    test_interpreter_and_rewriter({"./binaries/sample_ovis_manual_function/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_ovis_manual_function/a.elf")},
         "spu_initialize\n"
         "elf=20d00\n"
         "Creating an SPU thread group.\n"
@@ -1765,7 +1765,7 @@ TEST_CASE("sample_ovis_manual_function") {
 }
 
 TEST_CASE("sample_ovis_on_spurs") {
-    test_interpreter_and_rewriter({"./binaries/sample_ovis_on_spurs/a.elf"},
+    test_interpreter_and_rewriter({testPath("sample_ovis_on_spurs/a.elf")},
         "spu_initialize\n"
         "elf=1f900\n"
         "Addresses are:\n"
@@ -1795,7 +1795,7 @@ TEST_CASE("sample_ovis_on_spurs") {
 }
 
 TEST_CASE("spu_thr_mmio") {
-    test_interpreter_and_rewriter({"./binaries/spu_thr_mmio/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thr_mmio/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -1822,7 +1822,7 @@ TEST_CASE("spu_thr_mmio") {
 }
 
 TEST_CASE("spu_thr_recv_event") {
-    test_interpreter_and_rewriter({"./binaries/spu_thr_recv_event/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thr_recv_event/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an event port.\n"
@@ -1855,7 +1855,7 @@ TEST_CASE("spu_thr_recv_event") {
 }
 
 TEST_CASE("spu_thr_send_event") {
-    test_interpreter_and_rewriter({"./binaries/spu_thr_send_event/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thr_send_event/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -1902,7 +1902,7 @@ TEST_CASE("spu_thr_send_event") {
 }
 
 TEST_CASE("spu_thr_dma_sync") {
-    test_interpreter_and_rewriter({"./binaries/spu_thr_dma_sync/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thr_dma_sync/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -2007,53 +2007,53 @@ TEST_CASE("spu_thr_dma_sync") {
 TEST_CASE("ppu_spu_round_trip_ppu_side_raw_spu") {
 #define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
     std::string output;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "GETLLAR_POLLING___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "LLR_LOST_EVENT___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "LLR_LOST_EVENT___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "LLR_LOST_EVENT___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "LLR_LOST_EVENT___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "LLR_LOST_EVENT___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
 #undef ASSERT
 }
@@ -2061,41 +2061,41 @@ TEST_CASE("ppu_spu_round_trip_ppu_side_raw_spu") {
 TEST_CASE("ppu_spu_round_trip_ppu_side_spu_thread") {
 #define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
     std::string output;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "GETLLAR_POLLING___EVENT_QUEUE_SEND/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_SEND/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "GETLLAR_POLLING___EVENT_QUEUE_THROW/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_THROW/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "LLR_LOST_EVENT___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "LLR_LOST_EVENT___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "LLR_LOST_EVENT___EVENT_QUEUE_SEND/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___EVENT_QUEUE_SEND/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "LLR_LOST_EVENT___EVENT_QUEUE_THROW/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "LLR_LOST_EVENT___EVENT_QUEUE_THROW/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_SEND/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_SEND/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/ppu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/ppu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf")});
     ASSERT;
 #undef ASSERT
 }
@@ -2103,44 +2103,44 @@ TEST_CASE("ppu_spu_round_trip_ppu_side_spu_thread") {
 TEST_CASE("ppu_spu_round_trip_spu_side_raw_spu") {
 #define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
     std::string output;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_INTERRUPT_MAILBOX_HANDLE/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "GETLLAR_POLLING___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "GETLLAR_POLLING___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SIGNAL_NOTIFICATION___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_INTERRUPT_MAILBOX/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_raw_spu/"
-                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_raw_spu/"
+                                 "SPU_INBOUND_MAILBOX___SPU_OUTBOUND_MAILBOX/a.elf")});
     ASSERT;
 #undef ASSERT
 }
@@ -2148,35 +2148,35 @@ TEST_CASE("ppu_spu_round_trip_spu_side_raw_spu") {
 TEST_CASE("ppu_spu_round_trip_spu_side_spu_thread") {
 #define ASSERT REQUIRE(output.find("has finihsed successfully.") != std::string::npos)
     std::string output;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "GETLLAR_POLLING___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "GETLLAR_POLLING___EVENT_QUEUE_SEND/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_SEND/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "GETLLAR_POLLING___EVENT_QUEUE_THROW/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "GETLLAR_POLLING___EVENT_QUEUE_THROW/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___ATOMIC_PUTLLUC/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___DMA_PUT/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_SEND/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_SEND/a.elf")});
     ASSERT;
-    output = startWaitGetOutput({"./binaries/ppu_spu_round_trip/output/spu_side_spu_thread/"
-                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf"});
+    output = startWaitGetOutput({testPath("ppu_spu_round_trip/output/spu_side_spu_thread/"
+                                 "SIGNAL_NOTIFICATION___EVENT_QUEUE_THROW/a.elf")});
     ASSERT;
 #undef ASSERT
 }
 
 TEST_CASE("spurs_iwl_communication1_event_flag") {
-    test_interpreter_and_rewriter({"./binaries/spurs_iwl_communication1_event_flag/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_iwl_communication1_event_flag/a.elf")},
         "PPU: wait until all task becomes ready\n"
         "PPU: wake up setter tasks\n"
         "PPU: joining all tasks\n"
@@ -2186,7 +2186,7 @@ TEST_CASE("spurs_iwl_communication1_event_flag") {
 }
 
 TEST_CASE("spurs_task_hello2") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_hello2/a.elf"});
+    auto output = startWaitGetOutput({testPath("spurs_task_hello2/a.elf")});
     REQUIRE( output ==
         "PPU: wait for completion of the task\n"
         "Total sum = 7116240\n"
@@ -2196,14 +2196,14 @@ TEST_CASE("spurs_task_hello2") {
 }
 
 TEST_CASE("l10n_convert_str") {
-    test_interpreter_and_rewriter({"./binaries/l10n_convert_str/a.elf", "CODEPAGE_1251", "UTF8"},
+    test_interpreter_and_rewriter({testPath("l10n_convert_str/a.elf"), "CODEPAGE_1251", "UTF8"},
         "cellSysmoduleLoadModule() : 0\n"
         "l10n_convert_str: CODEPAGE_1251 0xe0 0xe1 0xe2 => UTF8 0xd0 0xb0 0xd0 0xb1 0xd0 0xb2\n"
     );
 }
 
 TEST_CASE("spu_dma_polling") {
-    test_interpreter_and_rewriter({"./binaries/spu_dma_polling/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_dma_polling/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -2215,7 +2215,7 @@ TEST_CASE("spu_dma_polling") {
 }
 
 TEST_CASE("spurs_task_queue") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_queue/a.elf"});
+    auto output = startWaitGetOutput({testPath("spurs_task_queue/a.elf")});
     REQUIRE( output ==
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
@@ -2229,7 +2229,7 @@ TEST_CASE("spurs_task_queue") {
 }
 
 TEST_CASE("spurs_task_poll") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_poll/a.elf"});
+    auto output = startWaitGetOutput({testPath("spurs_task_poll/a.elf")});
     REQUIRE( output ==
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
@@ -2241,7 +2241,7 @@ TEST_CASE("spurs_task_poll") {
 }
 
 TEST_CASE("spurs_task_lfqueue") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_lfqueue/a.elf"});
+    auto output = startWaitGetOutput({testPath("spurs_task_lfqueue/a.elf")});
     REQUIRE( output ==
         "PPU: waiting for completion of sender/receiver PPU threads\n"
         "PPU: waiting for completion of tasks\n"
@@ -2254,7 +2254,7 @@ TEST_CASE("spurs_task_lfqueue") {
 }
 
 TEST_CASE("spurs_task_barrier") {
-    auto output = startWaitGetOutput({"./binaries/spurs_task_barrier/a.elf"});
+    auto output = startWaitGetOutput({testPath("spurs_task_barrier/a.elf")});
     REQUIRE( output ==
         "PPU: waiting for completion of tasks\n"
         "Task#0 exited with code 0\n"
@@ -2279,7 +2279,7 @@ TEST_CASE("spurs_task_barrier") {
 }
 
 TEST_CASE("spurs_task_create_on_task") {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_create_on_task/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_create_on_task/a.elf")},
         "PPU: wait for completion of the task\n"
         "SPU: Task create task start!\n"
         "Task#0 exited with code 0\n"
@@ -2289,7 +2289,7 @@ TEST_CASE("spurs_task_create_on_task") {
 }
 
 TEST_CASE("spurs_job_inout_dma") {
-    test_interpreter_and_rewriter({"./binaries/spurs_job_inout_dma/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_job_inout_dma/a.elf")},
         "00031700 dstBuffer[0]=1\n"
         "00031710 dstBuffer[1]=2\n"
         "00031720 dstBuffer[2]=3\n"
@@ -2423,7 +2423,7 @@ TEST_CASE("spurs_job_inout_dma") {
 }
 
 TEST_CASE("libswcache_linked_list_sort") {
-    auto output = startWaitGetOutput({"./binaries/libswcache_linked_list_sort/a.elf"});
+    auto output = startWaitGetOutput({testPath("libswcache_linked_list_sort/a.elf")});
     REQUIRE( output ==
         "(1) ### Sort linked list by PPU ###\n"
         "Linked list by PatchedObject\n"
@@ -2440,7 +2440,7 @@ TEST_CASE("libswcache_linked_list_sort") {
 }
 
 TEST_CASE("spurs_task_hello3_exit_if_no_work") {
-    test_interpreter_and_rewriter({"./binaries/spurs_task_hello3_exit_if_no_work/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_task_hello3_exit_if_no_work/a.elf")},
         "PPU: wait for completion of the task\n"
         "res = 80\n"
         "PPU: taskset completed\n"
@@ -2449,7 +2449,7 @@ TEST_CASE("spurs_task_hello3_exit_if_no_work") {
 }
 
 TEST_CASE("ppu_threads_mutex_errors") {
-    auto output = startWaitGetOutput({"./binaries/ppu_threads_mutex_errors/a.elf"});
+    auto output = startWaitGetOutput({testPath("ppu_threads_mutex_errors/a.elf")});
     REQUIRE( output ==
         "create RECURSIVE LOCK\n"
         "8001000d\n"
@@ -2596,7 +2596,7 @@ TEST_CASE("ppu_threads_mutex_errors") {
 }
 
 TEST_CASE("lwarx_stwcx") {
-    test_interpreter_and_rewriter({"./binaries/lwarx_stwcx/a.elf"},
+    test_interpreter_and_rewriter({testPath("lwarx_stwcx/a.elf")},
         "loc address 20c00\n"
         "cache line 20c00\n"
         "simple incrementing\n"
@@ -2611,7 +2611,7 @@ TEST_CASE("lwarx_stwcx") {
 }
 
 TEST_CASE("spu_generic_test2") {
-    test_interpreter_and_rewriter({"./binaries/spu_generic_test2/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_generic_test2/a.elf")},
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -2640,9 +2640,9 @@ TEST_CASE("spu_generic_test2") {
 }
 
 TEST_CASE("sysutil_save_basic_auto_only", TAG_SERIAL) {
-    auto savedir = "./binaries/sysutil_save_basic_auto_only/SAVEDATA";
+    auto savedir = testPath("sysutil_save_basic_auto_only/SAVEDATA");
     std::filesystem::remove_all(savedir);
-    auto output = startWaitGetOutput({"./binaries/sysutil_save_basic_auto_only/USRDIR/a.elf"});
+    auto output = startWaitGetOutput({testPath("sysutil_save_basic_auto_only/USRDIR/a.elf")});
     REQUIRE( output ==
         "thr_auto_save() start\n"
         "cb_data_status_save() start\n"
@@ -2727,13 +2727,13 @@ TEST_CASE("sysutil_save_basic_auto_only", TAG_SERIAL) {
 }
 
 TEST_CASE("ppu_mem_alloc") {
-    test_interpreter_and_rewriter({"./binaries/ppu_mem_alloc/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_mem_alloc/a.elf")},
         "at lease 180 mb have been allocated\n"
     );
 }
 
 TEST_CASE("spurs_sample_jobqueue_sync_command") {
-    test_interpreter_and_rewriter({"./binaries/spurs_sample_jobqueue_sync_command/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_sample_jobqueue_sync_command/a.elf")},
         "*** sync with sync() method \n"
         "*** sync with SYNC command with multiple tags\n"
         "## libspurs : sample_spurs_jobqueue_sync_command SUCCEEDED ##\n"
@@ -2741,13 +2741,13 @@ TEST_CASE("spurs_sample_jobqueue_sync_command") {
 }
 
 TEST_CASE("spurs_sample_jobqueue_hello") {
-    test_interpreter_and_rewriter({"./binaries/spurs_sample_jobqueue_hello/a.elf"},
+    test_interpreter_and_rewriter({testPath("spurs_sample_jobqueue_hello/a.elf")},
         "Hello, jobqueue!\n"
     );
 }
 
 TEST_CASE("ppu_simd_generic") {
-    test_interpreter_and_rewriter({"./binaries/ppu_simd_generic/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_simd_generic/a.elf")},
         "0: 00140032 0bba1257 f59bdc8c 7fff0000\n"
         "1: 01000005 0000ffff 0001000a 141effff\n"
         "2: 00010001 00010001 00010001 00010001\n"
@@ -2786,7 +2786,7 @@ TEST_CASE("ppu_simd_generic") {
 
 TEST_CASE("gcm_cube_tls_callback") {
     // also checks gcmFlush/flipCallback synchronization, testing for a possible deadlock
-    test_interpreter_and_rewriter({"./binaries/gcm_cube_tls_callback/a.elf"},
+    test_interpreter_and_rewriter({testPath("gcm_cube_tls_callback/a.elf")},
         "tls int: 201\n"
         "tls int: 202\n"
         "tls int: 203\n"
@@ -2797,7 +2797,7 @@ TEST_CASE("gcm_cube_tls_callback") {
 }
 
 TEST_CASE("performance_tips_advanced_merge_sort") {
-    test_interpreter_and_rewriter({"./binaries/performance_tips_advanced_merge_sort/a.elf"},
+    test_interpreter_and_rewriter({testPath("performance_tips_advanced_merge_sort/a.elf")},
         "Initilaize Sort Data ... Done\n"
         "initializing communication\n"
         "Check Sorted Data ... done\n"
@@ -2806,7 +2806,7 @@ TEST_CASE("performance_tips_advanced_merge_sort") {
 }
 
 TEST_CASE("spu_thr_embed_img") {
-    test_interpreter_and_rewriter({"./binaries/spu_thr_embed_img/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thr_embed_img/a.elf")},
         "start=21c80 end=22054 size=3d4\n"
         "Initializing SPUs\n"
         "Creating an SPU thread group.\n"
@@ -2821,7 +2821,7 @@ TEST_CASE("spu_thr_embed_img") {
 }
 
 TEST_CASE("ppu_threads_mutex_cond2") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_mutex_cond2/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_mutex_cond2/a.elf")},
         "test_all: ok=4 timeout=0\n"
         "test_one: ok=1 timeout=3\n"
         "test_to_3(ok): e1=0 e2=0 e3=1 e4=0\n"
@@ -2829,20 +2829,20 @@ TEST_CASE("ppu_threads_mutex_cond2") {
 }
 
 TEST_CASE("ppu_threads_event_queue") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_event_queue/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_event_queue/a.elf")},
         "done\n"
     );
 }
 
 TEST_CASE("ppu_threads_event_queue2") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_event_queue2/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_event_queue2/a.elf")},
         "done 0: 1317 1 2 3\n"
         "done 0: expected=1 1 2 3\n"
     );
 }
 
 TEST_CASE("ppu_threads_event_queue3") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_event_queue3/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_event_queue3/a.elf")},
         "ret=0\n"
         "ret=0\n"
         "ret=0\n"
@@ -2855,7 +2855,7 @@ TEST_CASE("ppu_threads_event_queue3") {
 }
 
 TEST_CASE("spu_thread_group_1") {
-    test_interpreter_and_rewriter({"./binaries/spu_thread_group_1/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thread_group_1/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -2967,7 +2967,7 @@ TEST_CASE("spu_thread_group_1") {
 }
 
 TEST_CASE("spu_thread_group_2") {
-    test_interpreter_and_rewriter({"./binaries/spu_thread_group_2/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thread_group_2/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -2982,7 +2982,7 @@ TEST_CASE("spu_thread_group_2") {
 }
 
 TEST_CASE("spu_thread_group_5") {
-    test_interpreter_and_rewriter({"./binaries/spu_thread_group_5/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thread_group_5/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -2993,7 +2993,7 @@ TEST_CASE("spu_thread_group_5") {
 }
 
 TEST_CASE("ps3call_tests") {
-    test_interpreter_and_rewriter({"./binaries/ps3call_tests/a.elf"},
+    test_interpreter_and_rewriter({testPath("ps3call_tests/a.elf")},
         "main\n"
         "stolen ps3call_tests(107c4, 10744, 106f4)\n"
         "calling simple(5,7)\n"
@@ -3011,7 +3011,7 @@ TEST_CASE("ps3call_tests") {
 }
 
 TEST_CASE("function_splicing") {
-    auto output = startWaitGetOutput({"./binaries/function_splicing/a.elf"});
+    auto output = startWaitGetOutput({testPath("function_splicing/a.elf")});
     REQUIRE( output ==
         "main\n"
         "---------\n"
@@ -3037,7 +3037,7 @@ TEST_CASE("function_splicing") {
 }
 
 TEST_CASE("libfs_general_simple") {
-    auto output = startWaitGetOutput({"./binaries/libfs_general_simple/a.elf"});
+    auto output = startWaitGetOutput({testPath("libfs_general_simple/a.elf")});
     REQUIRE( output ==
         "Waiting for mounting\n"
         "Waiting for mounting done\n"
@@ -3124,7 +3124,7 @@ TEST_CASE("libfs_general_simple") {
 }
 
 TEST_CASE("libfs_general_stream") {
-    auto output = startWaitGetOutput({"./binaries/libfs_general_stream/a.elf"});
+    auto output = startWaitGetOutput({testPath("libfs_general_stream/a.elf")});
     REQUIRE( output ==
         "Waiting for mounting\n"
         "Waiting for mounting done\n"
@@ -3189,7 +3189,7 @@ TEST_CASE("libfs_general_stream") {
 }
 
 TEST_CASE("ppu_threads_lwcond_2") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_lwcond_2/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_lwcond_2/a.elf")},
         "consumer started\n"
         "consumer started\n"
         "producers done\n"
@@ -3204,19 +3204,19 @@ TEST_CASE("ppu_threads_lwcond_2") {
 }
 
 TEST_CASE("ppu_threads_main_thread_id") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_main_thread_id/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_main_thread_id/a.elf")},
         "thread id: 1000087 prio: 1000\n"
     );
 }
 
 TEST_CASE("ppu_threads_cond_repeated_signal") {
-    test_interpreter_and_rewriter({"./binaries/ppu_threads_cond_repeated_signal/a.elf"},
+    test_interpreter_and_rewriter({testPath("ppu_threads_cond_repeated_signal/a.elf")},
         "all done\n"
     );
 }
 
 TEST_CASE("hash_spurs_sum") {
-    test_interpreter_and_rewriter({"./binaries/hash_spurs_sum/a.elf", "/app_home file"},
+    test_interpreter_and_rewriter({testPath("hash_spurs_sum/a.elf"), "/app_home file"},
         "SPU Sum samples\n"
         "-----------------------------------------------------------------------\n"
         "SPU Sum MD5:\n"
@@ -3254,7 +3254,7 @@ TEST_CASE("hash_spurs_sum") {
 }
 
 TEST_CASE("spu_thread_group_6") {
-    test_interpreter_and_rewriter({"./binaries/spu_thread_group_6/a.elf"},
+    test_interpreter_and_rewriter({testPath("spu_thread_group_6/a.elf")},
         "Initializing SPUs\n"
         "Creating an event queue.\n"
         "Creating an SPU thread group.\n"
@@ -3276,7 +3276,7 @@ TEST_CASE("spu_thread_group_6") {
 }
 
 TEST_CASE("job_call_ret_next") {
-    test_interpreter_and_rewriter({"./binaries/job_call_ret_next/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_call_ret_next/a.elf")},
         "job main\n"
         "job sub1\n"
         "job sub2\n"
@@ -3285,7 +3285,7 @@ TEST_CASE("job_call_ret_next") {
 }
 
 TEST_CASE("job_cpp_virtual") {
-    test_interpreter_and_rewriter({"./binaries/job_cpp_virtual/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_cpp_virtual/a.elf")},
         "Constructor for Base\n"
         "Constructor for Derived\n"
         "*** job_virtual(PIC) started\n"
@@ -3318,14 +3318,14 @@ TEST_CASE("job_cpp_virtual") {
 }
 
 TEST_CASE("job_double_buffer") {
-    test_interpreter_and_rewriter({"./binaries/job_double_buffer/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_double_buffer/a.elf")},
         "uniform = 2a700f3d\n"
         "uniform = 135ab93d\n"
     );
 }
 
 TEST_CASE("job_guard_and_next") {
-    test_interpreter_and_rewriter({"./binaries/job_guard_and_next/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_guard_and_next/a.elf")},
         "job1 hello\n"
         "job1 hello\n"
         "job1 hello\n"
@@ -3350,7 +3350,7 @@ TEST_CASE("job_guard_and_next") {
 }
 
 TEST_CASE("job_joblist") {
-    test_interpreter_and_rewriter({"./binaries/job_joblist/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_joblist/a.elf")},
         "Waiting for the event flag\n"
         "job hello\n"
         "job hello\n"
@@ -3457,7 +3457,7 @@ TEST_CASE("job_joblist") {
 }
 
 //TEST_CASE("job_stall_successor") {
-//    test_interpreter_and_rewriter({"./binaries/job_stall_successor/a.elf"},
+//    test_interpreter_and_rewriter({testPath("job_stall_successor/a.elf")},
 //        "DMA in job TEST\n"
 //        "  elapsed time = 0(us)\n"
 //        "DMA in job w/Restart TEST\n"
@@ -3466,7 +3466,7 @@ TEST_CASE("job_joblist") {
 //}
 
 TEST_CASE("job_sync_label") {
-    test_interpreter_and_rewriter({"./binaries/job_sync_label/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_sync_label/a.elf")},
         "TEST with SYNC command\n"
         "  elapsed time = 0(us)\n"
         "TEST with SYNC_LABEL command\n"
@@ -3475,7 +3475,7 @@ TEST_CASE("job_sync_label") {
 }
 
 TEST_CASE("job_urgent_call") {
-    test_interpreter_and_rewriter({"./binaries/job_urgent_call/a.elf"},
+    test_interpreter_and_rewriter({testPath("job_urgent_call/a.elf")},
         "notify\n"
         " ****** event sender : ev=0, counter=0\n"
         "notify\n"

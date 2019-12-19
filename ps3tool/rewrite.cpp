@@ -735,14 +735,18 @@ void printSegment(std::string baseName, std::string name, SegmentInfo const& seg
     f << "};\n";
     
     f << entrySignature(segment) << " {\n";
-    f << "    static void* labels[] = {\n";
-    for (auto& block : segment.blocks) {
-        f << ssnprintf("        &&_0x%xu,\n", block.label);
+
+    if (!segment.blocks.empty()) {
+        f << "    static void* labels[] = {\n";
+        for (auto& block : segment.blocks) {
+            f << ssnprintf("        &&_0x%xu,\n", block.label);
+        }
+        f << "    };\n\n";
+        f << "    uint32_t pic_offset = 0;\n";
+        f << "    bool pic_offset_set = false;\n";
+        f << "    goto *labels[label];\n\n";
     }
-    f << "    };\n\n";
-    f << "    uint32_t pic_offset = 0;\n";
-    f << "    bool pic_offset_set = false;\n";
-    f << "    goto *labels[label];\n\n";
+
     for (auto& block : segment.blocks) {
         f << ssnprintf("    _0x%xu:\n", block.label);
         for (auto& line : block.body) {
@@ -771,7 +775,7 @@ void printNinja(std::string name, std::vector<SegmentInfo> const& segments) {
     script.statement("compile", inMain, outMain, {});
     objects += outMain;
     
-    auto out = ssnprintf("%s.x86.so", baseName);
+    auto out = ssnprintf("%s.so", baseName);
     script.statement("link", objects, out, {});
     
     std::ofstream f(name);

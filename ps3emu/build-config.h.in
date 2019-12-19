@@ -1,0 +1,8 @@
+#pragma once
+
+constexpr inline auto g_compiler = "@CMAKE_CXX_COMPILER@";
+constexpr inline auto g_ps3bin = "@CMAKE_BINARY_DIR@";
+constexpr inline auto g_ps3sources = "@CMAKE_SOURCE_DIR@";
+constexpr inline auto g_buildName = "@EMU_CONFIGURATION_BUILD_NAME@";
+constexpr inline auto g_rewriterPpuExtension = ".@EMU_CONFIGURATION_BUILD_NAME@";
+constexpr inline auto g_rewriterSpuExtension = ".spu.@EMU_CONFIGURATION_BUILD_NAME@";

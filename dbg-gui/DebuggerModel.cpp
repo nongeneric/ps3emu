@@ -1088,7 +1088,7 @@ void DebuggerModel::spuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::str
 }
 
 void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
-    auto tracefile = "/tmp/ps3trace-spu";
+    auto tracefile = "/tmp/ps3trace-spu.bz2";
     auto traceScript = "/tmp/ps3trace-spu-script";
     TraceFile f(tracefile);
     std::map<std::string, int> counts;
@@ -1122,7 +1122,7 @@ void DebuggerModel::ppuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::str
     std::string name;
     _updateUIWhenRunning = false;
     _activeThread->singleStepBreakpoint(true);
-    while ((nip = _activeThread->getNIP()) != va) {
+    while ((nip = _activeThread->getNIP()) != va && nip != 0) {
         uint32_t instr;
         g_state.mm->readMemory(nip, &instr, sizeof instr);
         ppu_dasm<DasmMode::Name>(&instr, nip, &name);
@@ -1141,7 +1141,7 @@ void DebuggerModel::ppuTraceTo(TraceFile& f, ps3_uintptr_t va, std::map<std::str
 }
 
 void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
-    auto tracefile = "/tmp/ps3trace";
+    auto tracefile = "/tmp/ps3trace.bz2";
     TraceFile f(tracefile);
     auto traceScript = "/tmp/ps3trace-ppu-script";
     std::map<std::string, int> counts;

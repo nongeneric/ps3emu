@@ -2,8 +2,6 @@ project(tests)
 
 find_package(Qt5Core)
 
-FILE(COPY binaries DESTINATION .)
-
 set(SRC
     main.cpp
     PPUTests.cpp

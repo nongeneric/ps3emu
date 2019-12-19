@@ -1,30 +1,31 @@
 #include "Process.h"
 
-#include "rsx/Rsx.h"
-#include "MainMemory.h"
-#include "ContentManager.h"
-#include "InternalMemoryManager.h"
-#include "ELFLoader.h"
-#include "state.h"
 #include "Config.h"
-#include "ps3emu/libs/sync/queue.h"
-#include "ps3emu/libs/audio/libaudio.h"
-#include "ps3emu/HeapMemoryAlloc.h"
-#include "ps3emu/utils/debug.h"
-#include "ps3emu/profiler.h"
-
-#include <SDL2/SDL.h>
+#include "ContentManager.h"
+#include "ELFLoader.h"
+#include "InternalMemoryManager.h"
+#include "MainMemory.h"
+#include "log.h"
 #include "ppu/InterruptPPUThread.h"
+#include "ps3emu/HeapMemoryAlloc.h"
+#include "ps3emu/build-config.h"
+#include "ps3emu/libs/audio/libaudio.h"
+#include "ps3emu/libs/sync/queue.h"
+#include "ps3emu/profiler.h"
+#include "ps3emu/utils/debug.h"
+#include "rsx/Rsx.h"
+#include "state.h"
 #include <GLFW/glfw3.h>
-#include <boost/thread/locks.hpp>
+#include <SDL2/SDL.h>
+#include <boost/align.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/thread/locks.hpp>
+#include <cstdlib>
 #include <filesystem>
 #include <optional>
-#include "log.h"
 #include <set>
-#include <cstdlib>
 
-using namespace std::filesystem;
+namespace fs = std::filesystem;
 
 ELFLoader* Process::elfLoader() {
     return _elf.get();
@@ -119,7 +120,7 @@ void Process::insertSegment(ModuleSegment segment) {
 }
 
 void Process::loadPrxStore() {
-    path storePath = g_state.config->prxStorePath;
+    fs::path storePath = g_state.config->prxStorePath;
     loadPrx((storePath / "sys" / "external" / "liblv2.sprx.elf").string());
 }
 
@@ -206,7 +207,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
 std::optional<SysPrxInfo> getSysPrxInfo(std::string prxPath) {
     auto& infos = g_state.config->sysPrxInfos;
     auto it = std::find_if(begin(infos), end(infos), [&](auto& info) {
-        return info.name == path(prxPath).filename().string();
+        return info.name == fs::path(prxPath).filename().string();
     });
     if (it == end(infos))
         return {};
@@ -229,16 +230,22 @@ uint32_t Process::loadPrx(std::string path) {
             auto& lastInfo = g_state.config->sysPrxInfos.back();
             available = std::max(available, lastInfo.imageBase + lastInfo.size);
         }
-        imageBase = ::align(available, 1 << 10);
+        imageBase = boost::alignment::align_up(available, 1 << 10);
     }
     std::vector<std::string> x86paths;
     if (prxInfo) {
-        auto x86path = path + ".x86.so";
-        auto x86spuPath = path + ".spu.x86.so";
-        if (prxInfo->loadx86 && exists(x86path)) {
+        auto dir = fs::path(path).parent_path().string();
+        auto filename = fs::path(path).filename().string();
+        auto x86path = ssnprintf("%s/%s/%s.so", dir, g_buildName, filename);
+        auto x86spuPath = ssnprintf("%s/%s/%s.spu.so", dir, g_buildName, filename);
+
+        INFO(libs) << ssnprintf("looking for %s", x86path);
+        if (prxInfo->loadx86 && fs::exists(x86path)) {
             x86paths.push_back(x86path);
         }
-        if (prxInfo->loadx86spu && exists(x86spuPath)) {
+
+        INFO(libs) << ssnprintf("looking for %s", x86spuPath);
+        if (prxInfo->loadx86spu && fs::exists(x86spuPath)) {
             x86paths.push_back(x86spuPath);
         }
     }

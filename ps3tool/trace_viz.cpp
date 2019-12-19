@@ -41,7 +41,7 @@ class Parser {
     
     uint32_t parseOffset(Iter& it) {
         auto s = it;
-        while (isalnum(*it)) it++;
+        while (isalnum(*it) || *it == '-') it++;
         std::string str(s, it + 1);
         return std::stoi(str, nullptr, 16);
     }
@@ -94,7 +94,7 @@ class Parser {
                 if (_spu) {
                     state.r128[key] = toR128(val);
                 } else {
-                    state.r64[key] = std::stoll(key, nullptr, 16);
+                    state.r64[key] = std::strtoll(val.c_str(), nullptr, 16);
                 }
             }
         }
@@ -202,7 +202,7 @@ public:
     }
     
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
-        return 5;
+        return 6;
     }
     
     QModelIndex index(int row,
@@ -427,8 +427,8 @@ void HandleTraceViz(TraceVizCommand const& command) {
     auto selectionModel = list->selectionModel();
     list->setSelectionMode(QAbstractItemView::SingleSelection);
     list->setSelectionBehavior(QAbstractItemView::SelectRows);
-    list->setColumnWidth(2, 200);
-    for (int i = 3; i < 5; ++i) {
+    list->setColumnWidth(2, 10);
+    for (int i = 3; i < model->columnCount({}); ++i) {
         list->setColumnWidth(i, 320);
     }
 

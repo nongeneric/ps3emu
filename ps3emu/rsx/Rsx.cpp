@@ -13,6 +13,7 @@
 #include "../utils.h"
 #include "ps3emu/ImageUtils.h"
 #include "ps3emu/state.h"
+#include "ps3emu/Config.h"
 #include "ps3emu/int.h"
 #include "ps3emu/utils/ranges.h"
 #include <atomic>
@@ -684,7 +685,7 @@ void Rsx::DriverFlip(uint32_t value) {
     static int framenum = 0;
     auto id = getpid();
     if (framenum < 22 && tex) {
-        auto filename = ssnprintf("/tmp/ps3frame_%d_%d.png", id, framenum);
+        auto filename = ssnprintf("%s/ps3frame_%d_%d.png", getTestOutputDir(), id, framenum);
         dumpOpenGLTexture(tex->handle(), false, 0, filename, true, true);
         framenum++;
     }

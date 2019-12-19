@@ -26,3 +26,5 @@ public:
     
     void save();
 };
+
+std::string getTestOutputDir();

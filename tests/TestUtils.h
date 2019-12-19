@@ -11,3 +11,4 @@ void test_interpreter_and_rewriter(std::vector<std::string> args,
                                    std::string output,
                                    bool rewriterOnly = false,
                                    std::vector<std::string> ps3runArgs = {});
+std::string testPath(const char* relative);
