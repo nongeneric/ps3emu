@@ -89,7 +89,7 @@ public:
                   int role = Qt::DisplayRole) const override {
         auto command = _db->getCommand(_frame, index.row());
         auto id = (CommandId)command.id;
-        if (role == Qt::BackgroundColorRole) {
+        if (role == Qt::BackgroundRole) {
            if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray ||
                id == CommandId::ClearSurface) {
                return QColor(Qt::green);
@@ -315,7 +315,7 @@ public:
                               0,
                               GL_RGBA, 
                               GL_UNSIGNED_INT_8_8_8_8_REV, 
-                              image.byteCount(), 
+                              image.sizeInBytes(),
                               image.bits());
         });
         

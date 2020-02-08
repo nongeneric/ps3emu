@@ -25,7 +25,7 @@ void MonospaceGrid::paintEvent(QPaintEvent* event) {
     
     QPainter painter(this);
     painter.setFont(QFont("monospace", 10));
-    _charWidth = painter.fontMetrics().width('q');
+    _charWidth = painter.fontMetrics().horizontalAdvance('q');
     _charHeight = painter.fontMetrics().height();
     
     int x = 0;

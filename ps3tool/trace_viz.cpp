@@ -232,7 +232,7 @@ public:
     }
     
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
-        if (role == Qt::BackgroundColorRole) {
+        if (role == Qt::BackgroundRole) {
              if (printState(_left[index.row()].effect) !=
                  printState(_right[index.row()].effect)) {
                  return QColor(Qt::yellow);
