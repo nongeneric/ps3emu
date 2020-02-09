@@ -16,7 +16,7 @@ namespace {
 }
 
 int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr) {
-    INFO(libs, sync) << ssnprintf("sys_lwmutex_create(%x, %s)", mutex_id, attr->name);
+    INFO(sync) << ssnprintf("sys_lwmutex_create(%x, %s)", mutex_id, attr->name);
     sys_lwmutex_t type = { 0 };
     type.sleep_queue = 0x11223344;
     type.attribute = attr->attr_protocol | attr->attr_recursive;
@@ -39,7 +39,7 @@ int sys_lwmutex_create(ps3_uintptr_t mutex_id, sys_lwmutex_attribute_t* attr) {
 }
 
 int sys_lwmutex_destroy(ps3_uintptr_t lwmutex_id) {
-    INFO(libs, sync) << ssnprintf("sys_lwmutex_destroy(%x)", lwmutex_id);
+    INFO(sync) << ssnprintf("sys_lwmutex_destroy(%x)", lwmutex_id);
     boost::unique_lock<boost::mutex> lock(map_mutex);
     auto it = mutexes.find(lwmutex_id);
     if (it == end(mutexes))

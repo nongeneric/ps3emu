@@ -124,7 +124,7 @@ void initAudio() {
                 uint32_t base = (uint64_t)event.data2 >> 32;
                 uint32_t readIndex = control.Id.u() - AudioAttributes::portHwBase + 1;
                 portSizes[control.Id.u()] = size;
-                INFO(libs, audio) << ssnprintf(
+                INFO(audio) << ssnprintf(
                     "AUDIO_COMMAND_PORT_CONFIG size=%x base=%x readIndex=%x",
                     size,
                     base,
@@ -139,7 +139,7 @@ void initAudio() {
                 auto memInfo = emuFindSharedMemoryInfo(memId);
                 assert(memInfo);
                 auto ptr = g_state.mm->getMemoryPointer(memInfo->va, 4);
-                INFO(libs, audio)
+                INFO(audio)
                     << ssnprintf("AUDIO_COMMAND_PORT_OPEN level=%g blocks=%x "
                                  "channels=%x addr=%x memId=%x memVa=%x",
                                  level,
@@ -168,11 +168,11 @@ void initAudio() {
                 pulse->setNotifyQueue(notifyQueueKey);
                 ack(0, 0);
             } else if (command == AudioControlCommand::PORT_LEVEL) {
-                WARNING(libs, audio) << "AudioControlCommand::PORT_LEVEL not implemented";
+                WARNING(audio) << "AudioControlCommand::PORT_LEVEL not implemented";
                 if (control.Ack.u())
                     ack(0, 0);
             } else if (command == AudioControlCommand::PORT_CLOSE) {
-                WARNING(libs, audio) << "AudioControlCommand::PORT_CLOSE not implemented";
+                WARNING(audio) << "AudioControlCommand::PORT_CLOSE not implemented";
                 ack(0, 0);
             } else if (command == AudioControlCommand::QUIT) {
                 pulse->quit();
@@ -180,7 +180,7 @@ void initAudio() {
                 assert(false);
             }
 
-            WARNING(libs, audio) << message;
+            WARNING(audio) << message;
         }
 
         return;

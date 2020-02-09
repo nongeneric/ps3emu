@@ -93,7 +93,7 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     auto& entry = _methodMap[offset / 4];
 
     RangeCloser closer;
-    if (log_should(log_warning, log_rsx, log_perf)) {
+    if (log_should(log_warning, log_type_t::perf)) {
         closer = RangeCloser(&_perfMap[&entry]);
     }
 

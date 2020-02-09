@@ -57,7 +57,7 @@ public:
         for (auto& p : _store) {
             if (!intersects(p.second.updater->va, p.second.updater->size, va, size))
                 continue;
-            INFO(rsx, cache) << ssnprintf("invalidating cache entry %x, %x",
+            INFO(cache) << ssnprintf("invalidating cache entry %x, %x",
                                      p.second.updater->va,
                                      p.second.updater->size);
             _dirty.insert(p.first);
@@ -88,7 +88,7 @@ public:
     void watch(F action) {
         for (auto& p : _store) {
             if (action(p.second.updater->va, p.second.updater->size)) {
-                INFO(rsx, cache) << ssnprintf("invalidating cache entry (watch) %x, %x",
+                INFO(cache) << ssnprintf("invalidating cache entry (watch) %x, %x",
                                          p.second.updater->va,
                                          p.second.updater->size);
                 _dirty.insert(p.first);

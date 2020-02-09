@@ -16,14 +16,25 @@ using namespace boost::program_options;
 int main(int argc, char *argv[]) {
     g_state.init();
     g_config.load();
-    log_init(log_file,
-             log_info,
-             (g_config.config().LogSpu ? log_spu : 0) |
-                 (g_config.config().LogRsx ? log_rsx : 0) |
-                 (g_config.config().LogLibs ? log_libs : 0),
-             log_trace | log_cache | log_audio | log_fs | log_debugger | log_proxy |
-                 (g_config.config().LogSync ? log_sync : 0),
-             g_config.config().LogDates ? log_date : log_simple);
+
+    std::string filter = "I,Dcache,Daudio,Dfs,Ddebugger,Dproxy";
+    if (g_config.config().LogSpu) {
+        filter += ",Dspu";
+    }
+
+    if (g_config.config().LogRsx) {
+        filter += ",Drsx";
+    }
+
+    if (g_config.config().LogLibs) {
+        filter += ",Dlibs";
+    }
+
+    if (g_config.config().LogSync) {
+        filter += ",Dsync";
+    }
+
+    log_init(log_file, filter, g_config.config().LogDates ? log_date : log_simple);
     log_set_thread_name("dbg_main");
     if (g_config.config().EnableSpursTrace) {
         enableSpursTrace();

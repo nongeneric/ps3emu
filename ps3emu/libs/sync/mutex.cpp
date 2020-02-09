@@ -46,7 +46,7 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     
     info->id = mutexes.create(info);
     *mutex_id = info->id;
-    INFO(libs, sync) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
+    INFO(sync) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
 
     __itt_sync_create(info.get(), "mutex", attr->name, 0);
 
@@ -54,7 +54,7 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
 }
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
-    INFO(libs, sync) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
+    INFO(sync) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
     auto info = mutexes.try_get(mutex_id);
     if (!info) {
         return CELL_ESRCH;
@@ -75,7 +75,7 @@ int sys_mutex_destroy(sys_mutex_t mutex_id) {
 
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(libs, sync) << ssnprintf("locking %x %d %s",
+    INFO(sync) << ssnprintf("locking %x %d %s",
                             mutex_id,
                             timeout,
                             info ? (*info)->name : "NULL");
@@ -111,7 +111,7 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
 
 int sys_mutex_trylock(sys_mutex_t mutex_id) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(libs, sync) << ssnprintf(
+    INFO(sync) << ssnprintf(
         "trying to lock %x %s", mutex_id, info ? (*info)->name : "NULL");
 
     if (!info)
@@ -136,7 +136,7 @@ int sys_mutex_trylock(sys_mutex_t mutex_id) {
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(libs, sync) << ssnprintf("unlocking %x %s",
+    INFO(sync) << ssnprintf("unlocking %x %s",
                             mutex_id,
                             info ? (*info)->name : "NULL");
     if (!info)

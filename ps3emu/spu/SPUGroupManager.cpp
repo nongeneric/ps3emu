@@ -43,14 +43,14 @@ std::string printGroups(T& groups) {
 }
 
 void SPUGroupManager::add(ThreadGroup* group) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: add (%s)", group->name);
+    INFO(sync) << ssnprintf("SPUGroupManager: add (%s)", group->name);
     auto lock = boost::lock_guard(_mutex);
     _initialized.push_back(group);
-    INFO(libs, sync) <<  printGroups(_initialized);
+    INFO(sync) <<  printGroups(_initialized);
 }
 
 void SPUGroupManager::destroy(ThreadGroup* group) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: destroy (%s)", group->name);
+    INFO(sync) << ssnprintf("SPUGroupManager: destroy (%s)", group->name);
     auto lock = boost::lock_guard(_mutex);
     auto it = std::find(begin(_initialized), end(_initialized), group);
     EMU_ASSERT(it != end(_initialized));
@@ -58,7 +58,7 @@ void SPUGroupManager::destroy(ThreadGroup* group) {
 }
 
 void SPUGroupManager::start(ThreadGroup* group) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: start (%s)", group->name);
+    INFO(sync) << ssnprintf("SPUGroupManager: start (%s)", group->name);
     auto lock = boost::lock_guard(_mutex);
     for (auto th : group->threads) {
         group->initializers[th]();
@@ -73,7 +73,7 @@ void SPUGroupManager::start(ThreadGroup* group) {
 }
 
 int32_t SPUGroupManager::suspend(ThreadGroup* group) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: suspend (%s)", group->name);
+    INFO(sync) << ssnprintf("SPUGroupManager: suspend (%s)", group->name);
     auto lock = boost::lock_guard(_mutex);
     if (std::find(begin(_suspended), end(_suspended), group) != end(_suspended)) {
         return 0;
@@ -99,7 +99,7 @@ int32_t SPUGroupManager::suspend(ThreadGroup* group) {
 }
 
 int32_t SPUGroupManager::resume(ThreadGroup* group) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: resume (%s)", group->name);
+    INFO(sync) << ssnprintf("SPUGroupManager: resume (%s)", group->name);
     auto lock = boost::lock_guard(_mutex);
     auto it = std::find(begin(_suspended), end(_suspended), group);
     if (it == end(_suspended))
@@ -111,7 +111,7 @@ int32_t SPUGroupManager::resume(ThreadGroup* group) {
 }
 
 std::tuple<uint32_t, uint32_t> SPUGroupManager::join(ThreadGroup* group) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: join started (%s)", group->name);
+    INFO(sync) << ssnprintf("SPUGroupManager: join started (%s)", group->name);
     {
         auto lock = boost::lock_guard(_dbgJoinMutex);
         _dbgJoin.push_back(group);
@@ -155,7 +155,7 @@ std::tuple<uint32_t, uint32_t> SPUGroupManager::join(ThreadGroup* group) {
     } else {
         res = {0, 0};
     }
-    INFO(libs, sync) << ssnprintf(
+    INFO(sync) << ssnprintf(
         "SPUGroupManager: join finished %s %s %x",
         group->name,
         std::get<0>(res) == SYS_SPU_THREAD_GROUP_JOIN_TERMINATED
@@ -167,11 +167,11 @@ std::tuple<uint32_t, uint32_t> SPUGroupManager::join(ThreadGroup* group) {
 }
 
 void SPUGroupManager::dispatch() {
-    INFO(libs, sync) << ssnprintf("%s%s\n%s%s\n%s%s\n%s%s", 
-                                  "SPUGroupManager(0), initialized: ", printGroups(_initialized),
-                                  "SPUGroupManager(0), ready: ", printGroups(_ready),
-                                  "SPUGroupManager(0), running: ", printGroups(_running),
-                                  "SPUGroupManager(0), suspended: ", printGroups(_suspended));
+    INFO(sync) << ssnprintf("%s%s\n%s%s\n%s%s\n%s%s",
+                              "SPUGroupManager(0), initialized: ", printGroups(_initialized),
+                              "SPUGroupManager(0), ready: ", printGroups(_ready),
+                              "SPUGroupManager(0), running: ", printGroups(_running),
+                              "SPUGroupManager(0), suspended: ", printGroups(_suspended));
     std::vector<ThreadGroup*> vec;
     for (auto th : _running) {
         _ready.insert(th);
@@ -200,17 +200,17 @@ void SPUGroupManager::dispatch() {
             th->resume();
         }
     }
-    INFO(libs, sync) << ssnprintf("%s%s\n%s%s\n%s%s\n%s%s", 
-                                  "SPUGroupManager(0), initialized: ", printGroups(_initialized),
-                                  "SPUGroupManager(0), ready: ", printGroups(_ready),
-                                  "SPUGroupManager(0), running: ", printGroups(_running),
-                                  "SPUGroupManager(0), suspended: ", printGroups(_suspended));
+    INFO(sync) << ssnprintf("%s%s\n%s%s\n%s%s\n%s%s",
+                              "SPUGroupManager(0), initialized: ", printGroups(_initialized),
+                              "SPUGroupManager(0), ready: ", printGroups(_ready),
+                              "SPUGroupManager(0), running: ", printGroups(_running),
+                              "SPUGroupManager(0), suspended: ", printGroups(_suspended));
 }
 
 void SPUGroupManager::notifyThreadStopped(SPUThread* thread, SPUThreadExitCause cause) {
-    INFO(libs, sync) << ssnprintf("SPUGroupManager: thread stopped %x %s",
-                                  thread->getId(),
-                                  to_string(cause));
+    INFO(sync) << ssnprintf("SPUGroupManager: thread stopped %x %s",
+                              thread->getId(),
+                              to_string(cause));
     auto lock = boost::lock_guard(_mutex);
     auto group = thread->group();
 

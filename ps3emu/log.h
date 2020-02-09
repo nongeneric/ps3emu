@@ -1,84 +1,64 @@
 #pragma once
 
-#include <boost/preprocessor/variadic/size.hpp>
-#include <boost/preprocessor/comparison/equal.hpp>
-#include <boost/preprocessor/variadic/elem.hpp>
-#include <boost/preprocessor/control/if.hpp>
-#include <boost/preprocessor/cat.hpp>
-
+#include "ps3emu/enum.h"
 #include <string>
 
-enum log_severity_t { log_info, log_warning, log_error };
-enum log_area_t {
-    log_trace = 1,
-    log_perf = 2,
-    log_cache = 4,
-    log_sync = 8,
-    log_audio = 16,
-    log_fs = 32,
-    log_proxy = 64
-};
-enum log_type_t { log_spu = 1, log_rsx = 2, log_libs = 4, log_debugger = 8 };
+enum log_level_t { log_detail, log_info, log_warning, log_error, log_level_none };
+
+ENUM(log_type_t,
+     (spu, 0),
+     (perf, 1),
+     (cache, 2),
+     (sync, 3),
+     (audio, 4),
+     (fs, 5),
+     (proxy, 6),
+     (rsx, 7),
+     (libs, 8),
+     (debugger, 9));
+
 enum log_sink_t { log_file = 1, log_console = 2 };
 enum log_format_t { log_date, log_simple };
 
-void log_init(int sinks, log_severity_t severity, int types, int areas, log_format_t format);
+void log_init(int sinks, std::string config, log_format_t format);
 void log_set_thread_name(std::string name);
-void log_unconditional(log_severity_t severity,
+void log_unconditional(log_level_t level,
                        log_type_t type,
-                       log_area_t area,
                        const char* message);
-inline void log_unconditional(log_severity_t severity,
+inline void log_unconditional(log_level_t level,
                               log_type_t type,
-                              log_area_t area,
                               std::string const& message) {
-    log_unconditional(severity, type, area, message.c_str());
+    log_unconditional(level, type, message.c_str());
 }
 
 #ifdef LOG_ENABLED
-bool log_should(log_severity_t severity, log_type_t type, log_area_t area);
+bool log_should(log_level_t level, log_type_t type);
 #else
 #define log_should(a, b, c) false
 #endif
 
 class log_sink {
-    log_severity_t _severity;
+    log_level_t _level;
     log_type_t _type;
-    log_area_t _area;
 public:
-    log_sink(log_severity_t severity, log_type_t type, log_area_t area)
-        : _severity(severity), _type(type), _area(area) {}
+    log_sink(log_level_t level, log_type_t type)
+        : _level(level), _type(type) {}
     template <typename T>
     log_sink& operator<<(T&& message) {
-        log_unconditional(_severity, _type, _area, message);
+        log_unconditional(_level, _type, message);
         return *this;
     }
 };
 
-#define LOGMSG_IMPL(severity, type, area) \
-    if (!log_should(severity, type, area)) (void)0; \
-        else log_sink(severity, type, area)
-#define LOGMSG(...) \
-    BOOST_PP_IF( \
-        BOOST_PP_EQUAL(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__), 3), \
-            LOGMSG_IMPL( \
-                BOOST_PP_CAT(log_, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)), \
-                BOOST_PP_CAT(log_, BOOST_PP_VARIADIC_ELEM(1, __VA_ARGS__)), \
-                BOOST_PP_CAT(log_, BOOST_PP_VARIADIC_ELEM(2, __VA_ARGS__))), \
-            LOGMSG_IMPL( \
-                BOOST_PP_CAT(log_, BOOST_PP_VARIADIC_ELEM(0, __VA_ARGS__)), \
-                BOOST_PP_CAT(log_, BOOST_PP_VARIADIC_ELEM(1, __VA_ARGS__)), \
-                log_trace) \
-    )
-#define INFO(...) LOGMSG(info, __VA_ARGS__)
-#define WARNING(...) LOGMSG(warning, __VA_ARGS__)
-#define ERROR(...) LOGMSG(error, __VA_ARGS__)
+#define LOGMSG_IMPL(level, type) \
+    if (!log_should(level, type)) (void)0; \
+        else log_sink(level, type)
 
-#define PARSE(s, res, name) if (s == #name) { res |= log_##name; } else
+#define INFO(type) LOGMSG_IMPL(log_info, log_type_t:: type)
+#define WARNING(type) LOGMSG_IMPL(log_warning, log_type_t:: type)
+#define ERROR(type) LOGMSG_IMPL(log_error, log_type_t:: type)
+#define DETAIL(type) LOGMSG_IMPL(log_detail, log_type_t:: type)
 
 log_sink_t log_parse_sinks(std::string const& str);
-log_type_t log_parse_filter(std::string const& str);
-log_severity_t log_parse_verbosity(std::string const& str);
 log_format_t log_parse_format(std::string const& str);
-log_area_t log_parse_area(std::string const& str);
 std::string print_backtrace();

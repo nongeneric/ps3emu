@@ -59,7 +59,7 @@ void sigint_handler(int sig) {
 
 int main(int argc, char* argv[]) {
     g_state.init();
-    std::string elfPath, elfArgs, verbosity, filter, sinks, format, area;
+    std::string elfPath, elfArgs, filter, sinks, format;
     bool captureRsx;
     options_description consoleDescr("Allowed options");
     try {
@@ -67,16 +67,12 @@ int main(int argc, char* argv[]) {
             ("help", "produce help message")
             ("elf,e", value<std::string>(&elfPath)->required(), "elf file")
             ("args,a", value<std::string>(&elfArgs)->default_value(""), "elf arguments")
-            ("verbosity,v", value<std::string>(&verbosity)->default_value("warning"),
-                "logging verbosity: info, warning, error")
             ("filter,f", value<std::string>(&filter)->default_value(""),
-                "logging filter: spu, libs, ppu, debugger, perf [e.g. spu,libs]")
+                "logging filter: W,Drsx,Ilibs")
             ("sinks,s", value<std::string>(&sinks)->default_value(""),
                 "logging sinks: file, console [e.g. file,console]")
             ("format", value<std::string>(&format)->default_value("simple"),
                 "logging format: date, simple")
-            ("area", value<std::string>(&area)->default_value("trace"),
-                "logging area: trace, perf")
             ("x86", value<std::vector<std::string>>(&g_state.config->x86Paths),
                 "rewritten and compiled x86 so file")
             ("capture-rsx", bool_switch()->default_value(false), "capture rsx")
@@ -100,9 +96,7 @@ int main(int argc, char* argv[]) {
     }
     
     log_init(log_parse_sinks(sinks),
-             log_parse_verbosity(verbosity),
-             log_parse_filter(filter),
-             log_parse_area(area),
+             filter,
              log_parse_format(format));
 
     signal(SIGSEGV, sigsegv_handler);

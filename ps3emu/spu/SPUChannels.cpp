@@ -155,15 +155,14 @@ void SPUChannels::command(uint32_t word) {
     EMU_ASSERT(subset<uint32_t>(lsaVa, size, 0, LocalStorageSize));
     auto lsa = _thread->ls(lsaVa);
     auto opcode = cmd.opcode.u();
-    auto name = mfcCommandToString(opcode);
     auto tag = _channels[MFC_TagID].load();
     auto log = [&] {
-        INFO(spu) << ssnprintf("%s(%x, %x, %x) %x", name, size, lsaVa, eal, tag);
+        DETAIL(spu) << ssnprintf("%s(%x, %x, %x) %x", mfcCommandToString(opcode), size, lsaVa, eal, tag);
     };
     auto logAtomic = [&](bool stored) {
         if (stored) {
-            INFO(spu) << ssnprintf(
-                "%s(%x, %x, %x) %s", name, size, lsaVa, eal, stored ? "OK" : "FAIL");
+            DETAIL(spu) << ssnprintf(
+                "%s(%x, %x, %x) %s", mfcCommandToString(opcode), size, lsaVa, eal, stored ? "OK" : "FAIL");
         }
     };
     if (opcode == MFC_GETLLAR_CMD || opcode == MFC_PUTLLC_CMD) {
@@ -309,7 +308,7 @@ unsigned SPUChannels::readCount(unsigned ch) {
             default: assert(false); return 0u;
         }
     })();
-    INFO(spu) << ssnprintf("read count %d from channel %s", count, classIdToString(ch));
+    DETAIL(spu) << ssnprintf("read count %d from channel %s", count, classIdToString(ch));
     return count;
 }
 
@@ -322,7 +321,7 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         _event.acknowledge(data);
     } else if (ch == SPU_WrOutIntrMbox) {
         _interrupt2 |= INT_Mask_class2_M;
-        INFO(spu) << ssnprintf("write %x to interrupt mailbox", data);
+        DETAIL(spu) << ssnprintf("write %x to interrupt mailbox", data);
         throw SPUThreadInterruptException(data);
     } else if (ch == SPU_WrOutMbox) {
         _outboundMailbox.enqueue(data);
@@ -343,7 +342,7 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         ch == MFC_WrTagUpdate || ch == SPU_WrEventMask)
         return;
 
-    INFO(spu) << ssnprintf("write %s to channel %d (%s)",
+    DETAIL(spu) << ssnprintf("write %s to channel %d (%s)",
                            ch == SPU_WrEventMask || ch == SPU_WrEventAck
                                ? to_string((MfcEvent)data)
                                : ch == MFC_WrTagUpdate ? to_string((MfcTag)data)
@@ -381,14 +380,14 @@ uint32_t SPUChannels::read(unsigned ch) {
     if (ch == SPU_RdEventStat) {
         auto maskstr = to_string((MfcEvent)_event.mask());
         auto datastr = to_string((MfcEvent)data);
-        INFO(spu) << ssnprintf("SPU_RdEventStat(mask: %s, ret: %s)", maskstr, datastr);
+        DETAIL(spu) << ssnprintf("SPU_RdEventStat(mask: %s, ret: %s)", maskstr, datastr);
     } else if (ch == MFC_RdTagStat) {
-        INFO(spu) << ssnprintf("MFC_RdTagStat(%x, %s) %x",
+        DETAIL(spu) << ssnprintf("MFC_RdTagStat(%x, %s) %x",
                                _channels[MFC_RdTagMask].load(),
                                to_string((MfcTag)_channels[MFC_WrTagUpdate].load()),
                                data);
     } else if (ch != MFC_RdAtomicStat) {
-        INFO(spu) << ssnprintf("spu reads %x from channel %d (%s)",
+        DETAIL(spu) << ssnprintf("spu reads %x from channel %d (%s)",
                                data,
                                ch,
                                classIdToString(ch));
@@ -398,7 +397,7 @@ uint32_t SPUChannels::read(unsigned ch) {
 
 void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
     auto disable = DisableSuspend(_sthread);
-    INFO(spu) << ssnprintf("ppu writes %x via mmio to spu %d tag %s",
+    DETAIL(spu) << ssnprintf("ppu writes %x via mmio to spu %d tag %s",
                            data,
                            -1,
                            tagToString((TagClassId)offset));
@@ -460,7 +459,7 @@ void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
 
 uint32_t SPUChannels::mmio_read(unsigned offset) {
     auto disable = DisableSuspend(_sthread);
-    INFO(spu) << "reading mmio";
+    DETAIL(spu) << "reading mmio";
     auto res = [&] {
         switch (offset) {
             case TagClassId::SPU_Status: return _spuStatus.load();
@@ -480,7 +479,7 @@ uint32_t SPUChannels::mmio_read(unsigned offset) {
             default: throw std::runtime_error("unknown mmio offset");
         }
     }();
-    INFO(spu) << ssnprintf("read %x via mmio from spu %d tag %s",
+    DETAIL(spu) << ssnprintf("read %x via mmio from spu %d tag %s",
                            res,
                            -1,
                            tagToString((TagClassId)offset));

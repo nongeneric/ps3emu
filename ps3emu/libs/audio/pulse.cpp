@@ -48,7 +48,7 @@ void PulseBackend::waitContext() {
     pa_threaded_mainloop_start(_pulseMainLoop);
     while (!status) ums_sleep(1000);
     if (status == 2) {
-        ERROR(libs, audio) << ssnprintf("context connection failed");
+        ERROR(audio) << ssnprintf("context connection failed");
         exit(1);
     }
 }
@@ -62,7 +62,7 @@ PulseBackend::PulseBackend(AudioAttributes* attributes) : _attributes(attributes
     assignAffinity(_playbackThread.native_handle(), AffinityGroup::PPUHost);
     auto res = pa_context_connect(_pulseContext, NULL, PA_CONTEXT_NOFLAGS, NULL);
     if (res != PA_OK) {
-        ERROR(libs, audio) << ssnprintf("context connection failed %s", pa_strerror(res));
+        ERROR(audio) << ssnprintf("context connection failed %s", pa_strerror(res));
         exit(1);
     }
     waitContext();
@@ -85,7 +85,7 @@ void PulseBackend::openPort(unsigned id, PulsePortInfo const& info) {
         PA_STREAM_ADJUST_LATENCY);
     auto res = pa_stream_connect_playback(pulseStream, NULL, &attr, flags, NULL, NULL);
     if (res != PA_OK) {
-        ERROR(libs, audio) << ssnprintf("can't connect playback stream: %s", pa_strerror(res));
+        ERROR(audio) << ssnprintf("can't connect playback stream: %s", pa_strerror(res));
         exit(1);
     }
     auto& port = _ports[id];
@@ -161,7 +161,7 @@ void PulseBackend::playbackLoop() {
         }
 
         if (notifyPort) {
-            INFO(libs, audio) << ssnprintf("audioLoop notifying");
+            INFO(audio) << ssnprintf("audioLoop notifying");
             sys_event_port_send(notifyPort, 0, 0, 0);
         }
 

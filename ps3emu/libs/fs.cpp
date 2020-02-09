@@ -68,7 +68,7 @@ FILE* openFile(const char* path, int flags) {
     auto mode = t || !e ? (rw ? "w+" : "w") : (rw ? "r+" : "r");
     auto f = fopen(path, mode);
     if (!f) {
-        ERROR(libs, fs) << ssnprintf("openFile failed: %s", strerror(errno));
+        ERROR(fs) << ssnprintf("openFile failed: %s", strerror(errno));
         exit(1);
     }
     if (flags & CELL_FS_O_APPEND) {
@@ -102,10 +102,10 @@ CellFsErrno sys_fs_open(cstring_ptr_t path,
     auto f = openFile(hostPath.c_str(), flags);
     if (f) {
         *fd = fileMap.create(f);
-        INFO(libs, fs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) %d", path.str, hostPath.string(), flags, (uint32_t)*fd);
+        INFO(fs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) %d", path.str, hostPath.string(), flags, (uint32_t)*fd);
         return CELL_OK;
     }
-    INFO(libs, fs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) FAILED", path.str, hostPath.string(), flags);
+    INFO(fs) << ssnprintf("sys_fs_open(%s (%s), %x, ...) FAILED", path.str, hostPath.string(), flags);
     return toCellErrno(errno);
 }
 
@@ -113,7 +113,7 @@ CellFsErrno sys_fs_lseek(int32_t fd,
                          int64_t offset,
                          int32_t whence,
                          big_uint64_t* pos) {
-    INFO(libs, fs) << ssnprintf("sys_fs_lseek(%d, %x, %d, ...)", fd, offset, whence);
+    INFO(fs) << ssnprintf("sys_fs_lseek(%d, %x, %d, ...)", fd, offset, whence);
     auto stdWhence = toStdWhence(whence);
     auto file = fileMap.get(fd);
     if (fseek(file, offset, stdWhence))
@@ -133,7 +133,7 @@ CellFsErrno sys_fs_read(int32_t fd,
          *nread = bytesRead;
     }
     g_state.mm->writeMemory(buf, &localBuf[0], bytesRead);
-    INFO(libs, fs) << ssnprintf("sys_fs_read(%x, %x, %d) : %d", fd, buf, nbytes, bytesRead);
+    INFO(fs) << ssnprintf("sys_fs_read(%x, %x, %d) : %d", fd, buf, nbytes, bytesRead);
     return CELL_FS_SUCCEEDED;
 }
 
@@ -152,7 +152,7 @@ CellFsErrno sys_fs_write(int32_t fd,
 }
 
 CellFsErrno sys_fs_close(int32_t fd) {
-    INFO(libs, fs) << ssnprintf("sys_fs_close(%d)", fd);
+    INFO(fs) << ssnprintf("sys_fs_close(%d)", fd);
     auto file = fileMap.get(fd);
     if (fclose(file))
         return toCellErrno(errno);
@@ -172,12 +172,12 @@ void copy(CellFsStat& sb, struct stat& st) {
 }
 
 CellFsErrno sys_fs_fstat(int32_t fd, CellFsStat* sb) {
-    INFO(libs, fs) << ssnprintf("sys_fs_fstat(%d, ...)", fd);
+    INFO(fs) << ssnprintf("sys_fs_fstat(%d, ...)", fd);
     struct stat st;
     auto err = fstat(fileno(fileMap.get(fd)), &st);
     if (err) {
         auto cellError = toCellErrno(errno);
-        WARNING(libs, fs) << ssnprintf("err: %d", cellError);
+        WARNING(fs) << ssnprintf("err: %d", cellError);
         return cellError;
     }
     copy(*sb, st);
@@ -188,7 +188,7 @@ CellFsErrno sys_fs_disk_free(cstring_ptr_t directory_path,
                              big_uint64_t* capacity,
                              big_uint64_t* free) {
     auto host = path(g_state.content->toHost(directory_path.str));
-    INFO(libs, fs) << ssnprintf(
+    INFO(fs) << ssnprintf(
         "sys_fs_disk_free(%s (%s), ...)", directory_path.str, host.string());
     while (!exists(host)) {
         host = host.parent_path();
@@ -200,7 +200,7 @@ CellFsErrno sys_fs_disk_free(cstring_ptr_t directory_path,
 }
 
 CellFsErrno sys_fs_fsync(int32_t fd) {
-    INFO(libs, fs) << ssnprintf("sys_fs_fsync(%d, ...)", fd);
+    INFO(fs) << ssnprintf("sys_fs_fsync(%d, ...)", fd);
     auto file = fileMap.get(fd);
     syncfs(fileno(file));
     return CELL_FS_SUCCEEDED;
@@ -216,7 +216,7 @@ CellFsErrno getDirectoryEntries(int32_t fd,
                                 uint32_t entries_size,
                                 uint32_t* data_count)
 {
-    INFO(libs, fs) << ssnprintf("getDirectoryEntries(%d, ...)", fd);
+    INFO(fs) << ssnprintf("getDirectoryEntries(%d, ...)", fd);
     auto info = dirMap.get(fd);
     auto entry = readdir(info->dir);
     if (entry) {
@@ -229,7 +229,7 @@ CellFsErrno getDirectoryEntries(int32_t fd,
         auto err = stat((info->path + "/" + std::string(entry->d_name)).c_str(), &st);
         if (err) {
             auto cellError = toCellErrno(errno);
-            WARNING(libs, fs) << ssnprintf("err: %d", cellError);
+            WARNING(fs) << ssnprintf("err: %d", cellError);
             return cellError;
         }
         copy(entries->attribute, st);
@@ -299,7 +299,7 @@ CellFsErrno sys_fs_fcntl(int32_t fd, uint32_t cmd, uint32_t data, uint32_t size)
         g_state.mm->writeMemory(data, &config, size);
         return CELL_OK;
     }
-    WARNING(libs, fs) << ssnprintf("unknown sys_fs_fcntl(%x, %x, %x, %x)", fd, cmd, data, size);
+    WARNING(fs) << ssnprintf("unknown sys_fs_fcntl(%x, %x, %x, %x)", fd, cmd, data, size);
     return CELL_OK;
 }
 
@@ -320,12 +320,12 @@ CellFsErrno sys_fs_rename(cstring_ptr_t src, cstring_ptr_t dest) {
 
 CellFsErrno sys_fs_stat(cstring_ptr_t path, CellFsStat *sb) {
     auto hostPath = g_state.content->toHost(path.str);
-    INFO(libs, fs) << ssnprintf("sys_fs_stat(%s (%s), ...)", path.str, hostPath);
+    INFO(fs) << ssnprintf("sys_fs_stat(%s (%s), ...)", path.str, hostPath);
     struct stat st;
     auto err = stat(hostPath.c_str(), &st);
     if (err) {
         auto cellError = toCellErrno(errno);
-        WARNING(libs, fs) << ssnprintf("err: %d", cellError);
+        WARNING(fs) << ssnprintf("err: %d", cellError);
         return cellError;
     }
     copy(*sb, st);
@@ -333,7 +333,7 @@ CellFsErrno sys_fs_stat(cstring_ptr_t path, CellFsStat *sb) {
 }
 
 CellFsErrno sys_fs_mkdir(cstring_ptr_t path, CellFsMode mode) {
-    INFO(libs, fs) << ssnprintf("sys_fs_mkdir(%s, ...)", path.str);
+    INFO(fs) << ssnprintf("sys_fs_mkdir(%s, ...)", path.str);
     auto hostPath = g_state.content->toHost(path.str);
     if (exists(hostPath))
         return CELL_FS_EEXIST;
@@ -352,11 +352,11 @@ CellFsErrno sys_fs_ftruncate(int32_t fd, uint64_t size) {
 
 CellFsErrno sys_fs_opendir(cstring_ptr_t path, big_int32_t *fd) {
     auto host = g_state.content->toHost(path.str);
-    INFO(libs, fs) << ssnprintf("sys_fs_opendir(%s, ...) %s", path.str, host);
+    INFO(fs) << ssnprintf("sys_fs_opendir(%s, ...) %s", path.str, host);
     auto dir = opendir(host.c_str());
     if (!dir) {
         auto cellError = toCellErrno(errno);
-        WARNING(libs, fs) << ssnprintf("err: %d", cellError);
+        WARNING(fs) << ssnprintf("err: %d", cellError);
         return cellError;
     }
     auto dirInfo = std::shared_ptr<DirInfo>(new DirInfo{dir, host});
@@ -365,7 +365,7 @@ CellFsErrno sys_fs_opendir(cstring_ptr_t path, big_int32_t *fd) {
 }
 
 CellFsErrno sys_fs_readdir(int32_t fd, CellFsDirent *dirent, big_uint64_t *nread) {
-    INFO(libs, fs) << ssnprintf("sys_fs_readdir(%d, ...)", fd);
+    INFO(fs) << ssnprintf("sys_fs_readdir(%d, ...)", fd);
     auto info = dirMap.get(fd);
     auto entry = readdir(info->dir);
     if (entry) {
@@ -380,19 +380,19 @@ CellFsErrno sys_fs_readdir(int32_t fd, CellFsDirent *dirent, big_uint64_t *nread
 }
 
 CellFsErrno sys_fs_closedir(int32_t fd) {
-    INFO(libs, fs) << ssnprintf("sys_fs_closedir(%d, ...)", fd);
+    INFO(fs) << ssnprintf("sys_fs_closedir(%d, ...)", fd);
     dirMap.destroy(fd);
     return CELL_FS_SUCCEEDED;
 }
 
 CellFsErrno sys_fs_unlink(cstring_ptr_t path) {
-    INFO(libs, fs) << ssnprintf("sys_fs_unlink(%s, ...)", path.str);
+    INFO(fs) << ssnprintf("sys_fs_unlink(%s, ...)", path.str);
     remove(g_state.content->toHost(path.str));
     return CELL_FS_SUCCEEDED;
 }
 
 CellFsErrno sys_fs_rmdir(cstring_ptr_t path) {
-    INFO(libs, fs) << ssnprintf("sys_fs_rmdir(%s, ...)", path.str);
+    INFO(fs) << ssnprintf("sys_fs_rmdir(%s, ...)", path.str);
     remove(g_state.content->toHost(path.str));
     return CELL_FS_SUCCEEDED;
 }

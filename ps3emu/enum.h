@@ -10,6 +10,7 @@
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <string>
 #include <array>
+#include <string.h>
 #if DEBUG
 #include <assert.h>
 #endif
@@ -46,6 +47,18 @@ inline std::string to_string(T val) {
         i++;
     }
     return res;
+}
+
+template<class T>
+T parse_enum(const char* str) {
+    int i = 0;
+    for (auto v : enum_traits<T>::names()) {
+        if (strcmp(v, str) == 0) {
+            return enum_traits<T>::values()[i];
+        }
+        i++;
+    }
+    throw std::runtime_error("can't parse enum");
 }
 
 template <typename T>

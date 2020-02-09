@@ -318,11 +318,11 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 auto isSync = name == "cellSyncMutexLock" || name == "cellSyncMutexUnlock" ||
                               name == "cellSyncMutexTryLock";
                 std::function<void(std::string&&)> log = [=](auto message) {
-                    INFO(libs, proxy) << message;
+                    INFO(proxy) << message;
                 };
                 if (isSync) {
                     log = [=](auto message) {
-                        INFO(libs, sync) << message;
+                        INFO(sync) << message;
                     };
                 }
                 std::function<std::string(PPUThread*)> getPreInfo = [](auto th){
