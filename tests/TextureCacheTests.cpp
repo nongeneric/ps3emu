@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 //#include "ps3emu/rsx/TextureCache.h"
 
 struct TestTextureInfo {

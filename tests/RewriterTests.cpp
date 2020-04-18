@@ -6,7 +6,7 @@
 #include "ps3emu/build-config.h"
 #include "ps3tool-core/Rewriter.h"
 #include "TestUtils.h"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 #include <filesystem>
 #include <string>
 #include <sstream>

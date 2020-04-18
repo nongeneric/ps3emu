@@ -184,7 +184,7 @@ bool PPUThread::dbgIsPaused() {
 void PPUThread::run() {
     boost::unique_lock<boost::mutex> lock(_mutexRunning);
     if (!_init) {
-        _thread = boost::thread([=] { loop(); });
+        _thread = boost::thread([this] { loop(); });
         assignAffinity(_thread.native_handle(), AffinityGroup::PPUEmu);
         _init = true;
         _cvRunning.wait(lock, [&] { return _running; });

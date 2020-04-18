@@ -12,7 +12,7 @@ void MonospaceGrid::setModel(MonospaceGridModel* model) {
     _model = model;
     _columns.resize(model->getColumnCount());
     connect(model, &MonospaceGridModel::navigated, this, &MonospaceGrid::navigate);
-    connect(model, &MonospaceGridModel::updated, this, [=]{ update(); });
+    connect(model, &MonospaceGridModel::updated, this, [this]{ update(); });
 }
 
 void MonospaceGrid::setColumnWidth(int col, int chars) {
@@ -110,7 +110,7 @@ void MonospaceGrid::drawArrow(ArrowInfo arrow, int pos, QPainter& painter) {
         right += getColumnWidth(c);
     }
     auto x = right - space * pos;
-    auto y = [=](uint64_t row) {
+    auto y = [=, this](uint64_t row) {
         return (row - _curRow) / _model->getRowStep() * _charHeight + 2 * _charHeight / 3;
     };
     painter.setPen(QPen(QColor(arrow.highlighted ? Qt::red : Qt::black)));

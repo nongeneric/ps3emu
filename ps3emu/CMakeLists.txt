@@ -152,6 +152,7 @@ target_link_libraries(ps3emu
     ${ICUUC_LIBRARIES}
     ${TBB_LIBRARIES}
     ${SDL2_LIBRARIES}
+    ${FMT_LIBRARIES}
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/nvimage/libnvimage.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc7/libbc7.a
     $ENV{NVIDIA_TEXTURE_TOOLS}/src/bc6h/libbc6h.a

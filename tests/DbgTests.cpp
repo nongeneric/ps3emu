@@ -1,6 +1,6 @@
 #include "dbg-gui/DebugExpr.h"
 #include "ps3emu/ppu/PPUThread.h"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 TEST_CASE("dbg_expressions") {
     PPUThread th;

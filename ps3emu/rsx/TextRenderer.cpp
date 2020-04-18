@@ -253,7 +253,7 @@ struct TextRenderer::impl {
             for (;;) {
                 if ((unsigned)offset == line.text.size())
                     break;
-                U8_NEXT(line.text.c_str(), offset, -1, chr)
+                U8_NEXT(line.text.c_str(), offset, -1, chr);
                 if (chr < 0)
                     break;
                 length++;
@@ -288,7 +288,7 @@ struct TextRenderer::impl {
             for (;;) {
                 if ((unsigned)offset == line.text.size())
                     break;
-                U8_NEXT(line.text.c_str(), offset, -1, chr)
+                U8_NEXT(line.text.c_str(), offset, -1, chr);
                 if (chr < 0)
                     break;
                 auto index = FT_Get_Char_Index(face, chr);

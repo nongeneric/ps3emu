@@ -9,7 +9,7 @@
 #include "ps3emu/TimedCounter.h"
 #include <vector>
 #include <atomic>
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 TEST_CASE("modification_map_simple") {
     ModificationMap<32, 1024> map;
@@ -1287,7 +1287,7 @@ TEST_CASE("float_loads_with_update") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
-    auto mem = 0x400000;
+    uint64_t mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 16);
     uint8_t instr[] = { 
@@ -1328,7 +1328,7 @@ TEST_CASE("float_stores") {
     MainMemory mm;
     g_state.mm = &mm;
     PPUThread th;
-    auto mem = 0x400000;
+    uint64_t mem = 0x400000;
     mm.mark(mem, 0x1000, false, "");
     mm.setMemory(mem, 0, 100);
     th.setFPRd(1, 1.1);
@@ -1639,7 +1639,7 @@ TEST_CASE("fixed_divs") {
         ppu_dasm<DasmMode::Emulate>(instr + i, 0, &th);
     }
     
-    REQUIRE( th.getGPR(4) == -506344709675354235ll );
+    REQUIRE( th.getGPR(4) == -506344709675354235ull );
     REQUIRE( (th.getGPR(5) & 0xffffffff) == 0xd5e6f785 );
     REQUIRE( th.getGPR(6) == 8717027327179421572ll );
     REQUIRE( (th.getGPR(7) & 0xffffffff) == 0x55e6f784 );
@@ -1710,7 +1710,7 @@ TEST_CASE("fctiwz f1,f2") {
     REQUIRE( (int32_t)th.getFPR(1) == 0x7fffffff );
     th.setFPRd(2, -4294967295.);
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
-    REQUIRE( (int32_t)th.getFPR(1) == 0x80000000 );
+    REQUIRE( (uint32_t)th.getFPR(1) == 0x80000000 );
 }
 
 TEST_CASE("fixed logical") {
@@ -1999,7 +1999,7 @@ TEST_CASE("vrlw v0,v0,v12") {
     uint8_t instr[] = { 0x10, 0x00, 0x60, 0x84 };
     ppu_dasm<DasmMode::Emulate>(instr, 0, &th);
     REQUIRE( th.r(0).w(0) == 0x11223344 );
-    REQUIRE( th.r(0).w(1) == 0xaabbccdd );
+    REQUIRE( th.r(0).w(1) == (int32_t)0xaabbccdd );
     REQUIRE( th.r(0).w(2) == 0x46688aa4 );
     REQUIRE( th.r(0).w(3) == 0x3bc42ab3 );
 }

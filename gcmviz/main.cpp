@@ -10,7 +10,7 @@
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    log_init(log_console, "Irsx,Ilibs,Idebugger,Itrace", log_simple);
+    log_init(log_console, "Irsx,Ilibs,Idebugger", log_simple);
     std::string tracePath;
     bool replay;
     options_description consoleDescr("Allowed options");

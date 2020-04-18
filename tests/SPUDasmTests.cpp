@@ -2,7 +2,7 @@
 #include "ps3emu/spu/SPUThread.h"
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/state.h"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 TEST_CASE("spudasm_shufb") {
 /*

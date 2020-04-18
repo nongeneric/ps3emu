@@ -1109,13 +1109,13 @@ GLTexture* Rsx::addTextureToCache(uint32_t samplerId, bool isFragment) {
     auto size = (info.pitch == 0 ? (info.width * texelByteSize) : info.pitch) * info.height;
     auto updater = new SimpleCacheItemUpdater<GLTexture> {
         va, size,
-        [=](auto t) {
+        [=, this](auto t) {
             RangeCloser r(&_loadTextureCounter);
 //             std::vector<uint8_t> buf(size);
 //             g_state.mm->readMemory(va, &buf[0], size);
 //             t->update(buf);
 
-            auto buffer = this->getBuffer(info.location);
+            auto buffer = getBuffer(info.location);
             _textureReader->loadTexture(info, buffer->handle(), t->levelHandles());
         }
     };
@@ -1276,10 +1276,10 @@ void Rsx::init(sys_event_queue_t callbackQueue) {
     }
 
     boost::unique_lock<boost::mutex> lock(_initMutex);
-    _thread.reset(new boost::thread([=]{ loop(); }));
+    _thread = std::make_unique<boost::thread>([this]{ loop(); });
     assignAffinity(_thread->native_handle(), AffinityGroup::PPUHost);
     initMethodMap();
-    _initCv.wait(lock, [=] { return _initialized; });
+    _initCv.wait(lock, [this] { return _initialized; });
 
     INFO(rsx) << "rsx loop completed initialization";
 }

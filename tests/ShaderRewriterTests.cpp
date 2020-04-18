@@ -1,6 +1,6 @@
 #include "../ps3emu/shaders/shader_dasm.h"
 #include "../ps3emu/shaders/ShaderRewriter.h"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 using namespace ShaderRewriter;
 

@@ -1,6 +1,6 @@
 #include "ps3emu/MainMemory.h"
 #include "ps3emu/log.h"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 #include "ps3emu/spu/SPUChannels.h"
 #include "ps3emu/spu/SPUThread.h"
 #include <boost/thread.hpp>

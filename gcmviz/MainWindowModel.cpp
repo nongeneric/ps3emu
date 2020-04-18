@@ -944,7 +944,7 @@ void MainWindowModel::changeFrame() {
     _window.commandTableView->setModel(proxyModel);
     _window.commandTableView->resizeColumnsToContents();
     auto selectionModel = _window.commandTableView->selectionModel();
-    QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=] (auto current) {
+    QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=, this] (auto current) {
         if (current == QModelIndex())
             return;
         auto command = _db.getCommand(_currentFrame, proxyModel->mapToSource(current).row());
@@ -959,12 +959,12 @@ void MainWindowModel::changeFrame() {
 
 MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _currentFrame(0) {
     _window.setupUi(&_qwindow);
-    QObject::connect(_window.actionRun, &QAction::triggered, [=] { onRun(); });
-    QObject::connect(_window.actionVisualizeFeedback, &QAction::triggered, [=] {
+    QObject::connect(_window.actionRun, &QAction::triggered, [this] { onRun(); });
+    QObject::connect(_window.actionVisualizeFeedback, &QAction::triggered, [=, this] {
         onVisualizeFeedback();
     });
     Rsx::setOperationMode(RsxOperationMode::Replay);
-    QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=] (auto index) {
+    QObject::connect(_window.commandTableView, &QTableView::doubleClicked, [=, this] (auto index) {
         this->runTo(index.row(), _currentFrame);
     });
     _window.contextTree->setColumnCount(1);
@@ -998,7 +998,7 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
     items.append(fragmentSamplers);
     
     _window.contextTree->insertTopLevelItems(0, items);
-    QObject::connect(_window.contextTree, &QTreeWidget::currentItemChanged, [=] (auto item) {
+    QObject::connect(_window.contextTree, &QTreeWidget::currentItemChanged, [=, this] (auto item) {
         this->updateContextTable();
     });
     _window.contextTree->expandAll();

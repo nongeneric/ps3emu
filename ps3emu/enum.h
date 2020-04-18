@@ -10,6 +10,7 @@
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <string>
 #include <array>
+#include <stdexcept>
 #include <string.h>
 #if DEBUG
 #include <assert.h>

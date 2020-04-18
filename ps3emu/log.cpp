@@ -1,34 +1,46 @@
 #include "log.h"
+
+#include "ps3emu/ppu/PPUThread.h"
+#include "ps3emu/profiler.h"
+#include "ps3emu/spu/SPUThread.h"
+#include "ps3emu/state.h"
 #include "utils.h"
-#include <filesystem>
+
+#define SPDLOG_FMT_EXTERNAL
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
-#include <sys/prctl.h>
-#include "ps3emu/ppu/PPUThread.h"
-#include "ps3emu/spu/SPUThread.h"
-#include "ps3emu/state.h"
-#include "ps3emu/profiler.h"
+
 #include <boost/algorithm/string.hpp>
 #include <boost/range/algorithm.hpp>
 #include <execinfo.h>
+
+#include <filesystem>
 #include <stdio.h>
+#include <sys/prctl.h>
 
 log_type_t log_parse_type(std::string const& str);
 
 namespace {
 
+using Levels = std::array<log_level_t, enum_traits<log_type_t>::size()>;
+
+consteval Levels makeDefaultLevels() {
+    Levels result;
+    std::fill(begin(result), end(result), log_level_none);
+    return result;
+}
+
 thread_local std::string thread_name;
 std::shared_ptr<spdlog::logger> logger;
-std::array<log_level_t, enum_traits<log_type_t>::size()> levels;
+constinit Levels levels = makeDefaultLevels();
 
 void parse_config(std::string config) {
-    boost::fill(levels, log_level_none);
     std::vector<std::string> vec;
     boost::split(vec, config, boost::is_any_of(","), boost::token_compress_on);
     for (auto& part : vec) {
-        if (part.size() < 1)
-            throw std::runtime_error("parse error");
+        if (part.empty())
+            continue;
 
         std::optional<log_type_t> type;
         auto level = log_level_none;

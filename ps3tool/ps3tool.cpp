@@ -1,4 +1,5 @@
 #include "ps3tool.h"
+#include <ps3emu/log.h>
 #include <boost/program_options.hpp>
 #include <boost/variant.hpp>
 #include <boost/hana.hpp>
@@ -405,6 +406,7 @@ public:
 };
 
 int main(int argc, const char* argv[]) {
+    log_init(log_file, "I", log_simple);
     try {
         auto command = ParseOptions(argc, argv);
         boost::apply_visitor(CommandVisitor(), command);

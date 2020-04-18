@@ -31,7 +31,7 @@ std::string compileRule() {
         ""
 #endif
     ;
-    auto line = ssnprintf("%s -c -fPIC -std=c++17 %s $opt $trace -march=native -isystem%s $in -o $out",
+    auto line = ssnprintf("%s -c -fPIC -std=c++20 %s $opt $trace -march=native -isystem%s $in -o $out",
         g_compiler, memoryProtection, include
     );
     return line;

@@ -13,10 +13,6 @@
 #include <QKeyEvent>
 #include <QAbstractItemView>
 
-class LogTableView : public QAbstractItemView {
-
-};
-
 MainWindow::~MainWindow() { }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
@@ -106,36 +102,36 @@ void MainWindow::setupMenu() {
     {
         auto stepIn = new QAction("Step In", this);
         stepIn->setShortcut(QKeySequence(Qt::Key_F7));
-        connect(stepIn, &QAction::triggered, this, [=]() { _model.stepIn(); });
+        connect(stepIn, &QAction::triggered, this, [this]() { _model.stepIn(); });
         trace->addAction(stepIn);
     }
     {
         auto stepOver = new QAction("Step Over", this);
         stepOver->setShortcut(QKeySequence(Qt::Key_F8));
-        connect(stepOver, &QAction::triggered, this, [=]() { _model.stepOver(); });
+        connect(stepOver, &QAction::triggered, this, [this]() { _model.stepOver(); });
         trace->addAction(stepOver);
     }
     {
         auto runToLR = new QAction("Run to LR", this);
         runToLR->setShortcut(QKeySequence(Qt::Key_F4));
-        connect(runToLR, &QAction::triggered, this, [=]() { _model.runToLR(); });
+        connect(runToLR, &QAction::triggered, this, [this]() { _model.runToLR(); });
         trace->addAction(runToLR);
     }
     {
         auto run = new QAction("Run", this);
         run->setShortcut(QKeySequence(Qt::Key_F5));
-        connect(run, &QAction::triggered, this, [=]() { _model.run(); });
+        connect(run, &QAction::triggered, this, [this]() { _model.run(); });
         trace->addAction(run);
     }
     {
         auto action = new QAction("Pause", this);
-        connect(action, &QAction::triggered, this, [=]() { _model.pause(); });
+        connect(action, &QAction::triggered, this, [this]() { _model.pause(); });
         trace->addAction(action);
     }
     {
         auto action = new QAction("Capture Frames", this);
         action->setShortcut(QKeySequence(Qt::Key_F12));
-        connect(action, &QAction::triggered, this, [=]() { _model.captureFrames(); });
+        connect(action, &QAction::triggered, this, [this]() { _model.captureFrames(); });
         trace->addAction(action);
     }
     
@@ -147,7 +143,7 @@ void MainWindow::setupMenu() {
     auto view = menuBar()->addMenu("&View");
     auto toggleFPR = new QAction("Toggle GPR/FPR", this);
     toggleFPR->setShortcut(QKeySequence(Qt::Key_Tab));
-    connect(toggleFPR, &QAction::triggered, this, [=]() { _model.toggleFPR(); });
+    connect(toggleFPR, &QAction::triggered, this, [this]() { _model.toggleFPR(); });
     view->addAction(toggleFPR);
     
     auto settings = menuBar()->addMenu("Settings");
@@ -272,7 +268,7 @@ void MainWindow::openFile() {
 
 void MainWindow::setupStatusBar() {
     _command = new CommandLineEdit(this);
-    connect(_command, &CommandLineEdit::selected, this, [=] {
+    connect(_command, &CommandLineEdit::selected, this, [this] {
         auto line = _command->text();
         _command->clear();
        _log->append(QString("executing \"%1\"").arg(line));
@@ -282,7 +278,7 @@ void MainWindow::setupStatusBar() {
     
     statusBar()->addWidget(_command, 1);
     statusBar()->setSizeGripEnabled(false);
-    connect(&_model, &DebuggerModel::message, this, [=](QString text){
+    connect(&_model, &DebuggerModel::message, this, [this](QString text){
         _log->append(text);
     });
 }

@@ -186,7 +186,7 @@ SamplerContextTreeItem::SamplerContextTreeItem(bool fragment, int index)
 
 GenericTableModel<RsxContext>* SamplerContextTreeItem::getTable(
     RsxContext* context) {
-    auto i = [=]() -> TextureSamplerInfo& {
+    auto i = [=, this]() -> TextureSamplerInfo& {
         return _fragment ? context->fragmentTextureSamplers[_index]
                          : context->vertexTextureSamplers[_index];
     };
@@ -220,7 +220,7 @@ SamplerTextureContextTreeItem::SamplerTextureContextTreeItem(bool fragment, int 
       
 GenericTableModel<RsxContext>* SamplerTextureContextTreeItem::getTable(
     RsxContext* context) {
-    auto t = [=]() -> RsxTextureInfo& {
+    auto t = [=, this]() -> RsxTextureInfo& {
         return _fragment ? context->fragmentTextureSamplers[_index].texture
                          : context->vertexTextureSamplers[_index].texture;
     };
@@ -279,7 +279,7 @@ DisplayBufferContextTreeItem::DisplayBufferContextTreeItem(int index)
     : ContextTreeItem(ssnprintf("%d", index)), _index(index) {}
 
 GenericTableModel<RsxContext>* DisplayBufferContextTreeItem::getTable(RsxContext* context) {
-    auto b = [=]() -> auto& {
+    auto b = [=, this]() -> auto& {
         return context->displayBuffers[_index];
     };
     return new GenericTableModel<RsxContext>(

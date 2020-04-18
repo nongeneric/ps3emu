@@ -58,7 +58,7 @@ PulseBackend::PulseBackend(AudioAttributes* attributes) : _attributes(attributes
     _pulseMainLoop = pa_threaded_mainloop_new();
     auto api = pa_threaded_mainloop_get_api(_pulseMainLoop);
     _pulseContext = pa_context_new(api, "ps3emu");
-    _playbackThread = boost::thread([=]{ playbackLoop(); });
+    _playbackThread = boost::thread([this]{ playbackLoop(); });
     assignAffinity(_playbackThread.native_handle(), AffinityGroup::PPUHost);
     auto res = pa_context_connect(_pulseContext, NULL, PA_CONTEXT_NOFLAGS, NULL);
     if (res != PA_OK) {

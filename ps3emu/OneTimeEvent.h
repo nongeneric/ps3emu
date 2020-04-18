@@ -20,6 +20,6 @@ public:
     
     inline void wait() {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        _cv.wait(lock, [=] { return _fired; });
+        _cv.wait(lock, [this] { return _fired; });
     }
 };

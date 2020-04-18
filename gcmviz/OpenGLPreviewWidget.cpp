@@ -165,7 +165,7 @@ void OpenGLPreviewWidget::initializeGL() {
 }
 
 void OpenGLPreviewWidget::setVertices(std::vector<PreviewVertex> const& vertices) {
-    auto f = [=] {
+    auto f = [=, this] {
         auto byteSize = vertices.size() * sizeof(PreviewVertex);
         _vertexBuffer.reset(
             new GLBuffer(GLBufferType::Static, byteSize, &vertices[0]));

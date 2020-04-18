@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 project(ps3emu-root)
 include_directories(${ps3emu-root_SOURCE_DIR})
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_definitions(-DBOOST_ALL_DYN_LINK)
 set(Boost_USE_STATIC_LIBS       OFF)
@@ -26,6 +26,7 @@ pkg_search_module(PULSEAUDIO REQUIRED libpulse)
 pkg_search_module(ICUUC REQUIRED icu-uc)
 pkg_search_module(TBB REQUIRED tbb)
 pkg_search_module(SDL2 REQUIRED sdl2)
+pkg_search_module(FMT REQUIRED fmt)
 
 set(CMAKE_AR gcc-ar)
 set(CMAKE_RANLIB gcc-ranlib)

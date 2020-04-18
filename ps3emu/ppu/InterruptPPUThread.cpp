@@ -34,7 +34,7 @@ void InterruptPPUThread::disestablish() {
 
 void InterruptPPUThread::establish(SPUThread* thread) {
     _establishedThread = thread;
-    thread->setInterruptHandler(_mask2, [=] {
+    thread->setInterruptHandler(_mask2, [this] {
         _queue.send({ InterruptType::Spu });
     });
 }

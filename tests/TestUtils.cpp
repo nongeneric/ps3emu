@@ -9,7 +9,7 @@
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 #include <unistd.h>
 
 static const char* runnerPath = "../ps3run/ps3run";

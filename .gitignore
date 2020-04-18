@@ -3,3 +3,7 @@
 *.db*
 *.autosave
 *.i
+tests/binaries/ppu_spu_round_trip/output
+tests/binaries/ppu_fios/sys_cache
+tests/binaries/sys_cache
+tests/binaries/sysutil_save_basic_auto_only/SAVEDATA

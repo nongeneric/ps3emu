@@ -163,9 +163,9 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
                                                  "stack allock"));
     g_state.memalloc = _internalMemoryManager.get();
     g_state.heapalloc = _heapMemoryManager.get();
-    
+
     _threads.emplace_back(std::make_unique<PPUThread>(
-        [=](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); }, true));
+        [this](auto t, auto e, auto p) { ppuThreadEventHandler(t, e, p); }, true));
     _rsx.reset(new Rsx());
     _elf.reset(new ELFLoader());
     _elf->load(elfPath);
@@ -400,7 +400,7 @@ uint64_t Process::createThread(uint32_t stackSize,
                                bool start) {
     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     _threads.emplace_back(std::make_unique<PPUThread>(
-        [=](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); }, false));
+        [this](auto t, auto e, auto p) { ppuThreadEventHandler(t, e, p); }, false));
     auto t = _threads.back().get();
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     t->setGPR(3, arg);
@@ -421,7 +421,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
                                         bool start) {
     boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
     auto t = new InterruptPPUThread(
-        [=](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); });
+        [this](auto t, auto e, auto p) { this->ppuThreadEventHandler(t, e, p); });
     t->setArg(arg);
     t->setEntry(entryPointDescriptorVa);
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
@@ -511,7 +511,7 @@ PPUThread* Process::getThread(uint64_t id) {
 uint32_t Process::createSpuThread(std::string name) {
     boost::lock_guard<boost::recursive_mutex> _(_spuThreadMutex);
     _spuThreads.emplace_back(
-        std::make_shared<SPUThread>(name, [=](auto t, auto e) {
+        std::make_shared<SPUThread>(name, [this](auto t, auto e) {
             auto oneTime = std::make_shared<OneTimeEvent>();
             _eventQueue.enqueue(ThreadEvent{SPUThreadEventInfo{e, t}, oneTime});
             oneTime->wait();
