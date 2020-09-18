@@ -1,6 +1,7 @@
 #include <QProcess>
 #include "ps3emu/RewriterUtils.h"
 #include "ps3emu/utils.h"
+#include "ps3emu/utils/ranges.h"
 #include "ps3emu/build-config.h"
 #include "ps3emu/Config.h"
 #include "TestUtils.h"
@@ -12,7 +13,6 @@
 #include <catch2/catch.hpp>
 #include <unistd.h>
 
-static const char* runnerPath = "../ps3run/ps3run";
 using namespace boost;
 
 std::string startWaitGetOutput(std::vector<std::string> args,
@@ -25,13 +25,20 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     }
     list << "--elf" << QString::fromStdString(args.front());
     list << "--args" << QString::fromStdString(argstr);
-    proc.start(runnerPath, list);
+
+    auto runnerPath = (std::filesystem::path(g_ps3bin) / "ps3run/ps3run").string();
+    auto argsStr = ssnprintf(
+        "%s %s",
+        runnerPath,
+        boost::join(list | ranges::views::transform(&QString::toStdString), " "));
+
+    proc.start(runnerPath.c_str(), list);
     if (!proc.waitForStarted())
-        throw std::runtime_error("can't start process");
+        throw std::runtime_error("can't start ps3run: " + argsStr);
     if (!proc.waitForFinished(180 * 1000))
-        throw std::runtime_error("process timed out");
+        throw std::runtime_error("ps3run timed out: " + argsStr);
     if (proc.exitCode())
-        throw std::runtime_error("process exited with error");
+        throw std::runtime_error("ps3run exited with error: " + argsStr);
     return QString(proc.readAll()).toStdString();
 }
 

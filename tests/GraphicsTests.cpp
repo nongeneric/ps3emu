@@ -17,7 +17,7 @@ void compareLastFrame(std::string expected, int n = 0, int tolerance = 5, int sa
     comparisonNum++;
     QProcess proc;
     auto id = lastProcId;
-    auto args = QStringList() 
+    auto args = QStringList()
         << "-metric"
         << "AE"
         << "-alpha" << "opaque"
@@ -29,12 +29,12 @@ void compareLastFrame(std::string expected, int n = 0, int tolerance = 5, int sa
     REQUIRE( proc.exitCode() != 2 );
     auto output = QString(proc.readAllStandardError()).toInt();
     if (output > safePixels) {
-        args = QStringList() 
+        args = QStringList()
             << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d.png", testDir, id, n))
             << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d_bad%d.png", testDir, id, n, comparisonNum));
         proc.start("cp", args);
         proc.waitForFinished(-1);
-        args = QStringList() 
+        args = QStringList()
             << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d.png", testDir, id, n))
             << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d_bad%d.png", testDir, id, n, comparisonNum));
         proc.start("cp", args);
@@ -56,12 +56,18 @@ void runAndWait(std::string path, bool gcmviz = false, bool nocapture = false) {
         if (!nocapture) {
             args << "--capture-rsx";
         }
-    }   
+    }
     proc.start(gcmviz ? gcmvizPath : runnerPath, args);
     lastProcId = proc.processId();
     proc.waitForFinished(-1);
     if (proc.exitCode() != 0) {
         WARN(path);
+        if (proc.exitCode()) {
+            auto stdOut = proc.readAllStandardOutput().toStdString();
+            auto stdErr = proc.readAllStandardError().toStdString();
+            WARN(stdOut);
+            WARN(stdErr);
+        }
         REQUIRE( proc.exitCode() == 0 );
     }
 }

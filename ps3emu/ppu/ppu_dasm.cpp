@@ -86,7 +86,7 @@ using namespace boost::endian;
 #endif
 
 namespace {
-    
+
 alignas(16) static const __m128i BYTE_SHIFT_RIGHT_SHUFFLE_CONTROL[17] {
     _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
     _mm_set_epi8(-1, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1),
@@ -122,30 +122,30 @@ alignas(16) static const __m128i VSPLTH_SHUFFLE_CONTROL[8] {
     _mm_set_epi8(7, 6, 7, 6, 7, 6, 7, 6, 7, 6, 7, 6, 7, 6, 7, 6),
     _mm_set_epi8(5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4),
     _mm_set_epi8(3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2),
-    _mm_set_epi8(1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0), 
+    _mm_set_epi8(1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0),
 };
 
 static const __m128i VMRGHH1_SHUFFLE_CONTROL =
     _mm_set_epi8(15, 14, -1, -1, 13, 12, -1, -1, 11, 10, -1, -1, 9, 8, -1, -1);
-    
+
 static const __m128i VMRGHH2_SHUFFLE_CONTROL =
     _mm_set_epi8(-1, -1, 15, 14, -1, -1, 13, 12, -1, -1, 11, 10, -1, -1, 9, 8);
 
 static const __m128i VMRGLH1_SHUFFLE_CONTROL =
     _mm_set_epi8(7, 6, -1, -1, 5, 4, -1, -1, 3, 2, -1, -1, 1, 0, -1, -1);
-    
+
 static const __m128i VMRGLH2_SHUFFLE_CONTROL =
     _mm_set_epi8(-1, -1, 7, 6, -1, -1, 5, 4, -1, -1, 3, 2, -1, -1, 1, 0);
 
 static const __m128i VMRGHW1_SHUFFLE_CONTROL =
     _mm_set_epi8(15, 14, 13, 12, -1, -1, -1, -1, 11, 10, 9, 8, -1, -1, -1, -1);
-    
+
 static const __m128i VMRGHW2_SHUFFLE_CONTROL =
     _mm_set_epi8(-1, -1, -1, -1, 15, 14, 13, 12, -1, -1, -1, -1, 11, 10, 9, 8);
-    
+
 static const __m128i VMRGLW1_SHUFFLE_CONTROL =
     _mm_set_epi8(7, 6, 5, 4, -1, -1, -1, -1, 3, 2, 1, 0, -1, -1, -1, -1);
-    
+
 static const __m128i VMRGLW2_SHUFFLE_CONTROL =
     _mm_set_epi8(-1, -1, -1, -1, 7, 6, 5, 4, -1, -1, -1, -1, 3, 2, 1, 0);
 
@@ -187,7 +187,7 @@ static const __m128i LVSL_TABLE[] = {
     _mm_set_epi64x(0x0F10111213141516ull, 0x1718191A1B1C1D1Eull),
 };
 
-}    
+}
 // Branch I-form, p24
 
 inline uint64_t getNIA(IForm* i, uint64_t cia) {
@@ -3309,7 +3309,7 @@ EMU_REWRITE(LVEWX, SIMDForm, i->rA_u(), i->rB_u(), i->vD_u())
 
 
 PRINT(VSPLTW, SIMDForm) {
-    *result = format_nnn("vspltw", i->vD(), i->vB(), i->UIMM());
+    *result = format_nnn("vspltw", i->vD(), i->vB(), i->UIMM2());
 }
 
 #define _VSPLTW(_vb, _uimm, _vd) { \
@@ -3317,10 +3317,10 @@ PRINT(VSPLTW, SIMDForm) {
     auto d = _mm_shuffle_epi8(b, VSPLTW_SHUFFLE_CONTROL[_uimm]); \
     TH->r(_vd).set_xmm(d); \
 }
-EMU_REWRITE(VSPLTW, SIMDForm, i->vB_u(), i->UIMM_u(), i->vD_u())
+EMU_REWRITE(VSPLTW, SIMDForm, i->vB_u(), i->UIMM2_u(), i->vD_u())
 
 PRINT(VSPLTH, SIMDForm) {
-    *result = format_nnn("vsplth", i->vD(), i->vB(), i->UIMM());
+    *result = format_nnn("vsplth", i->vD(), i->vB(), i->UIMM3());
 }
 
 #define _VSPLTH(_vb, _uimm, _vd) { \
@@ -3328,7 +3328,7 @@ PRINT(VSPLTH, SIMDForm) {
     auto d = _mm_shuffle_epi8(b, VSPLTH_SHUFFLE_CONTROL[_uimm]); \
     TH->r(_vd).set_xmm(d); \
 }
-EMU_REWRITE(VSPLTH, SIMDForm, i->vB_u(), i->UIMM_u(), i->vD_u())
+EMU_REWRITE(VSPLTH, SIMDForm, i->vB_u(), i->UIMM3_u(), i->vD_u())
 
 PRINT(VSPLTISH, SIMDForm) {
     *result = format_nn("vspltish", i->vD(), i->SIMM());

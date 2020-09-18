@@ -23,7 +23,6 @@
 #include <QStringList>
 #include "stdio.h"
 #include <regex>
-#include <boost/range/algorithm.hpp>
 #include <boost/thread/locks.hpp>
 #include <filesystem>
 #include <set>
@@ -37,7 +36,7 @@ public:
         : _model(model) {
         _rows = rows == 0 ? _model->getMaxRow() : rows;
     }
-        
+
     void track() {
         for (auto r = _model->getMinRow(); r <= _rows; r += _model->getRowStep()) {
             for (auto c = 0; c < _model->getColumnCount(); ++c) {
@@ -47,12 +46,12 @@ public:
             }
         }
     }
-    
+
     bool isHighlighted(uint64_t row, int col) {
         auto pair = std::make_pair(row, col);
         return _map[pair].first != _map[pair].second;
     }
-    
+
     void reset() {
         _map.clear();
         track();
@@ -63,7 +62,7 @@ public:
 QString printHex(void* ptr, int len) {
     QString res;
     auto bytes = reinterpret_cast<uint8_t*>(ptr);
-    for (auto byte = bytes; byte != bytes + len; ++byte) { 
+    for (auto byte = bytes; byte != bytes + len; ++byte) {
         res += QString("%1 ").arg(*byte, 2, 16, QChar('0'));
     }
     return res;
@@ -75,12 +74,12 @@ class MemoryDumpModel : public MonospaceGridModel {
 public:
     MemoryDumpModel() : _thread(nullptr), _spuThread(nullptr) {
     }
-    
+
     void setThread(PPUThread* thread) {
         _thread = thread;
         _spuThread = nullptr;
     }
-    
+
     void setThread(SPUThread* thread) {
         _thread = nullptr;
         _spuThread = thread;
@@ -116,27 +115,27 @@ public:
             }
         }
     }
-    
+
     virtual uint64_t getMinRow() override {
         return 0;
     }
-    
+
     virtual uint64_t getMaxRow() override {
         return -1;
     }
-    
+
     virtual int getColumnCount() override {
         return 3;
     }
-    
+
     virtual void update() override {
         MonospaceGridModel::update();
     }
-    
+
     virtual uint64_t getRowStep() override {
         return 16;
     }
-    
+
     virtual bool isHighlighted(uint64_t row, int col) override {
         return false;
     }
@@ -151,35 +150,35 @@ public:
     GPRModel() : _thread(nullptr), _spuThread(nullptr), _tracker(this) {
         _tracker.reset();
     }
-    
+
     void toggleFPR() {
         _view = (_view + 1) % 4;
         _tracker.reset();
         update();
     }
-    
+
     QString print(uint64_t value) {
         return QString("%1").arg(value, 16, 16, QChar('0'));
     }
-    
+
     QString print(uint32_t value) {
         return QString("%1").arg(value, 8, 16, QChar('0'));
     }
-    
+
     QString printBit(uint8_t value) {
         return QString("%1").arg(value);
     }
-    
+
     void setThread(PPUThread* thread) {
         _thread = thread;
         _spuThread = nullptr;
     }
-    
+
     void setThread(SPUThread* thread) {
         _thread = nullptr;
         _spuThread = thread;
     }
-    
+
     QString getPPUCell(uint64_t row, int col) {
         if (col == 0) {
             if (8 <= row && row <= 15) {
@@ -266,11 +265,11 @@ public:
         }
         return "";
     }
-    
+
     QString getSPUCell(uint64_t row, int col) {
         if (col == 0) {
             switch (row) {
-                case 0: return "NIP";   
+                case 0: return "NIP";
             }
         }
         if (col == 1) {
@@ -296,7 +295,7 @@ public:
         }
         return "";
     }
-    
+
     virtual QString getCell(uint64_t row, int col) override {
         if (_thread && row < 32)
             return getPPUCell(row, col);
@@ -304,24 +303,24 @@ public:
             return getSPUCell(row, col);
         return "";
     }
-    
+
     virtual uint64_t getMinRow() override {
         return 0;
     }
-    
+
     virtual uint64_t getMaxRow() override {
         return 127;
     }
-    
+
     virtual int getColumnCount() override {
         return 4;
     }
-    
+
     virtual void update() override {
         _tracker.track();
         MonospaceGridModel::update();
     }
-    
+
     virtual bool isHighlighted(uint64_t row, int col) override {
         return _tracker.isHighlighted(row, col);
     }
@@ -332,7 +331,7 @@ class DasmModel : public MonospaceGridModel {
     SPUThread* _spuThread;
     ELFLoader* _elf;
     std::vector<EmbeddedElfInfo> _spuElfs;
-    
+
     bool isSpuElfAddress(uint32_t va) {
         for (auto& elf : _spuElfs) {
             if (elf.startOffset <= va && va < elf.startOffset + elf.size)
@@ -340,11 +339,11 @@ class DasmModel : public MonospaceGridModel {
         }
         return false;
     }
-    
+
 public:
     DasmModel() : _thread(nullptr), _spuThread(nullptr), _elf(nullptr) {
     }
-    
+
     void updateSpuElfs() {
         _spuElfs.clear();
         for (auto& segment : g_state.proc->getSegments()) {
@@ -358,21 +357,21 @@ public:
             }
         }
     }
-    
+
     void setThread(PPUThread* thread) {
         //updateSpuElfs();
         _thread = thread;
         _spuThread = nullptr;
         _elf = g_state.proc->elfLoader();
     }
-    
+
     void setThread(SPUThread* thread) {
         //updateSpuElfs();
         _thread = nullptr;
         _spuThread = thread;
         _elf = nullptr;
     }
-    
+
     virtual QString getCell(uint64_t row, int col) override {
         if (!_thread && !_spuThread)
             return "";
@@ -383,7 +382,7 @@ public:
         auto spu = _spuThread && row < LocalStorageSize - 4;
         if ((!ppu && !spu) || col == 2)
             return "";
-        
+
         uint32_t instr;
         if (ppu) {
             try {
@@ -425,23 +424,23 @@ public:
         }
         return "";
     }
-    
+
     virtual uint64_t getMinRow() override {
         return 0;
     }
-    
+
     virtual uint64_t getMaxRow() override {
         return -1;
     }
-    
+
     virtual int getColumnCount() override {
         return 5;
     }
-    
+
     virtual uint64_t getRowStep() override {
         return 4;
     }
-    
+
     virtual bool isHighlighted(uint64_t row, int col) override {
         if (_thread)
             return row == _thread->getNIP();
@@ -449,7 +448,7 @@ public:
             return row == _spuThread->getNip();
         return false;
     }
-    
+
     virtual bool pointsTo(uint64_t row, uint64_t& to, bool& highlighted) override {
         if (!_thread || !g_state.mm->isAllocated(row))
             return false;
@@ -751,15 +750,15 @@ void DebuggerModel::execSingleCommand(QString command) {
         messagef("waiting for module %s", _moduleToWait);
         return;
     }
-    
+
     auto expr = command.section(':', 1, 1);
     if (name.isEmpty() || expr.isEmpty()) {
         emit message("incorrect command format");
         return;
     }
-    
+
     auto exprVal = evalExpr(expr.toStdString());
-    
+
     try {
         if (name == "spursb") {
             auto buffer = (char*)g_state.mm->getMemoryPointer(exprVal, 1);
@@ -957,7 +956,7 @@ void DebuggerModel::dumpThreads() {
     }
     auto printSpuThread = [&](auto i, auto th, auto prefix) {
         auto state = th->suspended() ? "SUSPENDED"
-                   : th->dbgIsPaused() ? "PAUSED" 
+                   : th->dbgIsPaused() ? "PAUSED"
                    : "RUNNING";
         emit messagef("%s[%03d]%s %08x %08x %08x  %08x  %s  %s",
                       prefix,
@@ -976,7 +975,7 @@ void DebuggerModel::dumpThreads() {
         printSpuThread(i, th, "");
         i++;
     }
-    
+
     std::set<uint32_t> printed;
     for (auto& group : getThreadGroups()) {
         i = 0u;
@@ -987,7 +986,7 @@ void DebuggerModel::dumpThreads() {
             i++;
         }
     }
-    
+
     i = 0u;
     emit messagef("No group");
     for (auto& th : allSpuThreads) {
@@ -1014,23 +1013,23 @@ void DebuggerModel::dumpImports() {
          if (elfs.find(s.elf.get()) != end(elfs))
             continue;
         elfs.insert(s.elf.get());
-        
+
         emit message(ssnprintf("module %s", s.elf->shortName()).c_str());
-        
+
         prx_import_t* imports;
         int count;
         std::tie(imports, count) = s.elf->imports();
-        
+
         for (auto i = 0; i < count; ++i) {
             std::string name;
             readString(g_state.mm, imports[i].name, name);
             emit message(ssnprintf("  import %s", name).c_str());
-            
+
             auto printImports = [&](auto idsVa, auto stubsVa, auto count, auto type, auto isVar) {
                 auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(idsVa, count * 4);
                 auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(stubsVa, count * 4);
                 for (auto j = 0; j < count; ++j) {
-                    auto segment = boost::find_if(segments, [=](auto& s) {
+                    auto segment = ranges::find_if(segments, [=](auto& s) {
                         auto stub = stubs[j];
                         if (isVar) {
                             auto tocVa = g_state.mm->load32(stubs[j] + 4);
@@ -1092,7 +1091,7 @@ void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
     auto traceScript = "/tmp/ps3trace-spu-script";
     TraceFile f(tracefile);
     std::map<std::string, int> counts;
-    
+
     auto scriptf = fopen(traceScript, "r");
     if (va == 0 && scriptf) {
         char command;
@@ -1108,7 +1107,7 @@ void DebuggerModel::spuTraceTo(ps3_uintptr_t va) {
     } else {
         spuTraceTo(f, va, counts);
     }
-    
+
     printFrequencies(f, counts);
 
     if (scriptf) {
@@ -1145,7 +1144,7 @@ void DebuggerModel::ppuTraceTo(ps3_uintptr_t va) {
     TraceFile f(tracefile);
     auto traceScript = "/tmp/ps3trace-ppu-script";
     std::map<std::string, int> counts;
-    
+
     auto scriptf = fopen(traceScript, "r");
     if (va == 0 && scriptf) {
         char command;
@@ -1320,7 +1319,7 @@ struct StackFrame {
 };
 
 std::vector<StackFrame> walkStack(uint64_t backChain) {
-    std::vector<StackFrame> frames;   
+    std::vector<StackFrame> frames;
     for (;;) {
         backChain = g_state.mm->load64(backChain);
         if (!backChain)
@@ -1355,7 +1354,7 @@ void DebuggerModel::dumpExecutionMap() {
                 va -= s.va;
             }
         }
-        
+
         auto entry = db.findPpuEntry(s.elf->elfName());
         if (entry) {
             std::copy(begin(entries), end(entries), std::back_inserter(entry->leads));
@@ -1368,7 +1367,7 @@ void DebuggerModel::dumpExecutionMap() {
             newEntry.isPPU = true;
             db.insertEntry(newEntry);
         }
-        
+
         messagef("dumping %d entries into %s", entries.size(), s.elf->shortName());
         isPrimary = false;
     }

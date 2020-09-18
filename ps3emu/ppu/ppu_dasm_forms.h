@@ -367,6 +367,8 @@ struct SIMDForm : public FormBase {
     BIT_FIELD(SHB, 22, 26, BitFieldType::Unsigned)
     BIT_FIELD(SIMM, 11, 16, BitFieldType::Signed)
     BIT_FIELD(UIMM, 11, 16)
+    BIT_FIELD(UIMM3, 13, 16)
+    BIT_FIELD(UIMM2, 14, 16)
     BIT_FIELD(VA_XO, 26, 32)
     BIT_FIELD(VX_XO, 21, 32)
     BIT_FIELD(VXR_XO, 22, 32)
