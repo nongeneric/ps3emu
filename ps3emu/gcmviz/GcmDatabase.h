@@ -32,7 +32,7 @@ public:
     void insertCommand(GcmCommand command);
     int frames();
     int commands(int frame);
-    GcmCommand getCommand(unsigned frame, unsigned num);
+    GcmCommand getCommand(unsigned frame, unsigned num, bool fillBlob);
     void close();
 };
 

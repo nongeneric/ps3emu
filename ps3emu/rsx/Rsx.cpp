@@ -743,7 +743,7 @@ void Rsx::drawStats() {
         auto [sum, count] = counter.value();
         vec.push_back({entry, count, sum});
     }
-    ranges::sort(vec, std::less<>(), [](auto& x) { return std::get<2>(x); });
+    ranges::sort(vec, std::greater<>(), [](auto& x) { return std::get<2>(x); });
 
     int i = 0;
     for (auto& [entry, count, sum] : vec) {
@@ -773,25 +773,27 @@ void Rsx::drawStats() {
         total += sumValue;                                                          \
     }
 
-    STAT_LINE("texture", _textureCounter);
-    STAT_LINE("fragment sh", _fragmentShaderCounter);
-    STAT_LINE("vertex sh", _vertexShaderCounter);
-    STAT_LINE("fragment retr", _fragmentShaderRetrieveCounter);
-    STAT_LINE("vertex retr", _vertexShaderRetrieveCounter);
-    STAT_LINE("textureCache", _textureCacheCounter);
-    STAT_LINE("resetCache", _resetCacheCounter);
-    STAT_LINE("linkShader", _linkShaderCounter);
-    STAT_LINE("vda", _vdaCounter);
-    STAT_LINE("waitForIdle", _waitingForIdleCounter);
-    STAT_LINE("index copying", _indexArrayProcessingCounter);
-    STAT_LINE("load texture", _loadTextureCounter);
-    STAT_LINE("callback", _callbackCounter);
-    STAT_LINE("semaphore", _semaphoreAcquireCounter);
+    if (log_should(log_info, log_type_t::perf)) {
+        STAT_LINE("texture", _textureCounter);
+        STAT_LINE("fragment sh", _fragmentShaderCounter);
+        STAT_LINE("vertex sh", _vertexShaderCounter);
+        STAT_LINE("fragment retr", _fragmentShaderRetrieveCounter);
+        STAT_LINE("vertex retr", _vertexShaderRetrieveCounter);
+        STAT_LINE("textureCache", _textureCacheCounter);
+        STAT_LINE("resetCache", _resetCacheCounter);
+        STAT_LINE("linkShader", _linkShaderCounter);
+        STAT_LINE("vda", _vdaCounter);
+        STAT_LINE("waitForIdle", _waitingForIdleCounter);
+        STAT_LINE("index copying", _indexArrayProcessingCounter);
+        STAT_LINE("load texture", _loadTextureCounter);
+        STAT_LINE("callback", _callbackCounter);
+        STAT_LINE("semaphore", _semaphoreAcquireCounter);
 
-    _context->statText.line(
-        ssnprintf("total time: %1.4f (real), %1.4f (frame adjusted)",
-                  total,
-                  total / fpsCount));
+        _context->statText.line(
+            ssnprintf("total time: %1.4f (real), %1.4f (frame adjusted)",
+                    total,
+                    total / fpsCount));
+    }
 
     _context->statText.render(_window.width(), _window.height(), {0,1,0,1}, {});
 }
@@ -2040,6 +2042,26 @@ void Rsx::transferImage() {
                surface.destOffset < buf.offset + buf.pitch * buf.height;
     }) != end(_context->displayBuffers))
         return;
+
+    if (!isSwizzle && surface.format == ScaleSettingsFormat::a8r8g8b8 &&
+        scale.format == ScaleSettingsFormat::a8r8g8b8 &&
+        surface.pitch == scale.pitch && scale.inH == scale.outH &&
+        scale.clipX == 0 && scale.clipY == 0 && scale.outX == 0 && scale.outY == 0)
+    {
+        auto size = scale.pitch * scale.inH;
+        if (scale.location == MemoryLocation::Local && surface.destLocation == MemoryLocation::Local) {
+            glCopyNamedBufferSubData(_context->localMemoryBuffer.handle(),
+                                     _context->localMemoryBuffer.handle(),
+                                     scale.offset,
+                                     surface.destOffset,
+                                     size);
+            waitForIdle();
+        } else {
+            memmove(dest, src, size);
+        }
+        invalidateCaches(destEa, 1 << 20);
+        return;
+    }
 
     auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
     auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;

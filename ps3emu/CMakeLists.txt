@@ -87,7 +87,7 @@ set(SRC
     utils/BZipFile.cpp
     utils/TraceFile.h
     utils/TraceFile.cpp
-    
+
     libs/sys.cpp
     libs/fs.cpp
     libs/Controller.cpp
@@ -134,8 +134,8 @@ set(SRC
 
 if(${EMU_CONFIGURATION_VTUNE})
     set(SRC ${SRC}
-        /opt/intel/vtune_amplifier/sdk/src/ittnotify/ittnotify_static.c
-        /opt/intel/vtune_amplifier/sdk/src/ittnotify/jitprofiling.c
+        /opt/intel/vtune_profiler/sdk/src/ittnotify/ittnotify_static.c
+        /opt/intel/vtune_profiler/sdk/src/ittnotify/jitprofiling.c
     )
 endif()
 

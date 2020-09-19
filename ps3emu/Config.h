@@ -15,7 +15,7 @@ struct SysPrxInfo {
 
 class Config {
     std::string _configPath;
-    
+
 public:
     Config();
     std::vector<std::string> x86Paths;
@@ -23,7 +23,8 @@ public:
     std::string configDirPath;
     std::vector<SysPrxInfo> sysPrxInfos;
     bool captureAudio = false;
-    
+    bool fullscreen = false;
+
     void save();
 };
 

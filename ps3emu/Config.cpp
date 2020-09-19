@@ -35,6 +35,9 @@ Config::Config() {
             info.x86trace = j["sysPrxInfos"][info.name]["x86trace"];
             sysPrxInfos.push_back(info);
         }
+
+        auto fullscreen = j["fullscreen"];
+        this->fullscreen = fullscreen.is_null() ? false : fullscreen.get<bool>();
     }
 }
 
@@ -47,6 +50,7 @@ void Config::save() {
         j["sysPrxInfos"][info.name]["loadx86spu"] = info.loadx86spu;
         j["sysPrxInfos"][info.name]["x86trace"] = info.x86trace;
     }
+    j["fullscreen"] = fullscreen;
     std::ofstream f(_configPath);
     f << j.dump(4);
 }

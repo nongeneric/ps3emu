@@ -9,8 +9,8 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 set(Boost_USE_STATIC_LIBS       OFF)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package(Boost COMPONENTS 
-    thread system
+find_package(Boost COMPONENTS
+    thread system regex
     chrono program_options context REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
@@ -68,7 +68,7 @@ if(${EMU_CONFIGURATION_THREAD_SANITIZER})
 endif()
 
 if(${EMU_CONFIGURATION_VTUNE})
-    include_directories(/opt/intel/vtune_amplifier/include)
+    include_directories(/opt/intel/vtune_profiler/include)
     add_definitions(-DVTUNE_ENABLED)
 else()
     add_definitions(-DINTEL_NO_ITTNOTIFY_API)
@@ -96,12 +96,12 @@ if(${EMU_CONFIGURATION_DEBUG})
 
     # detect accesses to unallocated memory (massive performance hit)
     #add_definitions(-DMEMORY_PROTECTION)
-    
+
     set(CMAKE_CXX_FLAGS "-ggdb3 -O0 ${CMAKE_CXX_FLAGS}")
 else()
     # disable all asserts (moderate performance hit)
     add_definitions(-DNDEBUG)
-    
+
     set(CMAKE_CXX_FLAGS "-ggdb3 -O3 ${CMAKE_CXX_FLAGS}")
 endif()
 

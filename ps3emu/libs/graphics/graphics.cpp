@@ -1,5 +1,8 @@
 #include "graphics.h"
 
+#include <ps3emu/state.h>
+#include <ps3emu/Config.h>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -11,7 +14,8 @@ void Window::init() {
 #else
     glfwWindowHint(GLFW_CONTEXT_NO_ERROR, GL_TRUE);
 #endif
-    _window = glfwCreateWindow(width(), height(), "ps3emu", NULL, NULL);
+    auto monitor = g_state.config->fullscreen ? glfwGetPrimaryMonitor() : NULL;
+    _window = glfwCreateWindow(width(), height(), "ps3emu", monitor, NULL);
     if (!_window) {
         throw std::runtime_error("window creation failed");
     }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 class Process;
 class MainMemory;
 class InternalMemoryManager;
@@ -27,15 +29,16 @@ struct g_state_t {
     Rsx* rsx = nullptr;
     ELFLoader* elf = nullptr;
     IEmuCallbacks* callbacks = nullptr;
-    Config* config = nullptr;
-    ExecutionMapCollection* executionMaps = nullptr;
-    BBCallMap* bbcallMap = nullptr;
-    SPUGroupManager* spuGroupManager = nullptr;
+    std::unique_ptr<Config> config;
+    std::unique_ptr<ExecutionMapCollection> executionMaps;
+    std::unique_ptr<BBCallMap> bbcallMap;
+    std::unique_ptr<SPUGroupManager> spuGroupManager;
     thread_local static PPUThread* th;
     thread_local static SPUThread* sth;
     thread_local static bool rewriter_ncall;
     thread_local static ReservationGranule* granule;
     void init();
+    ~g_state_t();
 };
 
 extern g_state_t g_state;

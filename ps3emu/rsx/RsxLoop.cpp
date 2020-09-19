@@ -31,8 +31,8 @@ std::array<float, 4> parseColor(uint32_t raw) {
         BitField<24, 32> b;
     } arg = { raw };
     std::array<float, 4> color {
-        (float)arg.a.u() / 255, 
-        (float)arg.r.u() / 255, 
+        (float)arg.a.u() / 255,
+        (float)arg.r.u() / 255,
         (float)arg.g.u() / 255,
         (float)arg.b.u() / 255
     };
@@ -53,7 +53,7 @@ float fixedUint9ToFloat(uint32_t val) {
 
 int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     MethodHeader header { fast_endian_reverse(read[0]) };
-    
+
     if (header.value == 0) {
         assert(header.count_u() == 0);
         INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, getPut());
@@ -93,7 +93,7 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     auto& entry = _methodMap[offset / 4];
 
     RangeCloser closer;
-    if (log_should(log_warning, log_type_t::perf)) {
+    if (log_should(log_info, log_type_t::perf)) {
         closer = RangeCloser(&_perfMap[&entry]);
     }
 
@@ -161,8 +161,8 @@ void Rsx::replayLoop() {
         if (id == CommandId::StopReplay)
             break;
         std::vector<uint32_t> argValues;
-        std::transform(begin(command.args), 
-                       end(command.args), 
+        std::transform(begin(command.args),
+                       end(command.args),
                        std::back_inserter(argValues),
                        [](auto& arg) { return arg.value; });
         _currentReplayBlob = command.blob;
@@ -172,14 +172,14 @@ void Rsx::replayLoop() {
         switch (id) {
 #define X(x) case CommandId::x: replay(&Rsx::x, this, argValues); break;
             CommandIdX
-#undef X    
+#undef X
             default: break;
        }
-       
+
        if (info.action) {
            info.action(boost::chrono::steady_clock::now() - past);
        }
-       
+
        if (info.notifyCompletion) {
            _completionQueue.send(true);
        }
@@ -189,7 +189,7 @@ void Rsx::replayLoop() {
 void Rsx::shutdown() {
     if (!_initialized)
         return;
-    
+
     if (!_shutdown) {
         INFO(rsx) << "waiting for shutdown";
         {

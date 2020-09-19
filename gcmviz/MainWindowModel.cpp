@@ -48,7 +48,7 @@ class CommandTableModel : public QAbstractItemModel {
     GcmDatabase* _db;
     int _frame;
     std::map<int, chrono::nanoseconds> _durations;
-    
+
 public:
     CommandTableModel(GcmDatabase* db, int frame) : _db(db), _frame(frame) {}
 
@@ -74,20 +74,20 @@ public:
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 3;
     }
-    
+
     QModelIndex index(int row,
                       int column,
                       const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         return _db->commands(_frame);
     }
-    
+
     QVariant data(const QModelIndex& index,
                   int role = Qt::DisplayRole) const override {
-        auto command = _db->getCommand(_frame, index.row());
+        auto command = _db->getCommand(_frame, index.row(), false);
         auto id = (CommandId)command.id;
         if (role == Qt::BackgroundRole) {
            if (id == CommandId::DrawArrays || id == CommandId::DrawIndexArray ||
@@ -110,13 +110,9 @@ public:
                 return "";
             return QString::fromStdString(ssnprintf("%d", it->second.count()));
         }
-        auto display = printCommandId((CommandId)command.id);
-        if (command.blob.empty())
-            return display;
-        return QString::fromStdString(
-            ssnprintf("%s (blob %d)", display, command.blob.size()));
+        return printCommandId((CommandId)command.id);
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
@@ -126,7 +122,7 @@ class ArgumentTableModel : public QAbstractItemModel {
     GcmCommand _command;
 public:
     ArgumentTableModel(GcmCommand const& command) : _command(command) { }
-    
+
     QVariant headerData(int section,
                         Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override {
@@ -141,21 +137,21 @@ public:
         }
         return QVariant();
     }
-    
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 5;
     }
-    
+
     QModelIndex index(int row,
                       int column,
                       const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         return _command.args.size();
     }
-    
+
     QString printComment(GcmCommandArg arg) const {
         std::string res;
         if ((CommandId)_command.id == CommandId::ClearSurface && arg.name == "mask") {
@@ -176,7 +172,7 @@ public:
         }
         return QString::fromStdString(res);;
     }
-    
+
     QVariant data(const QModelIndex& index,
                   int role = Qt::DisplayRole) const override {
          if (role != Qt::DisplayRole)
@@ -191,7 +187,7 @@ public:
          }
          return QVariant();
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
@@ -201,7 +197,7 @@ class TextureTableModel : public QAbstractItemModel {
     Rsx* _rsx;
 public:
     TextureTableModel(Rsx* rsx) : _rsx(rsx) { }
-    
+
     QVariant headerData(int section,
                         Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override {
@@ -217,11 +213,11 @@ public:
         }
         return QVariant();
     }
-    
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 6;
     }
-    
+
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
@@ -257,30 +253,30 @@ public:
         }
         return QVariant();
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
-    
+
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         auto regular = _rsx->context()->textureCache.cacheSnapshot();
         auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
         return regular.size() + framebuffer.size();
     }
-    
+
     void showPreview(unsigned row) {
         auto regular = _rsx->context()->textureCache.cacheSnapshot();
         auto framebuffer = _rsx->context()->framebuffer->cacheSnapshot();
-        
+
         uint32_t width, height, levels;
         GLuint handle;
-        
+
         bool isRegular = row < regular.size();
-        
+
         if (isRegular) {
             auto info = regular[row];
             handle = info.value->handle();
@@ -295,11 +291,11 @@ public:
             height = entry.texture->height();
             levels = 1;
         }
-        
+
         execInRsxThread(_rsx, [&](auto duration) {
             dumpOpenGLTextureAllImages(handle, false, levels, "/tmp", "last_texture");
         });
-        
+
         QImage background(width, height, QImage::Format_RGBA8888);
         for (auto x = 0u; x < width; ++x) {
             for (auto y = 0u; y < height; ++y) {
@@ -307,26 +303,26 @@ public:
                 background.setPixel(x, y, dark ? 0xff666666 : 0xff999999);
             }
         }
-        
+
         QImage image(width, height, QImage::Format_RGBA8888);
         execInRsxThread(_rsx, [&](auto duration) {
             assert(glIsTexture(handle));
-            glGetTextureImage(handle, 
+            glGetTextureImage(handle,
                               0,
-                              GL_RGBA, 
-                              GL_UNSIGNED_INT_8_8_8_8_REV, 
+                              GL_RGBA,
+                              GL_UNSIGNED_INT_8_8_8_8_REV,
                               image.sizeInBytes(),
                               image.bits());
         });
-        
+
         if (!isRegular) {
             image = image.mirrored();
         }
-        
+
         auto dialog = new QDialog();
         auto imageView = new Ui::ImageView();
         imageView->setupUi(dialog);
-        
+
         auto setPixmap = [=](bool alpha1, bool alphaOnly) {
             auto background_copy = background;
             for (auto x = 0u; x < width; ++x) {
@@ -349,15 +345,15 @@ public:
             imageView->labelImage->setPixmap(pixmap);
         };
         setPixmap(false, false);
-        
+
         QObject::connect(imageView->cbAlpha1, &QAbstractButton::clicked, [=] {
             setPixmap(imageView->cbAlpha1->isChecked(), imageView->cbAlphaOnly->isChecked());
         });
-        
+
         QObject::connect(imageView->cbAlphaOnly, &QAbstractButton::clicked, [=] {
             setPixmap(imageView->cbAlpha1->isChecked(), imageView->cbAlphaOnly->isChecked());
         });
-        
+
         dialog->show();
     }
 };
@@ -366,7 +362,7 @@ class BufferTableModel : public QAbstractItemModel {
     Rsx* _rsx;
 public:
     BufferTableModel(Rsx* rsx) : _rsx(rsx) { }
-    
+
     QVariant headerData(int section,
                         Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override {
@@ -378,11 +374,11 @@ public:
         }
         return QVariant();
     }
-    
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 2;
     }
-    
+
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
@@ -395,15 +391,15 @@ public:
         }
         return QVariant();
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
-    
+
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         return 0;
     }
@@ -412,9 +408,9 @@ public:
 class ConstTableModel : public QAbstractItemModel {
     std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> _values;
 public:
-    ConstTableModel(std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values) 
+    ConstTableModel(std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values)
         : _values(values) { }
-    
+
     QVariant headerData(int section,
                         Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override {
@@ -429,15 +425,15 @@ public:
         }
         return QVariant();
     }
-    
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 5;
     }
-    
+
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
-        
+
         auto i = index.row() / 2;
         if (index.row() % 2 == 0) {
             switch (index.column()) {
@@ -449,27 +445,27 @@ public:
             }
         } else {
             switch (index.column()) {
-                case 1: return QString::fromStdString(ssnprintf("%g", 
+                case 1: return QString::fromStdString(ssnprintf("%g",
                     bit_cast<float>( std::get<1>(_values[i])[0] )));
-                case 2: return QString::fromStdString(ssnprintf("%g", 
+                case 2: return QString::fromStdString(ssnprintf("%g",
                     bit_cast<float>( std::get<1>(_values[i])[1] )));
-                case 3: return QString::fromStdString(ssnprintf("%g", 
+                case 3: return QString::fromStdString(ssnprintf("%g",
                     bit_cast<float>( std::get<1>(_values[i])[2] )));
-                case 4: return QString::fromStdString(ssnprintf("%g", 
+                case 4: return QString::fromStdString(ssnprintf("%g",
                     bit_cast<float>( std::get<1>(_values[i])[3] )));
             }
         }
         return QVariant();
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
-    
+
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         return _values.size() * 2;
     }
@@ -477,10 +473,10 @@ public:
 
 class VDATableModel : public QAbstractItemModel {
     Rsx* _rsx;
-    
+
 public:
     VDATableModel(Rsx* rsx) : _rsx(rsx) { }
-    
+
     QVariant headerData(int section,
                         Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override {
@@ -501,15 +497,15 @@ public:
         }
         return QVariant();
     }
-    
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         return 11;
     }
-    
+
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
-        
+
         if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size()) {
             switch (index.column()) {
                 case 0: return "INDEX";
@@ -525,7 +521,7 @@ public:
                 case 10: return "";
             }
         }
-        
+
         if ((unsigned)index.row() == _rsx->context()->vertexDataArrays.size() + 1) {
             switch (index.column()) {
                 case 0: return "TRANSFORM";
@@ -541,7 +537,7 @@ public:
                 case 10: return "";
             }
         }
-        
+
         auto vda = _rsx->context()->vertexDataArrays[index.row()];
         auto input = _rsx->context()->vertexInputs[index.row()];
         auto op = _rsx->context()->frequencyDividerOperation & (1 << index.row());
@@ -571,15 +567,15 @@ public:
         }
         return QVariant();
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
-    
+
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         return _rsx->context()->vertexDataArrays.size() + 2;
     }
@@ -593,7 +589,7 @@ class VDABufferTableModel : public QAbstractItemModel {
     bool _be;
     std::unique_ptr<OpenGLPreview> _openglPreview;
     bool isFeedback;
-    
+
 public:
     VDABufferTableModel(Rsx* rsx,
                         std::uint8_t* buffer,
@@ -604,7 +600,7 @@ public:
         : _rsx(rsx), _buffer(buffer), _size(size), _info(info), _be(be) {
         isFeedback = vdaIndex == 16;
     }
-    
+
     QVariant headerData(int section,
                         Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override {
@@ -619,25 +615,25 @@ public:
         }
         return QVariant();
     }
-    
+
     int columnCount(const QModelIndex& parent = QModelIndex()) const override {
         if (_info.type == VertexInputType::x11y11z10n)
             return 5;
         return _info.size + 1;
     }
-    
+
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
         if (role != Qt::DisplayRole)
             return QVariant();
-        
+
         auto offset = _info.stride * index.row();
         if (index.column() == 0) {
             return QString::fromStdString(ssnprintf("#%08x", offset));
         }
-        
+
         auto typeSize = vertexDataArrayTypeSize(_info.type);
         auto valueOffset = offset + (index.column() - 1) * typeSize;
-        
+
         if (_info.type == VertexInputType::x11y11z10n) {
             union {
                 uint32_t val;
@@ -655,34 +651,34 @@ public:
             assert(component < int(sizeof(rgb) / sizeof(float)));
             return rgb[component];
         }
-        
+
         if (_info.type == VertexInputType::s1) {
             assert(_be);
             auto u16 = *(big_uint16_t*)&_buffer[valueOffset];
             return (2.0 * u16 + 1.0) / 65535.0;
         }
-        
+
         if (_info.type == VertexInputType::f16) {
             assert(_be);
             auto u16 = *(big_uint16_t*)&_buffer[valueOffset];
             return _cvtsh_ss(u16);
         }
-        
+
         if (_info.type == VertexInputType::u8) {
             uint8_t u8Value = *(uint8_t*)&_buffer[valueOffset];
             return QString::fromStdString(ssnprintf("#%02x", u8Value));
         }
-        
+
         if (_info.type == VertexInputType::u16) {
             uint16_t value = *(big_uint16_t*)&_buffer[valueOffset];
             return QString::fromStdString(ssnprintf("#%04x", value));
         }
-        
+
         if (_info.type == VertexInputType::u32) {
             uint32_t value = *(big_uint32_t*)&_buffer[valueOffset];
             return QString::fromStdString(ssnprintf("#%08x", value));
         }
-        
+
         if (_info.type == VertexInputType::f32) {
             float fValue = bit_cast<float>(endian_reverse(*(uint32_t*)&_buffer[valueOffset]));
             if (!_be) {
@@ -690,18 +686,18 @@ public:
             }
             return QString::fromStdString(ssnprintf("%g", fValue));
         }
-        
+
         return QVariant();
     }
-    
+
     QModelIndex parent(const QModelIndex& child) const override {
         return QModelIndex();
     }
-    
+
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override {
         return createIndex(row, column);
     }
-    
+
     int rowCount(const QModelIndex& parent = QModelIndex()) const override {
         if (_info.frequency == 1)
             return _size;
@@ -709,7 +705,7 @@ public:
             return _info.frequency;
         return _size;
     }
-    
+
     void showPreview() {
         std::vector<PreviewVertex> vertices;
         auto ptr = _buffer;
@@ -726,7 +722,7 @@ public:
             ptr += _info.stride;
             vertices.push_back(v);
         }
-        
+
         _openglPreview.reset(new OpenGLPreview());
         _openglPreview->widget()->setVertices(vertices);
         _openglPreview->widget()->setMode(isFeedback ? _rsx->context()->feedbackMode
@@ -775,7 +771,7 @@ void MainWindowModel::update() {
     auto context = _rsx->context();
     if (context->vertexShader) {
         auto instructions = context->vertexInstructions.data();
-        std::array<int, 4> samplerSizes = { 
+        std::array<int, 4> samplerSizes = {
             context->vertexTextureSamplers[0].texture.dimension,
             context->vertexTextureSamplers[1].texture.dimension,
             context->vertexTextureSamplers[2].texture.dimension,
@@ -790,7 +786,7 @@ void MainWindowModel::update() {
                                          &usedConsts);
         _window.teVertexAsm->setText(QString::fromStdString(asmText));
         _window.teVertexGlsl->setText(QString::fromStdString(glslText));
-        
+
         std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
         auto uints = (std::array<uint32_t, 4>*)_rsx->context()->drawRingBuffer->current(vertexConstBuffer);
         for (auto constIndex : usedConsts) {
@@ -798,11 +794,11 @@ void MainWindowModel::update() {
         }
         auto vertexConstModel = new ConstTableModel(values);
         _window.twVertexConsts->setModel(vertexConstModel);
-        
+
         auto vertexBytecodeText = PrintVertexBytecode(&context->vertexInstructions[0]);
         _window.teVertexBytecode->setText(QString::fromStdString(vertexBytecodeText));
     }
-    
+
     if (context->fragmentShader) {
         auto fconst = (std::array<float, 4>*)context->drawRingBuffer->current(fragmentConstBuffer);
         auto key = context->fragmentShaderCache.unzip(&context->fragmentBytecode[0], fconst, isMrt(context->surface));
@@ -817,10 +813,10 @@ void MainWindowModel::update() {
                                                    mrt);
             _window.teFragmentAsm->setText(QString::fromStdString(asmText));
             _window.teFragmentGlsl->setText(QString::fromStdString(glslText));
-            
+
             auto bytecodeText = PrintFragmentBytecode(&context->fragmentBytecode[0]);
             _window.teFragmentBytecode->setText(QString::fromStdString(bytecodeText));
-            
+
             std::vector<std::tuple<unsigned, std::array<uint32_t, 4>>> values;
             auto ptr = (std::array<uint32_t, 4>*)context->drawRingBuffer->current(fragmentConstBuffer);
             for (auto i = 0u; i < context->fragmentConstCount; ++i) {
@@ -830,17 +826,17 @@ void MainWindowModel::update() {
             _window.twFragmentConsts->setModel(vertexConstModel);
         }
     }
-    
+
     auto textureModel = new TextureTableModel(_rsx.get());
     _window.twTextures->setModel(textureModel);
     QObject::disconnect(_window.twTextures, &QTableView::doubleClicked, 0, 0);
     QObject::connect(_window.twTextures, &QTableView::doubleClicked, [=] (auto index) {
         textureModel->showPreview(index.row());
     });
-    
+
     auto bufferModel = new BufferTableModel(_rsx.get());
     _window.twBuffers->setModel(bufferModel);
-    
+
     auto vdaModel = new VDATableModel(_rsx.get());
     QObject::disconnect(_window.twVertexDataArrays, &QTableView::clicked, 0, 0);
     QObject::connect(_window.twVertexDataArrays, &QTableView::clicked, [&] (auto index) {
@@ -877,9 +873,9 @@ void MainWindowModel::update() {
         auto vdaBufferModel = new VDABufferTableModel(
             _rsx.get(), mapped, index.row(), _lastDrawCount, info, be);
         _window.twVertexDataArraysBuffer->setModel(vdaBufferModel);
-        
+
         QObject::disconnect(_window.pbVisualizeGeometry, &QPushButton::clicked, 0, 0);
-        QObject::connect(_window.pbVisualizeGeometry, &QPushButton::clicked, [=] { 
+        QObject::connect(_window.pbVisualizeGeometry, &QPushButton::clicked, [=] {
             vdaBufferModel->showPreview();
         });
     });
@@ -890,7 +886,7 @@ void MainWindowModel::update() {
 void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
     if (frame >= (unsigned)_db.frames())
         return;
-    
+
     if (!_proc) {
         _proc.reset(new Process());
         _rsx.reset(new Rsx());
@@ -900,10 +896,10 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
         g_state.mm->mark(RsxFbBaseAddr, GcmLocalMemorySize, false, "gcmviz");
         g_state.mm->mark(HeapArea, 256u << 20, false, "gcmviz");
     }
-    
+
     std::vector<GcmCommand> commands;
     for (auto i = _currentCommand; i <= lastCommand; ++i) {
-        auto command = _db.getCommand(frame, i);
+        auto command = _db.getCommand(frame, i, true);
         commands.push_back(command);
     }
 
@@ -919,12 +915,12 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
             i++;
         }});
     }
-    
+
     _rsx->sendCommand(makeNopCommand());
     _rsx->receiveCommandCompletion();
-    
+
     update();
-    
+
     _currentCommand = (lastCommand + 1) % _db.commands(frame);
     if (_currentCommand == 0) {
         _currentFrame++;
@@ -935,7 +931,7 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
 void MainWindowModel::changeFrame() {
     auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames());
     _window.labelFrame->setText(QString::fromStdString(text));
-    
+
     _commandModel = new CommandTableModel(&_db, _currentFrame);
     auto proxyModel = new QSortFilterProxyModel();
     proxyModel->setFilterKeyColumn(1);
@@ -947,10 +943,10 @@ void MainWindowModel::changeFrame() {
     QObject::connect(selectionModel, &QItemSelectionModel::currentRowChanged, [=, this] (auto current) {
         if (current == QModelIndex())
             return;
-        auto command = _db.getCommand(_currentFrame, proxyModel->mapToSource(current).row());
+        auto command = _db.getCommand(_currentFrame, proxyModel->mapToSource(current).row(), false);
         _window.twArgs->setModel(new ArgumentTableModel(command));
     });
-    
+
     QObject::disconnect(_window.leSearchCommand, &QLineEdit::textChanged, 0, 0);
     QObject::connect(_window.leSearchCommand, &QLineEdit::textChanged, [=] (auto text) {
         proxyModel->setFilterRegExp(QRegExp(text, Qt::CaseInsensitive, QRegExp::FixedString));
@@ -986,17 +982,17 @@ MainWindowModel::MainWindowModel() : _lastDrawCount(0), _currentCommand(0), _cur
         vertexSamplers->addChild(new SamplerContextTreeItem(false, i));
         vertexSamplers->addChild(new SamplerTextureContextTreeItem(false, i));
     }
-    
+
     auto fragmentSamplers = new QTreeWidgetItem();
     fragmentSamplers->setText(0, "Fragment Samplers");
     for (auto i = 0u; i < 16; ++i) {
         fragmentSamplers->addChild(new SamplerContextTreeItem(true, i));
         fragmentSamplers->addChild(new SamplerTextureContextTreeItem(true, i));
     }
-    
+
     items.append(vertexSamplers);
     items.append(fragmentSamplers);
-    
+
     _window.contextTree->insertTopLevelItems(0, items);
     QObject::connect(_window.contextTree, &QTreeWidget::currentItemChanged, [=, this] (auto item) {
         this->updateContextTable();

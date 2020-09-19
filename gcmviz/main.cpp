@@ -1,5 +1,6 @@
 #include "MainWindowModel.h"
 #include "ps3emu/log.h"
+#include "ps3emu/state.h"
 #include <GLFW/glfw3.h>
 #include <QApplication>
 #include <QMainWindow>
@@ -11,6 +12,7 @@ using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
     log_init(log_console, "Irsx,Ilibs,Idebugger", log_simple);
+    g_state.init();
     std::string tracePath;
     bool replay;
     options_description consoleDescr("Allowed options");
@@ -34,11 +36,11 @@ int main(int argc, char *argv[]) {
         std::cout << consoleDescr;
         return 1;
     }
-    
+
     if (!glfwInit()) {
         throw std::runtime_error("glfw initialization failed");
     }
-    
+
     QApplication app(argc, argv);
     MainWindowModel mainWindowModel;
     if (!tracePath.empty()) {

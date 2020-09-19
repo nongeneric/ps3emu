@@ -49,7 +49,7 @@ auto sqlCreate =
     "   Value            BLOB,"
     "   PRIMARY KEY(CommandNum, CommandFrame)"
     ");";
-    
+
 }
 
 GcmDatabase::GcmDatabase() = default;
@@ -73,23 +73,27 @@ void GcmDatabase::insertCommand(GcmCommand command) {
     _db->Insert(blobSql, command.num, command.frame, command.blob);
 }
 
-GcmCommand GcmDatabase::getCommand(unsigned frame, unsigned num) {
+GcmCommand GcmDatabase::getCommand(unsigned frame, unsigned num, bool fillBlob) {
     auto sqlCommand = "SELECT Id FROM GcmCommands WHERE Num = ? AND Frame = ?;";
     auto id = _db->Select<db::ScalarInt>(sqlCommand, num, frame).front().value;
-    auto sqlArgs = 
+    auto sqlArgs =
         "SELECT Value, Name, Type FROM Args "
         "WHERE CommandNum = ? AND CommandFrame = ? "
         "ORDER BY Num ASC;";
     auto args = _db->Select<GcmCommandArg>(sqlArgs, num, frame);
-    auto sqlBlob = 
+    auto sqlBlob =
         "SELECT Value FROM Blobs "
         "WHERE CommandNum = ? AND CommandFrame = ?;";
-    auto blob = _db->Select<db::IntVector>(sqlBlob, num, frame).front().value;
+
+    std::vector<uint8_t> blob;
+    if (fillBlob) {
+        blob = _db->Select<db::IntVector>(sqlBlob, num, frame).front().value;
+    }
     return { frame, num, id, args, blob };
 }
 
 int GcmDatabase::frames() {
-    auto sql = 
+    auto sql =
         "SELECT COUNT(*) FROM"
         "    (SELECT DISTINCT Frame FROM GcmCommands);";
     return _db->Select<db::ScalarInt>(sql).front().value;

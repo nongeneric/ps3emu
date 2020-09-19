@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include "TestUtils.h"
+#include <boost/regex.hpp>
 #include <filesystem>
 #include <vector>
 
@@ -64,7 +65,7 @@ TEST_CASE("printf") {
 
 TEST_CASE("fcmpconv") {
     auto output = startWaitGetOutput({testPath("fcmpconv/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "b > c: 0\n"
         "b < c: 1\n"
         "b == c: 0\n"
@@ -83,7 +84,7 @@ TEST_CASE("fcmpconv") {
 
 TEST_CASE("matrixmul") {
     auto output = startWaitGetOutput({testPath("matrixmul/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "mul3 = 1.851600e+01\n"
         "isnan(NAN)         = 1\n"
         "isnan(INFINITY)    = 0\n"
@@ -132,7 +133,7 @@ TEST_CASE("matrixmul") {
 
 TEST_CASE("dtoa") {
     auto output = startWaitGetOutput({testPath("dtoa/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "3.13 = 3.13\n"
         "0.02380113 = 0.02380113\n"
         "3.23234 * 0.1292999 = 0.41794123876600003\n"
@@ -144,7 +145,7 @@ TEST_CASE("dtoa") {
 
 TEST_CASE("float_printf") {
     auto output = startWaitGetOutput({testPath("float_printf/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "18.516 = 1.851600e+01\n"
         "float = 4.179412e-01\n"
         "double = 4.179412e-01\n"
@@ -158,7 +159,7 @@ TEST_CASE("gcm_context_size") {
 
 TEST_CASE("gcm_memory_mapping") {
     auto output = startWaitGetOutput({testPath("gcm_memory_mapping/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "host_addr to offset: 0\n"
         "offset 0 to address == host_addr?: 1\n"
         "address 0xc0000005 to offset: 5\n"
@@ -167,7 +168,7 @@ TEST_CASE("gcm_memory_mapping") {
 
 TEST_CASE("hello_simd") {
     auto output = startWaitGetOutput({testPath("hello_simd/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "vector: 2,2,2,2\n"
         "x: 2\n"
         "y: 2\n"
@@ -227,7 +228,7 @@ TEST_CASE("hello_simd") {
 
 TEST_CASE("basic_large_cmdbuf") {
     auto output = startWaitGetOutput({testPath("basic_large_cmdbuf/a.elf")});
-    REQUIRE( output ==  
+    REQUIRE( output ==
         "end - begin = 6ffc\n"
         "success\n"
     );
@@ -240,7 +241,7 @@ TEST_CASE("ppu_threads") {
 
 TEST_CASE("ppu_threads_tls") {
     auto output = startWaitGetOutput({testPath("ppu_threads_tls/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "exitstatus: 125055; i: 4000\n"
         "primary thread tls_int: 500\n"
     );
@@ -258,7 +259,7 @@ TEST_CASE("ppu_threads_atomic_single_lwarx") {
 
 TEST_CASE("ppu_cellgame") {
     auto output = startWaitGetOutput({testPath("ppu_cellgame/USRDIR/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "title: GameUpdate Utility Sample\n"
         "gamedir: EMUGAME\n"
         "contentdir: /dev_hdd0\n"
@@ -269,7 +270,7 @@ TEST_CASE("ppu_cellgame") {
 
 TEST_CASE("ppu_cellSysutil") {
     auto output = startWaitGetOutput({testPath("ppu_cellSysutil/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "CELL_SYSUTIL_SYSTEMPARAM_ID_LANG = 1\n"
         "CELL_SYSUTIL_SYSTEMPARAM_ID_ENTER_BUTTON_ASSIGN = 1\n"
         "CELL_SYSUTIL_SYSTEMPARAM_ID_DATE_FORMAT = 1\n"
@@ -302,7 +303,7 @@ TEST_CASE("ppu_threads_lwmutex_lwcond") {
 
 TEST_CASE("ppu_threads_mutex_cond") {
     auto output = startWaitGetOutput({testPath("ppu_threads_mutex_cond/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "test_mutex: 0; i: 4000\n"
         "test_mutex_recursive: 0; i: 4000\n"
         "test_cond: 5015; i: 0\n"
@@ -311,7 +312,7 @@ TEST_CASE("ppu_threads_mutex_cond") {
 
 TEST_CASE("ppu_threads_rwlock") {
     auto output = startWaitGetOutput({testPath("ppu_threads_rwlock/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "test_rwlock_w: 0; i: 4000\n"
         "test_lwmutex: 40; i: 10\n"
     );
@@ -319,7 +320,7 @@ TEST_CASE("ppu_threads_rwlock") {
 
 TEST_CASE("ppu_threads_queue") {
     auto output = startWaitGetOutput({testPath("ppu_threads_queue/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "test_correctness(1): 0; i: 481200\n"
         "test_correctness(0): 0; i: 481200\n"
     );
@@ -327,7 +328,7 @@ TEST_CASE("ppu_threads_queue") {
 
 TEST_CASE("ppu_threads_lwcond_init") {
     auto output = startWaitGetOutput({testPath("ppu_threads_lwcond_init/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "sys_lwmutex_t.recursive_count 0\n"
         "sys_lwmutex_t.attribute 22\n"
         "sys_lwmutex_t.lock_var.all_info 0\n"
@@ -338,7 +339,7 @@ TEST_CASE("ppu_threads_lwcond_init") {
 
 TEST_CASE("ppu_syscache") {
     auto output = startWaitGetOutput({testPath("ppu_syscache/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "cellSysCacheMount() : 0x0  sysCachePath:[/dev_hdd1]\n"
         "cellSysCacheClear Ok\n"
         "Save sample data\n"
@@ -351,7 +352,7 @@ TEST_CASE("ppu_syscache") {
 
 TEST_CASE("ppu_threads_is_stack") {
     auto output = startWaitGetOutput({testPath("ppu_threads_is_stack/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "main thread: 1100\n"
         "other thread: 1100\n"
     );
@@ -359,7 +360,7 @@ TEST_CASE("ppu_threads_is_stack") {
 
 TEST_CASE("ppu_fs_readdir") {
     auto output = startWaitGetOutput({testPath("ppu_fs_readdir/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "type: 1, namelen: 1, name: .\n"
         "type: 1, namelen: 2, name: ..\n"
         "type: 2, namelen: 5, name: file1\n"
@@ -403,7 +404,7 @@ TEST_CASE("ppu_hash") {
 
 TEST_CASE("ppu_simd_math") {
     auto output = startWaitGetOutput({testPath("ppu_simd_math/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "Vector3(01): 5.280, 5.280, 5.280\n"
         "Vector3(02): 1.900, 1.900, 1.900\n"
         "Vector3(03): 6.200, 6.200, 6.200\n"
@@ -523,7 +524,7 @@ TEST_CASE("raw_spu_printf") {
 
 TEST_CASE("gcm_memory") {
     auto output = startWaitGetOutput({testPath("gcm_memory/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "* vidmem base: 0xc0000000\n"
         "* vidmem size: 0xf900000\n"
         "* IO size    : 0x100000\n"
@@ -616,7 +617,7 @@ TEST_CASE("gcm_memory") {
 
 TEST_CASE("gcm_transfer") {
     auto output = startWaitGetOutput({testPath("gcm_transfer/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "success 100\n"
         "success 100()\n"
         "success 101\n"
@@ -646,7 +647,7 @@ TEST_CASE("gcm_transfer") {
 
 TEST_CASE("opengl_hash") {
     auto output = startWaitGetOutput({testPath("opengl_hash/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "hash: 1d0\n"
     );
 }
@@ -667,7 +668,7 @@ TEST_CASE("raw_spu_opengl_dma") {
 
 TEST_CASE("ppu_dcbz") {
     auto output = startWaitGetOutput({testPath("ppu_dcbz/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "0000000000000000000000000000000000000000000000000000000000000000\n"
         "0000000000000000000000000000000000000000000000000000000000000000\n"
         "1111111111111111111111111111111111111111111111111111111111111111\n"
@@ -713,14 +714,14 @@ TEST_CASE("ppu_dcbz") {
 
 TEST_CASE("ppu_float_cmp") {
     auto output = startWaitGetOutput({testPath("ppu_float_cmp/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "1 1 1 0 0 0 1 0 "
     );
 }
 
 TEST_CASE("ppu_sraw") {
     auto output = startWaitGetOutput({testPath("ppu_sraw/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "1000\n"
         "1000\n"
         "250\n"
@@ -731,7 +732,7 @@ TEST_CASE("ppu_sraw") {
 
 TEST_CASE("ppu_fs") {
     auto output = startWaitGetOutput({testPath("ppu_fs/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "FILE 0:\n"
         "\t_Mode = 161\n"
         "\t_Idx = 0\n"
@@ -807,7 +808,7 @@ TEST_CASE("ppu_fs") {
 
 TEST_CASE("pngdec_ppu") {
     auto output = startWaitGetOutput({testPath("pngdec_ppu/a.elf")});
-    REQUIRE( output == 
+    REQUIRE( output ==
         "* displayInit: displayInit: create display ... WIDTH=1280, HEIGHT=720\n"
         "* createModules: cellPngDecCreate() returned CELL_OK\n"
         "* openStream: open filename = /app_home/SampleStream.png\n"
@@ -853,8 +854,8 @@ TEST_CASE("spurs_task_hello") {
 }
 
 TEST_CASE("spu_generic_test") {
-    auto output = startWaitGetOutput({testPath("spu_generic_test/a.elf")});
-    REQUIRE( output == 
+    std::string output = startWaitGetOutput({testPath("spu_generic_test/a.elf")});
+    std::string expected =
         "Creating an SPU thread group.\n"
         "Initializing SPU thread 0\n"
         "All SPU threads have been successfully initialized.\n"
@@ -1248,8 +1249,30 @@ TEST_CASE("spu_generic_test") {
         "o[383] = f0f1f2f3 f4f5f6f7 f8f9fafb fcfdfeff\n"
         "o[384] = 00010203 04050607 08090a0b 0c0d0e0f\n"
         "o[385] = 10111213 14151617 18191a1b 1c1d1e1f\n"
-        "complete"
-    );
+        "complete";
+
+    auto patch = [] (auto& text) {
+        text = boost::regex_replace(text, boost::regex("o\\[155.*?\\n"), [] (auto line) {
+            return boost::regex_replace(line.str(), boost::regex("[0-9a-f]{8}"), [] (auto num) {
+                return num.str().substr(0, 7) + "*";
+            });
+        });
+        text = boost::regex_replace(text, boost::regex("o\\[167.*?\\n"), [] (auto line) {
+            return boost::regex_replace(line.str(), boost::regex("[0-9a-f]{8}"), [] (auto num) {
+                return num.str().substr(0, 7) + "*";
+            });
+        });
+        text = boost::regex_replace(text, boost::regex("o\\[187.*?\\n"), [] (auto line) {
+            return boost::regex_replace(line.str(), boost::regex(" -0 "), [] (auto num) {
+                return " 0 ";
+            });
+        });
+    };
+
+    patch(output);
+    patch(expected);
+
+    REQUIRE( output == expected );
 }
 
 TEST_CASE("spu_sync_mutex") {

@@ -17,12 +17,17 @@ void compareLastFrame(std::string expected, int n = 0, int tolerance = 5, int sa
     comparisonNum++;
     QProcess proc;
     auto id = lastProcId;
+
+    auto badDiff = ssnprintf("%s/ps3frame-diff_%d_%d_bad%d.png", testDir, id, n, comparisonNum);
+    auto badFrame = ssnprintf("%s/ps3frame_%d_%d_bad%d.png", testDir, id, n, comparisonNum);
+
     auto args = QStringList()
         << "-metric"
         << "AE"
         << "-alpha" << "opaque"
         << "-fuzz" << QString("%1%%").arg(tolerance)
-        << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d.png", testDir, id, n)) << expected.c_str()
+        << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d.png", testDir, id, n))
+        << expected.c_str()
         << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d.png", testDir, id, n));
     proc.start("compare", args);
     proc.waitForFinished(-1);
@@ -31,17 +36,20 @@ void compareLastFrame(std::string expected, int n = 0, int tolerance = 5, int sa
     if (output > safePixels) {
         args = QStringList()
             << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d.png", testDir, id, n))
-            << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d_bad%d.png", testDir, id, n, comparisonNum));
+            << QString::fromStdString(badDiff);
         proc.start("cp", args);
         proc.waitForFinished(-1);
         args = QStringList()
             << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d.png", testDir, id, n))
-            << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d_bad%d.png", testDir, id, n, comparisonNum));
+            << QString::fromStdString(badFrame);
         proc.start("cp", args);
         proc.waitForFinished(-1);
         REQUIRE( proc.exitCode() == 0 );
     }
-    CHECK( output <= safePixels );
+
+    if (output > safePixels) {
+        FAIL(ssnprintf("Expected frame:\n  %s\nActual frame:\n  %s\nDiff:\n  %s\n", expected, badFrame, badDiff));
+    }
 }
 
 void runAndWait(std::string path, bool gcmviz = false, bool nocapture = false) {
@@ -299,7 +307,7 @@ TEST_CASE("performance_tips_advanced_poisson") {
 
 TEST_CASE("edge_fragment_patch_sample") {
     runAndWait(testPath("edge_fragment_patch_sample/a.elf"), false, true);
-    compareLastFrame(testPath("edge_fragment_patch_sample/ps3frame0.png"), 0);
+    compareLastFrame(testPath("edge_fragment_patch_sample/ps3frame0.png"), 0, 5, 10);
 }
 
 TEST_CASE("np_basic_render") {

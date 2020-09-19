@@ -14,8 +14,10 @@ thread_local ReservationGranule* g_state_t::granule = nullptr;
 void g_state_t::init() {
     if (config)
         return;
-    config = new Config();
-    executionMaps = new ExecutionMapCollection();
-    bbcallMap = new BBCallMap();
-    spuGroupManager = new SPUGroupManager();
+    config = std::make_unique<Config>();
+    executionMaps = std::make_unique<ExecutionMapCollection>();
+    bbcallMap = std::make_unique<BBCallMap>();
+    spuGroupManager = std::make_unique<SPUGroupManager>();
 }
+
+g_state_t::~g_state_t() {}
