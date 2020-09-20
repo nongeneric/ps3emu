@@ -180,7 +180,7 @@ void initAudio() {
                 assert(false);
             }
 
-            WARNING(audio) << message;
+            INFO(audio) << message;
         }
 
         return;

@@ -125,15 +125,37 @@ uint32_t calcBlockSize(unsigned channels) {
     return channels * sizeof(float) * CELL_AUDIO_BLOCK_SAMPLES;
 }
 
+struct EightChannels {
+    big_uint32_t left;
+    big_uint32_t right;
+    big_uint32_t center;
+    big_uint32_t lfe;
+    big_uint32_t leftSurround;
+    big_uint32_t rightSurround;
+    big_uint32_t leftExtend;
+    big_uint32_t rightExtend;
+};
+
+struct TwoChannels {
+    big_uint32_t left;
+    big_uint32_t right;
+};
+
 void PulseBackend::playbackLoop() {
     log_set_thread_name("emu_audioloop");
 
     std::vector<uint8_t> tempDest;
 
-    std::array<FILE*, 8> fCapture;
+    struct FCapture {
+        FILE* pulse{};
+        FILE* raw{};
+    };
+    std::array<FCapture, 8> fCapture;
+
     if (g_state.config->captureAudio) {
         for (auto i = 0u; i < fCapture.size(); ++i) {
-            fCapture[i] = fopen(sformat("/tmp/ps3emu_audio_port{}.bin", i).c_str(), "w");
+            fCapture[i].pulse = fopen(sformat("/tmp/ps3emu_audio_port{}.bin", i).c_str(), "w");
+            fCapture[i].raw = fopen(sformat("/tmp/ps3emu_audio_raw{}.bin", i).c_str(), "w");
         }
     }
 
@@ -176,18 +198,36 @@ void PulseBackend::playbackLoop() {
             auto curBlock = _attributes->getReadIndex(id);
             auto blockSize = calcBlockSize(port.basic.channels);
             auto toWrite = CELL_AUDIO_BLOCK_SAMPLES * 2 * sizeof(float);
-            auto src = (big_uint64_t*)(port.basic.ptr + curBlock * blockSize);
+            auto src = (EightChannels*)(port.basic.ptr + curBlock * blockSize);
             tempDest.resize(toWrite);
-            auto dest = (big_uint64_t*)&tempDest[0];
+            auto dest = (TwoChannels*)&tempDest[0];
             if (port.basic.channels == 8) {
                 for (auto i = 0u; i < CELL_AUDIO_BLOCK_SAMPLES; ++i) {
-                    dest[i] = src[4*i];
+                    auto& ch8 = src[i];
+                    dest[i].left = bit_cast<uint32_t>(
+                        bit_cast<float>((uint32_t)ch8.left) +
+                        bit_cast<float>((uint32_t)ch8.center) +
+                        bit_cast<float>((uint32_t)ch8.leftSurround) +
+                        bit_cast<float>((uint32_t)ch8.leftExtend));
+                    dest[i].right = bit_cast<uint32_t>(
+                        bit_cast<float>((uint32_t)ch8.right) +
+                        bit_cast<float>((uint32_t)ch8.center) +
+                        bit_cast<float>((uint32_t)ch8.rightSurround) +
+                        bit_cast<float>((uint32_t)ch8.rightExtend));
                 }
             } else {
                 memcpy(dest, src, toWrite);
             }
 
             memset(src, 0, blockSize);
+
+            if (g_state.config->captureAudio) {
+                auto f = fCapture[id - AudioAttributes::portHwBase];
+                fwrite(&tempDest[0], 1, tempDest.size(), f.pulse);
+                fwrite(src, 1, CELL_AUDIO_BLOCK_SAMPLES * port.basic.channels * sizeof(float), f.raw);
+                fflush(f.pulse);
+                fflush(f.raw);
+            }
 
             pulseLock plock(_pulseMainLoop);
 
@@ -198,10 +238,6 @@ void PulseBackend::playbackLoop() {
                             0,
                             PA_SEEK_RELATIVE);
 
-            if (g_state.config->captureAudio) {
-                auto f = fCapture[id - AudioAttributes::portHwBase];
-                fwrite(&tempDest[0], 1, tempDest.size(), f);
-            }
 
             auto sizeLeft = pa_stream_writable_size(port.pulseStream);
             shouldSpeedUp |= sizeLeft > 2 * blockSize;
@@ -215,7 +251,9 @@ void PulseBackend::playbackLoop() {
             if (shouldSpeedUp) {
                 wait -= milliseconds(1);
             }
-            boost::this_thread::sleep_for(wait);
+            auto until = high_resolution_clock::now() + wait;
+            while (high_resolution_clock::now() < until) {
+            }
         }
     }
 }
