@@ -128,11 +128,11 @@ void logSPU(uint32_t nip, SPUThread* thread);
 #endif
 
 #ifndef NDEBUG
-#define LOG_FUNC(x) { INFO(libs) << ssnprintf("REWRITER FUNC: %x", x); }
-#define LOG_RET(lr) { INFO(libs) << ssnprintf("REWRITER RET: %x", lr); }
-#define LOG_RET_TO(x) { INFO(libs) << ssnprintf("REWRITER RET TO: %x", x); }
-#define LOG_CALL(from, to) { INFO(libs) << ssnprintf("REWRITER CALL: %x -> %x", from, to); }
-#define LOG_VMENTER(x) { INFO(libs) << ssnprintf("REWRITER VMENTER: %x", x); }
+#define LOG_FUNC(x) { INFO(libs) << sformat("REWRITER FUNC: {:x}", x); }
+#define LOG_RET(lr) { INFO(libs) << sformat("REWRITER RET: {:x}", lr); }
+#define LOG_RET_TO(x) { INFO(libs) << sformat("REWRITER RET TO: {:x}", x); }
+#define LOG_CALL(from, to) { INFO(libs) << sformat("REWRITER CALL: {:x} -> {:x}", from, to); }
+#define LOG_VMENTER(x) { INFO(libs) << sformat("REWRITER VMENTER: {:x}", x); }
 #else
 #define LOG_FUNC(x)
 #define LOG_RET(lr)
@@ -248,7 +248,7 @@ public:
         big_uint32_t instr = g_state.mm->load32(simple.cia);
         ppu_dasm<DasmMode::Rewrite>(&instr, simple.cia, &rewritten);
         ppu_dasm<DasmMode::Print>(&instr, simple.cia, &printed);
-        result = {ssnprintf("/*%8x: %-24s*/ log(0x%x, TH); %s;",
+        result = {sformat("/*{:8x}: {:<24}*/ log(0x{:x}, TH); {};",
                             simple.cia,
                             printed,
                             simple.cia,
@@ -261,37 +261,37 @@ public:
             return;
         }
         result.clear();
-        result.push_back(ssnprintf("{ // %s %d (%d bytes)",
+        result.push_back(sformat("{{ // {} {} ({} bytes)",
                                    store.load ? "LOAD" : "STORE",
                                    store.src.size(),
                                    store.size()));
         result.push_back("    struct __attribute__((packed)) {");
         int i = 0;
         for (auto& s : store.src) {
-            result.push_back(ssnprintf("        uint%d_t r%d;", s.size * 8, i));
+            result.push_back(sformat("        uint{}_t r{};", s.size * 8, i));
             i++;
         }
         result.push_back("    } t;");
-        auto dest = store.destReg == 0 ? "0" : ssnprintf("TH->getGPR(%d)", store.destReg);
+        auto dest = store.destReg == 0 ? "0" : sformat("TH->getGPR({})", store.destReg);
         if (store.load) {
-            result.push_back(ssnprintf("    MM->readMemory(%s + (%d), &t, %d);", dest, store.disp, store.size()));
+            result.push_back(sformat("    MM->readMemory({} + ({}), &t, {});", dest, store.disp, store.size()));
             i = 0;
             for (auto& s : store.src) {
-                result.push_back(ssnprintf(
-                    "    TH->setGPR(%d, fast_endian_reverse(t.r%d));", s.reg, i));
+                result.push_back(sformat(
+                    "    TH->setGPR({}, fast_endian_reverse(t.r{}));", s.reg, i));
                 i++;
             }
         } else {
             i = 0;
             for (auto& s : store.src) {
-                result.push_back(ssnprintf(
-                    "    t.r%d = fast_endian_reverse((uint%d_t)TH->getGPR(%d));",
+                result.push_back(sformat(
+                    "    t.r{} = fast_endian_reverse((uint{}_t)TH->getGPR({}));",
                     i,
                     s.size * 8,
                     s.reg));
                 i++;
             }
-            result.push_back(ssnprintf("    MM->writeMemory(%s + (%d), &t, %d);", dest, store.disp, store.size()));
+            result.push_back(sformat("    MM->writeMemory({} + ({}), &t, {});", dest, store.disp, store.size()));
         }
         result.push_back("}");
     }
@@ -416,7 +416,7 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
 
         SegmentInfo info;
         info.isSpu = false;
-        info.suffix = ssnprintf("ppu_bin_%d", i);
+        info.suffix = sformat("ppu_bin_{}", i);
 
         for (auto& block : part) {
             auto processed = transformBasicBlock(block);
@@ -432,14 +432,14 @@ std::vector<SegmentInfo> rewritePPU(RewriteCommand const& command, std::ofstream
             if (target) {
                 block.body.insert(block.body.begin(), "#define SET_NIP SET_NIP_INDIRECT");
                 block.body.insert(block.body.begin(), "#undef SET_NIP");
-                block.body.insert(block.body.begin(), ssnprintf("// target %x leads out of part", *target));
+                block.body.insert(block.body.begin(), sformat("// target {:x} leads out of part", *target));
                 block.body.push_back("#undef SET_NIP");
                 block.body.push_back("#define SET_NIP SET_NIP_INITIAL");
                 extractable = false;
             }
             if (fallthrough) {
-                block.body.insert(block.body.begin(), ssnprintf("// possible fallthrough %x leads out of part", fallthrough));
-                block.body.push_back(ssnprintf("SET_NIP_INDIRECT(0x%x);", fallthrough));
+                block.body.insert(block.body.begin(), sformat("// possible fallthrough {:x} leads out of part", fallthrough));
+                block.body.push_back(sformat("SET_NIP_INDIRECT(0x{:x});", fallthrough));
                 extractable = false;
             }
 
@@ -622,8 +622,8 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                     bool extractable = true;
 
                     if (elf.isJob) { // all jobs are position independent
-                        block.body.push_back(ssnprintf(
-                            "if (!pic_offset_set) { pic_offset = bb_va - 0x%x; pic_offset_set = true; }",
+                        block.body.push_back(sformat(
+                            "if (!pic_offset_set) {{ pic_offset = bb_va - 0x{:x}; pic_offset_set = true; }}",
                             block.start));
                     }
                     for (auto cia = block.start; cia < block.start + block.len; cia += 4) {
@@ -631,7 +631,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                         big_uint32_t instr = g_state.mm->load32(spuElfVaToParentVaInCurrentSegment(cia, segment));
                         SPUDasm<DasmMode::Rewrite>(&instr, cia, &rewritten);
                         SPUDasm<DasmMode::Print>(&instr, cia, &printed);
-                        auto line = ssnprintf("/* %08x %8x: %-24s*/ logSPU(0x%x, th); %s;", instr, cia, printed, cia, rewritten);
+                        auto line = sformat("/* {:08x} {:8x}: {:<24}*/ logSPU(0x{:x}, th); {};", instr, cia, printed, cia, rewritten);
                         block.body.push_back(line);
                     }
 
@@ -639,14 +639,14 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                     if (target) {
                         block.body.insert(begin(block.body), "#define SPU_SET_NIP SPU_SET_NIP_INDIRECT_PIC");
                         block.body.insert(begin(block.body), "#undef SPU_SET_NIP");
-                        block.body.insert(begin(block.body), ssnprintf("// target %x leads out of part", *target));
+                        block.body.insert(begin(block.body), sformat("// target {:x} leads out of part", *target));
                         block.body.push_back("#undef SPU_SET_NIP");
                         block.body.push_back("#define SPU_SET_NIP SPU_SET_NIP_INITIAL");
                         extractable = false;
                     }
                     if (fallthrough) {
-                        block.body.insert(block.body.begin(), ssnprintf("// possible fallthrough %x leads out of part", fallthrough));
-                        block.body.push_back(ssnprintf("SPU_SET_NIP_INDIRECT_PIC(0x%x);", fallthrough));
+                        block.body.insert(block.body.begin(), sformat("// possible fallthrough {:x} leads out of part", fallthrough));
+                        block.body.push_back(sformat("SPU_SET_NIP_INDIRECT_PIC(0x{:x});", fallthrough));
                         extractable = false;
                     }
 
@@ -658,7 +658,7 @@ std::vector<SegmentInfo> rewriteSPU(RewriteCommand const& command, std::ofstream
                 }
 
                 info.isSpu = true;
-                info.suffix = ssnprintf("spu_%x_%x_%x_part_%d_%s",
+                info.suffix = sformat("spu_{:x}_{:x}_{:x}_part_{}_{}",
                                         elf.startOffset,
                                         segment.p_vaddr,
                                         segment.p_vaddr + segment.p_filesz,
@@ -678,7 +678,7 @@ const char* threadTypeName(bool isSpu) {
 }
 
 std::string entrySignature(const SegmentInfo& segment) {
-    return ssnprintf("void entryPoint_%s(%s* thread, int label%s)",
+    return sformat("void entryPoint_{}({}* thread, int label{})",
                      segment.suffix,
                      threadTypeName(segment.isSpu),
                      segment.isSpu ? ", uint32_t bb_va" : "");
@@ -698,11 +698,11 @@ void printHeader(std::string name, std::vector<SegmentInfo> const& segments, boo
     }
 
     for (auto& segment : segments) {
-        f << ssnprintf("extern std::vector<RewrittenBlock> segment_%s_blocks;\n", segment.suffix);
+        f << sformat("extern std::vector<RewrittenBlock> segment_{}_blocks;\n", segment.suffix);
     }
 
     for (auto& segment : segments) {
-        f << ssnprintf("extern RewrittenSegment segment_%s;\n", segment.suffix);
+        f << sformat("extern RewrittenSegment segment_{};\n", segment.suffix);
     }
 }
 
@@ -718,7 +718,7 @@ void printMain(std::string name, std::vector<SegmentInfo> const& segments) {
     f << "    RewrittenSegmentsInfo info {\n";
     f << "        {\n";
     for (auto& segment : segments) {
-        f << ssnprintf("            segment_%s,\n", segment.suffix);
+        f << sformat("            segment_{},\n", segment.suffix);
     }
     f << "        }, \n";
     f << "        init\n";
@@ -730,20 +730,20 @@ void printSegment(std::string baseName, std::string name, SegmentInfo const& seg
     std::ofstream f(name);
     assert(f.is_open());
 
-    f << ssnprintf("#include \"%s.h\"\n\n", baseName);
+    f << sformat("#include \"{}.h\"\n\n", baseName);
 
-    f << ssnprintf("std::vector<RewrittenBlock> segment_%s_blocks {\n", segment.suffix);
+    f << sformat("std::vector<RewrittenBlock> segment_{}_blocks {{\n", segment.suffix);
     for (auto& block : segment.blocks) {
-        f << ssnprintf("    { 0x%x, 0x%x },\n", block.start, block.len);
+        f << sformat("    {{ 0x{:x}, 0x{:x} }},\n", block.start, block.len);
     }
     f << "};\n";
 
-    f << ssnprintf("RewrittenSegment segment_%s {\n", segment.suffix);
-    auto entryName = ssnprintf("entryPoint_%s", segment.suffix);
+    f << sformat("RewrittenSegment segment_{} {{\n", segment.suffix);
+    auto entryName = sformat("entryPoint_{}", segment.suffix);
     auto ppuEntry = segment.isSpu ? "nullptr" : entryName;
     auto spuEntry = segment.isSpu ? entryName : "nullptr";
-    auto blocks = ssnprintf("&segment_%s_blocks", segment.suffix);
-    f << ssnprintf("    %s, %s, \"%s\", %s\n",
+    auto blocks = sformat("&segment_{}_blocks", segment.suffix);
+    f << sformat("    {}, {}, \"{}\", {}\n",
                    ppuEntry,
                    spuEntry,
                    segment.suffix,
@@ -753,14 +753,14 @@ void printSegment(std::string baseName, std::string name, SegmentInfo const& seg
     auto shouldExtract = [&] (auto& block) { return block.extractable && block.body.size() >= g_minExtractableBlockSize; };
 
     for (auto& block : segment.blocks | ranges::views::filter(shouldExtract)) {
-        f << ssnprintf(
-            "void extracted_block_%s_%x(%s* thread, uint32_t& pic_offset) {\n",
+        f << sformat(
+            "void extracted_block_{}_{:x}({}* thread, uint32_t& pic_offset) {{\n",
             segment.suffix,
             block.label,
             threadTypeName(segment.isSpu));
 
         for (auto& line : block.body | ranges::views::drop_last(1)) {
-            f << ssnprintf("        %s\n", line);
+            f << sformat("        {}\n", line);
         }
         f << "}\n";
     }
@@ -770,7 +770,7 @@ void printSegment(std::string baseName, std::string name, SegmentInfo const& seg
     if (!segment.blocks.empty()) {
         f << "    static void* labels[] = {\n";
         for (auto& block : segment.blocks) {
-            f << ssnprintf("        &&_0x%xu,\n", block.label);
+            f << sformat("        &&_0x{:x}u,\n", block.label);
         }
         f << "    };\n\n";
         f << "    uint32_t pic_offset = 0;\n";
@@ -779,16 +779,16 @@ void printSegment(std::string baseName, std::string name, SegmentInfo const& seg
     }
 
     for (auto& block : segment.blocks) {
-        f << ssnprintf("    _0x%xu:\n", block.label);
+        f << sformat("    _0x{:x}u:\n", block.label);
         if (shouldExtract(block)) {
-            f << ssnprintf("        extracted_block_%s_%x(thread, pic_offset);\n",
+            f << sformat("        extracted_block_{}_{:x}(thread, pic_offset);\n",
                            segment.suffix,
                            block.label);
         }
         auto body = shouldExtract(block) ? ranges::any_view(ranges::views::single(block.body.back()))
                                          : ranges::any_view(ranges::views::all(block.body));
         for (auto& line : body) {
-            f << ssnprintf("        %s\n", line);
+            f << sformat("        {}\n", line);
         }
     }
     f << "}\n";
@@ -803,17 +803,17 @@ void printNinja(std::string name, std::vector<SegmentInfo> const& segments) {
     std::string objects;
     auto baseName = fs::path(name).stem().string();
     for (auto i = 0u; i < segments.size(); ++i) {
-        auto in = ssnprintf("%s.segment_%d.cpp", baseName, i);
-        auto out = ssnprintf("%s.segment_%d.o", baseName, i);
+        auto in = sformat("{}.segment_{}.cpp", baseName, i);
+        auto out = sformat("{}.segment_{}.o", baseName, i);
         script.statement("compile", in, out, {});
         objects += out + " ";
     }
-    auto inMain = ssnprintf("%s.cpp", baseName);
-    auto outMain = ssnprintf("%s.o", baseName);
+    auto inMain = sformat("{}.cpp", baseName);
+    auto outMain = sformat("{}.o", baseName);
     script.statement("compile", inMain, outMain, {});
     objects += outMain;
 
-    auto out = ssnprintf("%s.so", baseName);
+    auto out = sformat("{}.so", baseName);
     script.statement("link", objects, out, {});
 
     std::ofstream f(name);
@@ -850,7 +850,7 @@ void HandleRewrite(RewriteCommand const& command) {
     printMain(mainName, segmentInfos);
     printNinja(ninjaName, segmentInfos);
     for (auto i = 0u; i < segmentInfos.size(); ++i) {
-        auto segmentName = ssnprintf("%s.segment_%d.cpp", command.cpp, i);
+        auto segmentName = sformat("{}.segment_{}.cpp", command.cpp, i);
         printSegment(fs::path(headerName).stem(), segmentName, segmentInfos[i]);
     }
 }

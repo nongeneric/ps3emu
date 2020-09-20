@@ -10,7 +10,7 @@ int32_t cellNetCtlInit() {
 
 int32_t cellNetCtlNetStartDialogLoadAsync(
     const CellNetCtlNetStartDialogParam* param) {
-    INFO(libs) << ssnprintf("cellNetCtlNetStartDialogLoadAsync(%x)", param->type);
+    INFO(libs) << sformat("cellNetCtlNetStartDialogLoadAsync({:x})", param->type);
     return CELL_OK;
 }
 

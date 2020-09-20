@@ -45,9 +45,9 @@ void suspend_handler(int num, siginfo_t* info, void*) {
 void SPUThread::loop(OneTimeEvent* event) {
     g_state.sth = this;
     g_state.granule = &_granule;
-    _granule.dbgName = ssnprintf("spu_%d", _id);
+    _granule.dbgName = sformat("spu_{}", _id);
     log_set_thread_name(_granule.dbgName);
-    INFO(spu) << ssnprintf("spu thread loop started");
+    INFO(spu) << sformat("spu thread loop started");
 
     struct sigaction s;
     s.sa_handler = nullptr;
@@ -73,7 +73,7 @@ void SPUThread::loop(OneTimeEvent* event) {
     waitSuspended();
     
 #if TRACE_ENABLED
-    auto traceFilePath = ssnprintf("/tmp/spu_trace_%s.bz2", _name);
+    auto traceFilePath = sformat("/tmp/spu_trace_{}.bz2", _name);
     auto tf = std::make_unique<TraceFile>(traceFilePath);
     bool trace = false;
     int instrTraced = 0;
@@ -169,7 +169,7 @@ void SPUThread::loop(OneTimeEvent* event) {
             g_state.spuGroupManager->notifyThreadStopped(this, _cause);
             break;
         } catch (std::exception& e) {
-            INFO(spu) << ssnprintf("spu thread exception: %s", e.what());
+            INFO(spu) << sformat("spu thread exception: {}", e.what());
             setNip(cia);
             _eventHandler(this, SPUThreadEvent::Failure);
             break;
@@ -177,7 +177,7 @@ void SPUThread::loop(OneTimeEvent* event) {
     }
     
     auto disable = DisableSuspend(this, true);
-    WARNING(spu) << ssnprintf("spu thread loop finished, cause %s", to_string(_cause));
+    WARNING(spu) << sformat("spu thread loop finished, cause {}", to_string(_cause));
     _eventHandler(this, SPUThreadEvent::Finished);
 }
 
@@ -233,7 +233,7 @@ uint32_t SPUThread::getElfSource() {
 }
 
 void SPUThread::setElfSource(uint32_t src) {
-    INFO(spu) << ssnprintf("setting elf source to #%x", src);
+    INFO(spu) << sformat("setting elf source to #{:x}", src);
     _elfSource = src;
 }
 
@@ -268,7 +268,7 @@ void SPUThread::handleInterrupt(uint32_t interruptValue) {
     auto port = op_port & 0x3f;
     auto op = op_port >> 6;
     
-    INFO(spu) << ssnprintf("%s",
+    INFO(spu) << sformat("{}",
         op == SpuInterruptOperation_SendEvent ? "SpuInterruptOperation_SendEvent" :
         op == SpuInterruptOperation_ThrowEvent ? "SpuInterruptOperation_ThrowEvent" :
         op == SpuInterruptOperation_WriteInterruptMbox ? "SpuInterruptOperation_WriteInterruptMbox" :

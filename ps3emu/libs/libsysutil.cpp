@@ -37,13 +37,13 @@ namespace {
         std::vector<uint64_t> args;
         std::promise<uint64_t> promise;
     };
-    
+
     tbb::concurrent_queue<std::shared_ptr<CallbackInfo>> callbackQueue;
 }
 
 int32_t cellSysutilRegisterCallback(int32_t slot, ps3_uintptr_t callback, ps3_uintptr_t userdata) {
     // TODO: implement for handling game termination
-    WARNING(libs) << ssnprintf("NOT IMPLEMENTED: cellSysutilRegisterCallback(%d)", slot);
+    WARNING(libs) << sformat("NOT IMPLEMENTED: cellSysutilRegisterCallback({})", slot);
     return CELL_OK;
 }
 
@@ -94,7 +94,7 @@ int32_t cellSysutilGetSystemParamInt(int32_t id, big_int32_t* value) {
         case CELL_SYSUTIL_SYSTEMPARAM_ID_PAD_AUTOOFF: *value = 0; break;
         case CELL_SYSUTIL_SYSTEMPARAM_ID_MAGNETOMETER: *value = 0; break;
         default: {
-            INFO(libs) << ssnprintf("cellSysutilGetSystemParamInt: unknown param requested %d", id);
+            INFO(libs) << sformat("cellSysutilGetSystemParamInt: unknown param requested {}", id);
             throw std::runtime_error("unknown param");
         }
     }
@@ -111,7 +111,7 @@ int32_t cellSysutilGetSystemParamString(int32_t id, ps3_uintptr_t buf, uint32_t 
             mm->writeMemory(buf, nickname.c_str(), std::min<uint32_t>(nickname.size() + 1, bufsize));
             break;
         default: {
-            INFO(libs) << ssnprintf("cellSysutilGetSystemParamString: unknown param requested %d", id);
+            INFO(libs) << sformat("cellSysutilGetSystemParamString: unknown param requested {}", id);
             throw std::runtime_error("unknown param");
         }
     }
@@ -122,10 +122,10 @@ int32_t cellSysutilGetSystemParamString(int32_t id, ps3_uintptr_t buf, uint32_t 
 #define CELL_SYSCACHE_RET_OK_RELAYED            (1)
 
 int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
-    INFO(libs) << ssnprintf("cellSysCacheMount(id = %s)", param->cacheId);
+    INFO(libs) << sformat("cellSysCacheMount(id = {})", param->cacheId);
     auto cacheDir = g_state.content->cacheDir();
     auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
-    system(ssnprintf("mkdir -p \"%s\"", hostCacheDir).c_str());
+    system(sformat("mkdir -p \"{}\"", hostCacheDir).c_str());
     strcpy(param->getCachePath, cacheDir.c_str());
     cellSysCacheClear(proc);
     return CELL_SYSCACHE_RET_OK_CLEARED;
@@ -134,13 +134,13 @@ int32_t cellSysCacheMount(CellSysCacheParam* param, Process* proc) {
 int32_t cellSysCacheClear(Process* proc) {
     auto cacheDir = g_state.content->cacheDir();
     auto hostCacheDir = g_state.content->toHost(cacheDir.c_str());
-    INFO(libs) << ssnprintf("cellSysCacheClear %s", hostCacheDir);
-    system(ssnprintf("rm -rf \"%s\"/*", hostCacheDir).c_str());
+    INFO(libs) << sformat("cellSysCacheClear {}", hostCacheDir);
+    system(sformat("rm -rf \"{}\"/*", hostCacheDir).c_str());
     return CELL_OK;
 }
 
 emu_void_t sys_ppu_thread_once(big_int32_t* once_ctrl, const fdescr* init, PPUThread* th) {
-    INFO(libs) << ssnprintf("sys_ppu_thread_once(%d, %x)", *once_ctrl, init);
+    INFO(libs) << sformat("sys_ppu_thread_once({}, [{:x}, {:x}])", *once_ctrl, init->va, init->tocBase);
     if (*once_ctrl == 0) {
         th->setNIP(init->va);
         th->setGPR(2, init->tocBase);

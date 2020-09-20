@@ -12,24 +12,24 @@ void HandlePrintGcmVizTrace(PrintGcmVizTraceCommand const& command) {
 
     if (command.frame != -1 && command.command != -1) {
         auto gcmCommand = db.getCommand(command.frame, command.command, true);
-        auto path = ssnprintf("/tmp/blob_%d_%d.bin", command.frame, command.command);
+        auto path = sformat("/tmp/blob_{}_{}.bin", command.frame, command.command);
         write_all_bytes(&gcmCommand.blob[0], gcmCommand.blob.size(), path);
-        std::cout << ssnprintf("blob saved to %s\n", path);
+        std::cout << sformat("blob saved to {}\n", path);
         return;
     }
 
     for (auto frame = 0; frame < db.frames(); ++frame) {
-        std::cout << ssnprintf("# frame %d\n", frame);
+        std::cout << sformat("# frame {}\n", frame);
         for (auto command = 0; command < db.commands(frame); ++command) {
             auto gcmCommand = db.getCommand(frame, command, true);
             auto name = printCommandId((CommandId)gcmCommand.id);
             std::string blob;
             if (!gcmCommand.blob.empty()) {
-                blob = ssnprintf(" (blob %d)", gcmCommand.blob.size());
+                blob = sformat(" (blob {})", gcmCommand.blob.size());
             }
-            std::cout << ssnprintf("%s%s\n", name, blob);
+            std::cout << sformat("{}{}\n", name, blob);
             for (auto& arg : gcmCommand.args) {
-                std::cout << ssnprintf("\t%s %s: 0x%08x (%d)\n",
+                std::cout << sformat("\t{} {}: 0x{:08x} ({})\n",
                                        printArgType((GcmArgType)arg.type),
                                        arg.name,
                                        arg.value,

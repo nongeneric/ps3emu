@@ -57,7 +57,7 @@ std::string printName(char* str, int len) {
     if (isPrintStr(str, len)) {
         return std::string(str);
     }
-    return ssnprintf("%016llx", *(uint64_t*)str);
+    return sformat("{:016x}", *(uint64_t*)str);
 }
 
 int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
@@ -82,8 +82,8 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
     info->name = name;
     info->key = event_queue_key;
     *equeue_id = queues.create(std::move(info));
-    INFO(sync) << ssnprintf("sys_event_queue_create(id = %x, event_queue_key = %llx, "
-                            "size = %d, name = %s, %s)",
+    INFO(sync) << sformat("sys_event_queue_create(id = {:x}, event_queue_key = {:x}, "
+                            "size = {}, name = {}, {})",
                             *equeue_id,
                             event_queue_key,
                             size,
@@ -94,7 +94,7 @@ int32_t sys_event_queue_create(sys_event_queue_t* equeue_id,
 }
 
 int32_t sys_event_queue_destroy(sys_event_queue_t equeue_id, int32_t mode) {
-    INFO(sync) << ssnprintf("sys_event_queue_destroy(id = %x, mode = %x)", equeue_id, mode);
+    INFO(sync) << sformat("sys_event_queue_destroy(id = {:x}, mode = {:x})", equeue_id, mode);
     // TODO: wakeup threads and make them return ECANCELED
     auto info = queues.get(equeue_id);
     for (auto& [th, port] : info->connectedSpuThreads) {
@@ -113,8 +113,8 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
     //assert(timeout == 0);
     auto info = queues.get(equeue_id);
     if (info->log) {
-        INFO(sync) << ssnprintf(
-            "sys_event_queue_receive(%s[%x])", info->name, equeue_id);
+        INFO(sync) << sformat(
+            "sys_event_queue_receive({}[{:x}])", info->name, equeue_id);
     }
     auto event = info->queue->receive(th->priority());
     th->setGPR(4, event.source);
@@ -122,8 +122,8 @@ int32_t sys_event_queue_receive(sys_event_queue_t equeue_id,
     th->setGPR(6, event.data2);
     th->setGPR(7, event.data3);
     if (info->log) {
-        INFO(sync) << ssnprintf(
-            "completed sys_event_queue_receive(%s[%x]): %llx, %llx, %llx, %llx",
+        INFO(sync) << sformat(
+            "completed sys_event_queue_receive({}[{:x}]): {:x}, {:x}, {:x}, {:x}",
             info->name,
             equeue_id,
             event.source,
@@ -141,13 +141,13 @@ int32_t sys_event_queue_tryreceive(sys_event_queue_t equeue_id,
                                    PPUThread* th)
 {
     auto info = queues.get(equeue_id);
-    INFO(sync) << ssnprintf("sys_event_queue_tryreceive(%s[%x])", info->name, equeue_id);
+    INFO(sync) << sformat("sys_event_queue_tryreceive({}[{:x}])", info->name, equeue_id);
     std::vector<sys_event_t> vec(size);
     size_t num;
     info->queue->tryReceive(&vec[0], vec.size(), &num);
     *number = num;
     g_state.mm->writeMemory(event_array, &vec[0], sizeof(sys_event_t) * *number);
-    INFO(sync) << ssnprintf("completed sys_event_queue_tryreceive(%s[%x], num=%d)", info->name, equeue_id, num);
+    INFO(sync) << sformat("completed sys_event_queue_tryreceive({}[{:x}], num={})", info->name, equeue_id, num);
     return CELL_OK;
 }
 
@@ -159,14 +159,14 @@ int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uin
     }
     port->name = name;
     port->type = port_type;
-    INFO(sync) << ssnprintf("sys_event_port_create(id = %d, name = %llx)", *eport_id, name);
+    INFO(sync) << sformat("sys_event_port_create(id = {}, name = {:x})", *eport_id, name);
     return CELL_OK;
 }
 
 int32_t sys_event_port_connect_local(sys_event_port_t event_port_id, 
                                      sys_event_queue_t event_queue_id)
 {
-    INFO(sync) << ssnprintf("sys_event_port_connect_local(port = %d, queue = %x)",
+    INFO(sync) << sformat("sys_event_port_connect_local(port = {}, queue = {:x})",
                             event_port_id, event_queue_id);
     assert(ports.get(event_port_id)->type == SYS_EVENT_PORT_LOCAL);
     ports.get(event_port_id)->queue = queues.get(event_queue_id);
@@ -175,7 +175,7 @@ int32_t sys_event_port_connect_local(sys_event_port_t event_port_id,
 
 int32_t sys_event_port_connect_ipc(sys_event_port_t event_port_id,
                                    sys_ipc_key_t key) {
-    INFO(sync) << ssnprintf("sys_event_port_connect_ipc(port = %d, key = %llx)",
+    INFO(sync) << sformat("sys_event_port_connect_ipc(port = {}, key = {:x})",
                             event_port_id, key);
     ports.get(event_port_id)->queue = queues.get(getQueueByKey(key));
     return CELL_OK;
@@ -187,8 +187,8 @@ int32_t sys_event_port_send(sys_event_port_t eport_id,
                             uint64_t data3) {
     auto port = ports.get(eport_id);
     if (port->queue->log) {
-        INFO(sync) << ssnprintf(
-            "sys_event_port_send(port = %d, data = %llx, %llx, %llx)",
+        INFO(sync) << sformat(
+            "sys_event_port_send(port = {}, data = {:x}, {:x}, {:x})",
             eport_id,
             data1,
             data2,
@@ -218,8 +218,8 @@ int32_t sys_spu_thread_connect_event(uint32_t thread_id,
                                      sys_event_type_t et,
                                      uint8_t spup) {
     auto info = queues.get(eq);
-    INFO(sync) << ssnprintf(
-        "sys_spu_thread_connect_event(thread=%x, queue=%s|%x, spup=%02x)",
+    INFO(sync) << sformat(
+        "sys_spu_thread_connect_event(thread={:x}, queue={}|{:x}, spup={:02x})",
         thread_id,
         info->name,
         eq,
@@ -237,7 +237,7 @@ int32_t sys_spu_thread_disconnect_event(uint32_t thread_id,
                                         sys_event_type_t et,
                                         uint8_t spup) {
     assert(et == SYS_SPU_THREAD_EVENT_USER);
-    INFO(sync) << ssnprintf("sys_spu_thread_disconnect_event(thread = %d, spup = %02x)",
+    INFO(sync) << sformat("sys_spu_thread_disconnect_event(thread = {}, spup = {:02x})",
                             thread_id,
                             spup);
     auto thread = g_state.proc->getSpuThread(thread_id);
@@ -246,7 +246,7 @@ int32_t sys_spu_thread_disconnect_event(uint32_t thread_id,
 }
 
 int32_t sys_spu_thread_unbind_queue(uint32_t thread_id, uint32_t spuq_num) {
-    INFO(sync) << ssnprintf("sys_spu_thread_unbind_queue(thread = %d, spup = %02x)",
+    INFO(sync) << sformat("sys_spu_thread_unbind_queue(thread = {}, spup = {:02x})",
                             thread_id,
                             spuq_num);
     auto thread = g_state.proc->getSpuThread(thread_id);
@@ -258,8 +258,8 @@ int32_t sys_spu_thread_bind_queue(uint32_t thread_id,
                                   sys_event_queue_t spuq,
                                   uint32_t spuq_num) {
     auto info = queues.get(spuq);
-    INFO(sync) << ssnprintf(
-        "sys_spu_thread_bind_queue(thread=%d, queue=%s|%x, spuq=%02x)",
+    INFO(sync) << sformat(
+        "sys_spu_thread_bind_queue(thread={}, queue={}|{:x}, spuq={:02x})",
         thread_id,
         info->name,
         spuq,
@@ -276,8 +276,8 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
     if (req == 0)
         return CELL_EINVAL;
     auto info = queues.get(eq);
-    auto message = ssnprintf("sys_spu_thread_group_connect_event_all_threads"
-                             "(group=%d, queue=%s[%x], req=%016llx)",
+    auto message = sformat("sys_spu_thread_group_connect_event_all_threads"
+                             "(group={}, queue={}[{:x}], req={:016x})",
                              group_id, info->name, eq, req);
     auto group = findThreadGroup(group_id);
     for (auto i = 0u; i < 64; ++i) {
@@ -293,11 +293,11 @@ int32_t sys_spu_thread_group_connect_event_all_threads(uint32_t group_id,
                 info->connectedSpuThreads.push_back({thPtr, i});
             }
             *spup = i;
-            INFO(sync) << ssnprintf("%s [connected to spup %x]", message, i);
+            INFO(sync) << sformat("{} [connected to spup {:x}]", message, i);
             return CELL_OK;
         }
     }
-    INFO(sync) << ssnprintf("%s [FAILED]", message);
+    INFO(sync) << sformat("{} [FAILED]", message);
     return CELL_EISCONN;
 }
 

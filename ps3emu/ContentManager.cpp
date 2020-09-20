@@ -41,7 +41,7 @@ MountPoint splitPathImpl(const char* path, const char** point, const char** rela
     check("/dev_flash", MountPoint::DevFlash);
     check("", MountPoint::Relative);
 #undef check
-    throw std::runtime_error(ssnprintf("illegal mount point %s", path));
+    throw std::runtime_error(sformat("illegal mount point {}", path));
 }
 
 void ContentManager::setElfPath(std::string_view path) {

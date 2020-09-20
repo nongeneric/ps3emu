@@ -8,7 +8,7 @@ void emu_assert_failure(const char* expr,
                         const char* prettyFunc,
                         const char* file,
                         int line) {
-    ERROR(libs) << ssnprintf(
-        "assert %s at %s, %s:%d\n", expr, prettyFunc, file, line);
+    ERROR(libs) << sformat(
+        "assert {} at {}, {}:{}\n", expr, prettyFunc, file, line);
     throw BreakpointException();
 }

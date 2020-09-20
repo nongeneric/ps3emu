@@ -97,7 +97,7 @@ std::string printEntriesString(std::vector<uint32_t> const& entries) {
         return "";
     std::string entriesString = "--entries";
     for (auto entry : entries) {
-        entriesString += ssnprintf(" %x", entry);
+        entriesString += sformat(" {:x}", entry);
     }
     return entriesString;
 }
@@ -122,7 +122,7 @@ void rewritePrxStore() {
         auto prxPath = (external / prxInfo.name).string();
         assert(exists(prxPath));
         
-        std::tuple imagebaseVar("imagebase", ssnprintf("%x", prxInfo.imageBase));
+        std::tuple imagebaseVar("imagebase", sformat("{:x}", prxInfo.imageBase));
 
         if (prxInfo.loadx86) {
             auto out = buildPath / (prxInfo.name + ".ninja");

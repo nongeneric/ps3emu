@@ -63,13 +63,13 @@ void initAudio() {
             std::string message;
 
             auto event = sysQueueReceive(queueId);
-            message += ssnprintf("(in %016llx %016llx %016llx) ",
+            message += sformat("(in {:016x} {:016x} {:016x}) ",
                                        event.data1,
                                        event.data2,
                                        event.data3);
             AudioControl control = { (uint32_t)((uint64_t)event.data1 >> 32u) };
             auto command = enum_cast<AudioControlCommand>(control.Command.u());
-            message += ssnprintf("(control; command=%s ackq=%x ack=%x id=%x) ",
+            message += sformat("(control; command={} ackq={:x} ack={:x} id={:x}) ",
                                        ::to_string(command),
                                        control.AckQueue.u(),
                                        control.Ack.u(),
@@ -87,7 +87,7 @@ void initAudio() {
                 uint64_t data2 = ((uint64_t)arg2 << 32u) | arg3;
                 uint64_t data3 = ((uint64_t)arg4 << 32u) | arg5;
                 sys_event_port_send(ackQueuePort, data1, data2, data3);
-                message += ssnprintf("(ack %016llx %016llx %016llx) ", data1, data2, data3);
+                message += sformat("(ack {:016x} {:016x} {:016x}) ", data1, data2, data3);
             };
 
             if (command == AudioControlCommand::INIT) {
@@ -124,8 +124,8 @@ void initAudio() {
                 uint32_t base = (uint64_t)event.data2 >> 32;
                 uint32_t readIndex = control.Id.u() - AudioAttributes::portHwBase + 1;
                 portSizes[control.Id.u()] = size;
-                INFO(audio) << ssnprintf(
-                    "AUDIO_COMMAND_PORT_CONFIG size=%x base=%x readIndex=%x",
+                INFO(audio) << sformat(
+                    "AUDIO_COMMAND_PORT_CONFIG size={:x} base={:x} readIndex={:x}",
                     size,
                     base,
                     readIndex);
@@ -140,8 +140,8 @@ void initAudio() {
                 assert(memInfo);
                 auto ptr = g_state.mm->getMemoryPointer(memInfo->va, 4);
                 INFO(audio)
-                    << ssnprintf("AUDIO_COMMAND_PORT_OPEN level=%g blocks=%x "
-                                 "channels=%x addr=%x memId=%x memVa=%x",
+                    << sformat("AUDIO_COMMAND_PORT_OPEN level={} blocks={:x} "
+                                 "channels={:x} addr={:x} memId={:x} memVa={:x}",
                                  level,
                                  blocks,
                                  channels,

@@ -25,11 +25,11 @@ void HandleFindSpuElfs(FindSpuElfsCommand const& command) {
         return;
     }
     auto filename = fs::path(command.elf).stem().string();
-    std::cout << ssnprintf("%d embedded elfs found in %s\n", elfs.size(), filename);
+    std::cout << sformat("{} embedded elfs found in {}\n", elfs.size(), filename);
     for (auto& elf : elfs) {
-        auto tmppath = ssnprintf("/tmp/%s_%x_spu.elf", filename, elf.startOffset);
+        auto tmppath = sformat("/tmp/{}_{:x}_spu.elf", filename, elf.startOffset);
         write_all_bytes(&body[elf.startOffset], elf.size, tmppath);
-        std::cout << ssnprintf("    at 0x%x (va 0x%x) of size 0x%x (%d segments, %d sections, %s, %s)\n",
+        std::cout << sformat("    at 0x{:x} (va 0x{:x}) of size 0x{:x} ({} segments, {} sections, {}, {})\n",
                                elf.startOffset,
                                offsetToVa((Elf64_be_Ehdr*)&body[0], elf.startOffset),
                                elf.size,

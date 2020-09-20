@@ -132,7 +132,7 @@ public:
         auto line = &_lines[index];
         line->lock.lock();
         if (unlikely((va & 0x7f) + Len > 128)) {
-            //INFO(spu) << ssnprintf("locking second line %x", va);
+            //INFO(spu) << sformat("locking second line {:x}", va);
             auto next = line + 1;
             next->lock.lock();
             *first = line;

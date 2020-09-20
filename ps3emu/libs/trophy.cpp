@@ -171,7 +171,7 @@ int32_t sceNpTrophyRegisterContext(SceNpTrophyContext,
         trophy.hidden = t.attribute("hidden").as_string() == "yes"s;
         trophy.grade = parseGrade(t.attribute("ttype").as_string()[0]);
         trophy.unlocked = 0;
-        trophy.imagePath = *emuPath / ssnprintf("TROP%03d.PNG", trophy.id);
+        trophy.imagePath = *emuPath / sformat("TROP{:03}.PNG", trophy.id);
         context.trophies.push_back(trophy);
     }
 
@@ -310,7 +310,7 @@ int32_t sceNpTrophyGetGameIcon(SceNpTrophyContext,
                                SceNpTrophyHandle,
                                uint32_t buffer,
                                big_int32_t* size) {
-    INFO(libs) << ssnprintf("sceNpTrophyGetGameIcon(%s, %x)",
+    INFO(libs) << sformat("sceNpTrophyGetGameIcon({}, {:x})",
                             context.gameImagePath.string(),
                             buffer);
     boost::lock_guard<boost::mutex> lock(context.m);
@@ -334,7 +334,7 @@ int32_t sceNpTrophyGetTrophyIcon(SceNpTrophyContext,
     auto& trophy = context.trophies.at(trophyId);
     assert(trophy.id == trophyId);
     
-    INFO(libs) << ssnprintf("sceNpTrophyGetTrophyIcon(%s, %x)",
+    INFO(libs) << sformat("sceNpTrophyGetTrophyIcon({}, {:x})",
                             trophy.imagePath.string(),
                             buffer);
     

@@ -581,8 +581,8 @@ void patchEnumValues(std::string& text) {
     });
     for (auto i = 0u; i < pairs.size(); ++i) {
         boost::replace_all(text,
-                           ssnprintf("%s::%s", name, std::get<0>(pairs[i])),
-                           ssnprintf("%d", std::get<1>(pairs[i])));
+                           sformat("{}::{}", name, std::get<0>(pairs[i])),
+                           sformat("{}", std::get<1>(pairs[i])));
     }
 }
 

@@ -116,7 +116,7 @@ class DebuggerModel : public QWidget, public IEmuCallbacks {
 
     template<typename... Ts>
     void messagef(const char* format, Ts... args) {
-        emit message(QString::fromStdString(ssnprintf(format, args...)));
+        emit message(QString::fromStdString(sformat(format, args...)));
     }
 
 public:

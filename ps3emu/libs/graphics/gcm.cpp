@@ -87,7 +87,7 @@ struct OffsetTable {
     }
 
     void unmapEa(uint32_t ea) {
-        INFO(rsx) << ssnprintf("unmapping ea %08x", ea);
+        INFO(rsx) << sformat("unmapping ea {:08x}", ea);
         auto lock = boost::lock_guard(_m);
         ea >>= 20;
         auto io = ioAddress[ea];
@@ -106,7 +106,7 @@ struct OffsetTable {
     }
 
     void map(uint32_t ea, uint32_t io, uint32_t size) {
-        INFO(rsx) << ssnprintf("mapping ea %08x to io %08x of size %08x", ea, io, size);
+        INFO(rsx) << sformat("mapping ea {:08x} to io {:08x} of size {:08x}", ea, io, size);
         assert((size & (DefaultMainMemoryPageSize - 1)) == 0);
         assert((ea & (DefaultMainMemoryPageSize - 1)) == 0);
         auto lock = boost::lock_guard(_m);
@@ -130,7 +130,7 @@ struct {
 uint32_t sys_rsx_device_map(big_uint64_t* unk0, big_uint64_t* unk1, uint64_t unk2) {
     EMU_ASSERT(*unk0 == 0);
     EMU_ASSERT(unk2 == 8);
-    INFO(libs) << ssnprintf("sys_rsx_device_map(%llx, ?, %llx)", *unk0, unk2);
+    INFO(libs) << sformat("sys_rsx_device_map({:x}, ?, {:x})", *unk0, unk2);
     *unk1 = 0x40000000u;
     return CELL_OK;
 }
@@ -141,8 +141,8 @@ uint32_t sys_rsx_memory_allocate(big_uint32_t* context,
                                  uint64_t unk1,
                                  uint64_t unk2,
                                  uint64_t unk3) {
-    INFO(libs) << ssnprintf(
-        "sys_rsx_memory_allocate(?, ?, %llx, %llx, %llx, %llx)",
+    INFO(libs) << sformat(
+        "sys_rsx_memory_allocate(?, ?, {:x}, {:x}, {:x}, {:x})",
         unk0,
         unk1,
         unk2,
@@ -191,12 +191,12 @@ uint32_t sys_rsx_context_allocate(big_uint32_t* context,
 }
 
 uint32_t sys_rsx_context_free(uint32_t context) {
-    INFO(libs) << ssnprintf("sys_rsx_context_free(%x)", context);
+    INFO(libs) << sformat("sys_rsx_context_free({:x})", context);
     return CELL_OK;
 }
 
 uint32_t sys_rsx_memory_free(uint32_t mem_ctx_id) {
-    INFO(libs) << ssnprintf("sys_rsx_memory_free(%x)", mem_ctx_id);
+    INFO(libs) << sformat("sys_rsx_memory_free({:x})", mem_ctx_id);
     return CELL_OK;
 }
 
@@ -205,8 +205,8 @@ uint32_t sys_rsx_context_iomap(uint32_t rsx_ctx_id,
                                uint32_t main_mem_ea,
                                uint32_t size,
                                uint64_t flags) {
-    INFO(libs) << ssnprintf(
-        "sys_rsx_context_iomap(%x, %x, %x)", local_offset, main_mem_ea, size);
+    INFO(libs) << sformat(
+        "sys_rsx_context_iomap({:x}, {:x}, {:x})", local_offset, main_mem_ea, size);
     auto ptr = g_state.rsx->context()->mainMemoryBuffer.mapped() + local_offset;
     g_state.mm->provideMemory(main_mem_ea, size, ptr);
     emuGcmState.offsetTable.map(main_mem_ea, local_offset, size);
@@ -231,8 +231,8 @@ uint32_t sys_rsx_context_attribute(uint32_t rsx_ctx_id,
         auto id = arg_1;
         auto height = arg_2;
         auto offset = arg_3;
-        INFO(libs) << ssnprintf(
-            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_DISPLAY_BUFFER, %x, %x, %x)",
+        INFO(libs) << sformat(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_DISPLAY_BUFFER, {:x}, {:x}, {:x})",
             id,
             height,
             offset);
@@ -243,8 +243,8 @@ uint32_t sys_rsx_context_attribute(uint32_t rsx_ctx_id,
         EMU_ASSERT(arg_3 == 0);
         EMU_ASSERT(arg_4 == 0);
     } else if (pkg_id == RSX_CONTEXT_ATTR_FLIP_STATUS) {
-        INFO(libs) << ssnprintf(
-            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_FLIP_STATUS, %x, %x, %x)",
+        INFO(libs) << sformat(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_FLIP_STATUS, {:x}, {:x}, {:x})",
             arg_1,
             arg_2,
             arg_3);
@@ -260,28 +260,28 @@ uint32_t sys_rsx_context_attribute(uint32_t rsx_ctx_id,
             EMU_ASSERT(false);
         }
     } else if (pkg_id == RSX_CONTEXT_ATTR_FLIP_MODE) {
-        INFO(libs) << ssnprintf(
-            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_FLIP_MODE, %x, %x, %x)",
+        INFO(libs) << sformat(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_FLIP_MODE, {:x}, {:x}, {:x})",
             arg_1,
             arg_2,
             arg_3);
     } else if (pkg_id == RSX_CONTEXT_ATTR_BIND_TILE) {
-        INFO(libs) << ssnprintf(
-            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_BIND_TILE, %x, %x, %x)",
+        INFO(libs) << sformat(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_BIND_TILE, {:x}, {:x}, {:x})",
             arg_1,
             arg_2,
             arg_3);
         // do nothing
     } else if (pkg_id == RSX_CONTEXT_ATTR_ZCULL) {
-        INFO(libs) << ssnprintf(
-            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_ZCULL, %x, %x, %x)",
+        INFO(libs) << sformat(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_ZCULL, {:x}, {:x}, {:x})",
             arg_1,
             arg_2,
             arg_3);
         // do nothing
     } else if (pkg_id == RSX_CONTEXT_ATTR_SECOND_VFREQUENCY) {
-        INFO(libs) << ssnprintf(
-            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_SECOND_VFREQUENCY, %x, %x, %x)",
+        INFO(libs) << sformat(
+            "sys_rsx_context_attribute(RSX_CONTEXT_ATTR_SECOND_VFREQUENCY, {:x}, {:x}, {:x})",
             arg_1,
             arg_2,
             arg_3);
@@ -297,7 +297,7 @@ uint32_t sys_rsx_attribute(uint64_t pkg_id,
                            uint64_t arg_2,
                            uint64_t arg_3,
                            uint64_t arg_4) {
-    INFO(libs) << ssnprintf("sys_rsx_attribute(%llx, %llx, %llx, %llx, %llx)",
+    INFO(libs) << sformat("sys_rsx_attribute({:x}, {:x}, {:x}, {:x}, {:x})",
                             pkg_id,
                             arg_1,
                             arg_2,
@@ -319,19 +319,19 @@ void logOffsetTable() {
     auto table = &emu::Gcm::emuGcmState.offsetTable;
     for (auto i = 0u; i < table->ioAddress.size(); ++i) {
         if (table->ioAddress[i] != 0xffff) {
-            INFO(rsx) << ssnprintf("io: %04x", table->ioAddress[i]);
+            INFO(rsx) << sformat("io: {:04x}", table->ioAddress[i]);
         }
     }
     
     for (auto i = 0u; i < table->eaAddress.size(); ++i) {
         if (table->eaAddress[i] != 0xffff) {
-            INFO(rsx) << ssnprintf("ea: %04x", table->eaAddress[i]);
+            INFO(rsx) << sformat("ea: {:04x}", table->eaAddress[i]);
         }
     }
     
     for (auto i = 0u; i < table->mapPageCount.size(); ++i) {
         if (table->mapPageCount[i]) {
-            INFO(rsx) << ssnprintf("count: %04x", table->mapPageCount[i]);
+            INFO(rsx) << sformat("count: {:04x}", table->mapPageCount[i]);
         }
     }
 }

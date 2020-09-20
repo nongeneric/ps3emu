@@ -33,12 +33,12 @@ int32_t sys_cond_create(sys_cond_t* cond_id,
     info->name = attr->name;
     // TODO: error handling
     *cond_id = cvs.create(std::move(info));
-    INFO(sync) << ssnprintf("sys_cond_create(%d, %x, %s)", *cond_id, mutex, attr->name);
+    INFO(sync) << sformat("sys_cond_create({}, {:x}, {})", *cond_id, mutex, attr->name);
     return CELL_OK;
 }
 
 int32_t sys_cond_destroy(sys_cond_t cond) {
-    INFO(sync) << ssnprintf("sys_cond_destroy(%x)", cond);
+    INFO(sync) << sformat("sys_cond_destroy({:x})", cond);
     auto optinfo = cvs.try_get(cond);
     if (!optinfo)
         return CELL_ESRCH;
@@ -65,7 +65,7 @@ int32_t sys_cond_wait(sys_cond_t cond, usecond_t timeout) {
     if (!optinfo)
         return CELL_ESRCH;
     auto& info = *optinfo;
-    INFO(sync) << ssnprintf("sys_cond_wait(%x) c:%s m:%x(%s)",
+    INFO(sync) << sformat("sys_cond_wait({:x}) c:{} m:{:x}({})",
                             cond,
                             info->name,
                             info->m->id,
@@ -122,7 +122,7 @@ int32_t sys_cond_signal(sys_cond_t cond) {
         return CELL_ESRCH;
     auto& info = *optinfo;
     __itt_sync_releasing(info.get());
-    INFO(sync) << ssnprintf("sys_cond_signal(%x) c:%s m:%x(%s)",
+    INFO(sync) << sformat("sys_cond_signal({:x}) c:{} m:{:x}({})",
                             cond,
                             info->name,
                             info->m->id,
@@ -142,7 +142,7 @@ int32_t sys_cond_signal_all(sys_cond_t cond) {
         return CELL_ESRCH;
     auto& info = *optinfo;
     __itt_sync_releasing(info.get());
-    INFO(sync) << ssnprintf("sys_cond_signal_all(%x) c:%s m:%x(%s)",
+    INFO(sync) << sformat("sys_cond_signal_all({:x}) c:{} m:{:x}({})",
                             cond,
                             info->name,
                             info->m->id,
@@ -161,7 +161,7 @@ int32_t sys_cond_signal_to(sys_cond_t cond, sys_ppu_thread_t ppu_thread_id) {
         return CELL_ESRCH;
     auto& info = *optinfo;
     __itt_sync_releasing(info.get());
-    INFO(sync) << ssnprintf("sys_cond_signal_to(%x, %x) c:%s m:%x(%s)",
+    INFO(sync) << sformat("sys_cond_signal_to({:x}, {:x}) c:{} m:{:x}({})",
                             cond,
                             ppu_thread_id,
                             info->name,

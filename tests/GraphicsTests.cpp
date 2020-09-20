@@ -5,6 +5,8 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/state.h"
 #include "ps3emu/Config.h"
+#include "ps3emu/utils/ranges.h"
+#include <boost/algorithm/string.hpp>
 
 static auto runnerPath = "../ps3run/ps3run";
 static auto gcmvizPath = "../gcmviz/gcmviz";
@@ -18,29 +20,29 @@ void compareLastFrame(std::string expected, int n = 0, int tolerance = 5, int sa
     QProcess proc;
     auto id = lastProcId;
 
-    auto badDiff = ssnprintf("%s/ps3frame-diff_%d_%d_bad%d.png", testDir, id, n, comparisonNum);
-    auto badFrame = ssnprintf("%s/ps3frame_%d_%d_bad%d.png", testDir, id, n, comparisonNum);
+    auto badDiff = sformat("{}/ps3frame-diff_{}_{}_bad{}.png", testDir, id, n, comparisonNum);
+    auto badFrame = sformat("{}/ps3frame_{}_{}_bad{}.png", testDir, id, n, comparisonNum);
 
     auto args = QStringList()
         << "-metric"
         << "AE"
         << "-alpha" << "opaque"
         << "-fuzz" << QString("%1%%").arg(tolerance)
-        << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d.png", testDir, id, n))
+        << QString::fromStdString(sformat("{}/ps3frame_{}_{}.png", testDir, id, n))
         << expected.c_str()
-        << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d.png", testDir, id, n));
+        << QString::fromStdString(sformat("{}/ps3frame-diff_{}_{}.png", testDir, id, n));
     proc.start("compare", args);
     proc.waitForFinished(-1);
     REQUIRE( proc.exitCode() != 2 );
     auto output = QString(proc.readAllStandardError()).toInt();
     if (output > safePixels) {
         args = QStringList()
-            << QString::fromStdString(ssnprintf("%s/ps3frame-diff_%d_%d.png", testDir, id, n))
+            << QString::fromStdString(sformat("{}/ps3frame-diff_{}_{}.png", testDir, id, n))
             << QString::fromStdString(badDiff);
         proc.start("cp", args);
         proc.waitForFinished(-1);
         args = QStringList()
-            << QString::fromStdString(ssnprintf("%s/ps3frame_%d_%d.png", testDir, id, n))
+            << QString::fromStdString(sformat("{}/ps3frame_{}_{}.png", testDir, id, n))
             << QString::fromStdString(badFrame);
         proc.start("cp", args);
         proc.waitForFinished(-1);
@@ -48,7 +50,7 @@ void compareLastFrame(std::string expected, int n = 0, int tolerance = 5, int sa
     }
 
     if (output > safePixels) {
-        FAIL(ssnprintf("Expected frame:\n  %s\nActual frame:\n  %s\nDiff:\n  %s\n", expected, badFrame, badDiff));
+        FAIL(sformat("Expected frame:\n  {}\nActual frame:\n  {}\nDiff:\n  {}\n", expected, badFrame, badDiff));
     }
 }
 
@@ -57,7 +59,7 @@ void runAndWait(std::string path, bool gcmviz = false, bool nocapture = false) {
     QStringList args;
     if (gcmviz) {
         args << "--trace"
-             << QString::fromStdString(ssnprintf("/tmp/ps3emu_%d.trace", lastProcId))
+             << QString::fromStdString(sformat("/tmp/ps3emu_{}.trace", lastProcId))
              << "--replay";
     } else {
         args << "--elf" << path.c_str();
@@ -65,10 +67,13 @@ void runAndWait(std::string path, bool gcmviz = false, bool nocapture = false) {
             args << "--capture-rsx";
         }
     }
-    proc.start(gcmviz ? gcmvizPath : runnerPath, args);
+    auto processName = gcmviz ? gcmvizPath : runnerPath;
+    proc.start(processName, args);
     lastProcId = proc.processId();
     proc.waitForFinished(-1);
     if (proc.exitCode() != 0) {
+        auto argLine = boost::join(args | ranges::views::transform(&QString::toStdString), " ");
+        WARN(sformat("failed exec: {} {}", processName, argLine));
         WARN(path);
         if (proc.exitCode()) {
             auto stdOut = proc.readAllStandardOutput().toStdString();
@@ -254,7 +259,7 @@ TEST_CASE("gcm_strip_branch", TAG_SERIAL) {
     runAndWait(testPath("gcm_strip_branch/a.elf"), false, true);
     for (int i = 0; i <= 18; ++i) {
         compareLastFrame(
-            testPath(ssnprintf("gcm_strip_branch/ps3frame%d.png", i).c_str()),
+            testPath(sformat("gcm_strip_branch/ps3frame{}.png", i).c_str()),
             i, 30, 400);
     }
 }

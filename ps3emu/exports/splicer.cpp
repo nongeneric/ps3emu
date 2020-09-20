@@ -37,7 +37,7 @@ void spliceFunction(uint32_t ea, std::function<void()> before, std::function<voi
         return;
     g_state.bbcallMap->set(ea, 0);
     g_state.bbcallMap->set(ea + 4, 0);
-    auto index = addNCallEntry({ssnprintf("spliced_%x", ea), 0, [=](PPUThread* th) {
+    auto index = addNCallEntry({sformat("spliced_{:x}", ea), 0, [=](PPUThread* th) {
         wrap(std::function([=](Process* proc, PPUThread* th, MainMemory* mm, boost::context::continuation* sink) {
             before();
             ppu_dasm<DasmMode::Emulate>(&instr, ea, th);

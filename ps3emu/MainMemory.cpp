@@ -33,16 +33,16 @@ inline void MainMemory::store(ps3_uintptr_t va,
 #if 0
     if constexpr(Len == 4) {
         if (va == GcmControlRegisters) {
-            WARNING(libs) << ssnprintf("rsx_reg_put: %x (nip: %x)", value, g_state.th->getNIP());
+            WARNING(libs) << sformat("rsx_reg_put: {:x} (nip: {:x})", value, g_state.th->getNIP());
         }
         if (va == GcmControlRegisters + 4) {
-            WARNING(libs) << ssnprintf("rsx_reg_get: %x (nip: %x)", value, g_state.th->getNIP());
+            WARNING(libs) << sformat("rsx_reg_get: {:x} (nip: {:x})", value, g_state.th->getNIP());
         }
         if (va == GcmControlRegisters + 8) {
-            WARNING(libs) << ssnprintf("rsx_reg_ref: %x (nip: %x)", value, g_state.th->getNIP());
+            WARNING(libs) << sformat("rsx_reg_ref: {:x} (nip: {:x})", value, g_state.th->getNIP());
         }
         if (va == 0x40201100) {
-            WARNING(libs) << ssnprintf("rsx_reg_flip_status: %x (nip: %x)", value, g_state.th->getNIP());
+            WARNING(libs) << sformat("rsx_reg_flip_status: {:x} (nip: {:x})", value, g_state.th->getNIP());
         }
     }
 #endif
@@ -50,7 +50,7 @@ inline void MainMemory::store(ps3_uintptr_t va,
 #if 0
     if constexpr(Len == 4 || Len == 8) {
         if (value == 0x10118000 || value == 0x10102c10 || value == 0x10102c00) {
-            WARNING(libs) << ssnprintf("write %llx to %x from %x", (uint64_t)value, va, g_state.th->getNIP());
+            WARNING(libs) << sformat("write {:x} to {:x} from {:x}", (uint64_t)value, va, g_state.th->getNIP());
         }
     }
 #endif
@@ -58,7 +58,7 @@ inline void MainMemory::store(ps3_uintptr_t va,
 #if 0
     if constexpr(Len == 4 || Len == 8) {
         if (va == 0x2a70df4) {
-            WARNING(libs) << ssnprintf("write %llx to %x from %x", (uint64_t)value, va, g_state.th->getNIP());
+            WARNING(libs) << sformat("write {:x} to {:x} from {:x}", (uint64_t)value, va, g_state.th->getNIP());
         }
     }
 #endif
@@ -368,12 +368,12 @@ void MainMemory::reportViolation(uint32_t ea, uint32_t len, bool write) {
     });
     auto rangeMessage = range == end(protectionRanges)
                             ? "no range"
-                            : ssnprintf("range %08x-%08x %s %s",
+                            : sformat("range {:08x}-{:08x} {} {}",
                                         range->start,
                                         range->start + range->len,
                                         range->readonly ? "R" : "RW",
                                         range->comment);
-    auto message = ssnprintf("memory %s violation at %08x size %x (%s)",
+    auto message = sformat("memory {} violation at {:08x} size {:x} ({})",
                              write ? "write" : "read",
                              ea,
                              len,

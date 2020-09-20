@@ -39,7 +39,7 @@ std::function<InstructionInfo(uint32_t)> make_analyze(V& vec, bool ppu = true) {
             if (p.first == cia)
                 return ppu ? analyze(p.second, cia) : analyzeSpu(p.second, cia);
         }
-        throw std::runtime_error(ssnprintf("bad cia: %x", cia));
+        throw std::runtime_error(sformat("bad cia: {:x}", cia));
     };
 }
 
@@ -59,7 +59,7 @@ std::function<std::string(uint32_t)> make_name(V& vec, bool ppu = true) {
                 }
             }
         }
-        throw std::runtime_error(ssnprintf("bad cia: %x", cia));
+        throw std::runtime_error(sformat("bad cia: {:x}", cia));
     };
 }
 
@@ -82,7 +82,7 @@ std::function<bool(uint32_t)> make_validate(V& vec, bool ppu = true) {
                 }
             }   
         }
-        throw std::runtime_error(ssnprintf("bad cia: %x", cia));
+        throw std::runtime_error(sformat("bad cia: {:x}", cia));
     };
 }
 
@@ -93,7 +93,7 @@ std::function<uint32_t(uint32_t)> make_read(V& vec) {
             if (p.first == cia)
                 return p.second;
         }
-        throw std::runtime_error(ssnprintf("bad cia: %x", cia));
+        throw std::runtime_error(sformat("bad cia: {:x}", cia));
     };
 }
 

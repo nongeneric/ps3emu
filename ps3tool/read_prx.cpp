@@ -14,7 +14,7 @@ std::string printFnid(uint32_t fnid) {
     auto name = fnidToName(fnid);
     if (name)
         return *name;
-    return ssnprintf("fnid_%08X");
+    return sformat("fnid_{:08X}");
 }
 
 void HandleReadPrx(ReadPrxCommand const& command) {
@@ -41,16 +41,16 @@ void HandleReadPrx(ReadPrxCommand const& command) {
     if (module) {
         auto tocOrigin = module->toc - 0x8000;
         auto tocSize = pheader[1].p_vaddr + pheader[1].p_filesz - tocOrigin;
-        std::cout << ssnprintf("# module_info (%08x)\n", pheader->p_paddr)
-                << ssnprintf("#   attributes %04x\n", module->attributes)
-                << ssnprintf("#   minor version %x\n", module->minor_version)
-                << ssnprintf("#   major version %x\n", module->major_version)
-                << ssnprintf("#   name %s\n", module->name)
-                << ssnprintf("#   toc %08x (origin %08x, size %08x)\n", module->toc, tocOrigin, tocSize)
-                << ssnprintf("#   exports start %08x\n", module->exports_start)
-                << ssnprintf("#   exports end %08x\n", module->exports_end)
-                << ssnprintf("#   imports start %08x\n", module->imports_start)
-                << ssnprintf("#   imports end %08x\n", module->imports_end);
+        std::cout << sformat("# module_info ({:08x})\n", pheader->p_paddr)
+                << sformat("#   attributes {:04x}\n", module->attributes)
+                << sformat("#   minor version {:x}\n", module->minor_version)
+                << sformat("#   major version {:x}\n", module->major_version)
+                << sformat("#   name {}\n", module->name)
+                << sformat("#   toc {:08x} (origin {:08x}, size {:08x})\n", module->toc, tocOrigin, tocSize)
+                << sformat("#   exports start {:08x}\n", module->exports_start)
+                << sformat("#   exports end {:08x}\n", module->exports_end)
+                << sformat("#   imports start {:08x}\n", module->imports_start)
+                << sformat("#   imports end {:08x}\n", module->imports_end);
     }
                 
     std::cout << "\n# exports\n";
@@ -62,20 +62,20 @@ void HandleReadPrx(ReadPrxCommand const& command) {
         }
         auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(e.fnid_table, 1);
         auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(e.stub_table, 1);
-        std::cout << ssnprintf("\n# functions: %d, variables: %d, tls_variables: %d\n\n",
+        std::cout << sformat("\n# functions: {}, variables: {}, tls_variables: {}\n\n",
                                e.functions,
                                e.variables,
                                e.tls_variables);
         for (auto i = 0; i < e.functions + e.variables + e.tls_variables; ++i) {
             auto descr =
                 reinterpret_cast<fdescr*>(g_state.mm->getMemoryPointer(stubs[i], 1));
-                std::cout << ssnprintf("# exported symbol\n")
-                          << ssnprintf("#   lib      %s\n", libname)
-                          << ssnprintf("#   name     %s\n", printFnid(fnids[i]))
-                          << ssnprintf("#   fnid     %08x\n", fnids[i] - imageBase)
-                          << ssnprintf("#   stub     %08x\n", stubs[i] - imageBase);
-                std::cout << ssnprintf(
-                    "make_func(0x%08x, \"%s_%s\")\n\n", descr->va - imageBase, libname, printFnid(fnids[i]));
+                std::cout << sformat("# exported symbol\n")
+                          << sformat("#   lib      {}\n", libname)
+                          << sformat("#   name     {}\n", printFnid(fnids[i]))
+                          << sformat("#   fnid     {:08x}\n", fnids[i] - imageBase)
+                          << sformat("#   stub     {:08x}\n", stubs[i] - imageBase);
+                std::cout << sformat(
+                    "make_func(0x{:08x}, \"{}_{}\")\n\n", descr->va - imageBase, libname, printFnid(fnids[i]));
         }
     }
     
@@ -86,16 +86,16 @@ void HandleReadPrx(ReadPrxCommand const& command) {
         readString(g_state.mm, import.name, libname);
         auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(import.fnids, 1);
         auto fstubs = (big_uint32_t*)g_state.mm->getMemoryPointer(import.fstubs, 1);
-        std::cout << ssnprintf(
-            "# fnid table: %08x, stub table: %08x\n", import.fnids, import.fstubs);
+        std::cout << sformat(
+            "# fnid table: {:08x}, stub table: {:08x}\n", import.fnids, import.fstubs);
         for (auto i = 0u; i < import.functions; ++i) {
-            std::cout << ssnprintf("# imported function\n")
-                      << ssnprintf("#   lib      %s\n", libname)
-                      << ssnprintf("#   name     %s\n", printFnid(fnids[i]))
-                      << ssnprintf("#   fstub    %08x\n", fstubs[i] - imageBase)
-                      << ssnprintf("#   fnid     %08x\n", fnids[i] - imageBase)
-                      << ssnprintf("#   fstubVa  %08x\n", import.fstubs + 4 * i - imageBase);
-            std::cout << ssnprintf("make_func(0x%08x, \"%s_stub_%s\")\n\n",
+            std::cout << sformat("# imported function\n")
+                      << sformat("#   lib      {}\n", libname)
+                      << sformat("#   name     {}\n", printFnid(fnids[i]))
+                      << sformat("#   fstub    {:08x}\n", fstubs[i] - imageBase)
+                      << sformat("#   fnid     {:08x}\n", fnids[i] - imageBase)
+                      << sformat("#   fstubVa  {:08x}\n", import.fstubs + 4 * i - imageBase);
+            std::cout << sformat("make_func(0x{:08x}, \"{}_stub_{}\")\n\n",
                                    fstubs[i] - imageBase,
                                    libname,
                                    printFnid(fnids[i]));
@@ -109,8 +109,8 @@ void HandleReadPrx(ReadPrxCommand const& command) {
         assert(((uint64_t)rel->r_offset >> 32) == 0);
         assert(((uint64_t)rel->r_addend >> 32) == 0);
         uint64_t info = rel->r_info;
-        std::cout << ssnprintf("# offset: %08x\n", rel->r_offset)
-                  << ssnprintf("# sym: %08x; type: %08x; addend: %08x\n\n",
+        std::cout << sformat("# offset: {:08x}\n", rel->r_offset)
+                  << sformat("# sym: {:08x}; type: {:08x}; addend: {:08x}\n\n",
                                ELF64_R_SYM(info), ELF64_R_TYPE(info), (uint32_t)rel->r_addend);
     }
 }

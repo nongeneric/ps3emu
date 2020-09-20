@@ -240,14 +240,14 @@ PRINT(BC, BForm) {
             { "bc", "bca" }, { "bcl", "bcla" }
         };
         auto mnemonic = mnemonics[i->LK_u()][i->AA_u()];
-        *result = ssnprintf("%s %d,%s,%x",
+        *result = sformat("{} {},{},{:x}",
                             mnemonic, i->BO_u(), formatCRbit(i->BI()).c_str(), getNIA(i, cia));
     } else if (i->BI_u() > 3) {
         if (mtype == BranchMnemonicType::ExtCondition) {
-            *result = ssnprintf("%s cr%d,%" PRIx64,
+            *result = sformat("{} cr{},{:x}",
                                 extMnemonic.c_str(), i->BI_u() / 4, getNIA(i, cia));
         } else if (mtype == BranchMnemonicType::ExtSimple) {
-            *result = ssnprintf("%s %s,%" PRIx64,
+            *result = sformat("{} {},{:x}",
                                 extMnemonic.c_str(), formatCRbit(i->BI()).c_str(), getNIA(i, cia));
         }
     } else {
@@ -290,10 +290,10 @@ PRINT(BCLR, XLForm_2) {
     auto mtype = getExtBranchMnemonic(i->LK_u(), 0, true, false, i->BO(), i->BI(), extMnemonic);
     if (mtype == BranchMnemonicType::Generic) {
         auto mnemonic = i->LK_u() ? "bclrl" : "bclr";
-        *result = ssnprintf("%s %d,%s,%d",
+        *result = sformat("{} {},{},{}",
                             mnemonic, i->BO_u(), formatCRbit(i->BI()).c_str(), i->BH_u());
     } else if (i->BI_u() > 3) {
-        *result = ssnprintf("%s cr%d", extMnemonic.c_str(), i->BI_u() / 4);
+        *result = sformat("{} cr{}", extMnemonic.c_str(), i->BI_u() / 4);
     } else {
         *result = extMnemonic;
     }
@@ -319,10 +319,10 @@ PRINT(BCCTR, XLForm_2) {
     auto mtype = getExtBranchMnemonic(i->LK_u(), 0, false, true, i->BO(), i->BI(), extMnemonic);
     if (mtype == BranchMnemonicType::Generic) {
         auto mnemonic = i->LK_u() ? "bcctrl" : "bcctr";
-        *result = ssnprintf("%s %d,%s,%d",
+        *result = sformat("{} {},{},{}",
                             mnemonic, i->BO_u(), formatCRbit(i->BI()).c_str(), i->BH_u());
     } else if (i->BI_u() > 3) {
-        *result = ssnprintf("%s cr%d", extMnemonic.c_str(), i->BI_u() / 4);
+        *result = sformat("{} cr{}", extMnemonic.c_str(), i->BI_u() / 4);
     } else {
         *result = extMnemonic;
     }
@@ -1746,7 +1746,7 @@ EMU_REWRITE(SC, SCForm, 0)
 PRINT(NCALL, NCallForm) {
     auto entry = findNCallEntryByIndex(i->idx_u());
     auto name = entry ? entry->name : "???";
-    *result = ssnprintf("ncall %s (%x)", name, i->idx_u());
+    *result = sformat("ncall {} ({:x})", name, i->idx_u());
 }
 
 #define _NCALL(_idx) { \
@@ -1763,7 +1763,7 @@ PRINT(BBCALL, BBCallForm) {
 #define _BBCALL(_so, _label) { \
     assert(false); \
 }
-EMU_REWRITE(BBCALL, BBCallForm, i->Segment(), i->Label());
+EMU_REWRITE(BBCALL, BBCallForm, i->Segment_u(), i->Label_u());
 
 inline int64_t get_cmp_ab(unsigned l, uint64_t value) {
     return l == 0 ? (int64_t)static_cast<int32_t>(value) : value;
@@ -4714,7 +4714,7 @@ BranchMnemonicType getExtBranchMnemonic(bool lr,
             f = crbiSet ? "so" : "ns";
         }
 
-        m = ssnprintf("b%s%s%s%s%s",
+        m = sformat("b{}{}{}{}{}",
                       f,
                       tolr ? "lr" : "",
                       toctr ? "ctr" : "",
@@ -4752,7 +4752,7 @@ BranchMnemonicType getExtBranchMnemonic(bool lr,
             } else {
                 throw std::runtime_error("invalid instruction");
             }
-            m = ssnprintf("bd%s%s%s%s",
+            m = sformat("bd{}{}{}{}",
                           sem,
                           tolr ? "lr" : "",
                           lr ? "l" : "",
@@ -4781,7 +4781,7 @@ std::string formatCRbit(BitField<11, 16> bi) {
     case 3:
         crbit = "so";
     }
-    return ssnprintf("4*cr%d+%s", bi.u() / 4, crbit);
+    return sformat("4*cr{}+{}", bi.u() / 4, crbit);
 }
 
 bool isAbsoluteBranch(uint32_t instr) {

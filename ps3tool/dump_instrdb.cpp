@@ -7,7 +7,7 @@ void HandleDumpInstrDb(DumpInstrDbCommand const& command) {
     InstrDb db;
     db.open();
     for (auto& entry : db.entries()) {
-        std::cout << ssnprintf("%s %s:%d (%d leads)\n",
+        std::cout << sformat("{} {}:{} ({} leads)\n",
                                entry.isPPU ? "PPU" : "SPU",
                                entry.elfPath,
                                entry.isPPU ? 0 : entry.segment,
@@ -18,7 +18,7 @@ void HandleDumpInstrDb(DumpInstrDbCommand const& command) {
             }
             auto offset = entry.offsets[i];
             auto bytes = entry.offsetBytes[i];
-            std::cout << ssnprintf("    %8x: %08x", offset, bytes);
+            std::cout << sformat("    {:8x}: {:08x}", offset, bytes);
         }
         std::cout << "\n\n";
     }

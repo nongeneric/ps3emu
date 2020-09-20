@@ -254,13 +254,13 @@ public:
                 return print(_thread->getGPR(row));
             } else if (_view == 2) {
                 auto r = _thread->r(row);
-                return QString::fromStdString(ssnprintf("%016" PRIx64 "%016" PRIx64,
+                return QString::fromStdString(sformat("{:x}{:x}",
                                                         (uint64_t)r.dw(0),
                                                         (uint64_t)r.dw(1)));
             } else if (_view == 3) {
                 auto r = _thread->r(row);
                 return QString::fromStdString(
-                    ssnprintf("%g:%g:%g:%g", r.fs(0), r.fs(1), r.fs(2), r.fs(3)));
+                    sformat("{:g}:{:g}:{:g}:{:g}", r.fs(0), r.fs(1), r.fs(2), r.fs(3)));
             }
         }
         return "";
@@ -283,10 +283,10 @@ public:
         if (col == 3) {
             auto r = _spuThread->r(row);
             if (_view == 1 || _view == 3) {
-                return QString::fromStdString(ssnprintf(
-                    "%08x %08x %08x %08x", r.w<0>(), r.w<1>(), r.w<2>(), r.w<3>()));
+                return QString::fromStdString(sformat(
+                    "{:08x} {:08x} {:08x} {:08x}", r.w<0>(), r.w<1>(), r.w<2>(), r.w<3>()));
             } else {
-                return QString::fromStdString(ssnprintf("%g : %g : %g : %g",
+                return QString::fromStdString(sformat("{:g} : {:g} : {:g} : {:g}",
                                                         r.fs(0),
                                                         r.fs(1),
                                                         r.fs(2),
@@ -410,7 +410,7 @@ public:
                 if (ppu && !isSpuElf) {
                     ppu_dasm<DasmMode::Print>(&instr, row, &str);
                     auto bbcall = g_state.bbcallMap->safeGet(row);
-                    str = ssnprintf("%s%s", bbcall ? "." : " ", str);
+                    str = sformat("{}{}", bbcall ? "." : " ", str);
                 } else {
                     SPUDasm<DasmMode::Print>(&instr, row, &str);
                 }
@@ -608,7 +608,7 @@ void DebuggerModel::runHandler(RunCommand command) {
             emit message("process finished");
             cont = false;
         } else if (auto ev = boost::get<PPUThreadStartedEvent>(&untyped)) {
-            emit message(QString::fromStdString(ssnprintf("ppu thread started %x",
+            emit message(QString::fromStdString(sformat("ppu thread started {:x}",
                                                           ev->thread->getNIP())));
             if (g_config.config().StopAtNewPpuThread) {
                 cont = false;
@@ -888,7 +888,7 @@ uint32_t DebuggerModel::findLibFunc(std::string name) {
 std::string DebuggerModel::printSegment(uint32_t ea) {
     for (auto& segment : _proc->getSegments()) {
         if (intersects(segment.va, segment.size, ea, 1u)) {
-            return ssnprintf("base: %08x, rva: %08x, name: %s",
+            return sformat("base: {:08x}, rva: {:08x}, name: {}",
                                  segment.va,
                                  ea - segment.va,
                                  segment.elf->shortName());
@@ -1014,7 +1014,7 @@ void DebuggerModel::dumpImports() {
             continue;
         elfs.insert(s.elf.get());
 
-        emit message(ssnprintf("module %s", s.elf->shortName()).c_str());
+        emit message(sformat("module {}", s.elf->shortName()).c_str());
 
         prx_import_t* imports;
         int count;
@@ -1023,7 +1023,7 @@ void DebuggerModel::dumpImports() {
         for (auto i = 0; i < count; ++i) {
             std::string name;
             readString(g_state.mm, imports[i].name, name);
-            emit message(ssnprintf("  import %s", name).c_str());
+            emit message(sformat("  import {}", name).c_str());
 
             auto printImports = [&](auto idsVa, auto stubsVa, auto count, auto type, auto isVar) {
                 auto fnids = (big_uint32_t*)g_state.mm->getMemoryPointer(idsVa, count * 4);
@@ -1038,7 +1038,7 @@ void DebuggerModel::dumpImports() {
                         return s.va <= stub && stub < s.va + s.size;
                     });
                     auto resolution = segment == end(segments) ? "NCALL" : segment->elf->shortName();
-                    emit message(QString(ssnprintf("    %s fnid_%08X | %s", type, fnids[j], resolution).c_str()));
+                    emit message(QString(sformat("    {} fnid_{:08X} | {}", type, fnids[j], resolution).c_str()));
                 }
             };
             printImports(imports[i].fnids, imports[i].fstubs, imports[i].functions, "FUNC    ", false);
@@ -1057,14 +1057,14 @@ void DebuggerModel::toggleFPR() {
 }
 
 void printFrequencies(TraceFile& f, std::map<std::string, int>& counts) {
-    f.append(ssnprintf("#\n#instruction frequencies:\n"));
+    f.append("#\n#instruction frequencies:\n");
     std::vector<std::pair<std::string, int>> sorted;
     for (auto p : counts) {
         sorted.push_back(p);
     }
     ranges::sort(sorted, std::less<>(), [](auto x) { return x.second; });
     for (auto p : sorted) {
-        f.append(ssnprintf("#%-10s%-5d\n", p.first.c_str(), p.second));
+        f.append(sformat("#{:<10}{:<5}\n", p.first.c_str(), p.second));
     }
 }
 
@@ -1249,7 +1249,7 @@ void DebuggerModel::clearSoftBreak(ps3_uintptr_t va) {
         begin(_softBreaks), end(_softBreaks), [=](auto b) { return b.va == va; });
     if (it == end(_softBreaks)) {
         emit message(
-            QString::fromStdString(ssnprintf("there is no breakpoint at %x", va)));
+            QString::fromStdString(sformat("there is no breakpoint at {:x}", va)));
         return;
     }
     g_state.mm->store32(va, it->bytes, g_state.granule);

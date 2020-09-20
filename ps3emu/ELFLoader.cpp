@@ -33,52 +33,52 @@ void ELFLoader::load(std::string filePath) {
     _elfName = filePath;
     FILE* f = fopen(filePath.c_str(), "rb");
     if (!f) {
-        ERROR(libs) << ssnprintf("can't open file %s: %s", filePath, strerror(errno));
+        ERROR(libs) << sformat("can't open file {}: {}", filePath, strerror(errno));
         exit(1);
     }
     fseek(f, 0, SEEK_END);
     auto fileSize = static_cast<unsigned>(ftell(f));
     if (fileSize < sizeof(Elf64_Ehdr))
         throw std::runtime_error("File too small for an ELF64 file");
-    
+
     fseek(f, 0, SEEK_SET);
-    
+
     _file.resize(fileSize);
     auto read = fread(&_file[0], 1, fileSize, f);
     (void)read;
     assert(read == fileSize);
     fclose(f);
-    
+
     _header = reinterpret_cast<Elf64_be_Ehdr*>(&_file[0]);
-    bool hasElfIdent = 
+    bool hasElfIdent =
         _header->e_ident[EI_MAG0] == ELFMAG0 &&
         _header->e_ident[EI_MAG1] == ELFMAG1 &&
         _header->e_ident[EI_MAG2] == ELFMAG2 &&
         _header->e_ident[EI_MAG3] == ELFMAG3;
     if (!hasElfIdent)
         throw std::runtime_error("Incorrect ELF magic");
-    
+
     if (_header->e_ident[EI_CLASS] != ELFCLASS64)
         throw std::runtime_error("Only ELF64 supported");
-    
+
     auto ELFOSABI_CELLOSLV2 = 0x66;
-    
+
     if (_header->e_ident[EI_OSABI] != ELFOSABI_CELLOSLV2)
         throw std::runtime_error("Not CELLOSLV2 ABI");
-    
+
     if (_header->e_ident[EI_DATA] != ELFDATA2MSB)
         throw std::runtime_error("Only big endian supported");
-    
+
     if (_header->e_machine != EM_PPC64)
         throw std::runtime_error("Unkown machine value");
-    
+
     _sections = reinterpret_cast<Elf64_be_Shdr*>(&_file[0] + _header->e_shoff);
-    
+
     if (_header->e_phoff != sizeof(Elf64_Ehdr))
         throw std::runtime_error("Unknown data between header and program header");
-    
+
     _pheaders = reinterpret_cast<Elf64_be_Phdr*>(&_file[0] + _header->e_phoff);
-    
+
     for (auto ph = _pheaders; ph != _pheaders + _header->e_phnum; ++ph) {
         if (ph->p_type == PT_INTERP)
             throw std::runtime_error("program interpreter not supported");
@@ -140,7 +140,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         }
         if (ph->p_memsz == 0)
             continue;
-        
+
         uint64_t va = imageBase + ph->p_vaddr;
         auto index = std::distance(_pheaders, ph);
         if (imageBase && index == 1) {
@@ -148,23 +148,23 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
             auto ph0 = _pheaders[0];
             prxPh1Va = va = boost::alignment::align_up(imageBase + ph0.p_vaddr + ph0.p_memsz, 0x10000);
         }
-        
-        INFO(libs) << ssnprintf("mapping segment of size %08" PRIx64 " to %08" PRIx64 "-%08" PRIx64 " (image base: %08x)",
+
+        INFO(libs) << sformat("mapping segment of size {:08x} to {:08x}-{:08x} (image base: {:08x})",
             (uint64_t)ph->p_filesz, va, va + ph->p_memsz, imageBase);
-        
+
         g_state.mm->mark(va,
                          ph->p_memsz,
                          false, //!(ph->p_flags & PF_W),
-                         ssnprintf("%s segment", shortName()));
-        
+                         sformat("{} segment", shortName()));
+
         assert(ph->p_memsz >= ph->p_filesz);
         g_state.mm->writeMemory(va, ph->p_offset + &_file[0], ph->p_filesz);
-        
+
         if (ph->p_type != PT_TLS) {
             makeSegment(va, ph->p_memsz, index);
         }
     }
-    
+
     std::map<uint32_t, uint32_t> bbBytes;
 
     InstrDb db;
@@ -184,7 +184,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 } else {
                     index = store->addPPU(&segment);
                 }
-                INFO(libs) << ssnprintf("loading %s:%s with %d blocks",
+                INFO(libs) << sformat("loading {}:{} with {} blocks",
                                         x86path,
                                         segment.description,
                                         segment.blocks->size());
@@ -206,19 +206,19 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                 }
             }
         } else {
-            WARNING(libs) << ssnprintf("could not load %s: %s", x86path, dlerror());
+            WARNING(libs) << sformat("could not load {}: {}", x86path, dlerror());
         }
     }
-    
+
     if (!imageBase)
         return {};
-    
+
     assert(prxPh1Va);
-    
+
     auto lo = [](uint32_t x) { return x & 0xffff; };
     auto hi = [](uint32_t x) { return (x >> 16) & 0xffff; };
     auto ha = [](uint32_t x) { return ((x >> 16) + ((x & 0x8000) ? 1 : 0)) & 0xffff; };
-        
+
     auto rel = (Elf64_be_Rela*)&_file[_pheaders[2].p_offset];
     auto endRel = rel + _pheaders[2].p_filesz / sizeof(Elf64_be_Rela);
     for (; rel != endRel; ++rel) {
@@ -248,10 +248,10 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
             throw std::runtime_error("unimplemented reloc type");
         }
     }
-    
+
     _module = (module_info_t*)g_state.mm->getMemoryPointer(
         _pheaders->p_paddr - _pheaders->p_offset + imageBase, sizeof(module_info_t));
-    
+
     std::vector<Replacement> replacements = {
         { "cellSpurs", "cellSpursInitializeWithAttribute2" },
         { "cellSpurs", "cellSpursInitializeWithAttribute" },
@@ -269,21 +269,21 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
         { "sysPrxForUser", "_sys_memcpy" },
         { "sysPrxForUser", "_sys_memset" },
     };
-    
+
     std::vector<StolenFuncInfo> stolenInfos;
     for (auto&& repl : replacements) {
         auto fnid = calcFnid(repl.name.c_str());
         auto stub = findExportedSymbol({this}, fnid, repl.lib, prx_symbol_type_t::function);
         if (stub == 0)
             continue;
-        
+
         auto codeVa = g_state.mm->load32(stub);
         auto it = bbBytes.find(codeVa);
         if (it != end(bbBytes)) {
             auto bytes = it->second;
             g_state.mm->store32(codeVa, bytes, g_state.granule);
         }
-        
+
         uint32_t index;
         findNCallEntry(fnid, index, true);
         stolenInfos.push_back({codeVa, stub, g_state.mm->load32(codeVa), index});
@@ -299,7 +299,7 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
             auto stubs = (big_uint32_t*)g_state.mm->getMemoryPointer(exports[i].stub_table, 4 * exports[i].functions);
             for (auto j = 0; j < exports[i].functions; ++j) {
                 auto fnidName = fnidToName(fnids[j]);
-                auto name = fnidName ? *fnidName : ssnprintf("fnid_%08X", fnids[j]);
+                auto name = fnidName ? *fnidName : sformat("fnid_{:08X}", fnids[j]);
                 std::string libname;
                 readString(g_state.mm, exports[i].name, libname);
 
@@ -326,29 +326,29 @@ std::vector<StolenFuncInfo> ELFLoader::map(make_segment_t makeSegment,
                     };
                 }
                 std::function<std::string(PPUThread*)> getPreInfo = [](auto th){
-                    return ssnprintf("%llx", th->getGPR(3));
+                    return sformat("{:x}", th->getGPR(3));
                 };
                 auto getPostInfo = getPreInfo;
                 if (name == "cellAudioGetPortBlockTag" || name == "cellAudioGetPortTimestamp") {
                     static thread_local uint32_t tsVa = 0;
                     getPreInfo = [=](auto th) {
                         tsVa = th->getGPR(5);
-                        return ssnprintf("%d, %lld, ...", (uint32_t)th->getGPR(3), th->getGPR(4));
+                        return sformat("{}, {}, ...", (uint32_t)th->getGPR(3), th->getGPR(4));
                     };
                     getPostInfo = [=](auto th) {
                         auto ts = g_state.mm->load64(tsVa);
-                        return ssnprintf("%llx, %lld", (uint32_t)th->getGPR(3), ts);
+                        return sformat("{:x}, {}", (uint32_t)th->getGPR(3), ts);
                     };
                 }
                 spliceFunction(codeVa, [=] {
-                    log(ssnprintf("proxy [%08x] %s.%s(%s)", codeVa, libname, name, getPreInfo(g_state.th)));
+                    log(sformat("proxy [{:08x}] {}.{}({})", codeVa, libname, name, getPreInfo(g_state.th)));
                 }, [=] {
-                    log(ssnprintf("proxy [%08x] %s.%s -> %s", codeVa, libname, name, getPostInfo(g_state.th)));
+                    log(sformat("proxy [{:08x}] {}.{} -> {}", codeVa, libname, name, getPostInfo(g_state.th)));
                 });
             }
         }
     }
-    
+
     return stolenInfos;
 }
 
@@ -368,7 +368,7 @@ std::tuple<prx_import_t*, int> ELFLoader::imports() {
 std::tuple<prx_export_t*, int> ELFLoader::exports() {
     if (!_module)
         return {nullptr, 0};
-    
+
     auto count = _module->exports_end - _module->exports_start;
     return std::make_tuple(
         (prx_export_t*)g_state.mm->getMemoryPointer(_module->exports_start, count),
@@ -405,12 +405,12 @@ uint32_t findExportedEmuFunction(uint32_t id) {
     if (!ncallEntry) {
         auto resolved = fnidToName(id);
         index = curUnknownNcall--;
-        name = ssnprintf("(!) fnid_%08X%s", id, resolved ? " " + *resolved : "");
+        name = sformat("(!) fnid_{:08X}{}", id, resolved ? " " + *resolved : "");
     } else {
         name = ncallEntry->name;
     }
-    INFO(libs) << ssnprintf("    %s (ncall %x)", name, index);
-    
+    INFO(libs) << sformat("    {} (ncall {:x})", name, index);
+
     g_state.mm->setMemory(ncallDescrVa, 0, 8);
     g_state.mm->store32(ncallDescrVa, ncallDescrVa + 4, g_state.granule);
     encodeNCall(g_state.mm, ncallDescrVa + 4, index);
@@ -442,7 +442,7 @@ uint32_t findExportedSymbol(std::vector<ELFLoader*> const& prxs,
                 first = exports[i].functions;
                 last = first + exports[i].variables;
             } else { assert(false); }
-            
+
             for (auto j = first; j < last; ++j) {
                 if (fnids[j] == id) {
                     if (!isSymbolWhitelisted(prx, fnids[j]))
@@ -478,10 +478,10 @@ std::tuple<prx_import_t*, int> ELFLoader::elfImports() {
     auto phprx = std::find_if(_pheaders, _pheaders + _header->e_phnum, [](auto& ph) {
         return ph.p_type == PT_TYPE_PRXINFO;
     });
-    
+
     if (phprx == _pheaders + _header->e_phnum)
         throw std::runtime_error("PRXINFO segment not present");
-    
+
     auto prxInfo = (sys_process_prx_info*)g_state.mm->getMemoryPointer(phprx->p_vaddr, sizeof(sys_process_prx_info));
     auto count = prxInfo->imports_end - prxInfo->imports_start;
     return std::make_tuple(
@@ -490,7 +490,7 @@ std::tuple<prx_import_t*, int> ELFLoader::elfImports() {
 }
 
 void ELFLoader::link(std::vector<std::shared_ptr<ELFLoader>> prxs) {
-    INFO(libs) << ssnprintf("linking prx %s", elfName());
+    INFO(libs) << sformat("linking prx {}", elfName());
     auto [imports, count] = this->imports();
     for (auto i = 0; i < count; ++i) {
         std::string library;

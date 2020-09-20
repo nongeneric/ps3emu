@@ -21,14 +21,14 @@ namespace ShaderRewriter {
             default: assert(false); return FunctionName::none;
         }
     }
-    
+
     class PrintVisitor : public IExpressionVisitor {
         std::string _ret;
         unsigned level = 0;
         std::string indent(unsigned level) {
             return std::string(level * 4, ' ');
         }
-        
+
         std::string printOperatorName(FunctionName name) {
             switch (name) {
                 case FunctionName::mul: return "*";
@@ -44,76 +44,76 @@ namespace ShaderRewriter {
                 default: assert(false); return "";
             }
         }
-        
+
         std::string accept(Expression* st) {
             st->accept(this);
             return _ret;
         }
-        
+
         virtual void visit(IfStubFragmentStatement* st) override {
             return visit((IfStatement*)st);
         }
-        
+
         virtual void visit(FloatLiteral* literal) override {
             if (std::isnan(literal->value()))
                 throw std::runtime_error("FloatLiteral should never be nan");
-            _ret = ssnprintf("%g", literal->value());
+            _ret = sformat("{:g}", literal->value());
         }
-        
+
         virtual void visit(IntegerLiteral* literal) override {
-            _ret = ssnprintf("%d", literal->value());
+            _ret = sformat("{}", literal->value());
         }
-        
+
         virtual void visit(BinaryOperator* op) override {
             auto name = printOperatorName(op->name());
             auto args = op->args();
             auto left = accept(args.at(0));
             auto right = accept(args.at(1));
-            _ret = ssnprintf("(%s %s %s)", left.c_str(), name.c_str(), right.c_str());
+            _ret = sformat("({} {} {})", left, name, right);
         }
-        
+
         virtual void visit(UnaryOperator* op) override {
             auto name = printOperatorName(op->name());
             auto expr = accept(op->args().at(0));
-            _ret = ssnprintf("(%s%s)", name.c_str(), expr.c_str());
+            _ret = sformat("({}{})", name, expr);
         }
-        
+
         virtual void visit(Swizzle* swizzle) override {
             auto expr = accept(swizzle->expr());
             auto sw = print_swizzle(swizzle->swizzle(), true);
-            _ret = ssnprintf("(%s%s)", expr.c_str(), sw.c_str());
+            _ret = sformat("({}{})", expr, sw);
         }
-        
+
         virtual void visit(Assignment* assignment) override {
             auto var = accept(assignment->dest());
             auto expr = accept(assignment->expr());
-            _ret = ssnprintf("%s%s = %s;", indent(level), var.c_str(), expr.c_str());
+            _ret = sformat("{}{} = {};", indent(level), var, expr);
         }
-        
+
         virtual void visit(Variable* var) override {
             if (!var->index()) {
                 _ret = var->name();
                 return;
             }
             auto index = accept(var->index());
-            _ret = ssnprintf("%s[%s]", var->name(), index);
+            _ret = sformat("{}[{}]", var->name(), index);
         }
-        
+
         virtual void visit(Invocation* invocation) override {
             auto args = invocation->args();
-            
+
             if (invocation->name() == FunctionName::ftex) {
                 assert(invocation->args().size() == 2);
-                _ret = ssnprintf("tex%s(%s)", accept(args[0]), accept(args[1]));
+                _ret = sformat("tex{}({})", accept(args[0]), accept(args[1]));
                 return;
             }
-            
+
             if (invocation->name() == FunctionName::ftxp) {
                 assert(invocation->args().size() == 2);
-                _ret = ssnprintf("tex%sProj(%s)", accept(args[0]), accept(args[1]));
+                _ret = sformat("tex{}Proj({})", accept(args[0]), accept(args[1]));
                 return;
             }
-            
+
             std::string str;
             for (auto i = 0u; i < args.size(); ++i) {
                 if (i > 0)
@@ -162,15 +162,15 @@ namespace ShaderRewriter {
                 case FunctionName::any: name = "any"; break;
                 default: assert(false);
             }
-            _ret = ssnprintf("%s(%s)", name, str.c_str());
+            _ret = sformat("{}({})", name, str);
         }
-        
+
         virtual void visit(ComponentMask* mask) override {
             auto expr = accept(mask->expr());
             auto strMask = print_dest_mask(mask->mask());
-            _ret = ssnprintf("%s%s", expr.c_str(), strMask.c_str());
+            _ret = sformat("{}{}", expr, strMask);
         }
-        
+
         virtual void visit(IfStatement* ifst) override {
             auto cond = accept(ifst->condition());
             std::string res = indent(level) + "if (" + cond + ") {\n";
@@ -188,42 +188,42 @@ namespace ShaderRewriter {
             res += indent(level) + "}";
             _ret = res;
         }
-        
+
         virtual void visit(SwitchStatement* sw) override {
             std::string cases;
             for (auto& c : sw->cases()) {
                 std::string body;
                 for (auto& st : c.body) {
-                    body += ssnprintf("    %s\n", accept(st));
+                    body += sformat("    {}\n", accept(st));
                 }
-                cases += ssnprintf("case %d: {\n%s}\n", c.address, body);
+                cases += sformat("case {}: {{\n{}}}\n", c.address, body);
             }
-            _ret = ssnprintf("switch (%s) {\n%s}", accept(sw->switchOn()), cases);
+            _ret = sformat("switch ({}) {{\n{}}}", accept(sw->switchOn()), cases);
         }
-        
+
         virtual void visit(BreakStatement* sw) override {
             _ret = indent(level) + "break;";
         }
-        
+
         virtual void visit(DiscardStatement* sw) override {
             _ret = indent(level) + "discard;";
         }
-        
+
         virtual void visit(WhileStatement* ws) override {
             auto cond = accept(ws->condition());
             if (ws->body().empty()) {
-                _ret = ssnprintf("%swhile (%s) { }", indent(level), cond);
+                _ret = sformat("{}while ({}) {{ }}", indent(level), cond);
                 return;
             }
             std::string body;
             for (auto st : ws->body()) {
                 body += accept(st) + "\n";
             }
-            _ret = ssnprintf("%swhile (%s) {\n%s}", indent(level), cond, body);
+            _ret = sformat("{}while ({}) {{\n{}}}", indent(level), cond, body);
         }
-        
+
         virtual void visit(TernaryOperator* ternary) override {
-            _ret = ssnprintf("(%s ? %s : %s)",
+            _ret = sformat("({} ? {} : {})",
                              accept(ternary->args()[0]),
                              accept(ternary->args()[1]),
                              accept(ternary->args()[2]));
@@ -234,7 +234,7 @@ namespace ShaderRewriter {
             return _ret;
         }
     };
-    
+
     class InfoCollectorVisitor : public DefaultVisitor {
         int _lastRegisterUsed = -1;
         int _lastHRegisterUsed = -1;
@@ -251,12 +251,12 @@ namespace ShaderRewriter {
         int lastRegisterUsed() {
             return _lastRegisterUsed;
         }
-        
+
         int lastHRegisterUsed() {
             return _lastHRegisterUsed;
         }
     };
-    
+
     Expression* adaptToSingleScalar(ASTContext& context, Expression* expr) {
         return context.make<Swizzle>(expr, swizzle_t{
             swizzle2bit_t::X,
@@ -265,13 +265,13 @@ namespace ShaderRewriter {
             swizzle2bit_t::X
         });
     };
-    
+
     std::string PrintStatement(Statement* stat) {
         PrintVisitor visitor;
         stat->accept(&visitor);
         return visitor.result();
-    }    
-    
+    }
+
     Expression* ConvertArgument(ASTContext& context,
                                 FragmentInstr const& i,
                                 int n,
@@ -285,7 +285,7 @@ namespace ShaderRewriter {
             expr = context.make<Variable>("fconst.c", context.make<IntegerLiteral>(constIndex));
         } else if (arg.type == op_type_t::Attr) {
             // the g[] correction has no effect
-            auto name = ssnprintf("f_%s", print_attr(i.input_attr));
+            auto name = sformat("f_{}", print_attr(i.input_attr));
             expr = context.make<Variable>(name, nullptr);
         } else if (arg.type == op_type_t::Temp) {
             auto name = arg.reg_type == reg_type_t::H ? "h" : "r";
@@ -307,7 +307,7 @@ namespace ShaderRewriter {
         }
         return expr;
     }
-    
+
     Expression* makeCondition(ASTContext& context, condition_t cond) {
         if (cond.relation == cond_t::TR)
             return nullptr;
@@ -317,7 +317,7 @@ namespace ShaderRewriter {
         auto func = relationToFunction(cond.relation);
         return context.make<Invocation>(func, swizzled_c, vec);
     }
-    
+
     Expression* appendCondition(ASTContext& context,
                                 condition_t cond,
                                 Expression* expr,
@@ -327,7 +327,7 @@ namespace ShaderRewriter {
             return expr;
         return context.make<Invocation>(FunctionName::mix, lhs, expr, relation);
     }
-    
+
     Assignment* makeCAssignment(ASTContext& context,
                                 control_mod_t mod,
                                 bool isRegC,
@@ -343,12 +343,12 @@ namespace ShaderRewriter {
         }
         return nullptr;
     }
-    
+
     Expression* clamp(ASTContext& context, Expression* expr, float min, float max) {
         return context.make<Invocation>(FunctionName::clamp,
                               expr, context.make<FloatLiteral>(min), context.make<FloatLiteral>(max));
     }
-    
+
     std::vector<Statement*> MakeStatement(ASTContext& context,
                                           FragmentInstr const& i,
                                           unsigned constIndex) {
@@ -357,7 +357,7 @@ namespace ShaderRewriter {
         for (int n = 0; n < i.opcode.op_count; ++n) {
             args[n] = ConvertArgument(context, i, n, constIndex);
         }
-        
+
         auto isScalarRhs = false;
         std::vector<Statement*> res;
         switch (i.opcode.instr) {
@@ -526,7 +526,7 @@ namespace ShaderRewriter {
             }
             default: assert(false);
         }
-        
+
         if (i.scale != scale_t::None) {
             auto mul = [&] {
                 switch (i.scale) {
@@ -541,7 +541,7 @@ namespace ShaderRewriter {
             }();
             rhs = context.make<BinaryOperator>(FunctionName::mul, context.make<FloatLiteral>(mul), rhs);
         }
-        
+
         if (i.is_sat || i.is_bx2) {
             rhs = clamp(context, rhs, 0.0f, 1.0f);
         } else {
@@ -551,9 +551,9 @@ namespace ShaderRewriter {
                 rhs = clamp(context, rhs, -1.0f, 1.0f);
             }
         }
-        
+
         assert(!i.is_bx2);
-        
+
         int regnum;
         const char* regname;
         if (i.is_reg_c) {
@@ -563,7 +563,7 @@ namespace ShaderRewriter {
             regnum = i.reg_num;
             regname = i.reg == reg_type_t::H ? "h" : "r";
         }
-        
+
         if (i.opcode.instr == fragment_op_t::IFE) {
             auto relation = makeCondition(context, i.condition);
             assert(relation);
@@ -587,17 +587,17 @@ namespace ShaderRewriter {
                 }
                 auto assign = context.make<Assignment>(dest, rhs);
                 res.emplace_back(assign);
-                
+
                 auto cassign = makeCAssignment(context, i.control, i.is_reg_c, dest);
                 if (cassign) {
                     res.emplace_back(cassign);
                 }
             }
         }
-        
+
         return res;
     }
-    
+
     std::tuple<int, int> GetLastRegisterNum(Expression* expr) {
         InfoCollectorVisitor visitor;
         expr->accept(&visitor);
@@ -606,31 +606,31 @@ namespace ShaderRewriter {
 
     class VertexRefVisitor : public boost::static_visitor<Expression*> {
         ASTContext* _context;
-        
+
     public:
         VertexRefVisitor(ASTContext* context) : _context(context) {}
-        
+
         Expression* operator()(vertex_arg_address_ref x) const {
             Expression* var = _context->make<Variable>("a", _context->make<IntegerLiteral>(x.reg));
             var = _context->make<ComponentMask>(var, dest_mask_t{
-                x.component == 0, 
-                x.component == 1, 
-                x.component == 2, 
+                x.component == 0,
+                x.component == 1,
+                x.component == 2,
                 x.component == 3
             });
-            return _context->make<BinaryOperator>(FunctionName::add, 
-                                                  var, 
+            return _context->make<BinaryOperator>(FunctionName::add,
+                                                  var,
                                                   _context->make<IntegerLiteral>(x.displ));
         }
-        
+
         Expression* operator()(int x) const {
             return _context->make<IntegerLiteral>(x);
         }
     };
-    
+
     class VertexArgVisitor : public boost::static_visitor<Expression*> {
         ASTContext* _context;
-        
+
     public:
         VertexArgVisitor(ASTContext* context) : _context(context) {}
         Expression* convert(std::string name, vertex_arg_ref_t ref, bool neg, bool abs, swizzle_t sw) const {
@@ -644,49 +644,49 @@ namespace ShaderRewriter {
                 expr = _context->make<Swizzle>(expr, sw);
             return expr;
         }
-        
+
         Expression* operator()(vertex_arg_output_ref_t x) const {
             return convert("v_out", x.ref, false, false, swizzle_xyzw);
         }
-        
+
         Expression* operator()(vertex_arg_input_ref_t x) const {
             return convert("v_in", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
-        
+
         Expression* operator()(vertex_arg_const_ref_t x) const {
             return convert("constants.c", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
-        
+
         Expression* operator()(vertex_arg_temp_reg_ref_t x) const {
             return convert("r", x.ref, x.is_neg, x.is_abs, x.swizzle);
         }
-        
+
         Expression* operator()(vertex_arg_address_reg_ref_t x) const {
             return convert("a", x.a, false, false, swizzle_xyzw);
         }
-        
+
         Expression* operator()(vertex_arg_cond_reg_ref_t x) const {
             return convert("c", x.c, false, false, swizzle_xyzw);
         }
-        
+
         Expression* operator()(vertex_arg_label_ref_t x) const {
             return _context->make<IntegerLiteral>(x.l);
         }
-        
+
         Expression* operator()(vertex_arg_tex_ref_t x) const {
             return _context->make<IntegerLiteral>(x.tex);
         }
     };
-    
+
     std::vector<Statement*> MakeStatement(ASTContext& context, const VertexInstr& i, unsigned address) {
         VertexArgVisitor argVisitor(&context);
         auto arg = [&](int j) {
             return apply_visitor(argVisitor, i.args[j]);
         };
-        
+
         Expression* rhs = nullptr, *lhs = nullptr;
         bool isScalarRhs = false;
-        
+
         switch (i.operation) {
             case vertex_op_t::ADD: {
                 rhs = context.make<BinaryOperator>(FunctionName::add, arg(1), arg(2));
@@ -817,7 +817,7 @@ namespace ShaderRewriter {
                 auto y = context.make<Swizzle>(arg(1), swizzle_t{ swizzle2bit_t::Z, swizzle2bit_t::W });
                 auto sum = context.make<BinaryOperator>(FunctionName::add, x, y);
                 auto sw = context.make<Swizzle>(sum, swizzle_t{
-                    swizzle2bit_t::X, swizzle2bit_t::Y, swizzle2bit_t::X, swizzle2bit_t::Y 
+                    swizzle2bit_t::X, swizzle2bit_t::Y, swizzle2bit_t::X, swizzle2bit_t::Y
                 });
                 rhs = context.make<Invocation>(FunctionName::clamp4i, sw);
                 break;
@@ -877,7 +877,7 @@ namespace ShaderRewriter {
                 break;
             }
             case vertex_op_t::STR: {
-                rhs = context.make<Invocation>(FunctionName::vec4, 
+                rhs = context.make<Invocation>(FunctionName::vec4,
                     context.make<FloatLiteral>(1), context.make<FloatLiteral>(1),
                     context.make<FloatLiteral>(1), context.make<FloatLiteral>(1)
                 );
@@ -899,9 +899,9 @@ namespace ShaderRewriter {
             }
             default: assert(false);
         }
-        
+
         bool isRegC = i.op_count > 1 && boost::get<vertex_arg_cond_reg_ref_t>(&i.args[0]);
-        
+
         auto makeMaskedAssignment = [&] (auto lhs, auto rhs) {
             if (isScalarRhs) {
                 if (i.mask.arity() != 1) {
@@ -917,9 +917,9 @@ namespace ShaderRewriter {
             }
             return context.make<Assignment>(lhs, rhs);
         };
-        
+
         std::vector<Statement*> vec;
-        
+
         if (i.operation == vertex_op_t::MOV) {
             if (i.op_count == 2) {
                 auto rhs = appendCondition(context, i.condition, arg(1), arg(0));
@@ -959,13 +959,13 @@ namespace ShaderRewriter {
         if (cassign) {
             vec.emplace_back(cassign);
         }
-        
+
         for (auto& assignment : vec) {
             assignment->address(address);
         }
         return vec;
     }
-    
+
     class DoesContainBranchVisitor : public DefaultVisitor {
         virtual void visit(Assignment* assignment) override {
             if (auto variable = dynamic_cast<Variable*>(assignment->dest())) {
@@ -983,7 +983,7 @@ namespace ShaderRewriter {
         bool result = false;
         std::set<int> labels;
     };
-    
+
     std::vector<Statement*> RewriteBranches(
         ASTContext& context,
         std::vector<Statement*> uniqueStatements) {
@@ -995,7 +995,7 @@ namespace ShaderRewriter {
             return uniqueStatements;
         auto sts = uniqueStatements;
         auto sw = context.make<SwitchStatement>(context.make<Variable>("nip", nullptr));
-        
+
         std::vector<Statement*> curCase;
         for (auto i = 0u; i < sts.size(); ++i) {
             curCase.push_back(sts[i]);
@@ -1013,7 +1013,7 @@ namespace ShaderRewriter {
             sw->addCase(curCase.front()->address(), curCase);
             curCase.clear();
         }
-        
+
         std::vector<Statement*> res = {
             context.make<Assignment>(context.make<Variable>("nip", nullptr),
                                      context.make<IntegerLiteral>(0)),
@@ -1024,7 +1024,7 @@ namespace ShaderRewriter {
                 StV{sw})};
         return res;
     }
-    
+
     void UsedConstsVisitor::visit(Variable* variable) {
         if (variable->name() == "constants.c") {
             if (auto index = dynamic_cast<IntegerLiteral*>(variable->index())) {
@@ -1032,11 +1032,11 @@ namespace ShaderRewriter {
             }
         }
     }
-    
+
     const std::set<unsigned>& UsedConstsVisitor::consts() {
         return _consts;
     }
-    
+
     bool fixFirstIfStub(ASTContext& context, std::vector<Statement*>& statements) {
         auto it = boost::find_if(statements, [](auto s) {
             auto stub = dynamic_cast<IfStubFragmentStatement*>(s);
@@ -1060,7 +1060,7 @@ namespace ShaderRewriter {
         assert(trueEnd != end(statements));
         std::vector<Statement*> trueBlock(trueStart, trueEnd);
         std::vector<Statement*> falseBlock(trueEnd, falseEnd);
-        
+
         statements.erase(trueStart, falseEnd);
         while (fixFirstIfStub(context, trueBlock)) {}
         while (fixFirstIfStub(context, falseBlock)) {}
@@ -1068,7 +1068,7 @@ namespace ShaderRewriter {
         stub->setFalseBlock(falseBlock);
         return true;
     }
-    
+
     std::vector<Statement*> RewriteIfStubs(ASTContext& context,
                                            std::vector<Statement*> statements) {
         while (fixFirstIfStub(context, statements)) { }

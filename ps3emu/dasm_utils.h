@@ -13,39 +13,39 @@ enum class DasmMode {
 };
 
 inline std::string format_u(const char* mnemonic, uint64_t u) {
-    return ssnprintf("%s %" PRIx64, mnemonic, u);
+    return sformat("{} {:x}", mnemonic, u);
 }
 
 template <typename OP1>
 inline std::string format_n(const char* mnemonic, OP1 op1) {
-    return ssnprintf("%s %s%d", mnemonic, op1.prefix(), op1.native());
+    return sformat("{} {}{}", mnemonic, op1.prefix(), op1.native());
 }
 
 template <typename OP1, typename OP2>
 inline std::string format_nn(const char* mnemonic, OP1 op1, OP2 op2) {
-    return ssnprintf("%s %s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{}", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native());
 }
 
 template <typename OP2>
 inline std::string format_sn(const char* mnemonic, const char* op1, OP2 op2) {
-    return ssnprintf("%s %s,%s%d", mnemonic,
+    return sformat("{} {},{}{}", mnemonic,
                      op1,
                      op2.prefix(), op2.native());
 }
 
 template <typename OP1>
 inline std::string format_nu(const char* mnemonic, OP1 op1, uint64_t u) {
-    return ssnprintf("%s %s%d,0x%" PRIx64, mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},0x{:x}", mnemonic,
+                     op1.prefix(), op1.native(),
                      u);
 }
 
 template <typename OP1, typename OP2, typename OP3>
 inline std::string format_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
-    return ssnprintf("%s %s%d,%s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{},{}{}", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native(),
                      op3.prefix(), op3.native()
                     );
@@ -53,8 +53,8 @@ inline std::string format_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
 
 template <typename OP1, typename OP2>
 inline std::string format_nnu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u) {
-    return ssnprintf("%s %s%d,%s%d,%" PRId64, mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{},{}", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native(),
                      u
     );
@@ -62,8 +62,8 @@ inline std::string format_nnu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u
 
 template <typename OP1, typename OP2>
 inline std::string format_nnuu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t u1, uint64_t u2) {
-    return ssnprintf("%s %s%d,%s%d,%" PRId64 ",%" PRId64, mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{},{},{}", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native(),
                      u1, u2
     );
@@ -71,8 +71,8 @@ inline std::string format_nnuu(const char* mnemonic, OP1 op1, OP2 op2, uint64_t 
 
 template <typename OP1, typename OP2, typename OP3>
 inline std::string format_br_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3) {
-    return ssnprintf("%s %s%d,%s%d(%s%d)", mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{}({}{})", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native(),
                      op3.prefix(), op3.native()
     );
@@ -80,7 +80,7 @@ inline std::string format_br_nnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3
 
 template <typename OP1, typename OP3>
 inline std::string format_br_nin(const char* mnemonic, OP1 op1, int op2, OP3 op3) {
-    return ssnprintf("%s %s%d,%d(%s%d)", mnemonic,
+    return sformat("{} {}{},{}({}{})", mnemonic,
                      op1.prefix(), op1.native(),
                      op2,
                      op3.prefix(), op3.native()
@@ -89,8 +89,8 @@ inline std::string format_br_nin(const char* mnemonic, OP1 op1, int op2, OP3 op3
 
 template <typename OP1, typename OP2, typename OP3, typename OP4>
 inline std::string format_nnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4) {
-    return ssnprintf("%s %s%d,%s%d,%s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{},{}{},{}{}", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native(),
                      op3.prefix(), op3.native(),
                      op4.prefix(), op4.native()
@@ -99,8 +99,8 @@ inline std::string format_nnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, 
 
 template <typename OP1, typename OP2, typename OP3, typename OP4, typename OP5>
 inline std::string format_nnnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3, OP4 op4, OP5 op5) {
-    return ssnprintf("%s %s%d,%s%d,%s%d,%s%d,%s%d", mnemonic, 
-                     op1.prefix(), op1.native(), 
+    return sformat("{} {}{},{}{},{}{},{}{},{}{}", mnemonic,
+                     op1.prefix(), op1.native(),
                      op2.prefix(), op2.native(),
                      op3.prefix(), op3.native(),
                      op4.prefix(), op4.native(),
@@ -111,9 +111,9 @@ inline std::string format_nnnnn(const char* mnemonic, OP1 op1, OP2 op2, OP3 op3,
 template <typename T>
 std::string printSorU(T v) {
     if (std::is_signed<T>::value) {
-        return ssnprintf("%d", v);
+        return sformat("{}", v);
     }
-    return ssnprintf("0x%xu", v);
+    return sformat("0x{:x}u", v);
 }
 
 inline std::string print_args(std::vector<std::string> vec) {
@@ -129,7 +129,7 @@ inline std::string print_args(std::vector<std::string> vec) {
 
 template <typename... Ts>
 std::string rewrite_print(const char* mnemonic, Ts... ts) {
-    return ssnprintf("_%s(%s)", mnemonic, print_args(std::vector<std::string>{ printSorU(ts)... }));
+    return sformat("_{}({})", mnemonic, print_args(std::vector<std::string>{ printSorU(ts)... }));
 }
 
 template <DasmMode M, typename P, typename E, typename S, typename R>

@@ -157,12 +157,12 @@ void SPUChannels::command(uint32_t word) {
     auto opcode = cmd.opcode.u();
     auto tag = _channels[MFC_TagID].load();
     auto log = [&] {
-        DETAIL(spu) << ssnprintf("%s(%x, %x, %x) %x", mfcCommandToString(opcode), size, lsaVa, eal, tag);
+        DETAIL(spu) << sformat("{}({:x}, {:x}, {:x}) {:x}", mfcCommandToString(opcode), size, lsaVa, eal, tag);
     };
     auto logAtomic = [&](bool stored) {
         if (stored) {
-            DETAIL(spu) << ssnprintf(
-                "%s(%x, %x, %x) %s", mfcCommandToString(opcode), size, lsaVa, eal, stored ? "OK" : "FAIL");
+            DETAIL(spu) << sformat(
+                "{}({:x}, {:x}, {:x}) {}", mfcCommandToString(opcode), size, lsaVa, eal, stored ? "OK" : "FAIL");
         }
     };
     if (opcode == MFC_GETLLAR_CMD || opcode == MFC_PUTLLC_CMD) {
@@ -308,7 +308,7 @@ unsigned SPUChannels::readCount(unsigned ch) {
             default: assert(false); return 0u;
         }
     })();
-    DETAIL(spu) << ssnprintf("read count %d from channel %s", count, classIdToString(ch));
+    DETAIL(spu) << sformat("read count {} from channel {}", count, classIdToString(ch));
     return count;
 }
 
@@ -321,7 +321,7 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         _event.acknowledge(data);
     } else if (ch == SPU_WrOutIntrMbox) {
         _interrupt2 |= INT_Mask_class2_M;
-        DETAIL(spu) << ssnprintf("write %x to interrupt mailbox", data);
+        DETAIL(spu) << sformat("write {:x} to interrupt mailbox", data);
         throw SPUThreadInterruptException(data);
     } else if (ch == SPU_WrOutMbox) {
         _outboundMailbox.enqueue(data);
@@ -342,11 +342,11 @@ void SPUChannels::write(unsigned ch, uint32_t data) {
         ch == MFC_WrTagUpdate || ch == SPU_WrEventMask)
         return;
 
-    DETAIL(spu) << ssnprintf("write %s to channel %d (%s)",
+    DETAIL(spu) << sformat("write {} to channel {} ({})",
                            ch == SPU_WrEventMask || ch == SPU_WrEventAck
                                ? to_string((MfcEvent)data)
                                : ch == MFC_WrTagUpdate ? to_string((MfcTag)data)
-                                                       : ssnprintf("%x", data)
+                                                       : sformat("{:x}", data)
 
                                ,
                            ch,
@@ -380,14 +380,14 @@ uint32_t SPUChannels::read(unsigned ch) {
     if (ch == SPU_RdEventStat) {
         auto maskstr = to_string((MfcEvent)_event.mask());
         auto datastr = to_string((MfcEvent)data);
-        DETAIL(spu) << ssnprintf("SPU_RdEventStat(mask: %s, ret: %s)", maskstr, datastr);
+        DETAIL(spu) << sformat("SPU_RdEventStat(mask: {}, ret: {})", maskstr, datastr);
     } else if (ch == MFC_RdTagStat) {
-        DETAIL(spu) << ssnprintf("MFC_RdTagStat(%x, %s) %x",
+        DETAIL(spu) << sformat("MFC_RdTagStat({:x}, {}) {:x}",
                                _channels[MFC_RdTagMask].load(),
                                to_string((MfcTag)_channels[MFC_WrTagUpdate].load()),
                                data);
     } else if (ch != MFC_RdAtomicStat) {
-        DETAIL(spu) << ssnprintf("spu reads %x from channel %d (%s)",
+        DETAIL(spu) << sformat("spu reads {:x} from channel {} ({})",
                                data,
                                ch,
                                classIdToString(ch));
@@ -397,7 +397,7 @@ uint32_t SPUChannels::read(unsigned ch) {
 
 void SPUChannels::mmio_write(unsigned offset, uint64_t data) {
     auto disable = DisableSuspend(_sthread);
-    DETAIL(spu) << ssnprintf("ppu writes %x via mmio to spu %d tag %s",
+    DETAIL(spu) << sformat("ppu writes {:x} via mmio to spu {} tag {}",
                            data,
                            -1,
                            tagToString((TagClassId)offset));
@@ -479,7 +479,7 @@ uint32_t SPUChannels::mmio_read(unsigned offset) {
             default: throw std::runtime_error("unknown mmio offset");
         }
     }();
-    DETAIL(spu) << ssnprintf("read %x via mmio from spu %d tag %s",
+    DETAIL(spu) << sformat("read {:x} via mmio from spu {} tag {}",
                            res,
                            -1,
                            tagToString((TagClassId)offset));

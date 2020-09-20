@@ -9,7 +9,7 @@
 using namespace std::filesystem;
 
 TEST_CASE("instrdb_simple") {
-    auto path = ssnprintf("/tmp/instr_%d.db", getpid());
+    auto path = sformat("/tmp/instr_{}.db", getpid());
     if (exists(path))
         remove(path);
     

@@ -105,9 +105,9 @@ void log_set_thread_name(std::string name) {
 void log_unconditional(log_level_t level, log_type_t type, const char* message) {
     std::string nip;
     if (g_state.th) {
-        nip = ssnprintf("%08x ", g_state.th->getNIP());
+        nip = sformat("{:08x} ", g_state.th->getNIP());
     } else if (g_state.sth) {
-        nip = ssnprintf("%08x ", g_state.sth->getNip());
+        nip = sformat("{:08x} ", g_state.sth->getNip());
     }
     std::string backtrace;
     if (level == log_error) {
@@ -118,8 +118,8 @@ void log_unconditional(log_level_t level, log_type_t type, const char* message) 
                   : level == log_error ? "ERROR"
                   : level == log_detail ? "DETAIL"
                   : "?";
-    auto const& formatted = ssnprintf("%s %s%s%s: %s%s",
-                                      to_string(type).c_str() + sizeof("log"),
+    auto const& formatted = sformat("{} {}{}{}: {}{}",
+                                      to_string(type),
                                       thread_name,
                                       nip,
                                       levelStr,

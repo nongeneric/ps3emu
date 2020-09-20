@@ -277,8 +277,8 @@ public:
     }
     
     void error(std::string expected) {
-        auto token = ssnprintf("%s ('%s')", printTokenType(type()), cur().val());
-        auto msg = ssnprintf("expected %s but got %s at pos %d", expected, token, _pos);
+        auto token = sformat("{} ('{}')", printTokenType(type()), cur().val());
+        auto msg = sformat("expected {} but got {} at pos {}", expected, token, _pos);
         throw std::runtime_error(msg);
     }  
     

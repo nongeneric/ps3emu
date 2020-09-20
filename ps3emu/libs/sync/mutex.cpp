@@ -37,16 +37,16 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
     auto type = attr->attr_recursive == SYS_SYNC_RECURSIVE
                     ? PTHREAD_MUTEX_RECURSIVE
                     : PTHREAD_MUTEX_ERRORCHECK;
-                    
+
     ret = pthread_mutexattr_settype(&ptattr, type);
     assert(ret == 0);
-    
+
     ret = pthread_mutex_init(&info->mutex, &ptattr);
     assert(ret == 0);
-    
+
     info->id = mutexes.create(info);
     *mutex_id = info->id;
-    INFO(sync) << ssnprintf("sys_mutex_create(%x, %s, %s)", *mutex_id, attr->name, info->type());
+    INFO(sync) << sformat("sys_mutex_create({:x}, {}, {})", *mutex_id, attr->name, info->type());
 
     __itt_sync_create(info.get(), "mutex", attr->name, 0);
 
@@ -54,38 +54,38 @@ int sys_mutex_create(sys_mutex_t* mutex_id, sys_mutex_attribute_t* attr) {
 }
 
 int sys_mutex_destroy(sys_mutex_t mutex_id) {
-    INFO(sync) << ssnprintf("sys_mutex_destroy(%x, ...)", mutex_id);
+    INFO(sync) << sformat("sys_mutex_destroy({:x}, ...)", mutex_id);
     auto info = mutexes.try_get(mutex_id);
     if (!info) {
         return CELL_ESRCH;
     }
-    
+
     auto ret = pthread_mutex_destroy(&(*info)->mutex);
     if (ret == EBUSY)
         return CELL_EBUSY;
-    
+
     ret = pthread_mutexattr_destroy(&(*info)->attr);
     assert(ret == 0);
-    
+
     __itt_sync_destroy(info->get());
     mutexes.destroy(mutex_id);
-    
+
     return CELL_OK;
 }
 
 int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(sync) << ssnprintf("locking %x %d %s",
+    INFO(sync) << sformat("locking {:x} {} {}",
                             mutex_id,
                             timeout,
                             info ? (*info)->name : "NULL");
     if (!info)
         return CELL_ESRCH;
-    
+
     auto mutex = &(*info)->mutex;
 
     __itt_sync_prepare(info->get());
-    
+
     if (timeout == 0) {
         auto ret = pthread_mutex_lock(mutex);
         __itt_sync_acquired(info->get());
@@ -111,8 +111,8 @@ int sys_mutex_lock(sys_mutex_t mutex_id, usecond_t timeout) {
 
 int sys_mutex_trylock(sys_mutex_t mutex_id) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(sync) << ssnprintf(
-        "trying to lock %x %s", mutex_id, info ? (*info)->name : "NULL");
+    INFO(sync) << sformat(
+        "trying to lock {:x} {}", mutex_id, info ? (*info)->name : "NULL");
 
     if (!info)
         return CELL_ESRCH;
@@ -136,12 +136,12 @@ int sys_mutex_trylock(sys_mutex_t mutex_id) {
 
 int sys_mutex_unlock(sys_mutex_t mutex_id) {
     auto info = mutexes.try_get(mutex_id);
-    INFO(sync) << ssnprintf("unlocking %x %s",
+    INFO(sync) << sformat("unlocking {:x} {}",
                             mutex_id,
                             info ? (*info)->name : "NULL");
     if (!info)
         return CELL_ESRCH;
-    
+
     __itt_sync_releasing(info->get());
     auto ret = pthread_mutex_unlock(&(*info)->mutex);
     assert(ret == EPERM || ret == 0);

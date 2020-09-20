@@ -133,7 +133,7 @@ int32_t cellMsgDialogOpen2(uint32_t type,
                            uint32_t func,
                            uint32_t userData,
                            uint32_t extParam) {
-    INFO(libs) << ssnprintf("cellMsgDialogOpen2(\"%s\")", msgString.str);
+    INFO(libs) << sformat("cellMsgDialogOpen2(\"{}\")", msgString.str);
     assert(extParam == 0);
     g_shown = true;
     g_type = type;

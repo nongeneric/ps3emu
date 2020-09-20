@@ -102,13 +102,13 @@ public:
         if (role != Qt::DisplayRole)
             return QVariant();
         if (index.column() == 0) {
-            return QString::fromStdString(ssnprintf("%d", index.row()));
+            return QString::fromStdString(sformat("{}", index.row()));
         }
         if (index.column() == 2) {
             auto it = _durations.find(index.row());
             if (it == end(_durations))
                 return "";
-            return QString::fromStdString(ssnprintf("%d", it->second.count()));
+            return QString::fromStdString(sformat("{}", it->second.count()));
         }
         return printCommandId((CommandId)command.id);
     }
@@ -226,10 +226,10 @@ public:
         if ((unsigned)index.row() < regular.size()) {
             auto texture = regular[index.row()];
             switch (index.column()) {
-                case 0: return QString::fromStdString(ssnprintf("#%08x", texture.key.offset));
+                case 0: return QString::fromStdString(sformat("#{:08x}", texture.key.offset));
                 case 1: return (MemoryLocation)texture.key.location == MemoryLocation::Local ? "Local" : "Main";
-                case 2: return QString::fromStdString(ssnprintf("%d", texture.key.width));
-                case 3: return QString::fromStdString(ssnprintf("%d", texture.key.height));
+                case 2: return QString::fromStdString(sformat("{}", texture.key.width));
+                case 3: return QString::fromStdString(sformat("{}", texture.key.height));
                 case 4: return "Regular";
                 case 5: return "GL_RGBA32F";
             }
@@ -243,10 +243,10 @@ public:
                         : entry.texture->format() == GL_RGBA8 ? "GL_RGBA8"
                         : "unknown";
             switch (index.column()) {
-                case 0: return QString::fromStdString(ssnprintf("#%08x", entry.key.offset));
+                case 0: return QString::fromStdString(sformat("#{:08x}", entry.key.offset));
                 case 1: return "Local";
-                case 2: return QString::fromStdString(ssnprintf("%d", entry.texture->width()));
-                case 3: return QString::fromStdString(ssnprintf("%d", entry.texture->height()));
+                case 2: return QString::fromStdString(sformat("{}", entry.texture->width()));
+                case 3: return QString::fromStdString(sformat("{}", entry.texture->height()));
                 case 4: return "Framebuffer";
                 case 5: return format;
             }
@@ -387,7 +387,7 @@ public:
         //auto key = cache[index.row()].key;
         switch (index.column()) {
 //             case 0: return key.location == MemoryLocation::Local ? "Local" : "Main";
-//             case 1: return QString::fromStdString(ssnprintf("#%x", key.offset));
+//             case 1: return QString::fromStdString(sformat("#{:x}", key.offset));
         }
         return QVariant();
     }
@@ -437,21 +437,21 @@ public:
         auto i = index.row() / 2;
         if (index.row() % 2 == 0) {
             switch (index.column()) {
-                case 0: return QString::fromStdString(ssnprintf("%d", std::get<0>(_values[i])));
-                case 1: return QString::fromStdString(ssnprintf("#%08x", std::get<1>(_values[i])[0]));
-                case 2: return QString::fromStdString(ssnprintf("#%08x", std::get<1>(_values[i])[1]));
-                case 3: return QString::fromStdString(ssnprintf("#%08x", std::get<1>(_values[i])[2]));
-                case 4: return QString::fromStdString(ssnprintf("#%08x", std::get<1>(_values[i])[3]));
+                case 0: return QString::fromStdString(sformat("{}", std::get<0>(_values[i])));
+                case 1: return QString::fromStdString(sformat("#{:08x}", std::get<1>(_values[i])[0]));
+                case 2: return QString::fromStdString(sformat("#{:08x}", std::get<1>(_values[i])[1]));
+                case 3: return QString::fromStdString(sformat("#{:08x}", std::get<1>(_values[i])[2]));
+                case 4: return QString::fromStdString(sformat("#{:08x}", std::get<1>(_values[i])[3]));
             }
         } else {
             switch (index.column()) {
-                case 1: return QString::fromStdString(ssnprintf("%g",
+                case 1: return QString::fromStdString(sformat("{}",
                     bit_cast<float>( std::get<1>(_values[i])[0] )));
-                case 2: return QString::fromStdString(ssnprintf("%g",
+                case 2: return QString::fromStdString(sformat("{}",
                     bit_cast<float>( std::get<1>(_values[i])[1] )));
-                case 3: return QString::fromStdString(ssnprintf("%g",
+                case 3: return QString::fromStdString(sformat("{}",
                     bit_cast<float>( std::get<1>(_values[i])[2] )));
-                case 4: return QString::fromStdString(ssnprintf("%g",
+                case 4: return QString::fromStdString(sformat("{}",
                     bit_cast<float>( std::get<1>(_values[i])[3] )));
             }
         }
@@ -511,7 +511,7 @@ public:
                 case 0: return "INDEX";
                 case 1: return "ARRAY";
                 case 2: return "";
-                case 3: return QString::fromStdString(ssnprintf("#%08x", _rsx->context()->indexArray.offset));
+                case 3: return QString::fromStdString(sformat("#{:08x}", _rsx->context()->indexArray.offset));
                 case 4: return _rsx->context()->indexArray.location == MemoryLocation::Local ? "Local" : "Main";
                 case 5: return "";
                 case 6: return "";
@@ -542,23 +542,23 @@ public:
         auto input = _rsx->context()->vertexInputs[index.row()];
         auto op = _rsx->context()->frequencyDividerOperation & (1 << index.row());
         switch (index.column()) {
-            case 0: return QString::fromStdString(ssnprintf("%d", index.row()));
+            case 0: return QString::fromStdString(sformat("{}", index.row()));
             case 1: {
                 auto mask = (uint32_t)_rsx->context()->vertexAttribInputMask;
                 auto enabled = mask & (1 << index.row());
-                return QString::fromStdString(ssnprintf("%d", enabled != 0));
+                return QString::fromStdString(sformat("{}", enabled != 0));
             }
-            case 2: return QString::fromStdString(ssnprintf("%d", input.rank != 0));
-            case 3: return QString::fromStdString(ssnprintf("#%08x", vda.offset));
+            case 2: return QString::fromStdString(sformat("{}", input.rank != 0));
+            case 3: return QString::fromStdString(sformat("#{:08x}", vda.offset));
             case 4: return vda.location == MemoryLocation::Local ? "Local" : "Main";
-            case 5: return QString::fromStdString(ssnprintf("%d", vda.frequency));
-            case 6: return QString::fromStdString(ssnprintf("%d", vda.stride));
-            case 7: return QString::fromStdString(ssnprintf("%d", vda.size));
+            case 5: return QString::fromStdString(sformat("{}", vda.frequency));
+            case 6: return QString::fromStdString(sformat("{}", vda.stride));
+            case 7: return QString::fromStdString(sformat("{}", vda.size));
             case 8: return QString::fromStdString(to_string(vda.type));
             case 9: return op ? "MODULO" : "DIVIDE";
             case 10: {
                 auto uniform = (VertexShaderSamplerUniform*)_rsx->context()->drawRingBuffer->current(vertexSamplersBuffer);
-                return QString::fromStdString(ssnprintf("%g,%g,%g,%g",
+                return QString::fromStdString(sformat("{},{},{},{}",
                                               uniform->disabledInputValues[index.row()][0],
                                               uniform->disabledInputValues[index.row()][1],
                                               uniform->disabledInputValues[index.row()][2],
@@ -628,7 +628,7 @@ public:
 
         auto offset = _info.stride * index.row();
         if (index.column() == 0) {
-            return QString::fromStdString(ssnprintf("#%08x", offset));
+            return QString::fromStdString(sformat("#{:08x}", offset));
         }
 
         auto typeSize = vertexDataArrayTypeSize(_info.type);
@@ -666,17 +666,17 @@ public:
 
         if (_info.type == VertexInputType::u8) {
             uint8_t u8Value = *(uint8_t*)&_buffer[valueOffset];
-            return QString::fromStdString(ssnprintf("#%02x", u8Value));
+            return QString::fromStdString(sformat("#{:02x}", u8Value));
         }
 
         if (_info.type == VertexInputType::u16) {
             uint16_t value = *(big_uint16_t*)&_buffer[valueOffset];
-            return QString::fromStdString(ssnprintf("#%04x", value));
+            return QString::fromStdString(sformat("#{:04x}", value));
         }
 
         if (_info.type == VertexInputType::u32) {
             uint32_t value = *(big_uint32_t*)&_buffer[valueOffset];
-            return QString::fromStdString(ssnprintf("#%08x", value));
+            return QString::fromStdString(sformat("#{:08x}", value));
         }
 
         if (_info.type == VertexInputType::f32) {
@@ -684,7 +684,7 @@ public:
             if (!_be) {
                 fValue = bit_cast<float>(*(uint32_t*)&_buffer[valueOffset]);
             }
-            return QString::fromStdString(ssnprintf("%g", fValue));
+            return QString::fromStdString(sformat("{}", fValue));
         }
 
         return QVariant();
@@ -727,8 +727,8 @@ public:
         _openglPreview->widget()->setVertices(vertices);
         _openglPreview->widget()->setMode(isFeedback ? _rsx->context()->feedbackMode
                                                      : _rsx->context()->glVertexArrayMode);
-        _openglPreview->setWindowTitle(QString::fromStdString(ssnprintf(
-            "%s, %d", to_string(_rsx->context()->vertexArrayMode), vertices.size())));
+        _openglPreview->setWindowTitle(QString::fromStdString(sformat(
+            "{}, {}", to_string(_rsx->context()->vertexArrayMode), vertices.size())));
         _openglPreview->show();
     }
 };
@@ -761,7 +761,7 @@ void MainWindowModel::onVisualizeFeedback() {
 //     _openglPreview.reset(new OpenGLPreview());
 //     _openglPreview->widget()->setVertices(vertices);
 //     _openglPreview->widget()->setMode(_rsx->context()->feedbackMode);
-//     _openglPreview->setWindowTitle(QString::fromStdString(ssnprintf("%s, %d",
+//     _openglPreview->setWindowTitle(QString::fromStdString(sformat("{}, {}",
 //                                    to_string(_rsx->context()->vertexArrayMode),
 //                                    vertices.size())));
 //     _openglPreview->show();
@@ -929,7 +929,7 @@ void MainWindowModel::runTo(unsigned lastCommand, unsigned frame) {
 }
 
 void MainWindowModel::changeFrame() {
-    auto text = ssnprintf("Frame: %d/%d", _currentFrame, _db.frames());
+    auto text = sformat("Frame: {}/{}", _currentFrame, _db.frames());
     _window.labelFrame->setText(QString::fromStdString(text));
 
     _commandModel = new CommandTableModel(&_db, _currentFrame);

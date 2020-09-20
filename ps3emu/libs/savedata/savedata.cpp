@@ -194,8 +194,8 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
                                  uint32_t userdata,
                                  bool isLoad,
                                  boost::context::continuation* sink) {
-    INFO(libs) << ssnprintf(
-        "cellSaveDataAutoSaveLoad(%s) buf: dirmax %d filemax %d size %x",
+    INFO(libs) << sformat(
+        "cellSaveDataAutoSaveLoad({}) buf: dirmax {} filemax {} size {:x}",
         dirName.str,
         setBuf->dirListMax,
         setBuf->fileListMax,
@@ -327,7 +327,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
                 return std::get<0>(parseFileName(file)) == getFileName(fileSet);
             });
             if (file == end(files)) {
-                WARNING(libs) << ssnprintf("a save file not found");
+                WARNING(libs) << sformat("a save file not found");
                 break;
             }
             auto body = read_all_bytes(*file);
@@ -349,7 +349,7 @@ int32_t cellSaveDataAutoSaveLoad(uint32_t version,
                 return std::get<0>(parseFileName(file)) == getFileName(fileSet);
             });
             if (file == end(files)) {
-                WARNING(libs) << ssnprintf("a save file not found");
+                WARNING(libs) << sformat("a save file not found");
                 break;
             }
             remove(*file);

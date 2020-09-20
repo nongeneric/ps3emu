@@ -24,16 +24,16 @@ void TraceFile::nextFlush() {
 
 void TraceFile::append(SPUThread* th) {
     auto cia = th->getNip();
-    _file->write(ssnprintf("pc:%08x;", cia));
+    _file->write(sformat("pc:{:08x};", cia));
     for (auto i = 0u; i < 128; ++i) {
         auto v = th->r(i);
-        _file->write(ssnprintf(
-            "r%03d:%08x%08x%08x%08x;", i, v.w<0>(), v.w<1>(), v.w<2>(), v.w<3>()));
+        _file->write(sformat(
+            "r{:03}:{:08x}{:08x}{:08x}{:08x};", i, v.w<0>(), v.w<1>(), v.w<2>(), v.w<3>()));
     }
     auto instr = th->ptr(cia);
     std::string str;
     SPUDasm<DasmMode::Print>(instr, cia, &str);
-    _file->write(ssnprintf(" #%s\n", str));
+    _file->write(sformat(" #{}\n", str));
     nextFlush();
 }
 
@@ -44,24 +44,24 @@ void TraceFile::append(PPUThread* th) {
     std::string str;
     ppu_dasm<DasmMode::Print>(&instr, cia, &str);
 
-    _file->write(ssnprintf("pc:%08x;", cia));
+    _file->write(sformat("pc:{:08x};", cia));
     for (auto i = 0u; i < 32; ++i) {
         auto r = th->getGPR(i);
         _file->write(
-            ssnprintf("r%d:%08x%08x;", i, (uint32_t)(r >> 32), (uint32_t)r));
+            sformat("r{}:{:08x}{:08x};", i, (uint32_t)(r >> 32), (uint32_t)r));
     }
     _file->write(
-        ssnprintf("r%d:%08x%08x;", 32, 0, (uint32_t)th->getLR()));
+        sformat("r{}:{:08x}{:08x};", 32, 0, (uint32_t)th->getLR()));
     for (auto i = 0u; i < 32; ++i) {
         auto r = th->r(i);
-        _file->write(ssnprintf("v%d:%08x%08x%08x%08x;",
+        _file->write(sformat("v{}:{:08x}{:08x}{:08x}{:08x};",
                                i,
                                (uint32_t)r.w(0),
                                (uint32_t)r.w(1),
                                (uint32_t)r.w(2),
                                (uint32_t)r.w(3)));
     }
-    _file->write(ssnprintf(" #%s\n", str.c_str()));
+    _file->write(sformat(" #{}\n", str.c_str()));
     nextFlush();
 }
 

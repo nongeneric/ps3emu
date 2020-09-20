@@ -24,7 +24,7 @@ Shader::Shader(GLuint type, const char* text) : _program(create(type, text)) {
     std::vector<std::string> split;
     boost::split(split, text, boost::is_any_of("\n"));
     for (auto l : split) {
-        _source += ssnprintf("%03d:  %s\n", i, l);
+        _source += sformat("{:03}:  {}\n", i, l);
         i++;
     }
 #endif

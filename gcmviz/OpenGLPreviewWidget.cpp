@@ -103,7 +103,7 @@ void glDebugCallbackFunction(GLenum source,
             GLsizei length,
             const GLchar *message,
             const void *userParam) {
-    WARNING(debugger) << ssnprintf("gl callback: %s", message);
+    WARNING(debugger) << sformat("gl callback: {}", message);
     if (severity == GL_DEBUG_SEVERITY_HIGH)
         exit(1);
 }

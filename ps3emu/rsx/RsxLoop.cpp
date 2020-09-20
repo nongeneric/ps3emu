@@ -56,7 +56,7 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
 
     if (header.value == 0) {
         assert(header.count_u() == 0);
-        INFO(rsx) << ssnprintf("%08x/%08x | rsx nop", get, getPut());
+        INFO(rsx) << sformat("{:08x}/{:08x} | rsx nop", get, getPut());
         return 4;
     }
 
@@ -68,7 +68,7 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     if (header.prefix_u() == 1) {
         auto offset = header.jumpoffset_u();
         if (offset != get) { // don't log on busy wait
-            INFO(rsx) << ssnprintf("rsx jump to %x", offset);
+            INFO(rsx) << sformat("rsx jump to {:x}", offset);
         }
         return offset - get;
     }
@@ -76,12 +76,12 @@ int64_t Rsx::interpret(uint32_t get, const uint32_t* read) {
     if (header.callsuffix_u() == 2) {
         auto offset = header.calloffset_u() << 2;
         _ret = get + 4;
-        INFO(rsx) << ssnprintf("rsx call %x to %x", get, offset);
+        INFO(rsx) << sformat("rsx call {:x} to {:x}", get, offset);
         return offset - get;
     }
 
     if (header.value == 0x20000) {
-        INFO(rsx) << ssnprintf("rsx ret to %x", _ret.load());
+        INFO(rsx) << sformat("rsx ret to {:x}", _ret.load());
         if (!get) {
             ERROR(rsx) << "rsx ret to 0, command buffer corruption is likely";
         }

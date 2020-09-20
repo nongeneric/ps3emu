@@ -90,7 +90,7 @@ void SplitBlocks(std::set<BasicBlock>& blocks, uint32_t at) {
             return;
         }
     }
-    WARNING(libs) << ssnprintf("splitting at %x is out of range, add this address to branches\n", at);
+    WARNING(libs) << sformat("splitting at {:x} is out of range, add this address to branches\n", at);
 }
 
 bool containsIllegalInstruction(BasicBlock const& block, validate_t validate) {

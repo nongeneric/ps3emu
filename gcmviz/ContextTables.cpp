@@ -9,11 +9,11 @@ ContextTreeItem::ContextTreeItem(std::string name)
                       QStringList(QString::fromStdString(name))) {}
 
 template <typename T> std::string printHex(T num) {
-    return ssnprintf("#%08x", num);
+    return sformat("#{:08x}", num);
 }
 
 template <typename T> std::string printDec(T num) {
-    return ssnprintf("%d", num);
+    return sformat("{}", num);
 }
 
 std::string printBool(bool value) {
@@ -41,7 +41,7 @@ std::string printBool(bool value) {
 },
 
 #define FLOAT(x, p) {\
-    #p, [=](auto) { return ssnprintf("%g", x. p); },\
+    #p, [=](auto) { return sformat("{}", x. p); },\
         [=](auto) { return ""; },\
 },
 
@@ -158,7 +158,7 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
             {
                 "Color target",
                 [=](auto c) {
-                    return ssnprintf("%d %d %d %d",
+                    return sformat("{} {} {} {}",
                                      c->surface.colorTarget[0],
                                      c->surface.colorTarget[1],
                                      c->surface.colorTarget[2],
@@ -180,7 +180,7 @@ GenericTableModel<RsxContext>* SurfaceContextTreeItem::getTable(
 }
 
 SamplerContextTreeItem::SamplerContextTreeItem(bool fragment, int index)
-    : ContextTreeItem(ssnprintf("s[%d]", index)),
+    : ContextTreeItem(sformat("s[{}]", index)),
       _fragment(fragment),
       _index(index) {}
 
@@ -214,7 +214,7 @@ GenericTableModel<RsxContext>* SamplerContextTreeItem::getTable(
 }
 
 SamplerTextureContextTreeItem::SamplerTextureContextTreeItem(bool fragment, int index)
-    : ContextTreeItem(ssnprintf("t[%d]", index)),
+    : ContextTreeItem(sformat("t[{}]", index)),
       _fragment(fragment),
       _index(index) {}
       
@@ -276,7 +276,7 @@ GenericTableModel<RsxContext>* FragmentOperationsTreeItem::getTable(RsxContext* 
 }
 
 DisplayBufferContextTreeItem::DisplayBufferContextTreeItem(int index)
-    : ContextTreeItem(ssnprintf("%d", index)), _index(index) {}
+    : ContextTreeItem(sformat("{}", index)), _index(index) {}
 
 GenericTableModel<RsxContext>* DisplayBufferContextTreeItem::getTable(RsxContext* context) {
     auto b = [=, this]() -> auto& {

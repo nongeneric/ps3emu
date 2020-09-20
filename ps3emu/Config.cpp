@@ -44,8 +44,8 @@ Config::Config() {
 void Config::save() {
     json j;
     for (auto& info : sysPrxInfos) {
-        j["sysPrxInfos"][info.name]["imageBase"] = ssnprintf("%x", info.imageBase);
-        j["sysPrxInfos"][info.name]["size"] = ssnprintf("%x", info.size);
+        j["sysPrxInfos"][info.name]["imageBase"] = sformat("{:x}", info.imageBase);
+        j["sysPrxInfos"][info.name]["size"] = sformat("{:x}", info.size);
         j["sysPrxInfos"][info.name]["loadx86"] = info.loadx86;
         j["sysPrxInfos"][info.name]["loadx86spu"] = info.loadx86spu;
         j["sysPrxInfos"][info.name]["x86trace"] = info.x86trace;

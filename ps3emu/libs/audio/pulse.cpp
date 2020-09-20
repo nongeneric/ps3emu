@@ -48,7 +48,7 @@ void PulseBackend::waitContext() {
     pa_threaded_mainloop_start(_pulseMainLoop);
     while (!status) ums_sleep(1000);
     if (status == 2) {
-        ERROR(audio) << ssnprintf("context connection failed");
+        ERROR(audio) << sformat("context connection failed");
         exit(1);
     }
 }
@@ -62,7 +62,7 @@ PulseBackend::PulseBackend(AudioAttributes* attributes) : _attributes(attributes
     assignAffinity(_playbackThread.native_handle(), AffinityGroup::PPUHost);
     auto res = pa_context_connect(_pulseContext, NULL, PA_CONTEXT_NOFLAGS, NULL);
     if (res != PA_OK) {
-        ERROR(audio) << ssnprintf("context connection failed %s", pa_strerror(res));
+        ERROR(audio) << sformat("context connection failed {}", pa_strerror(res));
         exit(1);
     }
     waitContext();
@@ -85,7 +85,7 @@ void PulseBackend::openPort(unsigned id, PulsePortInfo const& info) {
         PA_STREAM_ADJUST_LATENCY);
     auto res = pa_stream_connect_playback(pulseStream, NULL, &attr, flags, NULL, NULL);
     if (res != PA_OK) {
-        ERROR(audio) << ssnprintf("can't connect playback stream: %s", pa_strerror(res));
+        ERROR(audio) << sformat("can't connect playback stream: {}", pa_strerror(res));
         exit(1);
     }
     auto& port = _ports[id];
@@ -133,7 +133,7 @@ void PulseBackend::playbackLoop() {
     std::array<FILE*, 8> fCapture;
     if (g_state.config->captureAudio) {
         for (auto i = 0u; i < fCapture.size(); ++i) {
-            fCapture[i] = fopen(ssnprintf("/tmp/ps3emu_audio_port%d.bin", i).c_str(), "w");
+            fCapture[i] = fopen(sformat("/tmp/ps3emu_audio_port{}.bin", i).c_str(), "w");
         }
     }
 
@@ -161,7 +161,7 @@ void PulseBackend::playbackLoop() {
         }
 
         if (notifyPort) {
-            INFO(audio) << ssnprintf("audioLoop notifying");
+            DETAIL(audio) << sformat("audioLoop notifying");
             sys_event_port_send(notifyPort, 0, 0, 0);
         }
 

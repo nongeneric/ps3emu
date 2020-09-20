@@ -59,7 +59,7 @@ void dumpOpenGLTextureAllImages(unsigned texture,
                                 std::string directory,
                                 std::string fileName) {
     for (auto i = 0u; i < levels; ++i) {
-        auto name = ssnprintf("%s/%s_level%d.png", directory, fileName, i);
+        auto name = sformat("{}/{}_level{}.png", directory, fileName, i);
         dumpOpenGLTexture(texture, cube, i, name);
     }
 }

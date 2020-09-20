@@ -40,7 +40,7 @@ void emulate(std::string path, std::vector<std::string> args) {
     for (;;) {
         auto untyped = proc.run();
         if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
-            ERROR(libs) << ssnprintf("invalid instruction at %x", ev->thread->getNIP());
+            ERROR(libs) << sformat("invalid instruction at {:x}", ev->thread->getNIP());
             return;
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             return;
@@ -49,7 +49,7 @@ void emulate(std::string path, std::vector<std::string> args) {
 }
 
 void sigsegv_handler(int sig) {
-    ERROR(libs) << ssnprintf("crash (signal %d):\n%s", sig, print_backtrace());
+    ERROR(libs) << sformat("crash (signal {}):\n{}", sig, print_backtrace());
     _exit(1);
 }
 

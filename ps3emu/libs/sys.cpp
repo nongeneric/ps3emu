@@ -32,7 +32,7 @@ void init_sys_lib() {
 int sys_memory_get_user_memory_size(sys_memory_info_t* mem_info) {
     mem_info->total_user_memory = HeapAreaSize;
     mem_info->available_user_memory = g_state.heapalloc->available();
-    INFO(libs) << ssnprintf("sys_memory_get_user_memory_size(%x, %x)",
+    INFO(libs) << sformat("sys_memory_get_user_memory_size({:x}, {:x})",
                             mem_info->total_user_memory,
                             mem_info->available_user_memory);
     return CELL_OK;
@@ -91,7 +91,7 @@ int sys_tty_write(uint32_t ch,
                   uint32_t* pwritelen) {
     if (buf_len == 0)
         return CELL_OK;
-    
+
     auto buf = g_state.mm->getMemoryPointer(buf_va, buf_len);
     if (ch == SYS_TTYP_PPU_STDOUT) {
         g_state.callbacks->stdout((char*)buf, buf_len);
@@ -105,7 +105,7 @@ int sys_tty_write(uint32_t ch,
         g_state.callbacks->spustdout((char*)buf, buf_len);
         return CELL_OK;
     }
-    throw std::runtime_error(ssnprintf("unknown channel %d", ch));
+    throw std::runtime_error(sformat("unknown channel {}", ch));
 }
 
 int sys_dbg_set_mask_to_ppu_exception_handler(uint64_t mask, uint64_t flags) {
@@ -131,7 +131,7 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
     assert(opt->neg1 == -1ull);
     assert(opt->mode == 1 || opt->mode == 2);
     if (opt->mode == 1) {
-        INFO(libs) << ssnprintf("sys_prx_start_module(find, %08x, %s)",
+        INFO(libs) << sformat("sys_prx_start_module(find, {:08x}, {})",
                                 id,
                                 (char*)&opt->name_or_fdescrva);
         opt->name_or_fdescrva = findExportedModuleFunction(id, "module_start");
@@ -156,7 +156,7 @@ int32_t sys_prx_start_module(sys_prx_id_t id,
 sys_prx_id_t sys_prx_load_module(cstring_ptr_t path, uint64_t flags, uint64_t opt, Process* proc) {
     assert(flags == 0);
     assert(opt == 0);
-    INFO(libs) << ssnprintf("sys_prx_load_module(%s)", path.str);
+    INFO(libs) << sformat("sys_prx_load_module({})", path.str);
     auto hostPath = g_state.content->toHost(path.str.c_str()) + ".elf";
     return proc->loadPrx(hostPath);
 }
@@ -178,7 +178,7 @@ int32_t sys_prx_stop_module(sys_prx_id_t id,
     assert(opt->struct_size == sizeof(sys_prx_start_module_t));
     assert(opt->neg1 == -1ull);
     auto mode = enum_cast<prx_module_mode>(opt->mode);
-    
+
     if (mode == prx_module_mode::user_lookup || mode == prx_module_mode::system_lookup) {
         opt->name_or_fdescrva = id == 0 ? 0 : findExportedModuleFunction(id, "module_stop");
         if (!opt->name_or_fdescrva) {
@@ -193,12 +193,12 @@ int32_t sys_prx_stop_module(sys_prx_id_t id,
         }
     } else if (mode == prx_module_mode::user_confirm || mode == prx_module_mode::system_confirm) {
     }
-    
-    INFO(libs) << ssnprintf("sys_prx_stop_module(find, %08x, %s, mode: %d)",
+
+    INFO(libs) << sformat("sys_prx_stop_module(find, {:08x}, {}, mode: {})",
                             id,
                             (char*)&opt->name_or_fdescrva,
                             to_string(mode));
-    
+
     return CELL_OK;
 }
 
@@ -221,7 +221,7 @@ constexpr uint32_t SYS_MEMORY_PAGE_SIZE_1M = 0x400;
 constexpr uint32_t SYS_MEMORY_PAGE_SIZE_64K = 0x200;
 
 int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, PPUThread* thread) {
-    INFO(libs) << ssnprintf("sys_memory_allocate(%x,...)", size);
+    INFO(libs) << sformat("sys_memory_allocate({:x},...)", size);
     (void)SYS_MEMORY_PAGE_SIZE_1M; (void)SYS_MEMORY_PAGE_SIZE_64K;
     assert(flags == SYS_MEMORY_PAGE_SIZE_1M || flags == SYS_MEMORY_PAGE_SIZE_64K);
     assert(size < 256 * 1024 * 1024);
@@ -234,7 +234,7 @@ int sys_memory_allocate(uint32_t size, uint64_t flags, sys_addr_t* alloc_addr, P
 }
 
 int sys_memory_free(ps3_uintptr_t start_addr, PPUThread* thread) {
-    INFO(libs) << ssnprintf("sys_memory_free(%x)", start_addr);
+    INFO(libs) << sformat("sys_memory_free({:x})", start_addr);
     g_state.heapalloc->dealloc(start_addr);
     return CELL_OK;
 }
@@ -276,7 +276,7 @@ int32_t sys_ppu_thread_get_stack_information(sys_ppu_thread_stack_t* info, PPUTh
 }
 
 uint32_t cellSysmoduleLoadModule(uint16_t id) {
-    INFO(libs) << ssnprintf("cellSysmoduleLoadModule(0x%x)", id);
+    INFO(libs) << sformat("cellSysmoduleLoadModule(0x{:x})", id);
     return CELL_OK;
 }
 
@@ -301,7 +301,7 @@ class CellSemaphore {
 public:
     CellSemaphore(unsigned val, unsigned max)
         : _val(val), _max(max) { }
-        
+
     bool post(uint32_t val) {
         auto lock = boost::unique_lock(_m);
         if (_val == _max)
@@ -310,7 +310,7 @@ public:
         _cv.notify_all();
         return true;
     }
-    
+
     bool wait(usecond_t timeout) {
         auto lock = boost::unique_lock(_m);
         if (!lock.owns_lock())
@@ -330,13 +330,13 @@ public:
 
 IDMap<sys_semaphore_t, std::unique_ptr<CellSemaphore>> semaphores;
 
-int32_t sys_semaphore_create(sys_semaphore_t* sem, 
-                             sys_semaphore_attribute_t* attr, 
-                             sys_semaphore_value_t initial_val, 
+int32_t sys_semaphore_create(sys_semaphore_t* sem,
+                             sys_semaphore_attribute_t* attr,
+                             sys_semaphore_value_t initial_val,
                              sys_semaphore_value_t max_val) {
     auto csem = std::make_unique<CellSemaphore>(initial_val, max_val);
     *sem = semaphores.create(std::move(csem));
-    INFO(libs) << ssnprintf("sys_semaphore_create(%d)", *sem);
+    INFO(libs) << sformat("sys_semaphore_create({})", *sem);
     return CELL_OK;
 }
 
@@ -396,7 +396,7 @@ int32_t sys_ppu_thread_create(sys_ppu_thread_t* thread_id,
 }
 
 int32_t sys_ppu_thread_start(sys_ppu_thread_t id) {
-    INFO(libs) << ssnprintf("sys_ppu_thread_start(%d)", id);
+    INFO(libs) << sformat("sys_ppu_thread_start({})", id);
     auto thread = g_state.proc->getThread(id);
     thread->run();
     return CELL_OK;
@@ -487,8 +487,17 @@ int32_t _sys_printf(cstring_ptr_t format, PPUThread* thread) {
         if (ch == '%') {
             i++;
             ch = format.str[i];
-            if (ch == 'x' || ch == 'f' || ch == 'u' || ch == 'd') {
-                str += ssnprintf((std::string("%") + ch).c_str(), thread->getGPR(arg));
+            if (ch == 'x') {
+                str += sformat("{:x}", thread->getGPR(arg));
+                arg++;
+            } else if (ch == 'f') {
+                str += sformat("{}", bit_cast<double>(thread->getGPR(arg)));
+                arg++;
+            } else if (ch == 'u') {
+                str += sformat("{}", thread->getGPR(arg));
+                arg++;
+            } else if (ch == 'd') {
+                str += sformat("{}", static_cast<int64_t>(thread->getGPR(arg)));
                 arg++;
             } else if (ch == 's') {
                 std::string substr;
@@ -525,12 +534,12 @@ int32_t sys_get_process_info(process_info_t* info) {
 }
 
 int32_t sys_prx_register_module(cstring_ptr_t name, uint64_t opts) {
-    INFO(libs) << ssnprintf("sys_prx_register_module(%s)", name.str);
+    INFO(libs) << sformat("sys_prx_register_module({})", name.str);
     return CELL_OK;
 }
 
 int32_t sys_prx_register_library(uint32_t va) {
-    INFO(libs) << ssnprintf("sys_prx_register_library(%08x)", va);
+    INFO(libs) << sformat("sys_prx_register_library({:08x})", va);
     return CELL_OK;
 }
 
@@ -544,7 +553,7 @@ int32_t sys_prx_load_module_list(int32_t n,
                                  uint64_t flags,
                                  uint64_t pOpt,
                                  ps3_uintptr_t idlist) {
-    INFO(libs) << ssnprintf("sys_prx_load_module_list(%d, ...)", n);
+    INFO(libs) << sformat("sys_prx_load_module_list({}, ...)", n);
     assert(flags == 0);
     for (auto i = 0; i < n; ++i) {
         auto pathVa = g_state.mm->load64(path_list_va);
@@ -568,8 +577,8 @@ int32_t sys_mmapper_allocate_shared_memory(uint64_t id,
     uint32_t va;
     g_state.memalloc->allocInternalMemory(&va, size, alignment);
     *mem = va;
-    INFO(libs) << ssnprintf(
-        "sys_mmapper_allocate_shared_memory(%llx, %08x, %02x, va=%x)",
+    INFO(libs) << sformat(
+        "sys_mmapper_allocate_shared_memory({:x}, {:08x}, {:02x}, va={:x})",
         id,
         size,
         alignment,
@@ -582,8 +591,8 @@ int32_t sys_mmapper_allocate_address(uint32_t size,
                                      uint64_t flags,
                                      uint32_t alignment,
                                      big_uint32_t* addr) {
-    INFO(libs) << ssnprintf(
-        "sys_mmapper_allocate_address(%08x, %08x, %02x)", size, flags, alignment);
+    INFO(libs) << sformat(
+        "sys_mmapper_allocate_address({:08x}, {:08x}, {:02x})", size, flags, alignment);
     *addr = 0xbadbad10;
     return CELL_OK;
 }
@@ -592,7 +601,7 @@ int32_t sys_mmapper_search_and_map(uint32_t start_addr,
                                    uint32_t mem_id,
                                    uint64_t flags,
                                    big_uint32_t* alloc_addr) {
-    INFO(libs) << ssnprintf("sys_mmapper_search_and_map(%08x, %08x, %02x)",
+    INFO(libs) << sformat("sys_mmapper_search_and_map({:08x}, {:08x}, {:02x})",
                             start_addr,
                             mem_id,
                             flags);
@@ -602,13 +611,13 @@ int32_t sys_mmapper_search_and_map(uint32_t start_addr,
 }
 
 int32_t sys_mmapper_unmap_shared_memory(sys_addr_t start_addr, uint32_t mem_id) {
-    INFO(libs) << ssnprintf(
-        "sys_mmapper_unmap_shared_memory(%08x, %08x)", start_addr, mem_id);
+    INFO(libs) << sformat(
+        "sys_mmapper_unmap_shared_memory({:08x}, {:08x})", start_addr, mem_id);
     return CELL_OK;
 }
 
 int32_t sys_mmapper_free_shared_memory(sys_addr_t start_addr) {
-    INFO(libs) << ssnprintf("sys_mmapper_free_shared_memory(%08x)", start_addr);
+    INFO(libs) << sformat("sys_mmapper_free_shared_memory({:08x})", start_addr);
     g_state.memalloc->free(start_addr);
     return CELL_OK;
 }
@@ -617,7 +626,7 @@ int32_t sys_mmapper_free_shared_memory(sys_addr_t start_addr) {
 #define SYS_MODULE_STOP_LEVEL_SYSTEM	0x00004000
 
 int32_t sys_prx_get_module_list(uint32_t flags, sys_prx_get_module_list_t* info) {
-    INFO(libs) << ssnprintf("sys_prx_get_module_list(%x, ...)", flags);
+    INFO(libs) << sformat("sys_prx_get_module_list({:x}, ...)", flags);
     assert(flags == 2);
     auto& segments = g_state.proc->getSegments();
     assert(info->max_ids_size >= segments.size() / 2);

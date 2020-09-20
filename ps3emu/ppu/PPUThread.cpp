@@ -130,7 +130,7 @@ void PPUThread::innerLoop() {
             _threadFinishedGracefully = true;
             break;
         } catch (std::exception& e) {
-            auto message = ssnprintf("thread exception: %s", e.what());
+            auto message = sformat("thread exception: {}", e.what());
             ERROR(libs) << message;
             setNIP(cia);
             _eventHandler(this, PPUThreadEvent::Failure, {});
@@ -143,10 +143,10 @@ void PPUThread::innerLoop() {
 void PPUThread::loop() {
     g_state.th = this;
     g_state.granule = &_granule;
-    _granule.dbgName = ssnprintf("ppu_%s_%x", _name, (unsigned)_id);
+    _granule.dbgName = sformat("ppu_{}_{:x}", _name, (unsigned)_id);
     _tid = syscall(__NR_gettid);
     log_set_thread_name(_granule.dbgName);
-    INFO(libs) << ssnprintf("thread loop started");
+    INFO(libs) << sformat("thread loop started");
     
     {
         boost::unique_lock<boost::mutex> lock(_mutexRunning);
@@ -158,7 +158,7 @@ void PPUThread::loop() {
     
     innerLoop();
     
-    INFO(libs) << ssnprintf("thread loop finished (%s)",
+    INFO(libs) << sformat("thread loop finished ({})",
         _threadFinishedGracefully ? "gracefully" : "with a failure"
     );
 }
@@ -329,16 +329,16 @@ emu_void_t ps3call_tests(fdescr* simpleDescr,
         printf("%s\n", msg.c_str());
     };
 
-    write(ssnprintf("stolen ps3call_tests(%x, %x, %x)",
+    write(sformat("stolen ps3call_tests({:x}, {:x}, {:x})",
                     simpleDescr->va,
                     recursiveDescr->va,
                     recursiveChildDescr->va));
 
     write("calling simple(5,7)");
     auto res = thread->ps3call(*simpleDescr, {5ull, 7ull}, sink);
-    write(ssnprintf("returned %d", res));
+    write(sformat("returned {}", res));
 
-    write(ssnprintf("[after a ps3call] stolen ps3call_tests(%x, %x, %x)",
+    write(sformat("[after a ps3call] stolen ps3call_tests({:x}, {:x}, {:x})",
                     simpleDescr->va,
                     recursiveDescr->va,
                     recursiveChildDescr->va));
@@ -347,7 +347,7 @@ emu_void_t ps3call_tests(fdescr* simpleDescr,
         wrap(std::function([=](uint32_t a, boost::context::continuation* sink) {
             write("calling (from recursive child) simple(10,20)");
             auto res = thread->ps3call(*simpleDescr, {10ull, 20ull}, sink);
-            write(ssnprintf("simple returned %d", res));
+            write(sformat("simple returned {}", res));
             return a + 17ul;
         }), th);
     }});
@@ -356,7 +356,7 @@ emu_void_t ps3call_tests(fdescr* simpleDescr,
 
     write("calling recursive(11)");
     res = thread->ps3call(*recursiveDescr, {11ull}, sink);
-    write(ssnprintf("recursive returned %d", res));
+    write(sformat("recursive returned {}", res));
 
     return emu_void;
 }
@@ -367,26 +367,26 @@ emu_void_t slicing_tests(fdescr* singleDescr,
                          PPUThread* thread) {
 
     auto write = [=](std::string msg) {
-        msg = ssnprintf("%s\n", msg);
+        msg = sformat("{}\n", msg);
         g_state.callbacks->stdout(msg.c_str(), msg.size());
     };
 
     spliceFunction(singleDescr->va, [=] {
-        write(ssnprintf("proxy single(%d, %d)", g_state.th->getGPR(3), g_state.th->getGPR(4)));
+        write(sformat("proxy single({}, {})", g_state.th->getGPR(3), g_state.th->getGPR(4)));
     }, [=] {
-        write(ssnprintf("proxy single = %d", g_state.th->getGPR(3)));
+        write(sformat("proxy single = {}", g_state.th->getGPR(3)));
     });
 
     spliceFunction(multipleDescr->va, [=] {
-        write(ssnprintf("proxy multiple(%d, %d)", g_state.th->getGPR(3), g_state.th->getGPR(4)));
+        write(sformat("proxy multiple({}, {})", g_state.th->getGPR(3), g_state.th->getGPR(4)));
     }, [=] {
-        write(ssnprintf("proxy multiple = %d", g_state.th->getGPR(3)));
+        write(sformat("proxy multiple = {}", g_state.th->getGPR(3)));
     });
 
     spliceFunction(multipleRecursiveDescr->va, [=] {
-        write(ssnprintf("proxy multipleRecursive(%d, %d)", g_state.th->getGPR(3), g_state.th->getGPR(4)));
+        write(sformat("proxy multipleRecursive({}, {})", g_state.th->getGPR(3), g_state.th->getGPR(4)));
     }, [=] {
-        write(ssnprintf("proxy multipleRecursive = %d", g_state.th->getGPR(3)));
+        write(sformat("proxy multipleRecursive = {}", g_state.th->getGPR(3)));
     });
 
     return emu_void;

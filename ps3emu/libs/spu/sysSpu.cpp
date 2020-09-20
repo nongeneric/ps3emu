@@ -84,7 +84,7 @@ std::vector<sys_spu_segment_t> spuImageInit(MainMemory* mm,
             readString(mm, pos + namesz, desc);
             assert(name == "SPUNAME");
             assert(12 + namesz + descsz == ph.p_filesz); (void)descsz;
-            INFO(libs) << ssnprintf("initialized spu image SPUNAME = %s", desc);
+            INFO(libs) << sformat("initialized spu image SPUNAME = {}", desc);
             seg.size -= 12 + namesz;
             seg.src.pa_start += 12 + namesz;
         } else if (ph.p_memsz != ph.p_filesz) {
@@ -135,7 +135,7 @@ int32_t sys_spu_thread_read_ls(sys_spu_thread_t id,
 }
 
 int32_t sys_spu_thread_write_snr(sys_spu_thread_t id, int32_t number, uint32_t value) {
-    INFO(libs) << ssnprintf("sys_spu_thread_write_snr(id=%x, number=%d, value=%x)", id, number, value);
+    INFO(libs) << sformat("sys_spu_thread_write_snr(id={:x}, number={}, value={:x})", id, number, value);
     auto thread = g_state.proc->getSpuThread(id);
     auto ch = number ? SPU_Sig_Notify_2 : SPU_Sig_Notify_1;
     thread->channels()->mmio_write(ch, value);
@@ -174,7 +174,7 @@ int32_t sys_spu_image_import(sys_spu_image_t* img,
 }
 
 int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path) {
-    INFO(libs) << ssnprintf("sys_spu_image_open(\"%s\")", path.str);
+    INFO(libs) << sformat("sys_spu_image_open(\"{}\")", path.str);
     auto hostPath = g_state.content->toHost(path.str.c_str());
     auto elfPath = hostPath;
     if (hostPath.substr(hostPath.size() - 4) != ".elf") {
@@ -182,7 +182,7 @@ int32_t sys_spu_image_open(sys_spu_image_t* img, cstring_ptr_t path) {
     }
     FILE* f = fopen(elfPath.c_str(), "r");
     if (!f) {
-        auto message = ssnprintf("sys_spu_image_open: elf not found (\"%s\")", elfPath);
+        auto message = sformat("sys_spu_image_open: elf not found (\"{}\")", elfPath);
         INFO(libs) << message;
         throw std::runtime_error(message);
     }
@@ -272,7 +272,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
         spuImageInit(g_state.mm, g_state.memalloc, img, img->entry_point, true);
     }
     
-    INFO(libs) << ssnprintf("sys_spu_thread_initialize() source=%x", img->segs);
+    INFO(libs) << sformat("sys_spu_thread_initialize() source={:x}", img->segs);
     auto group = groups.get(group_id);
     std::string name;
     name.resize(attr->nsize - 1);
@@ -298,7 +298,7 @@ int32_t sys_spu_thread_initialize(sys_spu_thread_t* thread_id,
 
 int32_t sys_spu_thread_group_start(sys_spu_thread_group_t id, Process* proc) {
     auto group = groups.get(id);
-    INFO(libs) << ssnprintf("sys_spu_thread_group_start(%s)", group->name);
+    INFO(libs) << sformat("sys_spu_thread_group_start({})", group->name);
     g_state.spuGroupManager->start(group.get());
     return CELL_OK;
 }
@@ -308,11 +308,11 @@ int32_t sys_spu_thread_group_join(sys_spu_thread_group_t gid,
                                   big_int32_t* status,
                                   Process* proc) {
     auto group = groups.get(gid);
-    INFO(libs) << ssnprintf("sys_spu_thread_group_join(%s)", group->name);
+    INFO(libs) << sformat("sys_spu_thread_group_join({})", group->name);
     auto [c, s] = g_state.spuGroupManager->join(group.get());
     *cause = c;
     *status = s;
-    INFO(libs) << ssnprintf("sys_spu_thread_group_join(%s) returned %x, %x", group->name, c, s);
+    INFO(libs) << sformat("sys_spu_thread_group_join({}) returned {:x}, {:x}", group->name, c, s);
     return CELL_OK;
 }
 
@@ -749,19 +749,19 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
         logLine("No spus initialized yet");
         return;
     }
-    logLine(ssnprintf("Tracing SPURS with %d SPUs, buffer va: %08x",
+    logLine(sformat("Tracing SPURS with {} SPUs, buffer va: {:08x}",
                   info->nspu,
                   spursTrace.bufferVa));
     auto traceAreaSize = ((buffer_size - sizeof(CellSpursTraceInfo)) / info->nspu) & 0xfff0;
     for (auto i = 0u; i < info->nspu; ++i) {
-        logLine(ssnprintf("SPU %d trace", i));
+        logLine(sformat("SPU {} trace", i));
         auto packet = (CellSpursTracePacket*)(buffer +
                                               sizeof(CellSpursTraceInfo) + i * traceAreaSize);
         for (;;) {
             if (packet->header.tag == 0)
                 break;
             auto log = [&](auto&& msg) {
-                logLine(ssnprintf("[SPU%d W:%02x T:%08x] %s",
+                logLine(sformat("[SPU{} W:{:02x} T:{:08x}] {}",
                                   packet->header.spu,
                                   packet->header.workload,
                                   packet->header.time,
@@ -786,32 +786,32 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
                 case CELL_SPURS_TRACE_TAG_TASK: {
                     switch (packet->data.task.incident) {
                         case CELL_SPURS_TRACE_TASK_DISPATCH:
-                            log(ssnprintf("TASK_DISPATCH: %04x", packet->data.task.task));
+                            log(sformat("TASK_DISPATCH: {:04x}", packet->data.task.task));
                             break;
                         case CELL_SPURS_TRACE_TASK_WAIT:
-                            log(ssnprintf("TASK_WAIT: %04x", packet->data.task.task));
+                            log(sformat("TASK_WAIT: {:04x}", packet->data.task.task));
                             break;
                         case CELL_SPURS_TRACE_TASK_EXIT:
-                            log(ssnprintf("TASK_EXIT: %04x", packet->data.task.task));
+                            log(sformat("TASK_EXIT: {:04x}", packet->data.task.task));
                             break;
                         case CELL_SPURS_TRACE_TASK_YIELD:
-                            log(ssnprintf("TASK_YIELD: %04x", packet->data.task.task));
+                            log(sformat("TASK_YIELD: {:04x}", packet->data.task.task));
                             break;
                         default: assert(false);
                     }
                     break;
                 }
                 case CELL_SPURS_TRACE_TAG_GUID:
-                    log(ssnprintf("TASK_YIELD: %016llx", packet->data.guid));
+                    log(sformat("TASK_YIELD: {:016x}", packet->data.guid));
                     break;
                 case CELL_SPURS_TRACE_TAG_LOAD:
-                    log(ssnprintf("USER_LOAD: ea=%08u, ls=%06x, size=%x",
+                    log(sformat("USER_LOAD: ea={:08u}, ls={:06x}, size={:x}",
                                   packet->data.load.ea,
                                   packet->data.load.ls * 16,
                                   packet->data.load.size));
                     break;
                 case CELL_SPURS_TRACE_TAG_MAP:
-                    log(ssnprintf("USER_MAP: offset=%08u, ls=%06x, size=%x",
+                    log(sformat("USER_MAP: offset={:08u}, ls={:06x}, size={:x}",
                                   packet->data.map.offset,
                                   packet->data.map.ls * 16,
                                   packet->data.map.size));
@@ -820,7 +820,7 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
                     auto level = packet->data.start.level == 0 ? "kernel"
                                : packet->data.start.level == 1 ? "policy" 
                                : "job/task";
-                    log(ssnprintf("USER_START: name=%s, level=%04x(%s), ls=%x",
+                    log(sformat("USER_START: name={}, level={:04x}({}), ls={:x}",
                                   std::string(packet->data.start.module, 4),
                                   packet->data.start.level,
                                   level,
@@ -828,50 +828,50 @@ void dumpSpursTrace(std::function<void(std::string)> logLine, char* buffer, uint
                     break;
                 }
                 case CELL_SPURS_TRACE_TAG_STOP:
-                    log(ssnprintf("USER_STOP: %016llx", packet->data.stop));
+                    log(sformat("USER_STOP: {:016x}", packet->data.stop));
                     break;
                 case CELL_SPURS_TRACE_TAG_KERNEL:
-                    log(ssnprintf("KERNEL: %016llx", packet->data.guid));
+                    log(sformat("KERNEL: {:016x}", packet->data.guid));
                     break;
                 case CELL_TRACE_TAG_LOAD:
-                    log(ssnprintf("LOAD: ea=%08u, ls=%x, size=%04x",
+                    log(sformat("LOAD: ea={:08u}, ls={:x}, size={:04x}",
                         packet->data.load.ea,
                         packet->data.load.ls * 16,
                         packet->data.load.size));
                     break;
                 case CELL_TRACE_TAG_MAP:
-                    log(ssnprintf("MAP: offset=%08u, ls=%x, size=%04x",
+                    log(sformat("MAP: offset={:08u}, ls={:x}, size={:04x}",
                                   packet->data.map.offset,
                                   packet->data.map.ls * 16,
                                   packet->data.map.size));
                     break;
                 case CELL_TRACE_TAG_DISPATCH:
-                    log(ssnprintf("DISPATCH: name=%s, va=%08x",
+                    log(sformat("DISPATCH: name={}, va={:08x}",
                                   std::string(packet->data.dispatch.name, 4),
                                   packet->data.dispatch.va));
                     break;
                 case CELL_TRACE_TAG_RESUME:
-                    log(ssnprintf("RESUME: name=%s, va=%08x",
+                    log(sformat("RESUME: name={}, va={:08x}",
                                   std::string(packet->data.dispatch.name, 4),
                                   packet->data.dispatch.va));
                     break;
                 case CELL_TRACE_TAG_EXIT:
-                    log(ssnprintf("EXIT: %016llx", packet->data.guid));
+                    log(sformat("EXIT: {:016x}", packet->data.guid));
                     break;
                 case CELL_TRACE_TAG_YIELD:
-                    log(ssnprintf("YIELD: %016llx", packet->data.guid));
+                    log(sformat("YIELD: {:016x}", packet->data.guid));
                     break;
                 case CELL_TRACE_TAG_SLEEP:
-                    log(ssnprintf("SLEEP: %016llx", packet->data.guid));
+                    log(sformat("SLEEP: {:016x}", packet->data.guid));
                     break;
                 case CELL_TRACE_TAG_GUID:
-                    log(ssnprintf("GUID: %016llx", packet->data.guid));
+                    log(sformat("GUID: {:016x}", packet->data.guid));
                     break;
                 case CELL_TRACE_TAG_USER:
-                    log(ssnprintf("USER: %016llx", packet->data.guid));
+                    log(sformat("USER: {:016x}", packet->data.guid));
                     break;
                 default:
-                    log(ssnprintf("UNKNOWN TAG: %02x, %016llx", packet->header.tag, packet->data.guid));
+                    log(sformat("UNKNOWN TAG: {:02x}, {:016x}", packet->header.tag, packet->data.guid));
                     break;
             }
             packet++;

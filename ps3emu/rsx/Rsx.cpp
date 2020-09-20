@@ -96,7 +96,7 @@ void Rsx::setLabel(int index, uint32_t value, bool waitForIdle) {
         this->waitForIdle();
     }
     auto offset = index * 0x10;
-    INFO(rsx) << ssnprintf("setting rsx label at offset %x (%08x)",
+    INFO(rsx) << sformat("setting rsx label at offset {:x} ({:08x})",
                            offset,
                            GcmLabelBaseOffset + offset);
     g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
@@ -112,7 +112,7 @@ void Rsx::ChannelSemaphoreOffset(uint32_t offset) {
 
 void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     auto offset = _semaphores[_activeSemaphoreHandle];
-    INFO(rsx) << ssnprintf("acquiring semaphore %x at offset %x with value %x",
+    INFO(rsx) << sformat("acquiring semaphore {:x} at offset {:x} with value {:x}",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
     RangeCloser r(&_semaphoreAcquireCounter);
@@ -130,12 +130,12 @@ void Rsx::ChannelSemaphoreAcquire(uint32_t value) {
     while (g_state.mm->load32(GcmLabelBaseOffset + offset) != value) {
         ums_sleep(1);
     }
-    INFO(rsx) << ssnprintf("acquired");
+    INFO(rsx) << sformat("acquired");
 }
 
 void Rsx::SemaphoreRelease(uint32_t value) {
     auto offset = _semaphores[_activeSemaphoreHandle];
-    INFO(rsx) << ssnprintf("releasing semaphore %x at offset %x with value %x",
+    INFO(rsx) << sformat("releasing semaphore {:x} at offset {:x} with value {:x}",
         _activeSemaphoreHandle, GcmLabelBaseOffset + offset, value
     );
     g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
@@ -145,7 +145,7 @@ void Rsx::TextureReadSemaphoreRelease(uint32_t value) {
     // the label is set when all texture referencing processing
     // and fragment shader processing are complete
     auto offset = _context->semaphoreOffset;
-    INFO(rsx) << ssnprintf("releasing texture semaphore at offset %x with value %x",
+    INFO(rsx) << sformat("releasing texture semaphore at offset {:x} with value {:x}",
                            GcmLabelBaseOffset + offset,
                            value);
     g_state.mm->store32(GcmLabelBaseOffset + offset, value, g_state.granule);
@@ -685,7 +685,7 @@ void Rsx::DriverFlip(uint32_t value) {
     static int framenum = 0;
     auto id = getpid();
     if (framenum < 22 && tex) {
-        auto filename = ssnprintf("%s/ps3frame_%d_%d.png", getTestOutputDir(), id, framenum);
+        auto filename = sformat("{}/ps3frame_{}_{}.png", getTestOutputDir(), id, framenum);
         dumpOpenGLTexture(tex->handle(), false, 0, filename, true, true);
         framenum++;
     }
@@ -727,13 +727,13 @@ void Rsx::drawStats() {
     _context->statText.clear();
 
     auto fpsCount = std::get<1>(_fpsCounter.value(counter_clock_t::now()));
-    auto line = ssnprintf("FPS: %d", fpsCount);
+    auto line = sformat("FPS: {}", fpsCount);
     _context->statText.line(0, 0, line);
 
     auto [idleSum, idleCount] = _idleCounter.value();
     boost::chrono::duration<float> loadDuration = boost::chrono::seconds(1) - idleSum;
 
-    _context->statText.line(ssnprintf("RSX load: %1.2f, wait count: %d",
+    _context->statText.line(sformat("RSX load: {:1.2f}, wait count: {}",
                                       loadDuration.count(),
                                       idleCount));
 
@@ -747,7 +747,7 @@ void Rsx::drawStats() {
 
     int i = 0;
     for (auto& [entry, count, sum] : vec) {
-        line = ssnprintf("%-8d %-1.4f %-1.4f   %s",
+        line = sformat("{:<8} {:<1.4f} %{:<1.4f}   {}",
                          count,
                          boost::chrono::duration<float>(sum).count(),
                          boost::chrono::duration<float>(sum).count() / fpsCount,
@@ -765,7 +765,7 @@ void Rsx::drawStats() {
     {                                                                               \
         auto[sum, count] = counter.value();                                         \
         auto sumValue = boost::chrono::duration<float>(sum).count();                \
-        _context->statText.line(ssnprintf("%-14s %-8d  %-1.4f  %-1.6f",             \
+        _context->statText.line(sformat("{:<14} {:<8}  {:<1.4f}  {:<1.6f}",         \
                                           name,                                     \
                                           count,                                    \
                                           sumValue,                                 \
@@ -790,7 +790,7 @@ void Rsx::drawStats() {
         STAT_LINE("semaphore", _semaphoreAcquireCounter);
 
         _context->statText.line(
-            ssnprintf("total time: %1.4f (real), %1.4f (frame adjusted)",
+            sformat("total time: {:1.4f} (real), {:1.4f} (frame adjusted)",
                     total,
                     total / fpsCount));
     }
@@ -821,8 +821,8 @@ void Rsx::TransformConstantLoad(uint32_t loadAt, uint32_t offset, uint32_t count
 
     for (auto i = 0u; i < count; i += 4) {
         auto u = (float*)&source[i * 4];
-        INFO(rsx) << ssnprintf(
-            "vconst[%03d] = { %g, %g, %g, %g }", loadAt + i, u[0], u[1], u[2], u[3]);
+        INFO(rsx) << sformat(
+            "vconst[{:03}] = {{ {}, {}, {}, {} }}", loadAt + i, u[0], u[1], u[2], u[3]);
     }
 
     auto mapped = (uint8_t*)_context->drawRingBuffer->current(vertexConstBuffer) + loadAt * 16;
@@ -984,7 +984,7 @@ void Rsx::updateShaders() {
             RangeCloser r(&_fragmentShaderCounter);
 
             auto sizes = getFragmentSamplerSizes(_context.get());
-            INFO(libs) << ssnprintf("Updated fragment shader:\n%s\n%s",
+            INFO(libs) << sformat("Updated fragment shader:\n{}\n{}",
                             PrintFragmentBytecode(&_context->fragmentBytecode[0]),
                             PrintFragmentProgram(&_context->fragmentBytecode[0]));
             auto text = GenerateFragmentShader(_context->fragmentBytecode,
@@ -992,7 +992,7 @@ void Rsx::updateShaders() {
                                                _context->isFlatShadeMode,
                                                isMrt(_context->surface));
             shader = new FragmentShader(text.c_str());
-            INFO(libs) << ssnprintf("Updated fragment shader (2):\n%s\n%s", text, shader->log());
+            INFO(libs) << sformat("Updated fragment shader (2):\n{}\n{}", text, shader->log());
             _context->fragmentShaderCache.insert(key, shader);
         }
         _context->fragmentShader = shader;
@@ -1035,7 +1035,7 @@ void Rsx::updateShaders() {
         if (!shader) {
             RangeCloser r(&_vertexShaderCounter);
             INFO(rsx) << "updating vertex shader";
-            INFO(rsx) << ssnprintf("updated vertex shader:\n%s\n%s",
+            INFO(rsx) << sformat("updated vertex shader:\n{}\n{}",
                      PrintVertexBytecode(&_context->vertexInstructions[0]),
                      PrintVertexProgram(&_context->vertexInstructions[0]));
             auto text = GenerateVertexShader(&_context->vertexInstructions[0],
@@ -1045,7 +1045,7 @@ void Rsx::updateShaders() {
                                              nullptr,
                                              _mode == RsxOperationMode::Replay);
             shader = new VertexShader(text.c_str());
-            INFO(rsx) << ssnprintf("updated vertex shader (2):\n%s\n%s", text, shader->log());
+            INFO(rsx) << sformat("updated vertex shader (2):\n{}\n{}", text, shader->log());
             _context->vertexShaderCache.insert(&_context->vertexInstructions[0],
                                                _context->vertexLoadOffset,
                                                arraySizes,
@@ -1579,7 +1579,7 @@ inline void glDebugCallbackFunction(GLenum source,
                    : source == GL_DEBUG_SOURCE_THIRD_PARTY ? "ThirdParty"
                    : source == GL_DEBUG_SOURCE_APPLICATION ? "Application"
                    : "Other";
-    INFO(rsx) << ssnprintf("gl callback [source=%s]: %s", sourceStr, message);
+    INFO(rsx) << sformat("gl callback [source={}]: {}", sourceStr, message);
     if (severity == GL_DEBUG_SEVERITY_HIGH)
         exit(1);
 }
@@ -1729,13 +1729,13 @@ void Rsx::waitForIdle() {
 }
 
 void Rsx::BackEndWriteSemaphoreRelease(uint32_t value) {
-    INFO(rsx) << ssnprintf("BackEndWriteSemaphoreRelease(%x)", value);
+    INFO(rsx) << sformat("BackEndWriteSemaphoreRelease({:x})", value);
     waitForIdle();
     g_state.mm->store32(_context->semaphoreOffset + GcmLabelBaseOffset, value, g_state.granule);
 }
 
 void Rsx::SemaphoreOffset(uint32_t offset) {
-    INFO(rsx) << ssnprintf("SemaphoreOffset(%x)", offset);
+    INFO(rsx) << sformat("SemaphoreOffset({:x})", offset);
     _context->semaphoreOffset = offset;
 }
 

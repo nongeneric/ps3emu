@@ -27,8 +27,8 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     list << "--args" << QString::fromStdString(argstr);
 
     auto runnerPath = (std::filesystem::path(g_ps3bin) / "ps3run/ps3run").string();
-    auto argsStr = ssnprintf(
-        "%s %s",
+    auto argsStr = sformat(
+        "{} {}",
         runnerPath,
         boost::join(list | ranges::views::transform(&QString::toStdString), " "));
 
@@ -42,24 +42,28 @@ std::string startWaitGetOutput(std::vector<std::string> args,
     return QString(proc.readAll()).toStdString();
 }
 
-bool rewrite_and_compile(std::string elf, std::string cppPath) {
+void rewrite_and_compile(std::string elf, std::string cppPath) {
     auto line = rewrite(elf, cppPath, "");
     std::string output;
-    auto res = exec(line, output);
-    if (!res)
-        return false;
+    if (!exec(line, output)) {
+        FAIL(sformat("failed to exec: {}", line));
+    }
     line = compile(cppPath + ".ninja");
-    return exec(line, output);
+    if (!exec(line, output)) {
+        FAIL(sformat("failed to exec: {}", line));
+    }
 }
 
-bool rewrite_and_compile_spu(std::string elf, std::string cppPath) {
+void rewrite_and_compile_spu(std::string elf, std::string cppPath) {
     auto line = rewrite(elf, cppPath, "--spu");
     std::string output;
-    auto res = exec(line, output);
-    if (!res)
-        return false;
+    if (!exec(line, output)) {
+        FAIL(sformat("failed to exec: {}", line));
+    }
     line = compile(cppPath + ".ninja");
-    return exec(line, output);
+    if (!exec(line, output)) {
+        FAIL(sformat("failed to exec: {}", line));
+    }
 }
 
 void test_interpreter_and_rewriter(std::vector<std::string> args,
@@ -67,16 +71,16 @@ void test_interpreter_and_rewriter(std::vector<std::string> args,
                                    bool rewriterOnly,
                                    std::vector<std::string> ps3runArgs) {
     auto id = getpid();
-    auto spuSoPath = ssnprintf("%s/ps3_%d%s.so", getTestOutputDir(), id, g_rewriterSpuExtension);
-    auto spuCppPath = ssnprintf("%s/ps3_%d%s", getTestOutputDir(), id, g_rewriterSpuExtension);
-    auto soPath = ssnprintf("%s/ps3_%d%s.so", getTestOutputDir(), id, g_rewriterPpuExtension);
-    auto cppPath = ssnprintf("%s/ps3_%d%s", getTestOutputDir(), id, g_rewriterPpuExtension);
+    auto spuSoPath = sformat("{}/ps3_{}{}.so", getTestOutputDir(), id, g_rewriterSpuExtension);
+    auto spuCppPath = sformat("{}/ps3_{}{}", getTestOutputDir(), id, g_rewriterSpuExtension);
+    auto soPath = sformat("{}/ps3_{}{}.so", getTestOutputDir(), id, g_rewriterPpuExtension);
+    auto cppPath = sformat("{}/ps3_{}{}", getTestOutputDir(), id, g_rewriterPpuExtension);
     if (!rewriterOnly) {
         auto output = startWaitGetOutput(args);
         REQUIRE( output == expected );
     }
-    REQUIRE( rewrite_and_compile(args[0], cppPath) );
-    REQUIRE( rewrite_and_compile_spu(args[0], spuCppPath) );
+    rewrite_and_compile(args[0], cppPath);
+    rewrite_and_compile_spu(args[0], spuCppPath);
     ps3runArgs.push_back("--x86");
     ps3runArgs.push_back(soPath);
     ps3runArgs.push_back("--x86");
@@ -86,5 +90,5 @@ void test_interpreter_and_rewriter(std::vector<std::string> args,
 }
 
 std::string testPath(const char* relative) {
-    return ssnprintf("%s/tests/binaries/%s", g_ps3sources, relative);
+    return sformat("{}/tests/binaries/{}", g_ps3sources, relative);
 }

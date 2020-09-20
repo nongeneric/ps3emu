@@ -15,7 +15,7 @@
 
 void PPUThread::scall() {
     auto index = getGPR(11);
-    //INFO(libs) << ssnprintf("  -- scall %d at %08x", index, getNIP());
+    //INFO(libs) << sformat("  -- scall {} at {:08x}", index, getNIP());
     switch (index) {
         case 352: wrap(sys_memory_get_user_memory_size, this); break;
         case 403: wrap(sys_tty_write, this); break;
@@ -175,6 +175,6 @@ void PPUThread::scall() {
         case 673: wrap(emu::Gcm::sys_rsx_context_iounmap, this); break;
         case 674: wrap(emu::Gcm::sys_rsx_context_attribute, this); break;
         case 677: wrap(emu::Gcm::sys_rsx_attribute, this); break;
-        default: ERROR(libs) << ssnprintf("unknown syscall %d", index); exit(1);
+        default: ERROR(libs) << sformat("unknown syscall {}", index); exit(1);
     }
 }

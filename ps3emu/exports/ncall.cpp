@@ -289,14 +289,14 @@ tbb::concurrent_vector<NCallEntry> ncallTable {
 
 void PPUThread::ncall(uint32_t index) {
     if (index >= ncallTable.size()) {
-        auto msg = ssnprintf("unknown ncall index %x", index);
+        auto msg = sformat("unknown ncall index {:x}", index);
         ERROR(libs) << msg;
         throw std::runtime_error(msg);
     }
     setEMUREG(0, getNIP());
     setNIP(getLR());
     auto entry = &ncallTable[index];
-    //INFO(libs) << ssnprintf("ncall %s", entry->name);
+    //INFO(libs) << sformat("ncall {}", entry->name);
     entry->stub(this);
 }
 

@@ -55,7 +55,7 @@ public:
             std::string log;
             log.resize(len);
             glGetProgramPipelineInfoLog(handle(), log.size(), nullptr, &log[0]);
-            ERROR(rsx) << ssnprintf("pipeline validation failed\n%s", log);
+            ERROR(rsx) << sformat("pipeline validation failed\n{}", log);
             exit(1);
         }
     }

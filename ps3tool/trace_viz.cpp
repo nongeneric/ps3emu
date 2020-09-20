@@ -178,10 +178,10 @@ void synchronize(std::vector<Change>& left, std::vector<Change>& right) {
 std::string printState(State const& state) {
     std::string res;
     for (auto& [k, v] : state.r64) {
-        res += ssnprintf("%s=%llx ", k, v);
+        res += sformat("{}={:x} ", k, v);
     }
     for (auto& [k, v] : state.r128) {
-        res += ssnprintf("%s=%08x %08x %08x %08x ", k, v.w(0), v.w(1), v.w(2), v.w(3));
+        res += sformat("{}={:08x} {:08x} {:08x} {:08x} ", k, v.w(0), v.w(1), v.w(2), v.w(3));
     }
     return res;
 }
@@ -243,9 +243,9 @@ public:
             return {};
         switch (index.column()) {
             case 0:
-                return QString::fromStdString(ssnprintf("%d", index.row()));
+                return QString::fromStdString(sformat("{}", index.row()));
             case 1:
-                return QString::fromStdString(ssnprintf("%x", _left[index.row()].offset));
+                return QString::fromStdString(sformat("{:x}", _left[index.row()].offset));
             case 2:
             case 3: {
                 try {
@@ -284,9 +284,9 @@ public:
 
 std::string printR128(R128 const& r, bool isFloat) {
     if (isFloat) {
-        return ssnprintf("%g %g %g %g", r.fs(0), r.fs(1), r.fs(2), r.fs(3));
+        return sformat("{} {} {} {}", r.fs(0), r.fs(1), r.fs(2), r.fs(3));
     }
-    return ssnprintf("%08x %08x %08x %08x", r.w(0), r.w(1), r.w(2), r.w(3));
+    return sformat("{:08x} {:08x} {:08x} {:08x}", r.w(0), r.w(1), r.w(2), r.w(3));
 }
 
 class StateModel : public QAbstractItemModel {
@@ -348,8 +348,8 @@ public:
             auto& [name, r] = _r64[index.row()];
             switch (index.column()) {
                 case 0: return QString::fromStdString(name);
-                case 1: return QString::fromStdString(ssnprintf("%016llx", r, false));
-                case 2: return QString::fromStdString(ssnprintf("%016llx", r, true));
+                case 1: return QString::fromStdString(sformat("{:016x}", r, false));
+                case 2: return QString::fromStdString(sformat("{:016x}", r, true));
             }
             regName = name;
         } else {
@@ -366,7 +366,7 @@ public:
             if (it == end(_modified))
                 return "";
             auto [index, offset] = it->second;
-            return QString::fromStdString(ssnprintf("%08x | %d", offset, index));
+            return QString::fromStdString(sformat("{:08x} | {}", offset, index));
         }
         return {};
     }

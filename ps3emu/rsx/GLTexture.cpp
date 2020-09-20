@@ -25,7 +25,7 @@ void read_A1R5G5B5(const uint8_t* raw, u8vec4& texel) {
         BitField<6, 11> g;
         BitField<11, 16> b;
     } t = { (uint32_t)*(const uint16_t*)raw << 16 };
-    texel = { 
+    texel = {
         ext8(t.r),
         ext8(t.g),
         ext8(t.b),
@@ -41,7 +41,7 @@ void read_R5G5B5A1(const uint8_t* raw, u8vec4& texel) {
         BitField<10, 15> b;
         BitField<15, 16> a;
     } t = { (uint32_t)*(const uint16_t*)raw << 16 };
-    texel = { 
+    texel = {
         ext8(t.r),
         ext8(t.g),
         ext8(t.b),
@@ -57,7 +57,7 @@ void read_A4R4G4B4(const uint8_t* raw, u8vec4& texel) {
         BitField<8, 12> g;
         BitField<12, 16> b;
     } t = { (uint32_t)*(const uint16_t*)raw << 16 };
-    texel = { 
+    texel = {
         ext8(t.r),
         ext8(t.g),
         ext8(t.b),
@@ -72,7 +72,7 @@ void read_R5G6B5(const uint8_t* raw, u8vec4& texel) {
         BitField<5, 11> g;
         BitField<11, 16> b;
     } t = { (uint32_t)*(const uint16_t*)raw << 16 };
-    texel = { 
+    texel = {
         ext8(t.r),
         ext8(t.g),
         ext8(t.b),
@@ -87,7 +87,7 @@ void read_D1R5G5B5(const uint8_t* raw, u8vec4& texel) {
         BitField<6, 11> g;
         BitField<11, 16> b;
     } t = { (uint32_t)*(const uint16_t*)raw << 16 };
-    texel = { 
+    texel = {
         ext8(t.r),
         ext8(t.g),
         ext8(t.b),
@@ -102,7 +102,7 @@ void read_R6G5B5(const uint8_t* raw, u8vec4& texel) {
         BitField<6, 11> g;
         BitField<11, 16> b;
     } t = { (uint32_t)*(const uint16_t*)raw << 16 };
-    texel = { 
+    texel = {
         ext8(t.r),
         ext8(t.g),
         ext8(t.b),
@@ -111,7 +111,7 @@ void read_R6G5B5(const uint8_t* raw, u8vec4& texel) {
 }
 
 void read_B8(const uint8_t* raw, u8vec4& texel) {
-    texel = { 
+    texel = {
         *raw,
         *raw,
         *raw,
@@ -144,7 +144,7 @@ unsigned getTexelSize2(GcmTextureFormat format) {
         case GcmTextureFormat::R5G6B5:
         case GcmTextureFormat::D1R5G5B5:
         case GcmTextureFormat::R6G5B5:
-        case GcmTextureFormat::G8B8:        
+        case GcmTextureFormat::G8B8:
         case GcmTextureFormat::DEPTH16:
         case GcmTextureFormat::DEPTH16_FLOAT:
         case GcmTextureFormat::X16:
@@ -185,8 +185,8 @@ FormatInfo getFormat(GcmTextureFormat format) {
             return { FormatType::u8x4, read_R6G5B5 };
         case GcmTextureFormat::B8:
             return { FormatType::u8x4, read_B8 };
-        
-        case GcmTextureFormat::G8B8:        
+
+        case GcmTextureFormat::G8B8:
         case GcmTextureFormat::DEPTH16:
         case GcmTextureFormat::DEPTH16_FLOAT:
         case GcmTextureFormat::X16:
@@ -201,7 +201,7 @@ FormatInfo getFormat(GcmTextureFormat format) {
         case GcmTextureFormat::COMPRESSED_DXT1:
         case GcmTextureFormat::COMPRESSED_DXT23:
         case GcmTextureFormat::COMPRESSED_DXT45:
-        default: INFO(libs) << ssnprintf("unsupported texture format %d", format); assert(false);
+        default: INFO(libs) << sformat("unsupported texture format {}", format); assert(false);
     }
     return {};
 }
@@ -292,7 +292,7 @@ class LinearTextureIterator {
     uint32_t _levelWidth;
     uint32_t _levelHeight;
     uint32_t _levelPitch;
-    
+
 public:
     LinearTextureIterator(void* buf,
                           uint32_t pitch,
@@ -324,7 +324,7 @@ public:
     uint8_t* at(uint32_t x, uint32_t y) {
         return &_buf[y * _levelPitch + x * _texelSize] + _levelOffset;
     }
-    
+
     uint32_t w() { return _levelWidth; }
     uint32_t h() { return _levelHeight; }
     uint32_t size() { return at(0, h()) - _buf; }
@@ -332,7 +332,7 @@ public:
 
 uint32_t GLTexture::read2d(
     uint8_t* raw,
-    std::function<void(unsigned, unsigned, unsigned, glm::vec4*)> handler) 
+    std::function<void(unsigned, unsigned, unsigned, glm::vec4*)> handler)
 {
     auto size = 0ul;
     std::vector<vec4> conv(_info.width * _info.height);
@@ -356,10 +356,10 @@ uint32_t GLTexture::read2d(
                     auto a = print_hex(block, 16);
                     std::string b;
                     for (auto f4 : decoded) {
-                        b += ssnprintf("%0.3f ", f4.r);
-                        b += ssnprintf("%0.3f ", f4.g);
-                        b += ssnprintf("%0.3f ", f4.b);
-                        b += ssnprintf("%0.3f ", f4.a);
+                        b += sformat("{:0.3f} ", f4.r);
+                        b += sformat("{:0.3f} ", f4.g);
+                        b += sformat("{:0.3f} ", f4.b);
+                        b += sformat("{:0.3f} ", f4.a);
                         b += "| ";
                     }
                     for (int i = 0; i < 4; ++i) {
@@ -430,8 +430,8 @@ void GLTexture::bind(GLuint textureUnit) {
 
 TextureReader::TextureReader(GcmTextureFormat format, const RsxTextureInfo& info)
     : _read(make_read(format, info)) { }
-    
-std::function<glm::vec4(uint8_t*)> TextureReader::make_read(GcmTextureFormat texelFormat, 
+
+std::function<glm::vec4(uint8_t*)> TextureReader::make_read(GcmTextureFormat texelFormat,
                                                             RsxTextureInfo const& info)
 {
     if (texelFormat == GcmTextureFormat::W32_Z32_Y32_X32_FLOAT) {
@@ -558,7 +558,7 @@ SwizzledTextureIterator::SwizzledTextureIterator(uint8_t* buf,
       _lg2Height(log2l(height)),
       _lg2Depth(depth ? log2l(depth) : 0),
       _texelSize(texelSize) {}
-      
+
 SwizzledTextureIterator::SwizzledTextureIterator(uint8_t* buf,
                                                  unsigned lgWidth,
                                                  unsigned lgHeight,

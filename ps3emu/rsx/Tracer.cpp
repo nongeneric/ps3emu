@@ -8,7 +8,7 @@
 void Tracer::enable(bool enabled) {
     _enabled = enabled;
     if (_enabled) {
-        auto path = ssnprintf("/tmp/ps3emu_%d.trace", getpid());
+        auto path = sformat("/tmp/ps3emu_{}.trace", getpid());
         system(("rm -rf " + path).c_str());
         _db.createOrOpen(path);
     }
@@ -35,9 +35,9 @@ void Tracer::trace(uint32_t frame,
     
     std::string argStr = "  ";
     for (auto& arg : args) {
-        argStr += ssnprintf("%s:%s ", arg.name, printArgHex(arg));
+        argStr += sformat("{}:{} ", arg.name, printArgHex(arg));
     }
-    INFO(rsx) << ssnprintf("%08x[%08x/%08x] | %s%s",
+    INFO(rsx) << sformat("{:08x}[{:08x}/{:08x}] | {}{}",
                            rsxOffsetToEa(MemoryLocation::Main, g_state.rsx->getGet()),
                            g_state.rsx->getGet(),
                            g_state.rsx->getPut(),
@@ -64,17 +64,17 @@ const char* printCommandId(CommandId id) {
 
 std::string printArgDecimal(GcmCommandArg const& arg) {
     switch ((GcmArgType)arg.type) {
-        case GcmArgType::None: return ssnprintf("NONE(#%x)", arg.value);
+        case GcmArgType::None: return sformat("NONE(#{:x})", arg.value);
         case GcmArgType::Bool: return arg.value ? "True" : "False";
         case GcmArgType::Float: {
             float value = bit_cast<float>(arg.value);
-            return ssnprintf("%g", value);
+            return sformat("{}", value);
         }
         case GcmArgType::Int32:
         case GcmArgType::Int16:
         case GcmArgType::UInt8:
         case GcmArgType::UInt16:
-        case GcmArgType::UInt32: return ssnprintf("%d", arg.value);
+        case GcmArgType::UInt32: return sformat("{}", arg.value);
     }
     throw std::runtime_error("unknown type");
 }
@@ -83,12 +83,12 @@ std::string printArgHex(GcmCommandArg const& arg) {
     switch ((GcmArgType)arg.type) {
         case GcmArgType::None:
         case GcmArgType::Bool:
-        case GcmArgType::UInt8: return ssnprintf("#%02x", arg.value);
+        case GcmArgType::UInt8: return sformat("#{:02x}", arg.value);
         case GcmArgType::Int16:
-        case GcmArgType::UInt16: return ssnprintf("#%04x", arg.value);
+        case GcmArgType::UInt16: return sformat("#{:04x}", arg.value);
         case GcmArgType::Float:
         case GcmArgType::Int32:
-        case GcmArgType::UInt32: return ssnprintf("#%08x", arg.value);
+        case GcmArgType::UInt32: return sformat("#{:08x}", arg.value);
     }
     throw std::runtime_error("unknown type");
 }

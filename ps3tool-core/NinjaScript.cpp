@@ -16,24 +16,24 @@ void NinjaScript::statement(std::string rule,
                 std::string in,
                 std::string out,
                 std::vector<std::tuple<std::string, std::string>> variables) {
-    _statements.push_back(ssnprintf("build %s: %s %s", out, rule, in));
+    _statements.push_back(sformat("build {}: {} {}", out, rule, in));
     for (auto var : variables) {
         _statements.push_back(
-            ssnprintf("  %s = %s", std::get<0>(var), std::get<1>(var)));
+            sformat("  {} = {}", std::get<0>(var), std::get<1>(var)));
     }
 }
 
 void NinjaScript::variable(std::string name, std::string value) {
-    _variables.push_back(ssnprintf("%s = %s", name, value));
+    _variables.push_back(sformat("{} = {}", name, value));
     _variables.push_back("");
 }
 
 void NinjaScript::subninja(std::string name) {
-    _subninjas.push_back(ssnprintf("subninja %s", name));
+    _subninjas.push_back(sformat("subninja {}", name));
 }
 
 void NinjaScript::defaultStatement(std::string name) {
-    _defaults.push_back(ssnprintf("default %s", name));
+    _defaults.push_back(sformat("default {}", name));
 }
 
 std::string NinjaScript::dump() {

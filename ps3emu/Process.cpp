@@ -56,7 +56,7 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* fname) {
     auto& segments = g_state.proc->getSegments();
     auto segment = boost::find_if(segments, [=](auto& s) { return s.va == imageBase; });
     if (segment == end(segments)) {
-        WARNING(libs) << ssnprintf("module %x not found", imageBase);
+        WARNING(libs) << sformat("module {:x} not found", imageBase);
         return 0;
     }
     auto elfName = segment->elf->shortName();
@@ -73,7 +73,7 @@ uint32_t findExportedModuleFunction(uint32_t imageBase, const char* fname) {
                       "libcamera.sprx.elf",
                       "libresc.sprx.elf"}) {
         if (name == elfName) {
-            INFO(libs) << ssnprintf("ignoring function %s for module %s", fname, elfName);
+            INFO(libs) << sformat("ignoring function {} for module {}", fname, elfName);
             return 0;
         }
     }
@@ -96,16 +96,16 @@ int32_t executeExportedFunction(uint32_t imageBase,
     auto elfName = segment->elf->shortName();
     for (auto elf : { "libaudio.sprx.elf", "libsysutil.sprx.elf" }) {
         if (elf == elfName) {
-            INFO(libs) << ssnprintf("ignoring function %s for module %s", name, elfName);
+            INFO(libs) << sformat("ignoring function {} for module {}", name, elfName);
             return CELL_OK;
         }
     }
     auto func = g_state.proc->findExport(segment->elf.get(), calcEid(name));
     if (!func) {
-        INFO(libs) << ssnprintf("module %08x has no %s function", imageBase, name);
+        INFO(libs) << sformat("module {:08x} has no {} function", imageBase, name);
         return CELL_OK;
     }
-    INFO(libs) << ssnprintf("calling %s for module %s", name, elfName);
+    INFO(libs) << sformat("calling {} for module {}", name, elfName);
     //thread->setGPR(3, args);
     //thread->setGPR(4, argp);
     return thread->ps3call(*func, nullptr, 0, sink);
@@ -147,7 +147,7 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     }
     
     if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0) {
-        ERROR(libs) << ssnprintf("SDL initialization failed: %s", SDL_GetError());
+        ERROR(libs) << sformat("SDL initialization failed: {}", SDL_GetError());
         exit(1);
     }
 
@@ -236,15 +236,15 @@ uint32_t Process::loadPrx(std::string path) {
     if (prxInfo) {
         auto dir = fs::path(path).parent_path().string();
         auto filename = fs::path(path).filename().string();
-        auto x86path = ssnprintf("%s/%s/%s.so", dir, g_buildName, filename);
-        auto x86spuPath = ssnprintf("%s/%s/%s.spu.so", dir, g_buildName, filename);
+        auto x86path = sformat("{}/{}/{}.so", dir, g_buildName, filename);
+        auto x86spuPath = sformat("{}/{}/{}.spu.so", dir, g_buildName, filename);
 
-        INFO(libs) << ssnprintf("looking for %s", x86path);
+        INFO(libs) << sformat("looking for {}", x86path);
         if (prxInfo->loadx86 && fs::exists(x86path)) {
             x86paths.push_back(x86path);
         }
 
-        INFO(libs) << ssnprintf("looking for %s", x86spuPath);
+        INFO(libs) << sformat("looking for {}", x86spuPath);
         if (prxInfo->loadx86spu && fs::exists(x86spuPath)) {
             x86paths.push_back(x86spuPath);
         }
@@ -288,7 +288,7 @@ Event Process::run() {
                 // there might be a dangling spu_printf thread or similar
                 bool dangling = false;
                 for (auto& t : _threads) {
-                    WARNING(libs) << ssnprintf("a dangling thread at ProcessFinished %s", t->getName());
+                    WARNING(libs) << sformat("a dangling thread at ProcessFinished {}", t->getName());
                     dangling = true;
                 }
                 if (dangling) {
@@ -329,7 +329,7 @@ Event Process::run() {
                         boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
                         for (auto& t : _spuThreads) {
                             if (t->tryJoin(500).cause == SPUThreadExitCause::StillRunning) {
-                                WARNING(spu) << ssnprintf("a dangling SPU thread at ProcessFinished %s", t->getName());
+                                WARNING(spu) << sformat("a dangling SPU thread at ProcessFinished {}", t->getName());
                                 exit(0);
                             }
                         }
@@ -407,7 +407,7 @@ uint64_t Process::createThread(uint32_t stackSize,
     auto id = _threadIds.create(std::move(t));
     t->setId(id, name);
     t->setGPR(7, id);
-    INFO(libs) << ssnprintf("thread %x created", id);
+    INFO(libs) << sformat("thread {:x} created", id);
     if (start)
         t->run();
     return id;
@@ -426,7 +426,7 @@ uint64_t Process::createInterruptThread(uint32_t stackSize,
     t->setEntry(entryPointDescriptorVa);
     initNewThread(t, entryPointDescriptorVa, stackSize, tls);
     auto id = _threadIds.create(std::move(t));
-    INFO(libs) << ssnprintf("interrupt thread %d created", id);
+    INFO(libs) << sformat("interrupt thread {} created", id);
     if (start)
         t->run();
     _threads.emplace_back(std::unique_ptr<PPUThread>(t));
@@ -519,7 +519,7 @@ uint32_t Process::createSpuThread(std::string name) {
     auto t = _spuThreads.back();
     auto id = _spuThreadIds.create(std::move(t));
     _spuThreadIds.get(id)->setId(id);
-    INFO(libs) << ssnprintf("spu thread %d created", id);
+    INFO(libs) << sformat("spu thread {} created", id);
     return id;
 }
 

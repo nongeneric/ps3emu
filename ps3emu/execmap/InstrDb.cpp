@@ -84,7 +84,7 @@ enum SQLtext {
 };
 
 void InstrDb::open(std::string path) {
-    path = !path.empty() ? path : ssnprintf("%s/instr.db", g_state.config->configDirPath);
+    path = !path.empty() ? path : sformat("{}/instr.db", g_state.config->configDirPath);
     _db.reset(new SQLiteDB(path, sqlCreate));
     _statements.resize(sql_text_count);
     _statements[insert_into_entry] = Statement("INSERT INTO Entry VALUES(?,?,?);", *_db);

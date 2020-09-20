@@ -10,11 +10,11 @@
 using namespace std::filesystem;
 
 std::string ps3toolPath() {
-    return ssnprintf("%s/ps3tool/ps3tool", g_ps3bin);
+    return sformat("{}/ps3tool/ps3tool", g_ps3bin);
 }
 
 std::string rewrite(std::string elf, std::string cpp, std::string args) {
-    auto line = ssnprintf("%s rewrite --elf %s --cpp %s %s",
+    auto line = sformat("{} rewrite --elf {} --cpp {} {}",
                           ps3toolPath(),
                           absolute(elf).string(),
                           cpp,
@@ -31,7 +31,7 @@ std::string compileRule() {
         ""
 #endif
     ;
-    auto line = ssnprintf("%s -c -fPIC -std=c++20 %s $opt $trace -march=native -isystem%s $in -o $out",
+    auto line = sformat("{} -c -fPIC -std=c++20 {} $opt $trace -march=native -isystem{} $in -o $out",
         g_compiler, memoryProtection, include
     );
     return line;
@@ -39,12 +39,12 @@ std::string compileRule() {
 
 std::string linkRule() {
     auto lib = std::string(g_ps3bin) + "/ps3emu";
-    return ssnprintf("%s -shared $in -L%s -lps3emu -o $out", g_compiler, lib);
+    return sformat("{} -shared $in -L{} -lps3emu -o $out", g_compiler, lib);
 }
 
 std::string compile(std::string ninja) {
     auto wd = path(ninja).parent_path().string();
-    return ssnprintf("ninja-build -C %s -f %s", wd, ninja);
+    return sformat("ninja-build -C {} -f {}", wd, ninja);
 }
 
 bool exec(std::string line, std::string& output) {

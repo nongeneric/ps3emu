@@ -81,12 +81,14 @@ int32_t cellGameBootCheck(big_uint32_t* type,
     return CELL_OK;
 }
 
-int32_t cellGameDataCheck(uint32_t type, 
-                          const cell_game_dirname_t* dirName, 
+int32_t cellGameDataCheck(uint32_t type,
+                          const cell_game_dirname_t* dirName,
                           CellGameContentSize* size,
                           Process* proc)
 {
-    INFO(libs) << ssnprintf("cellGameDataCheck(%d, %s, ...)", type, dirName);
+    INFO(libs) << sformat("cellGameDataCheck({}, {}, ...)",
+                            type,
+                            std::string_view(dirName->data(), dirName->size()));
     init(size, proc);
     return CELL_OK;
 }

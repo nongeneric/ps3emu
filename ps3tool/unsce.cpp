@@ -181,10 +181,10 @@ std::vector<key_info_t> read_keys(path data_path) {
         std::cout << "can't read the keys file";
         return {};
     }
-    
+
     std::regex rx_header("\\[(.*?)\\]");
     std::regex rx_pair("(.*?)=(.*)");
-    
+
     std::vector<key_info_t> keys;
     key_info_t key;
     for (std::string line; std::getline(f, line); ) {
@@ -237,8 +237,8 @@ const char* get_self_type(uint32_t self_type) {
     }
 }
 
-optional<key_info_t> search_self_key(std::vector<key_info_t>& keys, 
-                                     uint32_t type, 
+optional<key_info_t> search_self_key(std::vector<key_info_t>& keys,
+                                     uint32_t type,
                                      uint16_t revision,
                                      uint64_t version)
 {
@@ -262,7 +262,7 @@ optional<key_info_t> search_self_key(std::vector<key_info_t>& keys,
 }
 
 #define SCE_HEADER_TYPE_SELF 1
-    
+
 #define CONTROL_INFO_TYPE_FLAGS 1
 #define CONTROL_INFO_TYPE_DIGEST 2
 #define CONTROL_INFO_TYPE_NPDRM 3
@@ -271,19 +271,19 @@ optional<key_info_t> search_self_key(std::vector<key_info_t>& keys,
 #define NP_LICENSE_LOCAL 2
 #define NP_LICENSE_FREE 3
 
-bool decrypt_npdrm(std::vector<key_info_t>& keys, 
+bool decrypt_npdrm(std::vector<key_info_t>& keys,
                    std::vector<control_info_t*> control_infos,
                    metadata_info_t* metadata_info) {
     auto klic_key = std::find_if(keys.begin(), keys.end(), [=](auto& key) {
         return key.name == "NP_klic_key";
     });
     assert(klic_key != keys.end());
-    
+
     auto it = std::find_if(control_infos.begin(), control_infos.end(), [=](auto ci) {
         return ci->type == CONTROL_INFO_TYPE_NPDRM;
     });
     assert(it != control_infos.end());
-    
+
     auto npdrm = reinterpret_cast<ci_data_npdrm*>(*it + 1);
     (void)npdrm;
     assert(npdrm->license_type == NP_LICENSE_FREE);
@@ -294,12 +294,12 @@ bool decrypt_npdrm(std::vector<key_info_t>& keys,
     uint8_t npdrm_key[0x10];
     assert(key->key.size() == sizeof(npdrm_key));
     memcpy(npdrm_key, &key->key[0], sizeof(npdrm_key));
-    
+
     AES_KEY aes_key;
     assert(klic_key->key.size() == 16);
     AES_set_decrypt_key(&klic_key->key[0], 128, &aes_key);
     AES_ecb_encrypt(npdrm_key, npdrm_key, &aes_key, AES_DECRYPT);
-    
+
     uint8_t npdrm_iv[0x10] = { 0 };
     AES_set_decrypt_key(npdrm_key, 128, &aes_key);
     AES_cbc_encrypt(reinterpret_cast<unsigned char*>(metadata_info),
@@ -313,9 +313,9 @@ bool decrypt_npdrm(std::vector<key_info_t>& keys,
 
 #define METADATA_SECTION_ENCRYPTED 3
 #define METADATA_SECTION_COMPRESSED 2
-    
-bool decrypt_metadata(std::vector<key_info_t>& keys, 
-                      app_info_t* app_info, 
+
+bool decrypt_metadata(std::vector<key_info_t>& keys,
+                      app_info_t* app_info,
                       sce_header_t* sce_header,
                       metadata_info_t* metadata_info,
                       metadata_header_t* metadata_header,
@@ -326,19 +326,19 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
         std::cout << "can't find a suitable key";
         return false;
     }
-    
+
     auto key = opt_key.get();
     std::cout << "key to decrypt metadata\n"
-        << ssnprintf("  name       %s\n", key.name)
-        << ssnprintf("  self_type  %s\n", key.self_type)
-        << ssnprintf("  revision   %x\n", key.revision)
-        << ssnprintf("  version    %lx\n", key.version);
-        
+        << sformat("  name       {}\n", key.name)
+        << sformat("  self_type  {}\n", key.self_type)
+        << sformat("  revision   {:x}\n", key.revision)
+        << sformat("  version    {:x}\n", key.version);
+
     assert(sce_header->type == SCE_HEADER_TYPE_SELF);
     if (app_info->self_type == SELF_TYPE_NPDRM) {
         decrypt_npdrm(keys, control_infos, metadata_info);
     }
-        
+
     AES_KEY aes_key;
     AES_set_decrypt_key(&key.erk[0], key.erk.size() * 8, &aes_key);
     AES_cbc_encrypt(reinterpret_cast<unsigned char*>(metadata_info),
@@ -347,17 +347,17 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                     &aes_key,
                     &key.riv[0],
                     AES_DECRYPT);
-    
+
     if (std::accumulate(metadata_info->iv_pad, metadata_info->iv_pad + 16, 0) != 0 ||
         std::accumulate(metadata_info->key_pad, metadata_info->key_pad + 16, 0) != 0) {
         std::cout << "metadata decryption failed, check your keys";
         return false;
     }
-    
+
     std::cout << "metadata info\n"
-        << ssnprintf("  key  %s\n", print_hex(metadata_info->key, 16))
-        << ssnprintf("  iv   %s\n", print_hex(metadata_info->iv, 16));
-    
+        << sformat("  key  {}\n", print_hex(metadata_info->key, 16))
+        << sformat("  iv   {}\n", print_hex(metadata_info->iv, 16));
+
     int outl;
     std::vector<uint8_t> tmp(sizeof(metadata_header_t) + 15);
     auto ctx = EVP_CIPHER_CTX_new();
@@ -368,11 +368,11 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
                       reinterpret_cast<unsigned char*>(metadata_header),
                       sizeof(metadata_header_t));
     memcpy(metadata_header, &tmp[0], sizeof(metadata_header_t));
-    
+
     std::cout << "metadata header\n"
-        << ssnprintf("  section_count  %d\n", metadata_header->section_count)
-        << ssnprintf("  key_count      %d\n", metadata_header->key_count);
-    
+        << sformat("  section_count  {}\n", metadata_header->section_count)
+        << sformat("  key_count      {}\n", metadata_header->key_count);
+
     auto metadata_size = sizeof(metadata_section_header_t) * metadata_header->section_count +
                          16 * metadata_header->key_count;
     tmp.resize(metadata_size + 15);
@@ -384,24 +384,24 @@ bool decrypt_metadata(std::vector<key_info_t>& keys,
     EVP_EncryptFinal_ex(ctx, &tmp[outl], &outl);
     EVP_CIPHER_CTX_free(ctx);
     memcpy(metadata_section_headers, &tmp[0], metadata_size);
-    
+
     std::cout << "metadata section headers\n"
         << "  Idx Offset   Size     Type Index Hashed SHA1 Encrypted Key IV Compressed\n";
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto sh = &metadata_section_headers[i];
         std::cout <<
-            ssnprintf("  %02d  %08X %08X %02X   %02d    %s    %02X   %s       %s  %s %s\n",
+            sformat("  {:02}  {:08X} {:08X} {:02X}   {:02}    {}    {:02X}   {}       {}  {} {}\n",
                 i, sh->data_offset, sh->data_size, sh->type, sh->index,
                 sh->hashed == 2 ? "YES" : "NO ",
                 sh->sha1_index,
                 sh->encrypted == METADATA_SECTION_ENCRYPTED ? "YES" : "NO ",
-                sh->key_index == 0xffffffff ? "--" : ssnprintf("%02X", sh->key_index), 
-                sh->iv_index == 0xffffffff ? "--" : ssnprintf("%02X", sh->iv_index), 
+                sh->key_index == 0xffffffff ? "--" : sformat("{:02X}", sh->key_index),
+                sh->iv_index == 0xffffffff ? "--" : sformat("{:02X}", sh->iv_index),
                 sh->compressed == METADATA_SECTION_COMPRESSED ? "YES" : "NO "
             );
     }
     std::cout << "";
-        
+
     return true;
 }
 
@@ -414,12 +414,12 @@ bool decrypt_sections(sce_header_t* sce_header,
                       metadata_section_header_t* metadata_section_headers) {
     auto keys = reinterpret_cast<std::array<uint8_t, 16>*>(
         metadata_section_headers + metadata_header->section_count);
-    
+
     std::cout << "sce keys\n";
     for (auto i = 0u; i < metadata_header->key_count; ++i) {
-        std::cout << ssnprintf("  %02x  %s\n", i, print_hex(&keys[i][0], 16));
+        std::cout << sformat("  {:02x}  {}\n", i, print_hex(&keys[i][0], 16));
     }
-    
+
     for (auto sh = metadata_section_headers;
          sh != metadata_section_headers + metadata_header->section_count;
          ++sh) {
@@ -430,18 +430,18 @@ bool decrypt_sections(sce_header_t* sce_header,
             std::cout << "a section marked encrypted references a non existent key";
             continue;
         }
-        
+
         auto key_ptr = &keys[sh->key_index][0];
         auto iv_ptr = &keys[sh->iv_index][0];
-        
+
         std::cout << "decoding section\n"
-            << ssnprintf("  offset  %08X\n", sh->data_offset)
-            << ssnprintf("  size    %08X\n", sh->data_size)
-            << ssnprintf("  key     %s\n", print_hex(key_ptr, 16))
-            << ssnprintf("  iv      %s\n", print_hex(iv_ptr, 16));
-        
+            << sformat("  offset  {:08X}\n", sh->data_offset)
+            << sformat("  size    {:08X}\n", sh->data_size)
+            << sformat("  key     {}\n", print_hex(key_ptr, 16))
+            << sformat("  iv      {}\n", print_hex(iv_ptr, 16));
+
         auto data = reinterpret_cast<uint8_t*>(sce_header) + sh->data_offset;
-        
+
         int outl;
         auto ctx = EVP_CIPHER_CTX_new();
         std::vector<uint8_t> tmp(sh->data_size + 15);
@@ -460,19 +460,19 @@ unsigned inflate(uint8_t* in, unsigned in_len, uint8_t* out, unsigned out_len) {
     strm.opaque = Z_NULL;
     strm.avail_in = in_len;
     strm.next_in = in;
-    
+
     if (inflateInit(&strm) != Z_OK)
         throw std::runtime_error("zlib init failed");
-    
+
     strm.avail_out = out_len;
     strm.next_out = out;
-    
+
     auto err = inflate(&strm, Z_FINISH);
     if (err != Z_STREAM_END)
         throw std::runtime_error("inflate failed: ");
-    
+
     inflateEnd(&strm);
-    
+
     return strm.total_out;
 }
 
@@ -487,47 +487,47 @@ bool write_elf(std::string elf_path,
         std::cout << "can't open elf file for writing";
         return false;
     }
-    
+
     auto keys = reinterpret_cast<std::array<uint8_t, 16>*>(
         metadata_section_headers + metadata_header->section_count);
     auto phs = reinterpret_cast<Elf64_be_Phdr*>(&file_buf[0] + self_header->program_header_offset);
-    
+
     for (auto i = 0u; i < metadata_header->section_count; ++i) {
         auto msh = metadata_section_headers + i;
         if (msh->type != METADATA_SECTION_TYPE_PHDR)
             continue;
-        
+
         auto ph = phs + msh->index;
         auto dest = ph->p_offset;
         auto src = msh->data_offset;
-        
+
         char* src_ptr = &file_buf[0] + src;
         auto src_size = msh->data_size;
-        
+
         unsigned mdlen;
-        auto md = HMAC(EVP_sha1(), &keys[msh->sha1_index + 2], 0x40, 
+        auto md = HMAC(EVP_sha1(), &keys[msh->sha1_index + 2], 0x40,
                        (uint8_t*)src_ptr, src_size, NULL, &mdlen);
         if (memcmp(md, &keys[msh->sha1_index], mdlen)) {
             throw std::runtime_error("section sha1 mismatch");
         }
-        
+
         std::vector<uint8_t> vec(std::max(ph->p_filesz, msh->data_size));
         if (msh->compressed == METADATA_SECTION_COMPRESSED) {
             std::cout << "inflating\n";
-            src_size = inflate(reinterpret_cast<uint8_t*>(src_ptr), 
+            src_size = inflate(reinterpret_cast<uint8_t*>(src_ptr),
                                msh->data_size, &vec[0], vec.size());
             src_ptr = reinterpret_cast<char*>(&vec[0]);
         }
-        
+
         std::cout << "writing self section to elf\n"
-            << ssnprintf("  self source  %08X\n", src)
-            << ssnprintf("  elf dest     %08X\n", dest)
-            << ssnprintf("  size         %08X\n", src_size);
-            
+            << sformat("  self source  {:08X}\n", src)
+            << sformat("  elf dest     {:08X}\n", dest)
+            << sformat("  size         {:08X}\n", src_size);
+
         elf_file.seekp((uint32_t)dest);
         elf_file.write(src_ptr, src_size);
     }
-    
+
     auto elf_header = reinterpret_cast<Elf64_be_Ehdr*>(&file_buf[0] + self_header->elf_offset);
     auto shs = &file_buf[0] + self_header->section_header_offset;
     elf_file.seekp(0);
@@ -536,13 +536,13 @@ bool write_elf(std::string elf_path,
     elf_file.write((char*)phs, sizeof(Elf64_be_Phdr) * elf_header->e_phnum);
     elf_file.seekp((uint32_t)elf_header->e_shoff);
     elf_file.write(shs, sizeof(Elf64_be_Shdr) * elf_header->e_shnum);
-    
+
     return true;
 }
 
 void HandleUnsce(UnsceCommand const& command) {
     auto keys = read_keys(command.data);
-    
+
     std::ifstream f(command.sce);
     if (!f.is_open()) {
         throw std::runtime_error("can't read input file");
@@ -552,7 +552,7 @@ void HandleUnsce(UnsceCommand const& command) {
     std::vector<char> file_buf(file_size);
     f.seekg(0, std::ios_base::beg);
     f.read(file_buf.data(), file_buf.size());
-    
+
     auto sce_header = reinterpret_cast<sce_header_t*>(&file_buf[0]);
     auto self_header = reinterpret_cast<self_header_t*>(sce_header + 1);
     auto app_info = reinterpret_cast<app_info_t*>(&file_buf[0] + self_header->appinfo_offset);
@@ -560,7 +560,7 @@ void HandleUnsce(UnsceCommand const& command) {
         &file_buf[0] + sizeof(sce_header_t) + sce_header->metadata_offset);
     auto metadata_header = reinterpret_cast<metadata_header_t*>(metadata_info + 1);
     auto metadata_section_headers = reinterpret_cast<metadata_section_header_t*>(metadata_header + 1);
-    
+
     std::vector<control_info_t*> control_infos;
     auto ptr = &file_buf[0] + self_header->control_info_offset;
     for (;;) {
@@ -570,31 +570,31 @@ void HandleUnsce(UnsceCommand const& command) {
         if (!control_info->next)
             break;
     }
-    
+
     if (std::string("SCE") != sce_header->magic) {
         throw std::runtime_error("not an sce file");
     }
-    
+
     std::cout << "sce header\n"
-        << ssnprintf("  magic:            %s\n", sce_header->magic)
-        << ssnprintf("  version:          %-x\n", sce_header->version)
-        << ssnprintf("  revision:         %-x\n", sce_header->revision)
-        << ssnprintf("  type:             %-x\n", sce_header->type)
-        << ssnprintf("  metadata_offset:  %-x\n", sce_header->metadata_offset)
-        << ssnprintf("  header_size:      %-lx\n", sce_header->header_size)
-        << ssnprintf("  data_size:        %-lx\n", sce_header->data_size);
-    
+        << sformat("  magic:            {}\n", sce_header->magic)
+        << sformat("  version:          {:<x}\n", sce_header->version)
+        << sformat("  revision:         {:<x}\n", sce_header->revision)
+        << sformat("  type:             {:<x}\n", sce_header->type)
+        << sformat("  metadata_offset:  {:<x}\n", sce_header->metadata_offset)
+        << sformat("  header_size:      {:<x}\n", sce_header->header_size)
+        << sformat("  data_size:        {:<x}\n", sce_header->data_size);
+
     std::cout << "self header\n"
-        << ssnprintf("  header_type:            %-lx\n", self_header->header_type)
-        << ssnprintf("  appinfo_offset:         %-lx\n", self_header->appinfo_offset)
-        << ssnprintf("  elf_offset:             %-lx\n", self_header->elf_offset)
-        << ssnprintf("  program_header_offset:  %-lx\n", self_header->program_header_offset)
-        << ssnprintf("  section_header_offset:  %-lx\n", self_header->section_header_offset)
-        << ssnprintf("  section_info_offset:    %-lx\n", self_header->section_info_offset)
-        << ssnprintf("  sce_version_offset:     %-lx\n", self_header->sce_version_offset)
-        << ssnprintf("  control_info_offset:    %-lx\n", self_header->control_info_offset)
-        << ssnprintf("  control_info_length:    %-lx\n", self_header->control_info_length);
-        
+        << sformat("  header_type:            {:<x}\n", self_header->header_type)
+        << sformat("  appinfo_offset:         {:<x}\n", self_header->appinfo_offset)
+        << sformat("  elf_offset:             {:<x}\n", self_header->elf_offset)
+        << sformat("  program_header_offset:  {:<x}\n", self_header->program_header_offset)
+        << sformat("  section_header_offset:  {:<x}\n", self_header->section_header_offset)
+        << sformat("  section_info_offset:    {:<x}\n", self_header->section_info_offset)
+        << sformat("  sce_version_offset:     {:<x}\n", self_header->sce_version_offset)
+        << sformat("  control_info_offset:    {:<x}\n", self_header->control_info_offset)
+        << sformat("  control_info_length:    {:<x}\n", self_header->control_info_length);
+
     if (!decrypt_metadata(keys,
                           app_info,
                           sce_header,
@@ -603,12 +603,12 @@ void HandleUnsce(UnsceCommand const& command) {
                           metadata_section_headers,
                           control_infos))
         throw std::runtime_error("can't decrypt metadata");
-        
+
     if (!decrypt_sections(sce_header,
                           metadata_header,
                           metadata_section_headers))
         throw std::runtime_error("can't decrypt sections");
-    
+
     if (!write_elf(command.elf, file_buf, sce_header, self_header,
                    metadata_header, metadata_section_headers))
         throw std::runtime_error("can't write elf");

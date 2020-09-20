@@ -42,8 +42,8 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         auto len = fragment_dasm_instr(&bytecode[0] + pos, fi);
         for (auto& st : MakeStatement(context, fi, constIndex)) {
             auto [r, h] = GetLastRegisterNum(st);
-            lastRReg = std::max(lastRReg, r); 
-            lastHReg = std::max(lastHReg, h); 
+            lastRReg = std::max(lastRReg, r);
+            lastHReg = std::max(lastHReg, h);
             st->address(pos);
             sts.emplace_back(std::move(st));
         }
@@ -53,18 +53,18 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         if (fi.is_last)
             break;
     }
-    
+
     sts = RewriteIfStubs(context, sts);
-    
+
     std::string res;
     auto line = [&](std::string s) { res += s + "\n"; };
     line("#version 450 core");
     line("layout (location = 0) out vec4 color[4];");
-    line(ssnprintf("%sin vec4 f_COL0;", isFlatColorShading ? "flat " : ""));
+    line(sformat("{}in vec4 f_COL0;", isFlatColorShading ? "flat " : ""));
     if (constIndex) {
-        line(ssnprintf("layout(std140, binding = %d) uniform FragmentConstants {",
+        line(sformat("layout(std140, binding = {}) uniform FragmentConstants {{",
                     FragmentShaderConstantBinding));
-        line(ssnprintf("    vec4 c[%d];", constIndex));
+        line(sformat("    vec4 c[{}];", constIndex));
         line("} fconst;");
     }
     line("in vec4 f_COL1;");
@@ -80,7 +80,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("in vec4 f_TEX8_varying;");
     line("in vec4 f_TEX9_varying;");
     line("in vec4 f_SSA;");
-    line(ssnprintf("layout (std140, binding = %d) uniform FragmentSamplersInfo {",
+    line(sformat("layout (std140, binding = {}) uniform FragmentSamplersInfo {{",
                    FragmentShaderSamplesInfoBinding));
     line("    ivec4 flip[4];");
     line("    vec4 xOffset[4];");
@@ -94,20 +94,20 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
         if (samplerSizes[i] == 0)
             continue;
         if (samplerSizes[i] == 6) {
-            line(ssnprintf("layout (binding = %d) uniform samplerCube s%d;",
+            line(sformat("layout (binding = {}) uniform samplerCube s{};",
                         i + FragmentTextureUnit, i));
-            line(ssnprintf("vec4 tex%d(vec4 uvp) { return texture(s%d, uvp.xyz); }", i, i));
+            line(sformat("vec4 tex{}(vec4 uvp) {{ return texture(s{}, uvp.xyz); }}", i, i));
         } else {
-            line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
+            line(sformat("layout (binding = {}) uniform sampler{}D s{};",
                         i + FragmentTextureUnit, samplerSizes[i], i));
-            line(ssnprintf("vec4 tex%d(vec4 uvp) {", i));
-            line(ssnprintf("    float xScale = fragmentSamplersInfo.xScale%s;", flipIndex(i)));
-            line(ssnprintf("    float yScale = fragmentSamplersInfo.yScale%s;", flipIndex(i)));
-            line(ssnprintf("    int isFlip = fragmentSamplersInfo.flip%s;", flipIndex(i)));
-            line(ssnprintf("    uvp = isFlip == 0 ? uvp : vec4(xScale * uvp.x, 1 - yScale * uvp.y, uvp.zw);"));
-            line(ssnprintf("    return texture(s%d, uvp.xy);", i));
+            line(sformat("vec4 tex{}(vec4 uvp) {{", i));
+            line(sformat("    float xScale = fragmentSamplersInfo.xScale{};", flipIndex(i)));
+            line(sformat("    float yScale = fragmentSamplersInfo.yScale{};", flipIndex(i)));
+            line(sformat("    int isFlip = fragmentSamplersInfo.flip{};", flipIndex(i)));
+            line(sformat("    uvp = isFlip == 0 ? uvp : vec4(xScale * uvp.x, 1 - yScale * uvp.y, uvp.zw);"));
+            line(sformat("    return texture(s{}, uvp.xy);", i));
             line("}");
-            line(ssnprintf("vec4 tex%dProj(vec4 uvp) { return textureProj(s%d, uvp.xyzw); }", i, i));
+            line(sformat("vec4 tex{}Proj(vec4 uvp) {{ return textureProj(s{}, uvp.xyzw); }}", i, i));
         }
     }
     line("void main(void) {");
@@ -128,23 +128,23 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     line("    vec4 f_TEX9 = (t0[0] && t2[2]) ? vec4(gl_PointCoord, 0, 0) : f_TEX9_varying;");
     line("    vec4 f_WPOS = gl_FragCoord;");
     line("    vec4 c[2];");
-    line(ssnprintf("    vec4 r[%d];", lastRReg + 1));
-    line(ssnprintf("    vec4 h[%d];", lastHReg + 1));
+    line(sformat("    vec4 r[{}];", lastRReg + 1));
+    line(sformat("    vec4 h[{}];", lastHReg + 1));
     for (auto i = 0; i < lastRReg + 1; ++i) {
-        line(ssnprintf("    r[%d] = vec4(0, 0, 0, 0);", i));
+        line(sformat("    r[{}] = vec4(0, 0, 0, 0);", i));
     }
     for (auto i = 0; i < lastHReg + 1; ++i) {
-        line(ssnprintf("    h[%d] = vec4(0, 0, 0, 0);", i));
+        line(sformat("    h[{}] = vec4(0, 0, 0, 0);", i));
     }
     for (auto& st : sts) {
         auto str = PrintStatement(st);
         line(str);
     }
-        
+
     if (isMrt) {
         int regs[] = { 0, 2, 3, 4 };
         for (int i = 0; i < 4 && regs[i] <= lastRReg; ++i) {
-            line(ssnprintf("    color[%d] = r[%d];", i, regs[i]));
+            line(sformat("    color[{}] = r[{}];", i, regs[i]));
         }
     } else {
         line("    color[0] = outputFromH ? h[0] : r[0];");
@@ -154,7 +154,7 @@ std::string GenerateFragmentShader(std::vector<uint8_t> const& bytecode,
     return res;
 }
 
-std::string GenerateVertexShader(const uint8_t* bytecode, 
+std::string GenerateVertexShader(const uint8_t* bytecode,
                                  std::array<VertexShaderInputFormat, 16> const& inputs,
                                  std::array<int, 4> const& samplerSizes,
                                  unsigned loadOffset,
@@ -170,11 +170,11 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("#version 450 core");
     line("#extension GL_NV_shader_buffer_load : require");
     line("#extension GL_ARB_gpu_shader_int64 : enable");
-    line(ssnprintf("layout(std140, binding = %d) uniform VertexConstants {", 
+    line(sformat("layout(std140, binding = {}) uniform VertexConstants {{",
                    VertexShaderConstantBinding));
-    line(ssnprintf("    vec4 c[%d];", VertexShaderConstantCount));
+    line(sformat("    vec4 c[{}];", VertexShaderConstantCount));
     line("} constants;");
-    line(ssnprintf("layout (std140, binding = %d) uniform SamplersInfo {",
+    line(sformat("layout (std140, binding = {}) uniform SamplersInfo {{",
                    VertexShaderSamplesInfoBinding));
     line("    ivec4 wrapMode[4];");
     line("    vec4 borderColor[4];");
@@ -280,19 +280,19 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         "    }\n"
         "    return samplersInfo.inputBufferBases[i] + samplersInfo.inputBufferStrides[i] * index;\n"
         "}");
-    
-    line(ssnprintf("layout (std140, binding = %d) uniform ViewportInfo {",
+
+    line(sformat("layout (std140, binding = {}) uniform ViewportInfo {{",
                    VertexShaderViewportMatrixBinding));
     line("    mat4 glInverseGcm;");
     line("} viewportInfo;");
 
     for (auto i = 0u; i < samplerSizes.size(); ++i) {
-        line(ssnprintf("layout (binding = %d) uniform sampler%dD s%d;",
+        line(sformat("layout (binding = {}) uniform sampler{}D s{};",
                        i + VertexTextureUnit, samplerSizes[i], i));
     }
-    
+
     if (feedback) {
-        line(ssnprintf("layout(xfb_buffer = %d) out gl_PerVertex {", TransformFeedbackBufferBinding));
+        line(sformat("layout(xfb_buffer = {}) out gl_PerVertex {{", TransformFeedbackBufferBinding));
         line("    layout(xfb_offset = 0) vec4 gl_Position;");
     } else {
         line("out gl_PerVertex {");
@@ -361,29 +361,29 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    return i;");
     line("}");
     auto txl = [&](int size, int s) {
-        line(ssnprintf("vec4 txl%d(vec4 uv) {", s, size));
-        line(ssnprintf("    ivec%d size = textureSize(s%d, 0);", size, s));
-        line(ssnprintf("    ivec4 type = samplersInfo.wrapMode[%d];", s));
-        line(ssnprintf("    ivec4 iuv = ivec4("));
+        line(sformat("vec4 txl{}(vec4 uv) {{", s, size));
+        line(sformat("    ivec{} size = textureSize(s{}, 0);", size, s));
+        line(sformat("    ivec4 type = samplersInfo.wrapMode[{}];", s));
+        line(sformat("    ivec4 iuv = ivec4("));
         for (int i = 0; i < size; ++i) {
             if (i != 0)
                 line(",");
             auto c = i == 0 ? "x" : i == 1 ? "y" : "z";
-            line(ssnprintf("        wrap(uv.%s, type[%d], size.%s)", c, i, c));
+            line(sformat("        wrap(uv.{}, type[{}], size.{})", c, i, c));
         }
         for (int i = 0; i < 4 - size; ++i) {
             line("        , 0");
         }
         line(");");
         auto sw = size == 1 ? "x" : size == 2 ? "xy" : "xyz";
-        line(ssnprintf("    vec4 texel = texture(s%d, (iuv.%s + 0.5) / size, uv.w);", s, sw));
-        line(ssnprintf("    if (iuv.x == -1 || iuv.y == -1 || iuv.z == -1)"));
-        line(ssnprintf("        texel = samplersInfo.borderColor[%d].abgr;", s));
-        line(ssnprintf("    return texel;"));
-        line(ssnprintf("};"));
+        line(sformat("    vec4 texel = texture(s{}, (iuv.{} + 0.5) / size, uv.w);", s, sw));
+        line(sformat("    if (iuv.x == -1 || iuv.y == -1 || iuv.z == -1)"));
+        line(sformat("        texel = samplersInfo.borderColor[{}].abgr;", s));
+        line(sformat("    return texel;"));
+        line("};");
     };
     for (auto i = 0u; i < std::min(size_t(2), samplerSizes.size()); ++i) {
-        txl(samplerSizes[i], i);   
+        txl(samplerSizes[i], i);
     }
     line("void main(void) {");
     line("    vec4 v_in[16];");
@@ -397,18 +397,18 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    vec4 void_var;");
     line("    int nip;");
     for (int i = 0; i < 32; ++i) {
-        line(ssnprintf("    r[%d] = vec4(0,0,0,1);", i));
+        line(sformat("    r[{}] = vec4(0,0,0,1);", i));
     }
     for (int i = 0; i < 16; ++i) {
-        line(ssnprintf("    v_out[%d] = vec4(0,0,0,1);", i));
+        line(sformat("    v_out[{}] = vec4(0,0,0,1);", i));
     }
     for (size_t i = 0; i < inputs.size(); ++i) {
         auto type = to_string(inputs[i].type);
         auto rank = inputs[i].type == VertexInputType::x11y11z10n ? 4 : inputs[i].rank;
-        line(ssnprintf(
-                "if (samplersInfo.enabledInputs[%d] == 1) {\n"
-                "    v_in[%d] = read_%svec(%d, %d, get_input_offset(%d));\n"
-                "} else { v_in[%d] = samplersInfo.disabledInputValues[%d]; }",
+        line(sformat(
+                "if (samplersInfo.enabledInputs[{}] == 1) {{\n"
+                "    v_in[{}] = read_{}vec({}, {}, get_input_offset({}));\n"
+                "}} else {{ v_in[{}] = samplersInfo.disabledInputValues[{}]; }}",
                 i, i, type, rank, i, i, i, i));
     }
     std::vector<Statement*> sts;
@@ -416,7 +416,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     bool isLast = false;
     int num = 0;
     UsedConstsVisitor usedConstsVisitor;
-    
+
     ASTContext context;
     while (!isLast) {
         int count = vertex_dasm_instr(bytecode, instr);
@@ -432,14 +432,14 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
         num++;
         bytecode += 16;
     }
-    
+
     if (usedConsts) {
         auto const& consts = usedConstsVisitor.consts();
         std::copy(begin(consts), end(consts), std::back_inserter(*usedConsts));
     }
-    
+
     sts = RewriteBranches(context, sts);
-    
+
     for (auto& st : sts) {
         line(PrintStatement(st));
     }
@@ -460,7 +460,7 @@ std::string GenerateVertexShader(const uint8_t* bytecode,
     line("    f_TEX9 = v_out[6];");
     line("    gl_PointSize = v_out[6].x;");
     line("}");
-    
+
     return res;
 }
 
@@ -496,7 +496,7 @@ std::string PrintFragmentProgram(const uint8_t* instr) {
         if (elses[pos]) {
             res += "         ELSE\n";
         }
-        res += ssnprintf("%03d|%03x: %s\n", pos / 16, pos / 16, line);
+        res += sformat("{:03}|{:03x}: {}\n", pos / 16, pos / 16, line);
         if (fi.opcode.instr == fragment_op_t::IFE) {
             elses[fi.elseLabel * 16]++;
             endifs[fi.endifLabel * 16]++;
@@ -508,10 +508,10 @@ std::string PrintFragmentProgram(const uint8_t* instr) {
 }
 
 std::string PrintMask(int mask) {
-    return ssnprintf("%d%d%d%d", 
-                     (mask & 8) != 0, 
-                     (mask & 4) != 0, 
-                     (mask & 2) != 0, 
+    return sformat("{}{}{}{}",
+                     (mask & 8) != 0,
+                     (mask & 4) != 0,
+                     (mask & 2) != 0,
                      (mask & 1) != 0);
 }
 
@@ -526,44 +526,44 @@ std::string PrintVertexProgram(const uint8_t* instr, bool verbose) {
         for (int n = 0; n < count; ++n) {
             auto& vi = vis[n];
             if (n == 0) {
-                res += ssnprintf("%03d: %s\n", num, vertex_dasm(vi));
+                res += sformat("{:03}: {}\n", num, vertex_dasm(vi));
             } else {
-                res += ssnprintf("     %s\n", vertex_dasm(vi));
+                res += sformat("     {}\n", vertex_dasm(vi));
             }
             if (verbose) {
                 res += "{\n";
-                res += ssnprintf("    is_last: %d\n", decoded.is_last);
-                res += ssnprintf("    is_complex_offset: %d\n", decoded.is_complex_offset);
-                res += ssnprintf("    output_reg_num: %d\n", decoded.output_reg_num);
-                res += ssnprintf("    dest_reg_num: %d\n", decoded.dest_reg_num);
-                res += ssnprintf("    addr_data_reg_num: %d\n", decoded.addr_data_reg_num);
-                res += ssnprintf("    mask1: %s\n", PrintMask(decoded.mask1));
-                res += ssnprintf("    mask2: %s\n", PrintMask(decoded.mask2));
-                res += ssnprintf("    v_displ: %x\n", decoded.v_displ);
-                res += ssnprintf("    input_v_num: %d\n", decoded.input_v_num);
-                res += ssnprintf("    opcode1: %d\n", decoded.opcode1);
-                res += ssnprintf("    opcode2: %d\n", decoded.opcode2);
-                res += ssnprintf("    disp_component: %x\n", decoded.disp_component);
-                res += ssnprintf("    cond_swizzle: %s\n", print_swizzle(decoded.cond_swizzle, false));
-                res += ssnprintf("    cond_relation: %s\n", print_cond(decoded.cond_relation));
-                res += ssnprintf("    flag2: %d\n", decoded.flag2);
-                res += ssnprintf("    has_cond: %d\n", decoded.has_cond);
-                res += ssnprintf("    is_addr_reg: %d\n", decoded.is_addr_reg);
-                res += ssnprintf("    is_cond_c1: %d\n", decoded.is_cond_c1);
-                res += ssnprintf("    is_sat: %d\n", decoded.is_sat);
-                res += ssnprintf("    v_index_has_displ: %d\n", decoded.v_index_has_displ);
-                res += ssnprintf("    output_has_complex_offset: %d\n", decoded.output_has_complex_offset);
-                res += ssnprintf("    sets_c: %d\n", decoded.sets_c);
-                res += ssnprintf("    mask_selector: %d\n", decoded.mask_selector);
-                res += ssnprintf("    label: %d\n\n", decoded.label);
+                res += sformat("    is_last: {}\n", decoded.is_last);
+                res += sformat("    is_complex_offset: {}\n", decoded.is_complex_offset);
+                res += sformat("    output_reg_num: {}\n", decoded.output_reg_num);
+                res += sformat("    dest_reg_num: {}\n", decoded.dest_reg_num);
+                res += sformat("    addr_data_reg_num: {}\n", decoded.addr_data_reg_num);
+                res += sformat("    mask1: {}\n", PrintMask(decoded.mask1));
+                res += sformat("    mask2: {}\n", PrintMask(decoded.mask2));
+                res += sformat("    v_displ: {:x}\n", decoded.v_displ);
+                res += sformat("    input_v_num: {}\n", decoded.input_v_num);
+                res += sformat("    opcode1: {}\n", decoded.opcode1);
+                res += sformat("    opcode2: {}\n", decoded.opcode2);
+                res += sformat("    disp_component: {:x}\n", decoded.disp_component);
+                res += sformat("    cond_swizzle: {}\n", print_swizzle(decoded.cond_swizzle, false));
+                res += sformat("    cond_relation: {}\n", print_cond(decoded.cond_relation));
+                res += sformat("    flag2: {}\n", decoded.flag2);
+                res += sformat("    has_cond: {}\n", decoded.has_cond);
+                res += sformat("    is_addr_reg: {}\n", decoded.is_addr_reg);
+                res += sformat("    is_cond_c1: {}\n", decoded.is_cond_c1);
+                res += sformat("    is_sat: {}\n", decoded.is_sat);
+                res += sformat("    v_index_has_displ: {}\n", decoded.v_index_has_displ);
+                res += sformat("    output_has_complex_offset: {}\n", decoded.output_has_complex_offset);
+                res += sformat("    sets_c: {}\n", decoded.sets_c);
+                res += sformat("    mask_selector: {}\n", decoded.mask_selector);
+                res += sformat("    label: {}\n\n", decoded.label);
                 for (int i = 0; i < 3; ++i) {
                     auto& arg = decoded.args[i];
-                    res += ssnprintf("arg %d\n", i);
-                    res += ssnprintf("    is_neg: %d\n", arg.is_neg);
-                    res += ssnprintf("    is_abs: %d\n", arg.is_abs);
-                    res += ssnprintf("    reg_num: %d\n", arg.reg_num);
-                    res += ssnprintf("    reg_type: %d\n", arg.reg_type);
-                    res += ssnprintf("    swizzle: %s\n", print_swizzle(arg.swizzle, false));
+                    res += sformat("arg {}\n", i);
+                    res += sformat("    is_neg: {}\n", arg.is_neg);
+                    res += sformat("    is_abs: {}\n", arg.is_abs);
+                    res += sformat("    reg_num: {}\n", arg.reg_num);
+                    res += sformat("    reg_type: {}\n", arg.reg_type);
+                    res += sformat("    swizzle: {}\n", print_swizzle(arg.swizzle, false));
                 }
                 res += "}\n\n";
             }
@@ -582,9 +582,9 @@ std::string PrintFragmentBytecode(const uint8_t* bytecode) {
     do {
         auto len = fragment_dasm_instr(&bytecode[pos], fi);
         auto hex = print_hex(&bytecode[pos], len, true);
-        res += ssnprintf("%03d: %s\n", pos / 16, hex);
+        res += sformat("{:03}: {}\n", pos / 16, hex);
         pos += len;
-        
+
     } while(!fi.is_last);
     return res;
 }
@@ -598,7 +598,7 @@ std::string PrintVertexBytecode(const uint8_t* bytecode) {
         int count = vertex_dasm_instr(bytecode, instr);
         for (int n = 0; n < count; ++n) {
             auto hex = print_hex(bytecode, 16, true);
-            res += ssnprintf("%03d: %s\n", (bytecode - initial) / 16, hex);
+            res += sformat("{:03}: {}\n", (bytecode - initial) / 16, hex);
             isLast |= instr[n].is_last;
         }
         bytecode += 16;
