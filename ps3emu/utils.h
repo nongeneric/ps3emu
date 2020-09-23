@@ -7,6 +7,7 @@
 #include <boost/endian/arithmetic.hpp>
 #include <inttypes.h>
 #include <string>
+#include <chrono>
 
 template <typename... Args>
 std::string sformat(const char* f, Args... args) {
@@ -38,6 +39,7 @@ inline slow_uint128_t make128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3
     return i;
 }
 
+void nap(std::chrono::microseconds duration);
 void ums_sleep(uint64_t microseconds);
 std::string print_hex(const void* buf, int len, bool cArray = false);
 

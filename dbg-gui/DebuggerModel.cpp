@@ -595,21 +595,18 @@ void DebuggerModel::runHandler(RunCommand command) {
             cont = false;
             switchThread(ev->thread);
         } else if (auto ev = boost::get<PPUInvalidInstructionEvent>(&untyped)) {
-            emit message(QString("invalid instruction at %1")
-                             .arg(ev->thread->getNIP(), 8, 16, QChar('0')));
+            emit messagef("invalid instruction at {:08x}", ev->thread->getNIP());
             cont = false;
             switchThread(ev->thread);
         } else if (auto ev = boost::get<MemoryAccessErrorEvent>(&untyped)) {
-            emit message(QString("memory access error at %1")
-                             .arg(ev->thread->getNIP(), 8, 16, QChar('0')));
+            emit messagef("memory access error at {:08x}", ev->thread->getNIP());
             cont = false;
             switchThread(ev->thread);
         } else if (boost::get<ProcessFinishedEvent>(&untyped)) {
             emit message("process finished");
             cont = false;
         } else if (auto ev = boost::get<PPUThreadStartedEvent>(&untyped)) {
-            emit message(QString::fromStdString(sformat("ppu thread started {:x}",
-                                                          ev->thread->getNIP())));
+            emit messagef("ppu thread started {:x}", ev->thread->getNIP());
             if (g_config.config().StopAtNewPpuThread) {
                 cont = false;
                 switchThread(ev->thread);
@@ -630,7 +627,7 @@ void DebuggerModel::runHandler(RunCommand command) {
                 return s.va == ev->imageBase;
             });
             assert(it != end(segments));
-            emit messagef("module loaded: %s", it->elf->shortName());
+            emit messagef("module loaded: {}", it->elf->shortName());
             auto stopAlways = g_config.config().StopAtNewModule;
             auto expectedModule = _moduleToWait == it->elf->shortName();
             if (stopAlways || expectedModule) {
@@ -642,8 +639,7 @@ void DebuggerModel::runHandler(RunCommand command) {
                 }
             }
         } else if (auto ev = boost::get<SPUInvalidInstructionEvent>(&untyped)) {
-            emit message(QString("invalid spu instruction at %1")
-                             .arg(ev->thread->getNip(), 8, 16, QChar('0')));
+            emit messagef("invalid spu instruction at {:08x}", ev->thread->getNip());
             cont = false;
             switchThread(ev->thread);
         } else if (auto ev = boost::get<SPUBreakpointEvent>(&untyped)) {
@@ -743,11 +739,11 @@ void DebuggerModel::execSingleCommand(QString command) {
         return;
     } else if (name == "libfunc") {
         auto name = command.section(':', 1, 1).trimmed().toStdString();
-        messagef("%x", findLibFunc(name));
+        messagef("{:x}", findLibFunc(name));
         return;
     } else if (name == "waitmodule") {
         _moduleToWait = command.section(':', 1, 1).trimmed().toStdString();
-        messagef("waiting for module %s", _moduleToWait);
+        messagef("waiting for module {}", _moduleToWait);
         return;
     }
 
@@ -823,7 +819,7 @@ void DebuggerModel::execSingleCommand(QString command) {
             }
             auto path = "/tmp/dump.bin";
             write_all_bytes(&vec[0], vec.size(), path);
-            messagef("memory dump %x-%x saved to %s", start, end, path);
+            messagef("memory dump {:x}-{:x} saved to {}", start, end, path);
         } else if (name == "p") {
             emit message(QString(" : 0x%1").arg(exprVal, 0, 16));
             return;
@@ -848,10 +844,10 @@ void DebuggerModel::execSingleCommand(QString command) {
             changeThread(exprVal);
             return;
         } else if (name == "segment") {
-            messagef("%s", printSegment(exprVal));
+            messagef("{}", printSegment(exprVal));
         } else if (name == "info") {
             auto range = g_state.mm->addressRange(exprVal);
-            messagef("range: %x-%x, %s, %s",
+            messagef("range: {:x}-{:x}, {}, {}",
                      range.start,
                      range.start + range.len,
                      range.readonly ? "R" : "RW",
@@ -923,11 +919,11 @@ PPUThread* getThreadByTid(std::vector<PPUThread*>& threads, unsigned tid) {
 }
 
 void DebuggerModel::dumpMutexes(bool lw) {
-    emit messagef("%smutexes (id, name, type, owner)", lw ? "lw " : "");
+    emit messagef("{}mutexes (id, name, type, owner)", lw ? "lw " : "");
     auto threads = _proc->dbgPPUThreads();
     for (auto& pair : lw ? dbgDumpLwMutexes() : dbgDumpMutexes()) {
         auto owner = getThreadByTid(threads, pair.second->mutex.__data.__owner);
-        emit messagef("  %x, %s, %s, %s",
+        emit messagef("  {:x}, {}, {}, {}",
                       pair.first,
                       pair.second->name,
                       pair.second->typestr(),
@@ -936,7 +932,7 @@ void DebuggerModel::dumpMutexes(bool lw) {
 }
 
 void DebuggerModel::dumpGroups() {
-    messagef("%s", g_state.spuGroupManager->dbgDumpGroups());
+    messagef("{}", g_state.spuGroupManager->dbgDumpGroups());
 }
 
 void DebuggerModel::dumpThreads() {
@@ -958,7 +954,7 @@ void DebuggerModel::dumpThreads() {
         auto state = th->suspended() ? "SUSPENDED"
                    : th->dbgIsPaused() ? "PAUSED"
                    : "RUNNING";
-        emit messagef("%s[%03d]%s %08x %08x %08x  %08x  %s  %s",
+        emit messagef("{}[{:03}]{} {:08x} {:08x} {:08x}  {:08x}  {}  {}",
                       prefix,
                       i,
                       th == _activeSPUThread ? "*" : " ",
@@ -979,7 +975,7 @@ void DebuggerModel::dumpThreads() {
     std::set<uint32_t> printed;
     for (auto& group : getThreadGroups()) {
         i = 0u;
-        emit messagef("\nGroup (prio %d) %s", group->priority, group->name);
+        emit messagef("\nGroup (prio {}) {}", group->priority, group->name);
         for (auto& th : group->threads) {
             printSpuThread(i, th, "  ");
             printed.insert(th->getId());
@@ -1285,7 +1281,7 @@ void DebuggerModel::clearSPUSoftBreak(ps3_uintptr_t va) {
         SPUForm i{*ptr};
         if (i.OP11_u() == SPU_STOPD_OPCODE) {
             auto index = i.StopAndSignalType_u();
-            messagef("main elf spu breakpoint at %x (index %x)", va, index);
+            messagef("main elf spu breakpoint at {:x} (index {:x})", va, index);
             auto info = _mainElfSpuBreaks.try_get(index);
             if (!info) {
                 messagef("unknown breakpoint", va, index);
@@ -1295,7 +1291,7 @@ void DebuggerModel::clearSPUSoftBreak(ps3_uintptr_t va) {
             return;
         }
 
-        messagef("there is no spu breakpoint at %x", va);
+        messagef("there is no spu breakpoint at {:x}", va);
         _activeSPUThread->setNip(_activeSPUThread->getNip() + 4);
         return;
     }
@@ -1332,8 +1328,8 @@ std::vector<StackFrame> walkStack(uint64_t backChain) {
 
 void DebuggerModel::printBacktrace() {
     if (_activeThread) {
-        messagef("backtrace thread %s", _activeThread->getName());
-        auto print = [&](auto ip) { this->messagef("  %x\t %s", ip, printSegment(ip)); };
+        messagef("backtrace thread {}", _activeThread->getName());
+        auto print = [&](auto ip) { this->messagef("  {:x}\t {}", ip, printSegment(ip)); };
         print(_activeThread->getLR());
         for (auto frame : walkStack(_activeThread->getGPR(1))) {
             print(frame.lr);
@@ -1368,7 +1364,7 @@ void DebuggerModel::dumpExecutionMap() {
             db.insertEntry(newEntry);
         }
 
-        messagef("dumping %d entries into %s", entries.size(), s.elf->shortName());
+        messagef("dumping {} entries into {}", entries.size(), s.elf->shortName());
         isPrimary = false;
     }
 }
@@ -1381,7 +1377,7 @@ void DebuggerModel::dumpSpuExecutionMaps() {
         auto leads = map.dump(0, LocalStorageSize);
         std::copy(begin(leads), end(leads), std::back_inserter(entry.leads));
         db.insertEntry(entry);
-        messagef("adding %d new leads to %s",
+        messagef("adding {} new leads to {}",
                  leads.size(),
                  entry.elfPath);
     }

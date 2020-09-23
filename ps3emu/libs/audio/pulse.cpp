@@ -3,11 +3,13 @@
 #include "ps3emu/log.h"
 #include "ps3emu/Process.h"
 #include "ps3emu/Config.h"
+#include <chrono>
 #include <pthread.h>
 #include <sched.h>
 #include <assert.h>
+#include <boost/range/irange.hpp>
 
-using namespace boost::chrono;
+using namespace std::chrono;
 
 #define CELL_AUDIO_PORT_2CH 2
 #define CELL_AUDIO_PORT_8CH 8
@@ -169,7 +171,6 @@ void PulseBackend::playbackLoop() {
         }
 
         for (auto& [id, port] : _ports) {
-            (void)id;
             auto lock = boost::unique_lock(*port.mutex);
             if (!port.started)
                 continue;
@@ -187,10 +188,11 @@ void PulseBackend::playbackLoop() {
             sys_event_port_send(notifyPort, 0, 0, 0);
         }
 
+        nap(std::chrono::milliseconds(4));
+        dumpStats();
         bool shouldSpeedUp = false;
 
         for (auto& [id, port] : _ports) {
-            (void)id;
             auto lock = boost::unique_lock(*port.mutex);
             if (!port.started)
                 continue;
@@ -243,17 +245,41 @@ void PulseBackend::playbackLoop() {
             shouldSpeedUp |= sizeLeft > 2 * blockSize;
         }
 
-        auto wait = duration_cast<microseconds>(duration<unsigned, boost::ratio<256, 48000>>(1));
+        auto wait = duration_cast<microseconds>(duration<unsigned, std::ratio<256, 48000>>(1));
         auto elapsed = duration_cast<microseconds>(steady_clock::now() - past);
 
         if (elapsed < wait) {
             wait -= elapsed;
+            auto speedup = milliseconds(4);
             if (shouldSpeedUp) {
-                wait -= milliseconds(1);
+                if (wait > speedup) {
+                    wait -= speedup;
+                } else {
+                    wait = {};
+                }
             }
-            auto until = high_resolution_clock::now() + wait;
-            while (high_resolution_clock::now() < until) {
-            }
+            nap(wait);
         }
+    }
+}
+
+void PulseBackend::dumpStats() {
+    if (!log_should(log_detail, log_type_t::audio))
+        return;
+
+    for (auto& [id, port] : _ports) {
+        auto blockSize = calcBlockSize(port.basic.channels);
+        auto readIndex = _attributes->getReadIndex(id);
+        std::string stats = sformat("Port {} stats: ", id);
+        for (auto block : boost::irange(port.basic.blocks)) {
+            auto src = port.basic.ptr + block * blockSize;
+            auto rsrc = std::reverse_iterator(src + blockSize);
+            auto rsrcEnd = std::reverse_iterator(src);
+            auto rit = std::find_if(rsrc, rsrcEnd, [](auto ch) { return ch != 0; });
+            auto zeroes = std::distance(rsrc, rit);
+            auto capacity = (int)((1 - (float)zeroes / blockSize) * 100);
+            stats += sformat("{}{:3} ", block == readIndex ? "R" : " ", capacity);
+        }
+        DETAIL(audio) << stats;
     }
 }

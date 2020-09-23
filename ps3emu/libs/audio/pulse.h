@@ -39,6 +39,7 @@ class PulseBackend {
 
     void waitContext();
     void playbackLoop();
+    void dumpStats();
 
 public:
     PulseBackend(AudioAttributes* attributes);

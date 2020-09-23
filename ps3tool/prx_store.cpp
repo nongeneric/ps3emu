@@ -32,7 +32,7 @@ void mapPrxStore() {
             continue;
         prxPaths.push_back(it->path());
     }
-    
+
     std::sort(begin(prxPaths), end(prxPaths), [&](auto l, auto r) {
         auto known = {
             "liblv2.sprx.elf",
@@ -61,7 +61,7 @@ void mapPrxStore() {
             return false;
         return l < r;
     });
-    
+
     RewriterStore rewriterStore;
     auto imageBase = 38 << 20;
     for (auto& prxPath : prxPaths) {
@@ -79,16 +79,16 @@ void mapPrxStore() {
             info->name = name;
         }
         info->imageBase = imageBase;
-        
+
         ELFLoader elf;
         elf.load(prxPath.string());
         auto stolen = elf.map([&](auto va, auto size, auto) {
             imageBase = boost::alignment::align_up(va + size, 1 << 10);
         }, imageBase, {}, &rewriterStore, true);
-        
+
         info->size = imageBase - info->imageBase;
     }
-    
+
     g_state.config->save();
 }
 
@@ -105,15 +105,15 @@ std::string printEntriesString(std::vector<uint32_t> const& entries) {
 void rewritePrxStore() {
     path prxStorePath = g_state.config->prxStorePath;
     auto& prxInfos = g_state.config->sysPrxInfos;
-    
+
     NinjaScript rewriteScript;
     auto ps3tool = ps3toolPath();
-    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --elf $in --cpp $cpp --image-base $imagebase");
+    rewriteScript.rule("rewrite-ppu", ps3tool + " rewrite --no-fexcept --elf $in --cpp $cpp --image-base $imagebase");
     rewriteScript.rule("rewrite-spu", ps3tool + " rewrite --spu --elf $in --cpp $cpp --image-base $imagebase");
-    
+
     NinjaScript buildScript;
     buildScript.variable("trace", "");
-    
+
     auto external = prxStorePath / "sys" / "external";
     auto buildPath = external / g_buildName;
     create_directories(buildPath);
@@ -121,7 +121,7 @@ void rewritePrxStore() {
     for (auto& prxInfo : prxInfos) {
         auto prxPath = (external / prxInfo.name).string();
         assert(exists(prxPath));
-        
+
         std::tuple imagebaseVar("imagebase", sformat("{:x}", prxInfo.imageBase));
 
         if (prxInfo.loadx86) {
@@ -130,7 +130,7 @@ void rewritePrxStore() {
             rewriteScript.statement("rewrite-ppu", prxPath, out, {imagebaseVar, cppVar});
             buildScript.subninja(out);
         }
-        
+
         if (prxInfo.loadx86spu) {
             auto out = buildPath / (prxInfo.name + ".spu.ninja");
             std::tuple cppVar{"cpp", (buildPath / (prxInfo.name + ".spu")).string()};
@@ -141,7 +141,7 @@ void rewritePrxStore() {
 
     write_all_text(rewriteScript.dump(), (buildPath / "rewrite.ninja").string());
     write_all_text(buildScript.dump(), (buildPath / "build.ninja").string());
-    
+
     write_all_lines({
         "#!/bin/bash",
         "set -e",
@@ -161,11 +161,11 @@ void HandlePrxStore(PrxStoreCommand const& command) {
     auto heapAlloc = std::make_unique<HeapMemoryAlloc>();
     g_state.memalloc = internalAlloc.get();
     g_state.heapalloc = heapAlloc.get();
-    
+
     if (command.map) {
         mapPrxStore();
     }
-    
+
     if (command.rewrite) {
         rewritePrxStore();
     }

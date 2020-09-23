@@ -39,6 +39,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <unistd.h>
+#include <chrono>
 
 using namespace boost::algorithm;
 using namespace boost::chrono;
@@ -53,6 +54,36 @@ enum RsxHandlers {
     RSX_HANDLER_USER = 0b10000000,
 };
 
+class FpsLimiter {
+    using clock = std::chrono::steady_clock;
+
+    clock::time_point _start{};
+    clock::time_point _swap{};
+    clock::duration _target{};
+    clock::duration _swapDuration{};
+
+public:
+    FpsLimiter(int fps) {
+        _target = std::chrono::duration_cast<clock::duration>(std::chrono::duration<float>(1.f / fps));
+    }
+
+    void startFrame() {
+        _start = clock::now();
+        if (_swap != clock::time_point()) {
+            _swapDuration = _start - _swap;
+        }
+    }
+
+    void wait() {
+        auto elapsed = clock::now() - _start;
+        if (elapsed < _target - _swapDuration) {
+            auto us = std::chrono::duration_cast<std::chrono::microseconds>(_target - _swapDuration - elapsed);
+            nap(us);
+        }
+        _swap = clock::now();
+    }
+};
+
 Rsx::Rsx()
     : _transformFeedbackQuery(0),
       _idleCounter(boost::chrono::seconds(1)) {
@@ -64,6 +95,8 @@ Rsx::Rsx()
     _isFlipInProgress = (big_uint32_t*)g_state.mm->getMemoryPointer(flipStatusVa, 4);
     auto lastFlipTimeVa = 0x402010f8u;
     _lastFlipTime = (big_uint64_t*)g_state.mm->getMemoryPointer(lastFlipTimeVa, 4);
+
+    _fpsLimiter = std::make_unique<FpsLimiter>(g_state.config->fpsCap);
 }
 
 Rsx::~Rsx() {
@@ -669,7 +702,10 @@ void Rsx::DriverFlip(uint32_t value) {
     drawStats();
     _context->pipeline.bind();
 
+    _fpsLimiter->wait();
     _window.swapBuffers();
+
+    _fpsLimiter->startFrame();
 
     __itt_frame_end_v3(_profilerDomain, NULL);
     __itt_frame_begin_v3(_profilerDomain, NULL);

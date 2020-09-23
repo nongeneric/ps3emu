@@ -236,6 +236,7 @@ class GLBuffer;
 class FragmentShader;
 struct RsxTextureInfo;
 class GLPersistentCpuBuffer;
+class FpsLimiter;
 class Rsx {
     static RsxOperationMode _mode;
     uint32_t* _get = nullptr;
@@ -286,6 +287,7 @@ class Rsx {
     __itt_domain* _profilerDomain;
     sys_event_queue_t _callbackQueue;
     sys_event_port_t _callbackQueuePort;
+    std::unique_ptr<FpsLimiter> _fpsLimiter;
 
     // loop
     const uint32_t* _currentGet = nullptr;
@@ -295,7 +297,7 @@ class Rsx {
     uint32_t _drawArrayFirst = -1;
     uint32_t _drawIndexFirst = -1;
     uint32_t _drawCount = 0;
-    
+
     void watchTextureCache();
     void resetCacheWatch();
     void invalidateCaches(uint32_t va, uint32_t size);
@@ -317,7 +319,7 @@ class Rsx {
     GLTexture* addTextureToCache(uint32_t samplerId, bool isFragment);
     GLBuffer* getBufferFromCache(uint32_t va, uint32_t size, bool wordReversed);
     void updateScissor();
-    
+
     void ChannelSetContextDmaSemaphore(uint32_t handle);
     void ChannelSemaphoreOffset(uint32_t offset);
     void ChannelSemaphoreAcquire(uint32_t value);
@@ -406,8 +408,8 @@ class Rsx {
     void IndexArrayAddress1(uint32_t offset);
     void IndexArrayDma(uint8_t location, GcmDrawIndexArrayType type);
     void DrawIndexArray(uint32_t first, uint32_t count);
-    void VertexTextureOffset(unsigned index, 
-                             uint32_t offset, 
+    void VertexTextureOffset(unsigned index,
+                             uint32_t offset,
                              uint8_t mipmap,
                              GcmTextureFormat format,
                              GcmTextureLnUn lnUn,
@@ -463,11 +465,11 @@ class Rsx {
     void OffsetDestin(uint32_t offset);
     void ColorFormat_3(uint32_t format, uint16_t pitch, uint32_t offset);
     void ColorFormat_2(uint32_t format, uint16_t pitch);
-    void Point(uint16_t pointX, 
-               uint16_t pointY, 
-               uint16_t outSizeX, 
-               uint16_t outSizeY, 
-               uint16_t inSizeX, 
+    void Point(uint16_t pointX,
+               uint16_t pointY,
+               uint16_t outSizeX,
+               uint16_t outSizeY,
+               uint16_t inSizeX,
                uint16_t inSizeY);
     void Color(uint32_t ptr, uint32_t count);
     void ContextDmaImageDestin(uint32_t location);
@@ -519,7 +521,7 @@ class Rsx {
                      float inX,
                      float inY);
     void BlendEnable(bool enable);
-    void BlendFuncSFactor(GcmBlendFunc sfcolor, 
+    void BlendFuncSFactor(GcmBlendFunc sfcolor,
                           GcmBlendFunc sfalpha,
                           GcmBlendFunc dfcolor,
                           GcmBlendFunc dfalpha);
@@ -548,7 +550,7 @@ class Rsx {
     void PointSize(float size);
     void PointParamsEnable(bool enable);
     void PointSpriteControl(bool enable, uint16_t rmode, PointSpriteTex tex);
-    
+
     // loop
     void initMethodMap();
     uint32_t readarg(int n);
@@ -844,7 +846,7 @@ class Rsx {
     void invokeHandler(uint32_t num, uint32_t arg);
     void drawStats();
     void advanceBuffers();
-    
+
     // Replay-specific
     void UpdateBufferCache(MemoryLocation location, uint32_t offset, uint32_t size);
     inline void StopReplay() { }
@@ -853,7 +855,7 @@ class Rsx {
     void beginTransformFeedback();
     void endTransformFeedback();
     void updateDisplayBuffersForCapture();
-    
+
 public:
     Rsx();
     ~Rsx();

@@ -24,6 +24,7 @@ public:
     std::vector<SysPrxInfo> sysPrxInfos;
     bool captureAudio = false;
     bool fullscreen = false;
+    int fpsCap = 30;
 
     void save();
 };
