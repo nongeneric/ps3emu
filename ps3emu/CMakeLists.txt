@@ -71,6 +71,8 @@ set(SRC
     rsx/FragmentShaderCache.h
     rsx/FragmentShaderCache.cpp
     rsx/GcmConstants.h
+    rsx/TransferImageProgram.h
+    rsx/TransferImageProgram.cpp
     gcmviz/GcmDatabase.cpp
     execmap/ExecutionMap.cpp
     execmap/ExecutionMapCollection.cpp

@@ -16,9 +16,9 @@
 
 #define CELL_EISCONN (-26)
 
-namespace {    
+namespace {
     using IQueue = IConcurrentQueue<sys_event_t>;
-    
+
     struct queue_info {
         std::shared_ptr<IQueue> queue;
         std::string name;
@@ -26,7 +26,7 @@ namespace {
         uint64_t key;
         bool log = true;
     };
-    
+
     struct queue_port_t {
         uint64_t name;
         int32_t type;
@@ -163,7 +163,7 @@ int32_t sys_event_port_create(sys_event_port_t* eport_id, int32_t port_type, uin
     return CELL_OK;
 }
 
-int32_t sys_event_port_connect_local(sys_event_port_t event_port_id, 
+int32_t sys_event_port_connect_local(sys_event_port_t event_port_id,
                                      sys_event_queue_t event_queue_id)
 {
     INFO(sync) << sformat("sys_event_port_connect_local(port = {}, queue = {:x})",

@@ -19,8 +19,6 @@
 #include <stdio.h>
 #include <sys/prctl.h>
 
-log_type_t log_parse_type(std::string const& str);
-
 namespace {
 
 using Levels = std::array<log_level_t, enum_traits<log_type_t>::size()>;

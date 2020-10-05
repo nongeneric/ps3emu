@@ -133,7 +133,7 @@ CellFsErrno sys_fs_read(int32_t fd,
          *nread = bytesRead;
     }
     g_state.mm->writeMemory(buf, &localBuf[0], bytesRead);
-    INFO(fs) << sformat("sys_fs_read({:x}, {:x}, {}) : {}", fd, buf, nbytes, bytesRead);
+    INFO(fs) << sformat("sys_fs_read({}, {:x}, {}) : {}", fd, buf, nbytes, bytesRead);
     return CELL_FS_SUCCEEDED;
 }
 
@@ -220,11 +220,11 @@ CellFsErrno getDirectoryEntries(int32_t fd,
     auto info = dirMap.get(fd);
     auto entry = readdir(info->dir);
     if (entry) {
-        entries->entry_name.d_type = 
+        entries->entry_name.d_type =
             entry->d_type == DT_REG ? CELL_FS_TYPE_REGULAR : CELL_FS_TYPE_DIRECTORY;
         entries->entry_name.d_namlen = strlen(entry->d_name);
         strcpy(entries->entry_name.d_name, entry->d_name);
-        
+
         struct stat st;
         auto err = stat((info->path + "/" + std::string(entry->d_name)).c_str(), &st);
         if (err) {
@@ -238,7 +238,7 @@ CellFsErrno getDirectoryEntries(int32_t fd,
         } else if (entry->d_type != DT_REG) {
             entries->attribute.st_size = 0;
         }
-        
+
         *data_count = 1;
     } else {
         *data_count = 0;

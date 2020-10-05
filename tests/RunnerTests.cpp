@@ -619,7 +619,7 @@ TEST_CASE("gcm_transfer") {
     auto output = startWaitGetOutput({testPath("gcm_transfer/a.elf")});
     REQUIRE( output ==
         "success 100\n"
-        "success 100()\n"
+        "success 100(2)\n"
         "success 101\n"
         "success 200\n"
         "success 300\n"

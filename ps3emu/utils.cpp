@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <unistd.h>
+#include <algorithm>
 
 void nap(std::chrono::microseconds duration) {
     if (duration > std::chrono::milliseconds(50)) {
@@ -26,6 +27,18 @@ std::string print_hex(const void* buf, int len, bool cArray) {
     auto typed = reinterpret_cast<const uint8_t*>(buf);
     for (auto it = typed; it != typed + len; ++it) {
         res += sformat(cArray ? "0x{:02x}, " : "{:02X} ", *it);
+    }
+    return res;
+}
+
+std::string pretty_print_hex(const uint8_t* buffer, size_t size, size_t line) {
+    std::string res;
+    for (size_t i = 0; i < size; i += line) {
+        auto left = std::min(line, size - i);
+        for (size_t j = 0; j < left; ++j) {
+            res += sformat("{:02x} ", buffer[i + j]);
+        }
+        res += "\n";
     }
     return res;
 }

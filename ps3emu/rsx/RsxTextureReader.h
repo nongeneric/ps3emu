@@ -11,9 +11,9 @@ class RsxTextureReader {
     Shader _debugFillShader;
 #endif
     GLPersistentCpuBuffer _uniformBuffer;
-    
+
 public:
-    void init();
+    RsxTextureReader();
     void loadTexture(RsxTextureInfo const& info,
                      GLuint buffer,
                      std::vector<uint64_t> const& levelHandles);

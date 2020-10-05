@@ -145,14 +145,14 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     if (!glfwInit()) {
         throw std::runtime_error("glfw initialization failed");
     }
-    
+
     if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0) {
         ERROR(libs) << sformat("SDL initialization failed: {}", SDL_GetError());
         exit(1);
     }
 
     initAudio();
-    
+
     g_profiler_process_domain = __itt_domain_create("proc");
     _internalMemoryManager.reset(new InternalMemoryManager(EmuInternalArea,
                                                            EmuInternalAreaSize,
@@ -188,11 +188,11 @@ void Process::init(std::string elfPath, std::vector<std::string> args) {
     *_threadInitInfo = _elf->getThreadInitInfo();
     auto thread = _threads.back().get();
     thread->setId(g_ppuThreadBaseId, "main");
-    
+
     g_state.content = _contentManager.get();
     g_state.rsx = _rsx.get();
     g_state.elf = _elf.get();
-    
+
     initPrimaryThread(thread,
                       _threadInitInfo->entryPointDescriptorVa,
                       _threadInitInfo->primaryStackSize);
@@ -279,11 +279,11 @@ Event Process::run() {
     if (_firstRun) {
         _threads.back()->run();
     }
-    
+
     for (;;) {
         {
             boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
-            boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);   
+            boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
             if (_spuThreads.empty() && _processFinished) {
                 // there might be a dangling spu_printf thread or similar
                 bool dangling = false;
@@ -310,12 +310,12 @@ Event Process::run() {
             _threadIds.destroy(thread->getId());
             _threads.erase(it);
         };
-        
+
         dbgPause(false);
         auto threadEvent = _eventQueue.dequeue();
         dbgPause(true);
         threadEvent.promise->signal();
-        
+
         if (_firstRun) {
             _firstRun = false;
         }
@@ -326,17 +326,17 @@ Event Process::run() {
                 case PPUThreadEvent::ProcessFinished: {
                     dbgPause(false);
                     {
-                        boost::lock_guard<boost::recursive_mutex> __(_spuThreadMutex);
+                        boost::lock_guard lock(_spuThreadMutex);
                         for (auto& t : _spuThreads) {
                             if (t->tryJoin(500).cause == SPUThreadExitCause::StillRunning) {
-                                WARNING(spu) << sformat("a dangling SPU thread at ProcessFinished {}", t->getName());
-                                exit(0);
+                                WARNING(spu) << sformat("a dangling SPU thread at ProcessFinished {}, suspending..", t->getName());
+                                t->suspend();
                             }
                         }
                     }
                     _spuThreads.clear();
                     {
-                        boost::lock_guard<boost::recursive_mutex> _(_ppuThreadMutex);
+                        boost::lock_guard lock(_ppuThreadMutex);
                         removeThread(ev->thread);
                     }
                     if (_threads.size() > 1) {
@@ -441,17 +441,17 @@ void Process::initPrimaryThread(PPUThread* thread, ps3_uintptr_t entryDescriptor
     uint32_t newEntryDescrVa;
     auto newEntryDescr = g_state.memalloc->internalAlloc<4, fdescr>(&newEntryDescrVa);
     _mainMemory->readMemory(entryDescriptorVa, newEntryDescr, sizeof(fdescr));
-    
+
     uint32_t initPrxStubVa;
     g_state.memalloc->internalAlloc<4, InitPrxStub>(&initPrxStubVa);
     uint32_t index;
     auto entry = findNCallEntry(calcFnid("EmuInitLoadedPrxModules"), index);
     assert(entry); (void)entry;
     encodeNCall(g_state.mm, initPrxStubVa, index);
-    
+
     thread->setLR(newEntryDescr->va);
     newEntryDescr->va = initPrxStubVa;
-    
+
     initNewThread(thread, newEntryDescrVa, stackSize, 0x10);
 }
 
@@ -464,15 +464,15 @@ void Process::initNewThread(PPUThread* thread,
     assert(stack < StackArea + StackAreaSize);
     assert(stack > StackArea);
     thread->setStackInfo(stack, stackSize);
-    
+
     // PPU_ABI-Specifications_e
 
     fdescr entryDescr;
     _mainMemory->readMemory(entryDescriptorVa, &entryDescr, sizeof(fdescr));
-    
+
     thread->setGPR(1, stack + stackSize - 0xf0);
     thread->setGPR(2, entryDescr.tocBase);
-    
+
     // undocumented:
     thread->setGPR(5, stack);
     thread->setGPR(6, 0);
@@ -480,7 +480,7 @@ void Process::initNewThread(PPUThread* thread,
     thread->setGPR(9, _threadInitInfo->tlsFileSize); // TODO: fix
     thread->setGPR(10, _threadInitInfo->tlsMemSize);
     thread->setGPR(12, DefaultMainMemoryPageSize);
-    
+
     thread->setGPR(13, tls);
     thread->setFPSCR(0);
     thread->setNIP(entryDescr.va);
@@ -592,7 +592,7 @@ std::vector<ModuleSegment>& Process::getSegments() {
 
 void Process::unloadSegment(uint32_t va) {
     auto it = std::find_if(begin(_segments), end(_segments), [&](auto& s) {
-        return s.va == va;  
+        return s.va == va;
     });
     if (it == end(_segments))
         throw std::runtime_error("unloading non-existent segment");

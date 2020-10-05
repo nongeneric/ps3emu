@@ -2,6 +2,10 @@
 
 #include "ps3emu/utils/sqlitedb.h"
 
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+
 BOOST_HANA_ADAPT_STRUCT(GcmCommandArg, value, name, type);
 
 using namespace sql;
@@ -55,11 +59,25 @@ auto sqlCreate =
 GcmDatabase::GcmDatabase() = default;
 GcmDatabase::~GcmDatabase() = default;
 
+template <class Filter>
+std::vector<uint8_t> filterStream(const std::vector<uint8_t>& blob) {
+    if (blob.empty())
+        return blob;
+    boost::iostreams::filtering_streambuf<boost::iostreams::input> in;
+    in.push(Filter());
+    auto ptr = reinterpret_cast<const char*>(blob.data());
+    boost::iostreams::array_source source(ptr, ptr + blob.size());
+    in.push(source);
+    std::vector<uint8_t> filtered;
+    boost::iostreams::copy(in, std::back_inserter(filtered));
+    return filtered;
+}
+
 void GcmDatabase::createOrOpen(std::string path) {
     _db.reset(new SQLiteDB(path, sqlCreate));
 }
 
-void GcmDatabase::insertCommand(GcmCommand command) {
+void GcmDatabase::insertCommand(const GcmCommand& command) {
     auto sql = "INSERT INTO GcmCommands VALUES(?,?,?);";
     _db->Insert(sql, command.id, command.num, command.frame);
     auto i = 0;
@@ -70,7 +88,9 @@ void GcmDatabase::insertCommand(GcmCommand command) {
         i++;
     }
     auto blobSql = "INSERT INTO Blobs VALUES(?,?,?);";
-    _db->Insert(blobSql, command.num, command.frame, command.blob);
+
+    auto deflated = filterStream<boost::iostreams::zlib_compressor>(command.blob);
+    _db->Insert(blobSql, command.num, command.frame, deflated);
 }
 
 GcmCommand GcmDatabase::getCommand(unsigned frame, unsigned num, bool fillBlob) {
@@ -88,6 +108,7 @@ GcmCommand GcmDatabase::getCommand(unsigned frame, unsigned num, bool fillBlob) 
     std::vector<uint8_t> blob;
     if (fillBlob) {
         blob = _db->Select<db::IntVector>(sqlBlob, num, frame).front().value;
+        blob = filterStream<boost::iostreams::zlib_decompressor>(blob);
     }
     return { frame, num, id, args, blob };
 }

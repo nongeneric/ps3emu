@@ -4,12 +4,15 @@
 #include "ps3emu/utils.h"
 #include "ps3emu/log.h"
 #include "ps3emu/ImageUtils.h"
+#include "ShaderUtils.h"
 
 #include <glad/glad.h>
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <tuple>
 #include <stdio.h>
+
+namespace {
 
 const char* commonShaderSource =
 R""(
@@ -185,18 +188,18 @@ float select(float f, uint _output) {
 
 void main(void) {
     ivec2 dest = ivec2(gl_GlobalInvocationID.xy);
-    
+
     uint levelOffset;
     uint levelWidth = i_width;
     uint levelHeight = i_height;
     uint levelPitch = i_pitch;
     int level = getLevel(dest.y, levelOffset, levelWidth, levelHeight, levelPitch);
-    
+
     levelOffset += getLayerOffset(i_pitch, i_height);
-    
+
     if (dest.x >= levelWidth || level == -1)
         return;
-    
+
     ivec2 src = dest;
     if (i_isSwizzled != 0) {
         uint logw = uint(log2(i_width));
@@ -204,13 +207,13 @@ void main(void) {
         uint swizzled = swizzleAddress(dest.x, dest.y, 0, logw, logh, 0);
         src = ivec2(swizzled & ((1 << logw) - 1), swizzled >> logw);
     }
-    
+
     uint src_index = 0;
     uint val = 0;
     vec4 color = vec4(0);
     ivec4 icolor = ivec4(0);
     bool doremap = false;
-    
+
     switch (i_format) {
         case GcmTextureFormat::A8R8G8B8:
             src_index = src.y * levelPitch + src.x * 4;
@@ -343,7 +346,7 @@ void main(void) {
             );
             break;
     }
-    
+
     if (doremap) {
         icolor = ivec4(crossbar(icolor, i_crossbarInput.r),
                        crossbar(icolor, i_crossbarInput.g),
@@ -358,7 +361,7 @@ void main(void) {
                      select(color.b, i_selectOutput.b),
                      select(color.a, i_selectOutput.a));
     }
-    
+
     layout(rgba32f) image2D image = layout(rgba32f)
         image2D(i_images[level + gl_GlobalInvocationID.z * i_levels]);
     imageStore(image, dest, color);
@@ -369,7 +372,7 @@ void main(void) {
 
 const char* sourceFirstShaderSource =
 R""(
-    
+
 uvec4 readRGB565(uint val) {
     return uvec4(ext8(bitfieldExtract(val, 11, 5), 5),
                  ext8(bitfieldExtract(val, 5, 6), 6),
@@ -404,23 +407,23 @@ void main(void) {
     uint blockHeight = i_height / 4;
     uint pitch = i_pitch / 4;
     ivec2 src = ivec2(gl_GlobalInvocationID.xy);
-    
+
     uint levelOffset;
     uint levelWidth = blockWidth;
     uint levelHeight = blockHeight;
     uint layerOffset = getLayerOffset(pitch, blockHeight);
     int level = getLevel(src.y, levelOffset, levelWidth, levelHeight, pitch);
-    
+
     if (src.x >= blockWidth || level == -1)
         return;
-    
+
     uint blockOffset = layerOffset + levelOffset + src.y * pitch + src.x * i_texelSize;
-    
+
     uvec4 colors[16];
-    
+
     uint w0 = read_aligned_le_32(blockOffset);
     uint w1 = read_aligned_le_32(blockOffset + 4);
-    
+
     if (isDXT1) {
         decodeDXT1Color(w0, false);
         for (int i = 0; i < 16; i++) {
@@ -489,7 +492,7 @@ void main(void) {
             w3 >>= 2;
         }
     }
-    
+
     layout(rgba32f) image2D image = layout(rgba32f)
         image2D(i_images[level + gl_GlobalInvocationID.z * i_levels]);
     ivec2 dest = src * 4;
@@ -506,22 +509,22 @@ void main(void) {
 
 )"";
 
-
+#ifdef DEBUG
 const char* debugFillShaderSource =
 R""(
-    
+
 void main(void) {
     ivec2 dest = ivec2(gl_GlobalInvocationID.xy);
-    
+
     uint levelOffset;
     uint levelWidth = i_width;
     uint levelHeight = i_height;
     uint levelPitch = i_pitch;
     int level = getLevel(dest.y, levelOffset, levelWidth, levelHeight, levelPitch);
-    
+
     if (dest.x >= levelWidth || level == -1)
         return;
-    
+
     layout(rgba32f) image2D image = layout(rgba32f)
         image2D(i_images[level + gl_GlobalInvocationID.z * i_levels]);
     level += 1;
@@ -532,6 +535,9 @@ void main(void) {
 }
 
 )"";
+#endif
+
+}
 
 union RemapCrossbarSelectForm {
     uint32_t v;
@@ -567,25 +573,6 @@ struct TextureInfoUniform {
 };
 #pragma pack()
 
-template<typename E>
-void patchEnumValues(std::string& text) {
-    auto values = enum_traits<E>::values();
-    auto names = enum_traits<E>::names();
-    auto name = enum_traits<E>::name();
-    std::vector<std::tuple<std::string, unsigned>> pairs;
-    for (auto i = 0u; i < values.size(); ++i) {
-        pairs.push_back(std::make_tuple(std::string(names[i]), (unsigned)values[i]));
-    }
-    std::sort(begin(pairs), end(pairs), [&](auto l, auto r) {
-        return std::get<0>(l).size() > std::get<0>(r).size();
-    });
-    for (auto i = 0u; i < pairs.size(); ++i) {
-        boost::replace_all(text,
-                           sformat("{}::{}", name, std::get<0>(pairs[i])),
-                           sformat("{}", std::get<1>(pairs[i])));
-    }
-}
-
 void initShader(Shader& shader, std::string text) {
     patchEnumValues<GcmTextureFormat>(text);
     patchEnumValues<TextureRemapInput>(text);
@@ -598,7 +585,7 @@ void initShader(Shader& shader, std::string text) {
     }
 }
 
-void RsxTextureReader::init() {
+RsxTextureReader::RsxTextureReader() {
     std::string text = std::string(commonShaderSource) + destFirstShaderSource;
     initShader(_destFirstShader, text);
     text = std::string(commonShaderSource) + sourceFirstShaderSource;
@@ -626,7 +613,7 @@ unsigned getTexelSize(GcmTextureFormat format) {
         case GcmTextureFormat::R5G6B5:
         case GcmTextureFormat::D1R5G5B5:
         case GcmTextureFormat::R6G5B5:
-        case GcmTextureFormat::G8B8:        
+        case GcmTextureFormat::G8B8:
         case GcmTextureFormat::DEPTH16:
         case GcmTextureFormat::DEPTH16_FLOAT:
         case GcmTextureFormat::X16:
@@ -690,24 +677,24 @@ void RsxTextureReader::loadTexture(RsxTextureInfo const& info,
         remapParams.outB.u(),
         remapParams.outA.u()
     };
-    
+
     auto layers = info.fragmentCubemap ? 6 : 1;
-    
+
     assert(info.mipmap <= 12);
     assert(info.mipmap == levelHandles.size() / layers);
-    
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, _uniformBuffer.handle());
-    
+
     for (auto i = 0u; i < levelHandles.size(); ++i) {
         uniform->images[i] = levelHandles[i];
     }
-    
+
 #ifdef DEBUG
     glUseProgram(_debugFillShader.handle());
     glDispatchCompute((info.width + 31) / 32, (info.height * 2 + 31) / 32, layers);
 #endif
-    
+
     if (info.format == GcmTextureFormat::COMPRESSED_DXT1 ||
         info.format == GcmTextureFormat::COMPRESSED_DXT23 ||
         info.format == GcmTextureFormat::COMPRESSED_DXT45) {

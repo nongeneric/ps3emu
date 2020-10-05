@@ -1020,7 +1020,7 @@ void Rsx::updateShaders() {
             RangeCloser r(&_fragmentShaderCounter);
 
             auto sizes = getFragmentSamplerSizes(_context.get());
-            INFO(libs) << sformat("Updated fragment shader:\n{}\n{}",
+            INFO(rsx) << sformat("Updated fragment shader:\n{}\n{}",
                             PrintFragmentBytecode(&_context->fragmentBytecode[0]),
                             PrintFragmentProgram(&_context->fragmentBytecode[0]));
             auto text = GenerateFragmentShader(_context->fragmentBytecode,
@@ -1028,7 +1028,7 @@ void Rsx::updateShaders() {
                                                _context->isFlatShadeMode,
                                                isMrt(_context->surface));
             shader = new FragmentShader(text.c_str());
-            INFO(libs) << sformat("Updated fragment shader (2):\n{}\n{}", text, shader->log());
+            INFO(rsx) << sformat("Updated fragment shader (2):\n{}\n{}", text, shader->log());
             _context->fragmentShaderCache.insert(key, shader);
         }
         _context->fragmentShader = shader;
@@ -1660,8 +1660,9 @@ void Rsx::initGcm() {
 
     _context->framebuffer.reset(new GLFramebuffer());
     _context->textureRenderer.reset(new TextureRenderer());
-    _textureReader = new RsxTextureReader();
-    _textureReader->init();
+    _textureReader = std::make_unique<RsxTextureReader>();
+    _transferImage = std::make_unique<TransferImageProgram>();
+
     //glDisableClientState(GL_ELEMENT_ARRAY_UNIFIED_NV);
 
     resetContext();
@@ -1673,6 +1674,8 @@ void Rsx::initGcm() {
 }
 
 void Rsx::shutdownGcm() {
+    _textureReader.reset();
+    _transferImage.reset();
     _context.reset();
     _window.shutdown();
 }
@@ -1821,11 +1824,9 @@ void colorFormat(RsxContext* context, uint32_t format, uint16_t pitch) {
     assert(format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5 ||
            format == CELL_GCM_TRANSFER_SURFACE_FORMAT_A8R8G8B8 ||
            format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32);
-    context->surface2d.format = format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5
-                   ? ScaleSettingsFormat::r5g6b5
-                   : format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32
-                         ? ScaleSettingsFormat::y32
-                         : ScaleSettingsFormat::a8r8g8b8;
+    context->surface2d.format = format == CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5 ? ScaleSettingsFormat::r5g6b5
+                              : format == CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32 ? ScaleSettingsFormat::y32
+                              : ScaleSettingsFormat::a8r8g8b8;
     context->surface2d.pitch = pitch;
 }
 
@@ -2037,12 +2038,101 @@ void Rsx::Nv3089SetColorConversion(uint32_t conv,
     s.dtdy = dtdy;
 }
 
-struct r6g6b5_t {
+struct r5g6b5_t {
     uint32_t value;
     BIT_FIELD(r, 0, 5)
     BIT_FIELD(g, 5, 11)
     BIT_FIELD(b, 11, 16)
 };
+
+void validateTransferImage(const ScaleSettings& scale,
+                           const SurfaceSettings& surface,
+                           const SwizzleSettings& swizzle,
+                           ps3_uintptr_t sourceEa,
+                           ps3_uintptr_t destEa) {
+    bool isSwizzle = scale.type == ScaleSettingsSurfaceType::Swizzle;
+    auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
+    auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;
+    auto destPixelSize = destPixelFormat == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
+
+    auto destX0 = std::max<int16_t>(scale.outX, scale.clipX);
+    auto destXn = std::min<int16_t>(scale.outX + scale.outW, scale.clipX + scale.clipW);
+    auto destY0 = std::max<int16_t>(scale.outY, scale.clipY);
+    auto destYn = std::min<int16_t>(scale.outY + scale.outH, scale.clipY + scale.clipH);
+
+    assert(destX0 >= 0);
+    assert(destY0 >= 0);
+
+    auto clipDiffX = scale.clipX > scale.outX ? scale.clipX - scale.outX : 0;
+    auto clipDiffY = scale.clipY > scale.outY ? scale.clipY - scale.outY : 0;
+
+    auto src = g_state.mm->getMemoryPointer(sourceEa, 1);
+    auto shaderDest = g_state.mm->getMemoryPointer(destEa, 1);
+    static std::vector<uint8_t> destBuf(20 << 20);
+    static std::vector<bool> destMap(destBuf.size());
+    auto dest = destBuf.data();
+
+    SwizzledTextureIterator swizzleIter(dest, swizzle.logWidth, swizzle.logHeight, destPixelSize);
+
+    auto destSize = destYn * surface.pitch;
+    assert(destSize <= destMap.size());
+    std::fill(begin(destMap), begin(destMap) + destSize, false);
+    std::fill(begin(destBuf), begin(destBuf) + destSize, 0);
+
+    for (auto destY = destY0; destY < destYn; ++destY) {
+        for (auto destX = destX0; destX < destXn; ++destX) {
+            int srcX = clamp(scale.inX + (destX - destX0 + clipDiffX) * scale.dsdx,
+                             .0f, scale.inW - 1);
+            int srcY = clamp(scale.inY + (destY - destY0 + clipDiffY) * scale.dtdy,
+                             .0f, scale.inH - 1);
+            auto srcPixelPtr = src + srcY * scale.pitch + srcX * sourcePixelSize;
+            auto destPixelPtr = dest +
+                (isSwizzle ? swizzleIter.swizzleAddress(destX, destY, 0) * destPixelSize
+                           : (destY * surface.pitch + destX * destPixelSize));
+            uint32_t srcPixel = fast_endian_reverse(*(uint32_t*)srcPixelPtr);
+            uint32_t destPixel = srcPixel;
+            if (sourcePixelSize != destPixelSize) {
+                if (sourcePixelSize == 2) {
+                    r5g6b5_t in { srcPixel };
+                    destPixel = (0xff << 24)
+                              | (ext8(in.r()) << 16)
+                              | (ext8(in.g()) << 8)
+                              | ext8(in.b());
+                } else {
+                    r5g6b5_t out { 0 };
+                    out.r_set(((srcPixel >> 16) & 0xff) * 32 / 255);
+                    out.g_set(((srcPixel >> 8) & 0xff) * 64 / 255);
+                    out.b_set((srcPixel & 0xff) * 32 / 255);
+                    destPixel = out.value;
+                }
+            }
+            if (destPixelSize == 2) {
+                *(uint16_t*)destPixelPtr = fast_endian_reverse(uint16_t(destPixel >> 16));
+            } else {
+                *(uint32_t*)destPixelPtr = fast_endian_reverse(destPixel);
+            }
+
+            for (auto i = 0; i < destPixelSize; ++i) {
+                destMap.at(destPixelPtr - dest + i) = true;
+            }
+        }
+    }
+
+    auto areEqual =
+        std::equal(shaderDest, shaderDest + destSize, dest, [&](auto& a, auto& b) {
+            auto index = &b - dest;
+            return !destMap[index] || a == b;
+        });
+
+    if (!areEqual) {
+        auto shaderDestHex = pretty_print_hex(shaderDest, destSize, surface.pitch);
+        auto cpuDestHex = pretty_print_hex(dest, destSize, surface.pitch);
+        ERROR(rsx) << sformat(
+            "transferImage failed, shader output:\n{}\ncpu output:\n{}\n",
+            shaderDestHex,
+            cpuDestHex);
+    }
+}
 
 void Rsx::transferImage() {
     ScaleSettings& scale = _context->scale2d;
@@ -2055,11 +2145,6 @@ void Rsx::transferImage() {
     auto destEa = isSwizzle
                       ? rsxOffsetToEa(swizzle.location, swizzle.offset)
                       : rsxOffsetToEa(surface.destLocation, surface.destOffset);
-    auto src = g_state.mm->getMemoryPointer(sourceEa, 1);
-    auto dest = g_state.mm->getMemoryPointer(destEa, 1);
-
-    if (scale.clipW == 1024 && scale.clipH == 720)
-        return;
 
     FramebufferTextureKey key{sourceEa};
     auto res = _context->framebuffer->findTexture(key);
@@ -2079,77 +2164,14 @@ void Rsx::transferImage() {
     }) != end(_context->displayBuffers))
         return;
 
-    if (!isSwizzle && surface.format == ScaleSettingsFormat::a8r8g8b8 &&
-        scale.format == ScaleSettingsFormat::a8r8g8b8 &&
-        surface.pitch == scale.pitch && scale.inH == scale.outH &&
-        scale.clipX == 0 && scale.clipY == 0 && scale.outX == 0 && scale.outY == 0)
-    {
-        auto size = scale.pitch * scale.inH;
-        if (scale.location == MemoryLocation::Local && surface.destLocation == MemoryLocation::Local) {
-            glCopyNamedBufferSubData(_context->localMemoryBuffer.handle(),
-                                     _context->localMemoryBuffer.handle(),
-                                     scale.offset,
-                                     surface.destOffset,
-                                     size);
-            waitForIdle();
-        } else {
-            memmove(dest, src, size);
-        }
-        invalidateCaches(destEa, 1 << 20);
-        return;
-    }
+    auto sourceBuffer = getBuffer(scale.location);
+    auto destBuffer = getBuffer(isSwizzle ? swizzle.location : surface.destLocation);
+    _transferImage->transfer(
+        sourceBuffer->handle(), destBuffer->handle(), scale, surface, swizzle);
 
-    auto sourcePixelSize = scale.format == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
-    auto destPixelFormat = isSwizzle ? swizzle.format : surface.format;
-    auto destPixelSize = destPixelFormat == ScaleSettingsFormat::r5g6b5 ? 2 : 4;
-
-    auto destX0 = std::max<int16_t>(scale.outX, scale.clipX);
-    auto destXn = std::min<int16_t>(scale.outX + scale.outW, scale.clipX + scale.clipW);
-    auto destY0 = std::max<int16_t>(scale.outY, scale.clipY);
-    auto destYn = std::min<int16_t>(scale.outY + scale.outH, scale.clipY + scale.clipH);
-
-    assert(destX0 >= 0);
-    assert(destY0 >= 0);
-
-    auto clipDiffX = scale.clipX > scale.outX ? scale.clipX - scale.outX : 0;
-    auto clipDiffY = scale.clipY > scale.outY ? scale.clipY - scale.outY : 0;
-
-    SwizzledTextureIterator swizzleIter(dest, swizzle.logWidth, swizzle.logHeight, destPixelSize);
-
-    for (auto destY = destY0; destY < destYn; ++destY) {
-        for (auto destX = destX0; destX < destXn; ++destX) {
-            int srcX = clamp(scale.inX + (destX - destX0 + clipDiffX) * scale.dsdx,
-                             .0f, scale.inW - 1);
-            int srcY = clamp(scale.inY + (destY - destY0 + clipDiffY) * scale.dtdy,
-                             .0f, scale.inH - 1);
-            auto srcPixelPtr = src + srcY * scale.pitch + srcX * sourcePixelSize;
-            auto destPixelPtr = dest +
-                (isSwizzle ? swizzleIter.swizzleAddress(destX, destY, 0) * destPixelSize
-                           : (destY * surface.pitch + destX * destPixelSize));
-            uint32_t srcPixel = fast_endian_reverse(*(uint32_t*)srcPixelPtr);
-            uint32_t destPixel = srcPixel;
-            if (sourcePixelSize != destPixelSize) {
-                if (sourcePixelSize == 2) {
-                    r6g6b5_t in { srcPixel };
-                    destPixel = (0xff << 24)
-                              | (ext8(in.r()) << 16)
-                              | (ext8(in.g()) << 8)
-                              | ext8(in.b());
-                } else {
-                    r6g6b5_t out { 0 };
-                    out.r_set(((srcPixel >> 16) & 0xff) * 32 / 255);
-                    out.g_set(((srcPixel >> 8) & 0xff) * 64 / 255);
-                    out.b_set((srcPixel & 0xff) * 32 / 255);
-                    destPixel = out.value;
-                }
-            }
-            if (destPixelSize == 2) {
-                *(uint16_t*)destPixelPtr = fast_endian_reverse(uint16_t(destPixel >> 16));
-            } else {
-                *(uint32_t*)destPixelPtr = fast_endian_reverse(destPixel);
-            }
-        }
-    }
+#ifdef DEBUG
+    validateTransferImage(scale, surface, swizzle, sourceEa, destEa);
+#endif
 
     invalidateCaches(destEa, 1 << 20);
 }

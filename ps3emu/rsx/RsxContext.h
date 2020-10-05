@@ -11,9 +11,10 @@
 #include "GLVARs.h"
 #include "RingBuffer.h"
 #include "TextRenderer.h"
+#include "RsxTypes.h"
 #include "Cache.h"
-#include "Rsx.h"
 #include "ps3emu/TimedCounter.h"
+#include "GcmConstants.h"
 #include "VertexShaderCache.h"
 #include "FragmentShaderCache.h"
 #include "../shaders/ShaderGenerator.h"
@@ -49,9 +50,11 @@ enum class ScaleSettingsSurfaceType {
     Linear, Swizzle
 };
 
-enum class ScaleSettingsFormat {
-    r5g6b5, a8r8g8b8, y32
-};
+ENUM(ScaleSettingsFormat,
+    (r5g6b5, CELL_GCM_TRANSFER_SURFACE_FORMAT_R5G6B5),
+    (a8r8g8b8, CELL_GCM_TRANSFER_SURFACE_FORMAT_A8R8G8B8),
+    (y32, CELL_GCM_TRANSFER_SURFACE_FORMAT_Y32)
+)
 
 struct ScaleSettings {
     ScaleSettingsSurfaceType type = ScaleSettingsSurfaceType::Linear;
@@ -70,7 +73,7 @@ struct ScaleSettings {
     uint32_t offset = 0;
     float inX = 0;
     float inY = 0;
-    
+
     float dsdx = 0;
     float dtdy = 0;
     MemoryLocation location = MemoryLocation::Local;
@@ -264,16 +267,16 @@ struct RsxContext {
     InputMask vertexAttribInputMask = {};
     uint32_t flipBuffer = 0;
     GLVARs glVARs;
-    
+
     ScaleSettings scale2d;
     SwizzleSettings swizzle2d;
     SurfaceSettings surface2d;
     CopySettings copy2d;
     InlineSettings inline2d;
-    
+
     std::set<SurfaceToFramebufferLink> surfaceLinks;
     TextRenderer statText;
-    
+
     inline void trace(CommandId id, std::vector<GcmCommandArg> const& args) {
         tracer.trace(frame, commandNum++, id, args);
     }

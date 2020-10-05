@@ -25,8 +25,7 @@ ENUM(MemoryLocation,
     (Local, 1)
 )
 
-namespace emu {
-namespace Gcm {
+namespace emu::Gcm {
 
 struct CellGcmConfig {
     boost::endian::big_uint32_t localAddress;
@@ -36,7 +35,7 @@ struct CellGcmConfig {
     boost::endian::big_uint32_t memoryFrequency;
     boost::endian::big_uint32_t coreFrequency;
 };
-    
+
 struct CellGcmOffsetTable {
     boost::endian::big_uint32_t ioAddress;
     boost::endian::big_uint32_t eaAddress;
@@ -74,7 +73,7 @@ uint32_t sys_rsx_context_attribute(uint32_t rsx_ctx_id,
 uint32_t sys_rsx_attribute(
     uint64_t pkg_id, uint64_t arg_1, uint64_t arg_2, uint64_t arg_3, uint64_t arg_4);
 
-}}
+}
 
 ps3_uintptr_t rsxOffsetToEa(MemoryLocation location, ps3_uintptr_t offset);
 std::vector<uint16_t> serializeOffsetTable();

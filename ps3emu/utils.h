@@ -42,6 +42,7 @@ inline slow_uint128_t make128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3
 void nap(std::chrono::microseconds duration);
 void ums_sleep(uint64_t microseconds);
 std::string print_hex(const void* buf, int len, bool cArray = false);
+std::string pretty_print_hex(const uint8_t* buffer, size_t size, size_t line);
 
 template <typename T>
 bool intersects(T a, T alen, T b, T blen) {

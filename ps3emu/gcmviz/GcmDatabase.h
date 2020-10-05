@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 enum class GcmArgType {
     None, UInt8, UInt16, UInt32, Int32, Int16, Float, Bool
@@ -19,7 +20,7 @@ struct GcmCommand {
     unsigned num;
     unsigned id;
     std::vector<GcmCommandArg> args;
-    std::vector<unsigned char> blob;
+    std::vector<uint8_t> blob;
 };
 
 namespace sql { class SQLiteDB; }
@@ -29,7 +30,7 @@ public:
     GcmDatabase();
     ~GcmDatabase();
     void createOrOpen(std::string path);
-    void insertCommand(GcmCommand command);
+    void insertCommand(const GcmCommand& command);
     int frames();
     int commands(int frame);
     GcmCommand getCommand(unsigned frame, unsigned num, bool fillBlob);
