@@ -672,7 +672,7 @@ void DebuggerModel::log(std::string str) {
 }
 
 void DebuggerModel::exec(QString command) {
-    for (auto c : command.split(';', QString::SkipEmptyParts)) {
+    for (auto c : command.split(';', Qt::SkipEmptyParts)) {
         execSingleCommand(c);
     }
 }

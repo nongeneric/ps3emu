@@ -22,21 +22,21 @@ void MonospaceGrid::setColumnWidth(int col, int chars) {
 void MonospaceGrid::paintEvent(QPaintEvent* event) {
     if (!_model)
         return;
-    
+
     QPainter painter(this);
     painter.setFont(QFont("monospace", 10));
     _charWidth = painter.fontMetrics().horizontalAdvance('q');
     _charHeight = painter.fontMetrics().height();
-    
+
     int x = 0;
     painter.setPen(QPen(QColor(Qt::gray)));
     for (auto i = 0u; i < _columns.size() - 1; ++i) {
         x += _columns.at(i).charsWidth * _charWidth;
         painter.drawLine(x, 0, x, event->rect().height());
     }
-    
+
     std::vector<ArrowInfo> arrows;
-    
+
     auto y = _charHeight;
     auto r = _curRow;
     for (; r <= _model->getMaxRow(); r += _model->getRowStep()) {
@@ -47,7 +47,7 @@ void MonospaceGrid::paintEvent(QPaintEvent* event) {
             painter.setPen(QPen(QColor(isHighlighted ? Qt::red : Qt::black)));
             painter.drawText(x, y, z);
             x += getColumnWidth(c);
-            
+
             ArrowInfo arrow;
             if (c == _arrowsColumn && _model->pointsTo(r, arrow.to, arrow.highlighted)) {
                 arrow.from = r;
@@ -89,7 +89,7 @@ void MonospaceGrid::navigate(uint64_t row) {
 void MonospaceGrid::wheelEvent(QWheelEvent* event) {
     if (!_scrollable)
         return;
-    auto d = event->delta() / 20.;
+    auto d = event->angleDelta().y() / 20.;
     auto newRow = (__int128)_curRow - (__int128)d;
     if (newRow > (__int128)~0ull || newRow < 0)
         return;
@@ -149,7 +149,7 @@ void MonospaceGrid::drawArrows(std::vector<ArrowInfo> arrows, QPainter& painter)
         uint linePos = 1;
         auto pred = [=](auto b) { return intersects(a, b); };
         if (!lines[linePos].empty()) {
-            while (std::find_if(begin(lines[linePos]), end(lines[linePos]), pred) 
+            while (std::find_if(begin(lines[linePos]), end(lines[linePos]), pred)
                 != end(lines[linePos]))
             {
                 linePos++;
@@ -157,11 +157,11 @@ void MonospaceGrid::drawArrows(std::vector<ArrowInfo> arrows, QPainter& painter)
         }
         lines[linePos].push_back(a);
     }
-    
+
     for (auto& pair : lines) {
         for (auto arrow : pair.second) {
             drawArrow(arrow, pair.first, painter);
-        }   
+        }
     }
 }
 

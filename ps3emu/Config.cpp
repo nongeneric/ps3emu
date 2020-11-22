@@ -1,7 +1,7 @@
 #include "Config.h"
 
 #include "ps3emu/utils.h"
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
 
