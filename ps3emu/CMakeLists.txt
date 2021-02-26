@@ -136,8 +136,8 @@ set(SRC
 
 if(${EMU_CONFIGURATION_VTUNE})
     set(SRC ${SRC}
-        /opt/intel/vtune_profiler/sdk/src/ittnotify/ittnotify_static.c
-        /opt/intel/vtune_profiler/sdk/src/ittnotify/jitprofiling.c
+        ${CMAKE_VTUNE_DIR}/src/ittnotify/ittnotify_static.c
+        ${CMAKE_VTUNE_DIR}/src/ittnotify/jitprofiling.c
     )
 endif()
 

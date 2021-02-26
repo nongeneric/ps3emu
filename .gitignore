@@ -9,4 +9,5 @@ tests/binaries/sys_cache
 tests/binaries/sysutil_save_basic_auto_only/SAVEDATA
 .clangd
 .vscode
+.cache
 compile_commands.json

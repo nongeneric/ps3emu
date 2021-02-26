@@ -17,7 +17,7 @@
 #include FT_FREETYPE_H
 namespace {
     using u32_string = std::basic_string<uint32_t>;
-    
+
     struct Context {
         GLProgramPipeline pipeline;
         VertexShader vertexShader;
@@ -57,58 +57,58 @@ enum CellMsgDialogButtonType {
 void initContext() {
     if (context)
         return;
-        
+
     context = new Context();
 
     if (FT_Init_FreeType(&context->freetype)) {
         ERROR(libs) << "can't initialize FreeType";
         exit(0);
     }
-    
-    if (FT_New_Face(context->freetype,
-                    "/usr/share/fonts/gnu-free/FreeSans.ttf",
-                    0,
-                    &context->face)) {
-        ERROR(libs) << "can't initialize font";
+
+    if (auto err = FT_New_Face(context->freetype,
+                               "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
+                               0,
+                               &context->face)) {
+        ERROR(libs) << fmt::format("can't initialize font: {}", err);
         exit(0);
     }
-    
+
     FT_Set_Pixel_Sizes(context->face, 0, 24);
-    
+
     auto vertexCode = R""(
         #version 450 core
-        
+
         layout (location = 0) in vec2 pos;
         layout (location = 1) in vec2 texcoord;
         out vec2 v_texcoord;
-        
+
         out gl_PerVertex {
             vec4 gl_Position;
         };
-        
+
         void main(void) {
             gl_Position = vec4(pos, 0, 1);
             v_texcoord = texcoord;
         }
     )"";
-    
+
     auto fragmentCode = R""(
         #version 450 core
-        
+
         out vec4 color;
-        
+
         void main(void) {
             color = vec4(1, 1, 1, 0.8);
         }
     )"";
-    
+
     auto textFragmentCode = R""(
         #version 450 core
-        
+
         layout (binding = 20) uniform sampler2D tex;
         in vec2 v_texcoord;
         out vec4 color;
-        
+
         void main(void) {
             color = vec4(0, 0, 0, 1 * texture(tex, v_texcoord).r);
         }
@@ -143,10 +143,10 @@ int32_t cellMsgDialogOpen2(uint32_t type,
     g_u8message = msgString.str;
     g_callback = func;
     g_userData = userData;
-    
+
     CellPadInfo2 info;
     cellPadGetInfo2(&info);
-    
+
     for (int i = 0; i < CELL_PAD_MAX_PORT_NUM; ++i) {
         if (info.port_status[i] == CELL_PAD_STATUS_CONNECTED) {
             g_controller = i;
@@ -164,12 +164,12 @@ void drawText(float x, float y, float width, float height, std::string text) {
             x = -0.8;
             continue;
         }
-        
+
         if (FT_Load_Char(context->face, ch, FT_LOAD_RENDER))
             continue;
-        
+
         FT_GlyphSlot g = context->face->glyph;
-    
+
         glTextureSubImage2D(context->texture->handle(),
                             0,
                             0,
@@ -179,25 +179,25 @@ void drawText(float x, float y, float width, float height, std::string text) {
                             GL_RED,
                             GL_UNSIGNED_BYTE,
                             g->bitmap.buffer);
-    
+
         float x2 = x + g->bitmap_left * sx;
         float y2 = -y - g->bitmap_top * sy;
         float w = g->bitmap.width * sx;
         float h = g->bitmap.rows * sy;
-    
+
         auto stx = (float)g->bitmap.width / context->texture->width();
         auto sty = (float)g->bitmap.rows / context->texture->height();
-        
+
         GLfloat box[4][4] = {
             {x2, y2, 0, 0},
             {x2 + w, y2, stx, 0},
             {x2, y2 + h, 0, sty},
             {x2 + w, y2 + h, stx, sty},
         };
-        
+
         glNamedBufferData(context->textVerticesBuffer, sizeof box, box, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    
+
         x += (g->advance.x / 64) * sx;
         y += (g->advance.y / 64) * sy;
     }
@@ -207,7 +207,7 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
     initContext();
     if (!g_shown)
         return;
-    
+
     CellPadData data;
     cellPadGetData(g_controller, &data);
     bool isCross = data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CROSS;
@@ -231,17 +231,17 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
             g_result = CELL_MSGDIALOG_BUTTON_NONE;
         }
     }
-    
+
     if (!g_shown) {
         emuCallback(g_callback, { g_result, g_userData }, false);
     }
-    
+
     glEnableVertexAttribArray(0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0);
     glVertexAttribBinding(0, 0);
     glBindVertexBuffer(0, context->buffer.handle(), 0, sizeof(glm::vec2));
-    
+
     context->pipeline.useShader(&context->fragmentShader);
     context->pipeline.useShader(&context->vertexShader);
     context->pipeline.bind();
@@ -254,25 +254,25 @@ void emuMessageDraw(uint32_t width, uint32_t height) {
     glViewport(0, 0, width, height);
     glDepthRange(0, 1);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    
+
     context->pipeline.useShader(&context->textFragmentShader);
-    
+
     auto samplerIndex = 20;
     glBindTextureUnit(samplerIndex, context->texture->handle());
     glBindSampler(samplerIndex, context->sampler.handle());
     glSamplerParameteri(context->sampler.handle(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glSamplerParameteri(context->sampler.handle(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    
+
     glEnableVertexAttribArray(0);
     glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0);
     glVertexAttribBinding(0, 0);
     glBindVertexBuffer(0, context->textVerticesBuffer, 0, sizeof(float) * 4);
-    
+
     glEnableVertexAttribArray(1);
     glVertexAttribFormat(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2);
     glVertexAttribBinding(1, 1);
     glBindVertexBuffer(1, context->textVerticesBuffer, 0, sizeof(float) * 4);
-    
+
     drawText(-0.8f, 0.3f, width, height, g_u8message);
     if (g_type & CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) {
         drawText(0.8, -0.3, width, height, "[OK]");

@@ -361,7 +361,7 @@ uint32_t SPUChannels::read(unsigned ch) {
             return _snr1.wait_clear();
         } else if (ch == SPU_RdSigNotify2) {
             return _snr2.wait_clear();
-        } else if (ch == SPU_RdEventMask) {  
+        } else if (ch == SPU_RdEventMask) {
             return _event.mask();
         } else if (ch == SPU_RdEventStat) {
             return _event.wait();
@@ -391,7 +391,7 @@ uint32_t SPUChannels::read(unsigned ch) {
                                data,
                                ch,
                                classIdToString(ch));
-    } 
+    }
     return data;
 }
 

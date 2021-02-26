@@ -75,15 +75,13 @@ struct TextRenderer::impl {
             ERROR(libs) << "can't initialize FreeType";
             exit(0);
         }
-        
-        if (FT_New_Face(freetype,
-                        "/usr/share/fonts/gnu-free/FreeMono.ttf",
-                        0,
-                        &face)) {
-            ERROR(libs) << "can't initialize font";
+
+        if (auto err = FT_New_Face(
+                freetype, "/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", 0, &face)) {
+            ERROR(libs) << fmt::format("can't initialize font: {}", err);
             exit(0);
         }
-        
+
         FT_Set_Pixel_Sizes(face, 0, size);
         this->lineHeight = .8f * size;
 
